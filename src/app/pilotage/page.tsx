@@ -13,6 +13,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useRouter } from "next/navigation";
 import { getCached, setCache } from "@/lib/apiCache";
+import { PeriodSelector, currentPeriod, shiftPeriod, type PeriodMode, type PeriodValue } from "@/components/PeriodSelector";
+import { ComposedChart, Line, Area, Legend } from "recharts";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -558,6 +560,17 @@ export default function PilotagePage() {
   });
   const [dayNavMode, setDayNavMode] = useState(false); // false=week, true=day
 
+  // Period selector
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("semaine");
+  const [period, setPeriod] = useState<PeriodValue>(() => currentPeriod("semaine"));
+
+  // Annual data
+  type AnnualMonth = { month: number; label: string; ca_ht: number; ca_ttc: number; couverts: number; jours: number; ms: number; ms_pct: number };
+  type AnnualKpis = { totalCA: number; totalCouverts: number; totalJours: number; activeMonths: number; avgCAMonth: number; avgCAJour: number; avgTM: number; msTotal: number; msPctAnnual: number; msSalaries: number; msGerants: number; bestMonth: { label: string; ca: number } | null; worstMonth: { label: string; ca: number } | null };
+  const [annualMonths, setAnnualMonths] = useState<AnnualMonth[]>([]);
+  const [annualKpis, setAnnualKpis] = useState<AnnualKpis | null>(null);
+  const [annualLoading, setAnnualLoading] = useState(false);
+
   const isPiccola = etab.current?.slug?.includes("piccola");
   const currentEtabId = etab.current?.id;
 
@@ -617,6 +630,53 @@ export default function PilotagePage() {
 
     return () => clearInterval(tick);
   }, [weekStr, currentWeek, loadStats, etab.current?.id]);
+
+  // Handle period mode change
+  function handleModeChange(mode: PeriodMode) {
+    setPeriodMode(mode);
+    const p = currentPeriod(mode);
+    setPeriod(p);
+    if (mode === "semaine") {
+      setWeekStr(getCurrentWeek());
+    } else if (mode === "annee" && currentEtabId) {
+      loadAnnualData(parseInt(p.from.slice(0, 4)));
+    } else if ((mode === "mois" || mode === "jour") && currentEtabId) {
+      // Use the ventes stats API for month/day view
+      // Will reuse weekly view for now, adjusting date range
+    }
+  }
+
+  function handlePeriodChange(p: PeriodValue) {
+    setPeriod(p);
+    if (p.mode === "semaine") {
+      // Compute ISO week from the from date
+      setWeekStr(dateToISOWeek(p.from));
+    } else if (p.mode === "annee" && currentEtabId) {
+      loadAnnualData(parseInt(p.from.slice(0, 4)));
+    }
+  }
+
+  async function loadAnnualData(year: number) {
+    if (!currentEtabId) return;
+    setAnnualLoading(true);
+    try {
+      const res = await fetchApi(`/api/pilotage/annual?etablissement_id=${currentEtabId}&year=${year}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAnnualMonths(data.months ?? []);
+        setAnnualKpis(data.kpis ?? null);
+      }
+    } finally {
+      setAnnualLoading(false);
+    }
+  }
+
+  // Load annual data when etab changes and mode is annee
+  useEffect(() => {
+    if (periodMode === "annee" && currentEtabId) {
+      loadAnnualData(parseInt(period.from.slice(0, 4)));
+    }
+  }, [currentEtabId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function goPrevWeek() {
     setWeekStr((w) => shiftWeek(w, -1));
@@ -705,6 +765,143 @@ export default function PilotagePage() {
       <>
         <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 56px", boxSizing: "border-box" }}>
 
+          {/* ── PERIOD SELECTOR ── */}
+          <PeriodSelector period={period} onPeriodChange={handlePeriodChange} onModeChange={handleModeChange} />
+
+          {/* ══════════ ANNUAL VIEW ══════════ */}
+          {periodMode === "annee" ? (
+            <div>
+              {annualLoading ? (
+                <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Chargement...</div>
+              ) : annualKpis ? (
+                <>
+                  {/* KPIs */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+                    {[
+                      { label: "CA HT annuel", value: fmtEuroInt(annualKpis.totalCA), color: ACCENT },
+                      { label: "Couverts", value: annualKpis.totalCouverts.toLocaleString("fr-FR"), color: "#1a1a1a" },
+                      { label: "TM HT", value: fmtEuro(annualKpis.avgTM), color: "#1a1a1a" },
+                      { label: "Jours ouverts", value: String(annualKpis.totalJours), color: "#1a1a1a" },
+                    ].map(k => (
+                      <div key={k.label} style={{ background: "#fff", borderRadius: 12, padding: "14px 10px", textAlign: "center", border: "1px solid #ddd6c8" }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginBottom: 4 }}>{k.label}</div>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: k.color, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{k.value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+                    {[
+                      { label: "CA moy/mois", value: fmtEuroInt(annualKpis.avgCAMonth), color: "#1a1a1a" },
+                      { label: "CA moy/jour", value: fmtEuroInt(annualKpis.avgCAJour), color: "#1a1a1a" },
+                      { label: "MS/CA", value: annualKpis.msPctAnnual + " %", color: annualKpis.msPctAnnual > 40 ? RED : GREEN },
+                      { label: "MS totale/mois", value: fmtEuroInt(annualKpis.msTotal), color: "#1a1a1a" },
+                    ].map(k => (
+                      <div key={k.label} style={{ background: "#fff", borderRadius: 12, padding: "14px 10px", textAlign: "center", border: "1px solid #ddd6c8" }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginBottom: 4 }}>{k.label}</div>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: k.color, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{k.value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Best/worst */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+                    {annualKpis.bestMonth && (
+                      <div style={{ background: "#eaf4ec", borderRadius: 12, padding: "12px 14px", border: "1px solid #c8dcc8" }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: GREEN, letterSpacing: ".08em" }}>Meilleur mois</div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: GREEN, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{annualKpis.bestMonth.label}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{fmtEuroInt(annualKpis.bestMonth.ca)}</div>
+                      </div>
+                    )}
+                    {annualKpis.worstMonth && (
+                      <div style={{ background: "#fef2f2", borderRadius: 12, padding: "12px 14px", border: "1px solid #e8c8c8" }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: RED, letterSpacing: ".08em" }}>Mois le plus bas</div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: RED, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{annualKpis.worstMonth.label}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{fmtEuroInt(annualKpis.worstMonth.ca)}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Chart: bars CA + courbe MS */}
+                  <div style={{ background: "#fff", borderRadius: 16, padding: "16px 12px", border: "1px solid #ddd6c8", marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginBottom: 10 }}>
+                      CA mensuel + Masse salariale
+                    </div>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <ComposedChart data={annualMonths} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0ebe2" />
+                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#999" }} />
+                        <YAxis yAxisId="ca" tick={{ fontSize: 10, fill: "#999" }} tickFormatter={v => `${Math.round(v / 1000)}k`} />
+                        <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 10, fill: "#999" }} tickFormatter={v => `${v}%`} domain={[0, 60]} />
+                        <Tooltip
+                          contentStyle={{ borderRadius: 10, border: "1px solid #ddd6c8", fontSize: 12 }}
+                          formatter={(value: unknown, name: unknown) => {
+                            const v = Number(value);
+                            const n = String(name);
+                            if (n === "CA HT") return [fmtEuroInt(v), n];
+                            if (n === "MS") return [fmtEuroInt(v), "MS/mois"];
+                            return [v + " %", n];
+                          }}
+                        />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Bar yAxisId="ca" dataKey="ca_ht" name="CA HT" fill={ACCENT} radius={[4, 4, 0, 0]} />
+                        <Bar yAxisId="ca" dataKey="ms" name="MS" fill="#c9b99a" radius={[4, 4, 0, 0]} opacity={0.6} />
+                        <Line yAxisId="pct" type="monotone" dataKey="ms_pct" name="MS %" stroke={RED} strokeWidth={2} dot={{ r: 3 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Monthly detail table */}
+                  <div style={{ background: "#fff", borderRadius: 16, padding: "16px 14px", border: "1px solid #ddd6c8" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginBottom: 10 }}>
+                      Detail par mois
+                    </div>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                        <thead>
+                          <tr style={{ borderBottom: "2px solid #ddd6c8" }}>
+                            <th style={{ textAlign: "left", padding: "8px 6px", fontWeight: 700, color: "#999", fontSize: 10, textTransform: "uppercase" }}>Mois</th>
+                            <th style={{ textAlign: "right", padding: "8px 6px", fontWeight: 700, color: "#999", fontSize: 10 }}>CA HT</th>
+                            <th style={{ textAlign: "right", padding: "8px 6px", fontWeight: 700, color: "#999", fontSize: 10 }}>Cvts</th>
+                            <th style={{ textAlign: "right", padding: "8px 6px", fontWeight: 700, color: "#999", fontSize: 10 }}>TM</th>
+                            <th style={{ textAlign: "right", padding: "8px 6px", fontWeight: 700, color: "#999", fontSize: 10 }}>Jours</th>
+                            <th style={{ textAlign: "right", padding: "8px 6px", fontWeight: 700, color: "#999", fontSize: 10 }}>MS %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {annualMonths.map(m => {
+                            const tm = m.couverts > 0 ? m.ca_ht / m.couverts : 0;
+                            return (
+                              <tr key={m.month} style={{ borderBottom: "1px solid #f0ebe2" }}>
+                                <td style={{ padding: "8px 6px", fontWeight: 600 }}>{m.label}</td>
+                                <td style={{ padding: "8px 6px", textAlign: "right", fontWeight: 700, color: m.ca_ht > 0 ? ACCENT : "#ccc" }}>{m.ca_ht > 0 ? fmtEuroInt(m.ca_ht) : "-"}</td>
+                                <td style={{ padding: "8px 6px", textAlign: "right" }}>{m.couverts > 0 ? m.couverts.toLocaleString("fr-FR") : "-"}</td>
+                                <td style={{ padding: "8px 6px", textAlign: "right" }}>{tm > 0 ? fmtEuro(tm) : "-"}</td>
+                                <td style={{ padding: "8px 6px", textAlign: "right" }}>{m.jours || "-"}</td>
+                                <td style={{ padding: "8px 6px", textAlign: "right", fontWeight: 700, color: m.ms_pct > 40 ? RED : m.ms_pct > 0 ? GREEN : "#ccc" }}>{m.ms_pct > 0 ? m.ms_pct + " %" : "-"}</td>
+                              </tr>
+                            );
+                          })}
+                          {/* Total row */}
+                          <tr style={{ borderTop: "2px solid #ddd6c8", fontWeight: 800 }}>
+                            <td style={{ padding: "10px 6px" }}>Total</td>
+                            <td style={{ padding: "10px 6px", textAlign: "right", color: ACCENT }}>{fmtEuroInt(annualKpis.totalCA)}</td>
+                            <td style={{ padding: "10px 6px", textAlign: "right" }}>{annualKpis.totalCouverts.toLocaleString("fr-FR")}</td>
+                            <td style={{ padding: "10px 6px", textAlign: "right" }}>{fmtEuro(annualKpis.avgTM)}</td>
+                            <td style={{ padding: "10px 6px", textAlign: "right" }}>{annualKpis.totalJours}</td>
+                            <td style={{ padding: "10px 6px", textAlign: "right", color: annualKpis.msPctAnnual > 40 ? RED : GREEN }}>{annualKpis.msPctAnnual} %</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Aucune donnee pour cette annee</div>
+              )}
+            </div>
+          ) : (
+          <>
           {/* ── TABS : Ventes | Produits ── */}
           <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
             {(["ventes", "produits"] as const).map(t => (
@@ -723,10 +920,12 @@ export default function PilotagePage() {
             ))}
           </div>
 
-          {/* ── BLOC 0 : WEEK SELECTOR (desktop only) ─────────────────────────── */}
-          <div className="desktop-only">
-            <WeekSelector weekStr={weekStr} currentWeek={currentWeek} onPrev={goPrevWeek} onNext={goNextWeek} />
-          </div>
+          {/* ── BLOC 0 : WEEK SELECTOR (desktop only, hidden when PeriodSelector handles it) ─────────────────────────── */}
+          {periodMode === "semaine" && (
+            <div className="desktop-only">
+              <WeekSelector weekStr={weekStr} currentWeek={currentWeek} onPrev={goPrevWeek} onNext={goNextWeek} />
+            </div>
+          )}
 
           {/* ── BLOC 1 : BANDEAU HAUT ────────────────────────────── */}
           <div style={{
@@ -1144,6 +1343,8 @@ export default function PilotagePage() {
             <div style={{ textAlign: "center", padding: "32px 0", fontSize: 13, color: "#bbb" }}>Données indisponibles</div>
           )}
 
+          </>
+          )}
         </main>
 
         {/* ── Day Detail Drawer ── */}
