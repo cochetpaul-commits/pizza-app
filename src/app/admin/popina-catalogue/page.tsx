@@ -28,7 +28,7 @@ type RecipeItem = {
   popina_price: number | null;
 };
 
-type SearchResult = { id: string; name: string };
+type SearchResult = { id: string; name: string; supplier?: string | null };
 
 type DoseMap = {
   id: string;
@@ -666,8 +666,11 @@ function CataloguePage() {
                       cursor: "pointer",
                       textAlign: "left", fontSize: 13, opacity: saving ? 0.6 : 1,
                     }}>
-                      <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{r.name}</span>
-                      <span style={{ fontSize: 11, color: "#D4775A", fontWeight: 700 }}>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{r.name}</span>
+                        {r.supplier && <span style={{ fontSize: 11, color: "#8a8079", marginLeft: 8 }}>{r.supplier}</span>}
+                      </span>
+                      <span style={{ fontSize: 11, color: "#D4775A", fontWeight: 700, flexShrink: 0 }}>
                         {linkType === "ingredient" && doseValue ? `${doseValue} ${doseUnit}` : "Relier"}
                       </span>
                     </button>
