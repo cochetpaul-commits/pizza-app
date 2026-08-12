@@ -1108,7 +1108,7 @@ function IngredientsPageInner() {
         .ing-mobile-search { display: none !important; }
         @media (max-width: 767px) {
           .ing-desktop-filters { display: none !important; }
-          .ing-mobile-search { display: none !important; }
+          .ing-mobile-search { display: flex !important; }
           .ing-add-btn { padding: 6px 12px !important; font-size: 12px !important; }
         }
       `}</style>
