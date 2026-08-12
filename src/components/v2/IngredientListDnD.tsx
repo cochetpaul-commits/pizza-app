@@ -147,118 +147,114 @@ export function IngredientListDnD({
                         ref={drag.innerRef}
                         {...drag.draggableProps}
                         style={{
-                          display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
+                          display: "flex", flexDirection: "column", gap: 4,
                           background: snapshot.isDragging ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.55)",
                           borderRadius: 10, padding: "8px 10px",
                           border: "1px solid rgba(217,199,182,0.7)",
                           ...drag.draggableProps.style,
                         }}
                       >
-                        {/* Handle */}
-                        <span
-                          {...drag.dragHandleProps}
-                          style={{ fontSize: 16, color: "#b0a89a", cursor: "grab", userSelect: "none", flexShrink: 0 }}
-                        >⠿</span>
+                        {/* Row 1: Handle + Name + edit link */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span
+                            {...drag.dragHandleProps}
+                            style={{ fontSize: 16, color: "#b0a89a", cursor: "grab", userSelect: "none", flexShrink: 0 }}
+                          >⠿</span>
 
-                        {/* Pivot star */}
-                        {onPivotChange && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!line.ingredient_id) return;
-                              onPivotChange(pivotId === line.ingredient_id ? null : line.ingredient_id);
-                            }}
-                            title="Définir comme ingrédient pivot"
-                            style={{
-                              background: "none", border: "none", flexShrink: 0,
-                              fontSize: 16, padding: "0 1px", lineHeight: 1,
-                              cursor: line.ingredient_id ? "pointer" : "default",
-                              color: line.ingredient_id && pivotId === line.ingredient_id ? "#D97706" : "#ccc",
-                            }}
-                          >
-                            {line.ingredient_id && pivotId === line.ingredient_id ? "★" : "☆"}
-                          </button>
-                        )}
+                          {onPivotChange && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!line.ingredient_id) return;
+                                onPivotChange(pivotId === line.ingredient_id ? null : line.ingredient_id);
+                              }}
+                              title="Définir comme ingrédient pivot"
+                              style={{
+                                background: "none", border: "none", flexShrink: 0,
+                                fontSize: 16, padding: "0 1px", lineHeight: 1,
+                                cursor: line.ingredient_id ? "pointer" : "default",
+                                color: line.ingredient_id && pivotId === line.ingredient_id ? "#D97706" : "#ccc",
+                              }}
+                            >
+                              {line.ingredient_id && pivotId === line.ingredient_id ? "★" : "☆"}
+                            </button>
+                          )}
 
-                        {/* Ingredient select + supplier/price info */}
-                        <div style={{ flex: "1 1 160px", minWidth: 140 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <SmartSelect
-                                options={ingredientOptions}
-                                value={line.ingredient_id}
-                                onChange={id => {
-                                  const ing = ingredients.find(i => i.id === id);
-                                  const du = normalizeUnit(ing?.default_unit);
-                                  updateLine(line.id, { ingredient_id: id, unit: du });
-                                }}
-                                placeholder="Ingrédient…"
-                                inputStyle={{ height: 34, fontSize: 13 }}
-                              />
-                            </div>
-                            {/* Edit ingredient link */}
-                            {line.ingredient_id && (
-                              <a
-                                href={`/ingredients?edit=${line.ingredient_id}${returnUrl ? `&back=${encodeURIComponent(returnUrl)}` : ""}`}
-                                title="Modifier l'ingrédient"
-                                style={{
-                                  flexShrink: 0, width: 24, height: 24, borderRadius: 6,
-                                  display: "flex", alignItems: "center", justifyContent: "center",
-                                  color: "#9a8f84", fontSize: 12, textDecoration: "none",
-                                }}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M7 17L17 7" /><path d="M7 7h10v10" />
-                                </svg>
-                              </a>
-                            )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <SmartSelect
+                              options={ingredientOptions}
+                              value={line.ingredient_id}
+                              onChange={id => {
+                                const ingFound = ingredients.find(ii => ii.id === id);
+                                const du = normalizeUnit(ingFound?.default_unit);
+                                updateLine(line.id, { ingredient_id: id, unit: du });
+                              }}
+                              placeholder="Ingrédient…"
+                              inputStyle={{ height: 34, fontSize: 13 }}
+                            />
                           </div>
-                          {/* Supplier + price label under the name */}
-                          {line.ingredient_id && priceLabelByIngredient?.[line.ingredient_id] && (
-                            <div style={{ fontSize: 11, color: "#9a8f84", marginTop: 2, paddingLeft: 2, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {priceLabelByIngredient[line.ingredient_id]}
-                            </div>
+
+                          {line.ingredient_id && (
+                            <a
+                              href={`/ingredients?edit=${line.ingredient_id}${returnUrl ? `&back=${encodeURIComponent(returnUrl)}` : ""}`}
+                              title="Modifier"
+                              style={{
+                                flexShrink: 0, width: 24, height: 24, borderRadius: 6,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                color: "#9a8f84", textDecoration: "none",
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M7 17L17 7" /><path d="M7 7h10v10" />
+                              </svg>
+                            </a>
                           )}
                         </div>
 
-                        {/* Qty */}
-                        <StepperInput
-                          value={line.qty}
-                          onChange={v => updateLine(line.id, { qty: v })}
-                          step={1} min={0}
-                          placeholder="Qté"
-                        />
+                        {/* Supplier + price label */}
+                        {line.ingredient_id && priceLabelByIngredient?.[line.ingredient_id] && (
+                          <div style={{ fontSize: 11, color: "#9a8f84", paddingLeft: 24, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {priceLabelByIngredient[line.ingredient_id]}
+                          </div>
+                        )}
 
-                        {/* Unit */}
-                        <select
-                          value={line.unit}
-                          onChange={e => updateLine(line.id, { unit: e.target.value })}
-                          style={{
-                            height: 34, borderRadius: 8, padding: "0 6px",
-                            border: "1px solid rgba(217,199,182,0.8)", fontSize: 13,
-                            background: "rgba(255,255,255,0.8)",
-                          }}
-                        >
-                          {units.map(u => <option key={u} value={u}>{u}</option>)}
-                        </select>
+                        {/* Row 2: Qty + Unit + Cost + Remove */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 24 }}>
+                          <StepperInput
+                            value={line.qty}
+                            onChange={v => updateLine(line.id, { qty: v })}
+                            step={1} min={0}
+                            placeholder="Qté"
+                          />
 
-                        {/* Cost display */}
-                        <span style={{ fontSize: 12, color: cost != null ? "#4a6741" : "#9a8f84", fontWeight: 700, minWidth: 60, flexShrink: 0 }}>
-                          {cost != null ? `${fmtMoney(cost)} €` : "—"}
-                        </span>
+                          <select
+                            value={line.unit}
+                            onChange={e => updateLine(line.id, { unit: e.target.value })}
+                            style={{
+                              height: 34, borderRadius: 8, padding: "0 6px",
+                              border: "1px solid rgba(217,199,182,0.8)", fontSize: 13,
+                              background: "rgba(255,255,255,0.8)",
+                            }}
+                          >
+                            {units.map(u => <option key={u} value={u}>{u}</option>)}
+                          </select>
 
-                        {/* Remove */}
-                        <button
-                          type="button"
-                          onClick={() => removeLine(line.id)}
-                          style={{
-                            flexShrink: 0, width: 28, height: 28, borderRadius: 7,
-                            border: "1px solid rgba(217,199,182,0.8)",
-                            background: "rgba(255,255,255,0.5)", color: "#9a8f84",
-                            fontSize: 12, cursor: "pointer", display: "flex",
-                            alignItems: "center", justifyContent: "center",
-                          }}
-                        >✕</button>
+                          <span style={{ fontSize: 12, color: cost != null ? "#4a6741" : "#9a8f84", fontWeight: 700, minWidth: 50, flexShrink: 0 }}>
+                            {cost != null ? `${fmtMoney(cost)} €` : "—"}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => removeLine(line.id)}
+                            style={{
+                              flexShrink: 0, width: 28, height: 28, borderRadius: 7,
+                              border: "1px solid rgba(217,199,182,0.8)",
+                              background: "rgba(255,255,255,0.5)", color: "#9a8f84",
+                              fontSize: 12, cursor: "pointer", display: "flex",
+                              alignItems: "center", justifyContent: "center",
+                            }}
+                          >✕</button>
+                        </div>
 
                         {/* Density warning for liquids — pas de lien pour eviter
                             la perte du form en cours (target=_blank est ignore
