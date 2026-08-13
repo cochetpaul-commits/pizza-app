@@ -1089,17 +1089,9 @@ function IngredientsPageInner() {
   // Register contextual actions in the bottom bar
   const accentColor = etab?.couleur ?? "#D4775A";
 
-  useBottomBarActions(() => {
-    if (isVariations) return [];
-    const actions = [
-      { key: "search", label: "Rechercher", accent: accentColor, onClick: () => setShowSearchSheet(true), icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg> },
-      { key: "filter", label: "Filtrer", accent: accentColor, onClick: () => setShowFilters(true), icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg> },
-    ];
-    if (userCanWrite) {
-      actions.push({ key: "add", label: "Ajouter un produit", accent: accentColor, onClick: () => setShowCreateForm(true), icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg> });
-    }
-    return actions;
-  }, [q, filterActive, userCanWrite, isVariations, accentColor]);
+  // Pas de FAB contextuel sur cette page : la rangée mobile a déjà
+  // recherche + filtres + ajout, le CTA flottant faisait doublon.
+  useBottomBarActions(() => [], []);
 
   return (
     <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
@@ -1251,6 +1243,12 @@ function IngredientsPageInner() {
               <button onClick={toggleCompact} style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
                 {compactMode ? "⊞" : "☰"}
               </button>
+              {userCanWrite && (
+                <button onClick={() => setShowCreateForm(true)} aria-label="Ajouter un produit"
+                  style={{ padding: "9px 12px", borderRadius: 10, border: "none", background: accentColor, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center" }}>
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+              )}
             </div>
           </div>
         ) : (

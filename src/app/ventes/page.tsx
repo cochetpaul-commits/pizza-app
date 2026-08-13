@@ -93,6 +93,31 @@ function defaultRange(): DateRange {
   return { from: iso, to: iso };
 }
 
+/**
+ * Décale la période sélectionnée d'un "pas" égal à sa propre durée :
+ * un jour → ±1 jour, une semaine → ±7 jours, un mois calendaire → mois
+ * précédent/suivant (en respectant les longueurs de mois), etc.
+ */
+function shiftRange(r: DateRange, dir: 1 | -1): DateRange {
+  const from = new Date(r.from + "T12:00:00");
+  const to = new Date(r.to + "T12:00:00");
+  const lastDayOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+
+  // Période "mois calendaire(s) complet(s)" (du 1er au dernier jour) :
+  // on saute de mois en mois plutôt que d'un nombre fixe de jours.
+  if (from.getDate() === 1 && to.getDate() === lastDayOfMonth(to)) {
+    const monthsSpan = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()) + 1;
+    const nf = new Date(from.getFullYear(), from.getMonth() + dir * monthsSpan, 1, 12);
+    const nt = new Date(nf.getFullYear(), nf.getMonth() + monthsSpan, 0, 12);
+    return { from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) };
+  }
+
+  const days = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+  const nf = new Date(from.getTime() + dir * days * 86400000);
+  const nt = new Date(to.getTime() + dir * days * 86400000);
+  return { from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) };
+}
+
 /** Renvoie l'ensemble des dates ISO (incluses) entre from et to. */
 function enumerateRange(from: string, to: string): string[] {
   const out: string[] = [];
@@ -641,60 +666,47 @@ function PerformancesPage() {
       <PilotageSwipeWrapper dateFrom={range.from} dateTo={range.to}>
       <div className={`ventes-container${showMoney ? "" : " no-money"}`} style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 120px" }}>
 
-        {/* DateRangePicker — centered (desktop) */}
+        {/* DateRangePicker — centered (desktop). Les flèches décalent d'un pas
+            égal à la période affichée (jour, semaine, mois...) */}
         <div className="desktop-only" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 10 }}>
-          <button type="button" onClick={() => {
-            const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
-            const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
-            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
-          }} style={{
+          <button type="button" onClick={() => setRange(shiftRange(range, -1))} style={{
             width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
             background: "#fff", color: accent, fontSize: 13, fontWeight: 700,
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
           }}>{"←"}</button>
           <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
           <button type="button" onClick={() => {
-            const today = new Date().toISOString().slice(0, 10);
-            if (range.from >= today) return;
-            const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
-            const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
-            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+            if (range.to >= new Date().toISOString().slice(0, 10)) return;
+            setRange(shiftRange(range, 1));
           }} style={{
             width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
-            background: range.from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : "#fff",
-            color: range.from >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
+            background: range.to >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : "#fff",
+            color: range.to >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
             fontSize: 13, fontWeight: 700,
-            cursor: range.from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
+            cursor: range.to >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>{"→"}</button>
         </div>
 
         {(<>
 
-        {/* DateRangePicker mobile — top */}
+        {/* DateRangePicker mobile — top. Même pas de navigation que le desktop */}
         <div className="mobile-only" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 10 }}>
-          <button type="button" onClick={() => {
-            const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
-            const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
-            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
-          }} style={{
+          <button type="button" onClick={() => setRange(shiftRange(range, -1))} style={{
             width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
             background: "#fff", color: accent, fontSize: 13, fontWeight: 700,
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
           }}>{"<"}</button>
           <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
           <button type="button" onClick={() => {
-            const todayStr = new Date().toISOString().slice(0, 10);
-            if (range.from >= todayStr) return;
-            const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
-            const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
-            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
+            if (range.to >= new Date().toISOString().slice(0, 10)) return;
+            setRange(shiftRange(range, 1));
           }} style={{
             width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
-            background: range.from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : "#fff",
-            color: range.from >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
+            background: range.to >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : "#fff",
+            color: range.to >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
             fontSize: 13, fontWeight: 700,
-            cursor: range.from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
+            cursor: range.to >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>{">"}</button>
         </div>
@@ -2125,64 +2137,6 @@ function PerformancesPage() {
         )}
       </>
       )}
-      </div>
-
-      {/* ── Mobile Bottom Bar: ← date → (hidden — moved to top) ── */}
-      <div className="mobile-only" style={{
-        display: "none",
-        position: "fixed",
-        bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
-        left: 0, right: 0, zIndex: 100,
-        justifyContent: "center",
-      }}>
-        <div style={{
-          height: 44,
-          display: "flex", flexDirection: "row", alignItems: "center", gap: 4,
-          padding: "0 6px",
-          background: "rgba(255,255,255,0.85)",
-          backdropFilter: "blur(20px) saturate(180%)",
-          WebkitBackdropFilter: "blur(20px) saturate(180%)",
-          borderRadius: 22,
-          boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
-          border: "1px solid rgba(0,0,0,0.06)",
-        }}>
-          {/* ← prev day */}
-          <button type="button" className="ventes-nav-btn" onClick={() => {
-            const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
-            const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
-            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
-          }} style={{
-            width: 32, height: 32, borderRadius: 16, border: "none",
-            background: "transparent", color: accent, fontSize: 15, fontWeight: 700,
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            transition: "background .15s",
-          }}>
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-          </button>
-
-          {/* Date center */}
-          <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
-
-          {/* → next day */}
-          <button type="button" className="ventes-nav-btn" onClick={() => {
-            const today = new Date().toISOString().slice(0, 10);
-            if (range.from >= today) return;
-            const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
-            const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
-            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
-          }} style={{
-            width: 32, height: 32, borderRadius: 16, border: "none",
-            background: "transparent",
-            color: from >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
-            fontSize: 15, fontWeight: 700,
-            cursor: from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            transition: "background .15s",
-          }}>
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-          </button>
-        </div>
-
       </div>
 
       <style>{`
