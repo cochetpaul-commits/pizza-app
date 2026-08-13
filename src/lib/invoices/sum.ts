@@ -28,23 +28,52 @@ function parseFrenchNumber(s: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// Nombre au format mixte : "1 046,90", "1046.9", "2,292.07", "1104,48"
+function parseAnyNumber(s: string): number | null {
+  let cleaned = s.trim().replace(/[\s€]/g, "");
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+  if (lastComma >= 0 && lastDot >= 0) {
+    // Le séparateur le plus à droite est la décimale, l'autre les milliers
+    if (lastComma > lastDot) cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+    else cleaned = cleaned.replace(/,/g, "");
+  } else if (lastComma >= 0) {
+    cleaned = cleaned.replace(",", ".");
+  }
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
 function extractMeta(
   text: string
 ): Pick<ParsedInvoice, "invoice_number" | "invoice_date" | "total_ht" | "total_ttc"> {
-  // "FA2600056 09/01/26"
-  const invMatch = text.match(/\b(FA\d+)\s+(\d{2})\/(\d{2})\/(\d{2})\b/);
+  // "FA2600056 09/01/26" (ancien) ou "FA2505499 10/10/2025" (nouveau)
+  const invMatch = text.match(/\b(FA\d+)\s+(\d{2})\/(\d{2})\/(\d{4}|\d{2})\b/);
   const invoice_number = invMatch ? invMatch[1] : null;
-  const invoice_date = invMatch
-    ? `${invMatch[2]}/${invMatch[3]}/20${invMatch[4]}`
-    : null;
+  const year = invMatch ? (invMatch[4].length === 2 ? `20${invMatch[4]}` : invMatch[4]) : null;
+  const invoice_date = invMatch ? `${invMatch[2]}/${invMatch[3]}/${year}` : null;
 
-  // "C2 1 300,69€ 5,5% 71,54€ 1 300,69€ 0,00€ 1 372,23€ 0,00€ 1 372,23€"
-  // C2 BASE_HT€ TVA% TVA€ TOTAL_HT€ ESCOMPTE€ TOTAL_TTC€ ACOMPTE€ NET€
-  const totalMatch = text.match(/\bC2\s+([\d ]+,\d{2})€.*?([\d ]+,\d{2})€\s+0,00€\s+([\d ]+,\d{2})€/);
-  const total_ht = totalMatch ? parseFrenchNumber(totalMatch[1]) : null;
-  const total_ttc = totalMatch ? parseFrenchNumber(totalMatch[3]) : null;
-
-  return { invoice_number, invoice_date, total_ht, total_ttc };
+  // Ancien format : "C2 1 300,69€ 5,5% 71,54€ ... 1 372,23€"
+  const totalMatchOld = text.match(/\bC2\s+([\d ]+,\d{2})€.*?([\d ]+,\d{2})€\s+0,00€\s+([\d ]+,\d{2})€/);
+  if (totalMatchOld) {
+    return {
+      invoice_number, invoice_date,
+      total_ht: parseFrenchNumber(totalMatchOld[1]),
+      total_ttc: parseFrenchNumber(totalMatchOld[3]),
+    };
+  }
+  // Nouveau format : une ligne par taux de TVA — "C2 1046.9 5.50% 57.57 [TTC]" / "C5 86 20.00% 17.20"
+  let ht = 0, tva = 0, found = false;
+  for (const m of text.matchAll(/\bC\d\s+([\d.,]+)\s+[\d.,]+%\s+([\d.,]+)/g)) {
+    const base = parseAnyNumber(m[1]);
+    const tax = parseAnyNumber(m[2]);
+    if (base != null && tax != null) { ht += base; tva += tax; found = true; }
+  }
+  return {
+    invoice_number, invoice_date,
+    total_ht: found ? Math.round(ht * 100) / 100 : null,
+    total_ttc: found ? Math.round((ht + tva) * 100) / 100 : null,
+  };
 }
 
 // Alphanumeric product code: 2+ letters + 2+ digits + optional trailing letter
@@ -79,11 +108,74 @@ function parseLines(text: string): ParsedLine[] {
   const result: ParsedLine[] = [];
   let i = 0;
 
+  // Nouveau format (2025+), sans € : "CODE NOM... QTE LOT PU [REMISE] MT"
+  // ex: "ANT016 S.A. - Câpres au sel 70gr 12,000 L180827 3,10 37,20"
+  // Le lot peut être numérique ("1126") et les longues désignations passent sur 2 lignes.
+  // Remise optionnelle : "14,76 50% 11,07" (pourcentage) ou montant "1,00"
+  const NEW_LINE_RE = /^([A-Z]{2,}[A-Z0-9]*\d{2,}[A-Z]?)\s+(.+?)\s+(\d[\d\s.]*,\d{1,3})\s+(\S+)\s+(\d[\d\s.]*,\d{2})(?:\s+(\d[\d\s.]*,\d{2}|\d+(?:[.,]\d+)?%))?\s+(\d[\d\s.]*,\d{2})$/;
+  // RUPTURE nouveau format : "NOM... CODE RUPTURE 0,000 0,00 0,00"
+  const NEW_RUPTURE_RE = /^(.*?)\s+([A-Z]{2,}[A-Z0-9]*\d{2,}[A-Z]?)\s+RUPTURE\b/;
+
+  const pushNewFormat = (m: RegExpExecArray) => {
+    const name = m[2].trim();
+    const qty = parseFrenchNumber(m[3]);
+    const total = parseFrenchNumber(m[7]);
+    // Si remise présente (m[6]), le PU affiché est avant remise → PU net = MT / qté
+    const pu = m[6] && total != null && qty
+      ? Math.round((total / qty) * 1000) / 1000
+      : parseFrenchNumber(m[5]);
+    if (!name || qty == null) return false;
+    result.push({
+      sku: m[1], name, quantity: qty, unit: "pc",
+      unit_price: pu, total_price: total, tax_rate: 5.5, notes: null,
+      piece_weight_g: extractWeightGFromName(name),
+      piece_volume_ml: extractVolumeFromName(name),
+    });
+    return true;
+  };
+
   while (i < sectionRows.length) {
     const row = sectionRows[i];
 
     // Skip bare "RUPTURE" lines (already consumed by lookahead below)
     if (row === "RUPTURE") { i++; continue; }
+
+    // ── Nouveau format (lignes sans €) ──
+    if (!row.includes("€")) {
+      // RUPTURE : "NOM CODE RUPTURE 0,000 0,00 0,00"
+      if (row.includes("RUPTURE")) {
+        const m = NEW_RUPTURE_RE.exec(row);
+        if (m) {
+          result.push({
+            sku: m[2], name: m[1].trim(), quantity: null, unit: null,
+            unit_price: null, total_price: null, tax_rate: null, notes: "RUPTURE",
+            piece_weight_g: extractWeightGFromName(m[1].trim()),
+            piece_volume_ml: extractVolumeFromName(m[1].trim()),
+          });
+          i++;
+          continue;
+        }
+      }
+      // Ligne produit, éventuellement coupée sur 2-3 rangées par le PDF
+      if (/^[A-Z]{2,}[A-Z0-9]*\d{2,}[A-Z]?\s/.test(row)) {
+        let matched = false;
+        let buffer = row;
+        for (let extra = 0; extra <= 2; extra++) {
+          if (extra > 0) {
+            const next = sectionRows[i + extra];
+            if (!next || next.includes("€") || /^[A-Z]{2,}[A-Z0-9]*\d{2,}[A-Z]?\s/.test(next)) break;
+            buffer += " " + next;
+          }
+          const m = NEW_LINE_RE.exec(buffer);
+          if (m && pushNewFormat(m)) {
+            i += extra + 1;
+            matched = true;
+            break;
+          }
+        }
+        if (matched) continue;
+      }
+    }
 
     // Two-line RUPTURE: current line ends with CODE, next line is "RUPTURE"
     if (
