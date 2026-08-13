@@ -22,11 +22,12 @@ export type DetectionResult = {
 const ETAB_KEYWORDS: Record<string, { name: string; keywords: string[] }> = {
   bello_mio: {
     name: "Bello Mio",
-    keywords: ["SARL SASHA", "SASHA", "BELLO MIO"],
+    keywords: ["SARL SASHA", "SASHA", "BELLO MIO", "BELLOMIO"],
   },
   piccola_mia: {
     name: "Piccola Mia",
-    keywords: ["SARL I FRATELLI", "I FRATELLI", "IFRATELLI", "PICCOLA MIA"],
+    // "PICCOLAMIA" et "SARL FRATELLI" : orthographes vues sur les factures Cozigou
+    keywords: ["SARL I FRATELLI", "I FRATELLI", "IFRATELLI", "SARL FRATELLI", "PICCOLA MIA", "PICCOLAMIA"],
   },
 };
 
