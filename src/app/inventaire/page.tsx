@@ -37,6 +37,51 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 }
 
+/** Mini stepper −/+ compact pour les doubles champs cartons + unités */
+function MiniStepper({ value, active, color, label, onChange }: {
+  value: number | "";
+  active: boolean;
+  color: string;
+  label: string;
+  onChange: (v: number) => void;
+}) {
+  const n = value === "" ? 0 : Number(value);
+  const btn: React.CSSProperties = {
+    width: 22, height: 36, border: "1px solid #ddd6c8", background: "#f9f5ef",
+    fontSize: 15, fontWeight: 700, cursor: "pointer", padding: 0,
+    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <button type="button" onClick={() => onChange(Math.max(0, n - 1))}
+          style={{ ...btn, borderRadius: "8px 0 0 8px", borderRight: "none", color: "#D4775A" }}>−</button>
+        <input
+          type="number"
+          step="1"
+          min="0"
+          value={value}
+          onChange={(e) => {
+            const val = e.target.value;
+            onChange(val === "" ? 0 : Math.max(0, Math.round(Number(val))));
+          }}
+          placeholder="0"
+          style={{
+            width: 40, height: 36, borderRadius: 0,
+            border: active ? `1.5px solid ${color}` : "1px solid #ddd6c8",
+            padding: "0 2px", fontSize: 14, fontWeight: 600,
+            textAlign: "center", background: "#fff", outline: "none",
+            color: active ? color : "#1a1a1a",
+          }}
+        />
+        <button type="button" onClick={() => onChange(n + 1)}
+          style={{ ...btn, borderRadius: "0 8px 8px 0", borderLeft: "none", color: "#4a6741" }}>+</button>
+      </div>
+      <span style={{ fontSize: 8, color: active ? color : "#999", fontWeight: 700, marginTop: 1 }}>{label}</span>
+    </div>
+  );
+}
+
 function fmtMoney(n: number) {
   return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 }
@@ -1268,55 +1313,23 @@ export default function InventairePage() {
                                 {hasQty ? (pack ? `${nbCartons}c + ${nbLoose}` : `${rawQtyNum}`) : "-"}
                               </span>
                             ) : pack ? (
-                              /* Dual input: cartons + loose units */
-                              <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    min="0"
-                                    value={hasQty || isZeroConfirmed ? nbCartons : ""}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      const c = val === "" ? 0 : Math.max(0, Math.round(Number(val)));
-                                      const total = c * pack.pack_count + nbLoose;
-                                      handleQtyChange(ing.id, String(total));
-                                    }}
-                                    placeholder="0"
-                                    style={{
-                                      width: 48, height: 36, borderRadius: 8,
-                                      border: nbCartons > 0 ? `1.5px solid #7C3AED` : "1px solid #ddd6c8",
-                                      padding: "0 4px", fontSize: 14, fontWeight: 600,
-                                      textAlign: "center", background: "#fff", outline: "none",
-                                      color: nbCartons > 0 ? "#7C3AED" : "#1a1a1a",
-                                    }}
-                                  />
-                                  <span style={{ fontSize: 8, color: "#7C3AED", fontWeight: 700, marginTop: 1 }}>crt</span>
-                                </div>
-                                <span style={{ fontSize: 11, color: "#999", fontWeight: 600 }}>+</span>
-                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    min="0"
-                                    value={hasQty || isZeroConfirmed ? nbLoose : ""}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      const l = val === "" ? 0 : Math.max(0, Math.round(Number(val)));
-                                      const total = nbCartons * pack.pack_count + l;
-                                      handleQtyChange(ing.id, String(total));
-                                    }}
-                                    placeholder="0"
-                                    style={{
-                                      width: 48, height: 36, borderRadius: 8,
-                                      border: nbLoose > 0 ? `1.5px solid ${color}` : "1px solid #ddd6c8",
-                                      padding: "0 4px", fontSize: 14, fontWeight: 600,
-                                      textAlign: "center", background: "#fff", outline: "none",
-                                      color: nbLoose > 0 ? color : "#1a1a1a",
-                                    }}
-                                  />
-                                  <span style={{ fontSize: 8, color: "#999", fontWeight: 600, marginTop: 1 }}>{packUnit}</span>
-                                </div>
+                              /* Dual input: cartons + loose units, avec steppers −/+ */
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: 4, flexShrink: 0 }}>
+                                <MiniStepper
+                                  value={hasQty || isZeroConfirmed ? nbCartons : ""}
+                                  active={nbCartons > 0}
+                                  color="#7C3AED"
+                                  label="crt"
+                                  onChange={(c) => handleQtyChange(ing.id, String(c * pack.pack_count + nbLoose))}
+                                />
+                                <span style={{ fontSize: 11, color: "#999", fontWeight: 600, alignSelf: "center" }}>+</span>
+                                <MiniStepper
+                                  value={hasQty || isZeroConfirmed ? nbLoose : ""}
+                                  active={nbLoose > 0}
+                                  color={color}
+                                  label={packUnit}
+                                  onChange={(l) => handleQtyChange(ing.id, String(nbCartons * pack.pack_count + l))}
+                                />
                               </div>
                             ) : (
                               /* Stepper input with +/- buttons */

@@ -26,8 +26,8 @@ const ETAB_KEYWORDS: Record<string, { name: string; keywords: string[] }> = {
   },
   piccola_mia: {
     name: "Piccola Mia",
-    // "PICCOLAMIA" et "SARL FRATELLI" : orthographes vues sur les factures Cozigou
-    keywords: ["SARL I FRATELLI", "I FRATELLI", "IFRATELLI", "SARL FRATELLI", "PICCOLA MIA", "PICCOLAMIA"],
+    // "PICCOLAMIA"/"SARL FRATELLI" : factures Cozigou · "VILLE PEPIN" : adresse (factures SUM)
+    keywords: ["SARL I FRATELLI", "I FRATELLI", "IFRATELLI", "SARL FRATELLI", "PICCOLA MIA", "PICCOLAMIA", "VILLE PEPIN"],
   },
 };
 
