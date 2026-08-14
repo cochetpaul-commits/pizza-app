@@ -117,6 +117,11 @@ export default function InventairePage() {
   const [newZoneCategorySlugs, setNewZoneCategorySlugs] = useState<string[]>([]);
   const [addingZone, setAddingZone] = useState(false);
   const [showManageZones, setShowManageZones] = useState(false);
+  const [showAddProducts, setShowAddProducts] = useState(false);
+  const [addProdSearch, setAddProdSearch] = useState("");
+  const [addProdSel, setAddProdSel] = useState<Set<string>>(new Set());
+  const [quickCreateCat, setQuickCreateCat] = useState<string>("epicerie_salee");
+  const [addingProducts, setAddingProducts] = useState(false);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
 
   const [packInfo, setPackInfo] = useState<Record<string, { pack_count: number; pack_each_qty: number | null; pack_each_unit: string | null }>>({}); // ingredient_id -> pack info
@@ -478,15 +483,23 @@ export default function InventairePage() {
       setAddingZone(false);
       return;
     }
-    // Auto-assign ingredients matching supplier/category to this zone
+    // Auto-assign ingredients matching supplier/category to this zone.
+    // Les produits déjà rangés ailleurs sont proposés au déplacement — sinon
+    // la zone paraît incomplète (« je n'ai pas tous les produits »).
     if (newZoneSupplierIds.length > 0 || newZoneCategorySlugs.length > 0) {
-      const toUpdate = ingredients.filter(ing => {
-        if (!ing.storage_zone || ing.storage_zone === SANS_ZONE) {
-          if (newZoneSupplierIds.length > 0 && ing.supplier_id && newZoneSupplierIds.includes(ing.supplier_id)) return true;
-          if (newZoneCategorySlugs.length > 0 && newZoneCategorySlugs.includes(ing.category)) return true;
-        }
-        return false;
-      });
+      const matches = (ing: Ingredient) =>
+        (newZoneSupplierIds.length > 0 && ing.supplier_id != null && newZoneSupplierIds.includes(ing.supplier_id)) ||
+        (newZoneCategorySlugs.length > 0 && newZoneCategorySlugs.includes(ing.category));
+      const matching = ingredients.filter(matches);
+      const alreadyZoned = matching.filter(ing => ing.storage_zone && ing.storage_zone !== SANS_ZONE);
+      let toUpdate = matching;
+      if (alreadyZoned.length > 0) {
+        const move = confirm(
+          `${matching.length} produit(s) correspondent aux critères, dont ${alreadyZoned.length} déjà rangé(s) dans d'autres zones.\n\n` +
+          `OK : tout déplacer vers "${name}"\nAnnuler : n'ajouter que les produits sans zone`
+        );
+        if (!move) toUpdate = matching.filter(ing => !ing.storage_zone || ing.storage_zone === SANS_ZONE);
+      }
       if (toUpdate.length > 0) {
         const ids = toUpdate.map(i => i.id);
         await supabase.from("ingredients").update({ storage_zone: name }).in("id", ids);
@@ -523,6 +536,71 @@ export default function InventairePage() {
     if (activeZone === zone.name) {
       setActiveZone(zList.length > 0 ? zList[0].name : SANS_ZONE);
     }
+  }
+
+  async function renameZone(zone: StorageZone) {
+    const name = prompt(`Nouveau nom pour la zone "${zone.name}" :`, zone.name)?.trim();
+    if (!name || name === zone.name) return;
+    const { error } = await supabase.from("storage_zones").update({ name }).eq("id", zone.id);
+    if (error) { alert(error.message); return; }
+    await supabase.from("ingredients").update({ storage_zone: name }).eq("storage_zone", zone.name);
+    setIngredients(prev => prev.map(i => i.storage_zone === zone.name ? { ...i, storage_zone: name } : i));
+    if (activeZone === zone.name) setActiveZone(name);
+    await loadZones();
+  }
+
+  /** Réapplique les critères (catégories / fournisseurs) de la zone à tous les produits */
+  async function syncZone(zone: StorageZone) {
+    const catSlugs: string[] = (zone as unknown as { category_slugs?: string[] }).category_slugs ?? [];
+    const supIds: string[] = (zone as unknown as { supplier_ids?: string[] }).supplier_ids ?? [];
+    if (catSlugs.length === 0 && supIds.length === 0) {
+      alert("Cette zone n'a pas de critères (catégories ou fournisseurs). Utilisez « + Produits » pour ajouter manuellement.");
+      return;
+    }
+    const matching = ingredients.filter(ing =>
+      (supIds.length > 0 && ing.supplier_id != null && supIds.includes(ing.supplier_id)) ||
+      (catSlugs.length > 0 && catSlugs.includes(ing.category))
+    );
+    const missing = matching.filter(ing => ing.storage_zone !== zone.name);
+    if (missing.length === 0) { alert(`"${zone.name}" est déjà à jour (${matching.length} produits).`); return; }
+    const fromOther = missing.filter(i => i.storage_zone && i.storage_zone !== SANS_ZONE).length;
+    if (!confirm(`Ajouter ${missing.length} produit(s) à "${zone.name}"${fromOther > 0 ? ` (dont ${fromOther} déplacé(s) d'autres zones)` : ""} ?`)) return;
+    const ids = missing.map(i => i.id);
+    const { error } = await supabase.from("ingredients").update({ storage_zone: zone.name }).in("id", ids);
+    if (error) { alert(error.message); return; }
+    setIngredients(prev => prev.map(i => ids.includes(i.id) ? { ...i, storage_zone: zone.name } : i));
+  }
+
+  /** Affecte les produits cochés à la zone active */
+  async function assignSelectedToZone() {
+    if (addProdSel.size === 0 || activeZone === SANS_ZONE) return;
+    setAddingProducts(true);
+    const ids = [...addProdSel];
+    const { error } = await supabase.from("ingredients").update({ storage_zone: activeZone }).in("id", ids);
+    setAddingProducts(false);
+    if (error) { alert(error.message); return; }
+    setIngredients(prev => prev.map(i => ids.includes(i.id) ? { ...i, storage_zone: activeZone } : i));
+    setAddProdSel(new Set());
+    setShowAddProducts(false);
+  }
+
+  /** Création rapide d'un produit directement dans la zone active */
+  async function quickCreateProduct() {
+    const name = addProdSearch.trim();
+    if (!name || activeZone === SANS_ZONE) return;
+    setAddingProducts(true);
+    const { data, error } = await supabase.from("ingredients").insert({
+      name,
+      category: quickCreateCat,
+      is_active: true,
+      default_unit: "pc",
+      storage_zone: activeZone,
+      ...(etab?.id ? { etablissement_id: etab.id } : {}),
+    }).select("*").single();
+    setAddingProducts(false);
+    if (error) { alert(error.message); return; }
+    if (data) setIngredients(prev => [...prev, data as Ingredient].sort((a, b) => a.name.localeCompare(b.name)));
+    setAddProdSearch("");
   }
 
   // ── Computed ───────────────────────────────────────────────
@@ -1028,24 +1106,126 @@ export default function InventairePage() {
                       {count} ingrédient{count !== 1 ? "s" : ""}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => deleteZone(z)}
-                    style={{
-                      fontSize: 11, color: "#DC2626", background: "none", border: "none",
-                      cursor: "pointer", padding: "4px 8px",
-                    }}
-                  >
-                    Supprimer
-                  </button>
+                  <div style={{ display: "flex", gap: 2 }}>
+                    <button type="button" onClick={() => renameZone(z)}
+                      style={{ fontSize: 11, color: "#2563EB", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>
+                      Renommer
+                    </button>
+                    <button type="button" onClick={() => syncZone(z)}
+                      title="Réaffecter tous les produits correspondant aux catégories/fournisseurs de la zone"
+                      style={{ fontSize: 11, color: "#2D6A4F", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>
+                      Synchroniser
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteZone(z)}
+                      style={{
+                        fontSize: 11, color: "#DC2626", background: "none", border: "none",
+                        cursor: "pointer", padding: "4px 8px",
+                      }}
+                    >
+                      Supprimer
+                    </button>
+                  </div>
                 </div>
               );
             })}
           </div>
         )}
 
-        {/* Search bar */}
-        <div style={{ marginBottom: 10, position: "relative" }}>
+        {/* Modal : ajouter des produits à la zone active */}
+        {showAddProducts && (() => {
+          const q = addProdSearch.trim().toLowerCase();
+          const candidates = ingredients
+            .filter(i => resolveZone(i, zones) !== activeZone)
+            .filter(i => !q || i.name.toLowerCase().includes(q))
+            .slice(0, 60);
+          const exactExists = ingredients.some(i => i.name.trim().toLowerCase() === q);
+          return (
+            <div onClick={() => setShowAddProducts(false)} style={{
+              position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.4)",
+              display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+            }}>
+              <div onClick={e => e.stopPropagation()} style={{
+                background: "#fff", borderRadius: 16, width: "100%", maxWidth: 520,
+                maxHeight: "85vh", display: "flex", flexDirection: "column",
+                boxShadow: "0 12px 40px rgba(0,0,0,0.2)",
+              }}>
+                <div style={{ padding: "16px 18px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800 }}>Ajouter des produits à « {activeZone} »</div>
+                  <button type="button" onClick={() => setShowAddProducts(false)} style={{ width: 30, height: 30, borderRadius: 8, border: "none", background: "rgba(0,0,0,0.06)", cursor: "pointer", fontSize: 14 }}>✕</button>
+                </div>
+                <div style={{ padding: "0 18px 10px" }}>
+                  <input
+                    autoFocus
+                    value={addProdSearch}
+                    onChange={e => setAddProdSearch(e.target.value)}
+                    placeholder="Rechercher un produit… (ou taper un nom à créer)"
+                    style={{ width: "100%", height: 38, borderRadius: 10, border: "1.5px solid #e5ddd0", padding: "0 12px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                  />
+                </div>
+                <div style={{ flex: 1, overflowY: "auto", padding: "0 18px" }}>
+                  {candidates.map(i => {
+                    const sel = addProdSel.has(i.id);
+                    const zone = resolveZone(i, zones);
+                    return (
+                      <label key={i.id} style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
+                        borderRadius: 10, cursor: "pointer", marginBottom: 4,
+                        background: sel ? "rgba(212,119,90,0.10)" : "#faf7f2",
+                        border: sel ? "1.5px solid rgba(212,119,90,0.45)" : "1.5px solid transparent",
+                      }}>
+                        <input type="checkbox" checked={sel} onChange={() => {
+                          setAddProdSel(prev => { const n = new Set(prev); if (n.has(i.id)) n.delete(i.id); else n.add(i.id); return n; });
+                        }} style={{ width: 16, height: 16, accentColor: "#D4775A" }} />
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{i.name}</span>
+                        <span style={{ fontSize: 10, color: "#999" }}>{CAT_LABELS[i.category as Category] ?? i.category}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: zone === SANS_ZONE ? "rgba(0,0,0,0.05)" : "rgba(37,99,235,0.08)", color: zone === SANS_ZONE ? "#999" : "#2563EB" }}>
+                          {zone === SANS_ZONE ? "Sans zone" : zone}
+                        </span>
+                      </label>
+                    );
+                  })}
+                  {candidates.length === 0 && !q && (
+                    <div style={{ fontSize: 12, color: "#999", padding: 16, textAlign: "center" }}>Tous les produits sont déjà dans cette zone.</div>
+                  )}
+                  {q.length >= 2 && !exactExists && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 10px", borderRadius: 10, background: "rgba(45,106,79,0.06)", border: "1.5px dashed rgba(45,106,79,0.35)", marginTop: 6 }}>
+                      <span style={{ flex: 1, fontSize: 12.5 }}>Créer « <b>{addProdSearch.trim()}</b> » dans</span>
+                      <select value={quickCreateCat} onChange={e => setQuickCreateCat(e.target.value)}
+                        style={{ fontSize: 12, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff" }}>
+                        {CATEGORIES.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+                      </select>
+                      <button type="button" disabled={addingProducts} onClick={quickCreateProduct}
+                        style={{ padding: "7px 12px", borderRadius: 8, border: "none", background: "#2D6A4F", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                        Créer
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div style={{ padding: "12px 18px 16px", borderTop: "1px solid #f0ebe2", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <button type="button" onClick={() => setShowAddProducts(false)}
+                    style={{ padding: "9px 16px", borderRadius: 10, border: "1.5px solid #ddd6c8", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    Fermer
+                  </button>
+                  <button type="button" disabled={addProdSel.size === 0 || addingProducts} onClick={assignSelectedToZone}
+                    style={{
+                      padding: "9px 18px", borderRadius: 10, border: "none",
+                      background: addProdSel.size > 0 ? "#D4775A" : "#e5ddd0",
+                      color: addProdSel.size > 0 ? "#fff" : "#999",
+                      fontSize: 13, fontWeight: 700, cursor: addProdSel.size > 0 ? "pointer" : "not-allowed",
+                    }}>
+                    {addingProducts ? "Ajout…" : `Ajouter ${addProdSel.size || ""} produit${addProdSel.size > 1 ? "s" : ""}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Search bar + ajout de produits à la zone */}
+        <div style={{ marginBottom: 10, display: "flex", gap: 8 }}>
+        <div style={{ flex: 1, position: "relative" }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
           </svg>
@@ -1064,6 +1244,17 @@ export default function InventairePage() {
               position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
               background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: 14,
             }}>✕</button>
+          )}
+        </div>
+          {activeZone !== SANS_ZONE && (
+            <button type="button" onClick={() => { setShowAddProducts(true); setAddProdSearch(""); setAddProdSel(new Set()); }}
+              style={{
+                height: 38, padding: "0 14px", borderRadius: 10, border: "none",
+                background: "#D4775A", color: "#fff", fontSize: 13, fontWeight: 700,
+                cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+              }}>
+              + Produits
+            </button>
           )}
         </div>
 
