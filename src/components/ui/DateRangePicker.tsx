@@ -285,6 +285,23 @@ export function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, fo
   const monthRight = useMemo(() => addMonths(monthLeft, 1), [monthLeft]);
   const activePreset = useMemo(() => detectPreset(value, presets), [value, presets]);
   const label = useMemo(() => {
+    if (value.from && value.to) {
+      const f = fromISO(value.from);
+      const t = fromISO(value.to);
+      const now = new Date();
+      // Jour unique → « VEN. 14 AOÛT » : libellé stable quand on navigue aux
+      // flèches (évite l'alternance Hier / 12 août / Aujourd'hui)
+      if (isSameDay(f, t)) {
+        const wd = f.toLocaleDateString("fr-FR", { weekday: "short" }).replace(/\.$/, "").toUpperCase();
+        const base = `${wd}. ${f.getDate()} ${MONTH_SHORT_FR[f.getMonth()].toUpperCase()}`;
+        return f.getFullYear() === now.getFullYear() ? base : `${base} ${f.getFullYear()}`;
+      }
+      // Mois calendaire complet → « AOÛT 2026 »
+      const lastDay = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+      if (f.getDate() === 1 && t.getDate() === lastDay && f.getMonth() === t.getMonth() && f.getFullYear() === t.getFullYear()) {
+        return `${f.toLocaleDateString("fr-FR", { month: "long" }).toUpperCase()} ${f.getFullYear()}`;
+      }
+    }
     const p = activePreset;
     if (p) return PRESET_LABELS[p];
     return formatLabel(value, format);

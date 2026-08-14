@@ -666,50 +666,40 @@ function PerformancesPage() {
       <PilotageSwipeWrapper dateFrom={range.from} dateTo={range.to}>
       <div className={`ventes-container${showMoney ? "" : " no-money"}`} style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 16px 120px" }}>
 
-        {/* DateRangePicker — centered (desktop). Les flèches décalent d'un pas
-            égal à la période affichée (jour, semaine, mois...) */}
-        <div className="desktop-only" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 10 }}>
-          <button type="button" onClick={() => setRange(shiftRange(range, -1))} style={{
-            width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
-            background: "#fff", color: accent, fontSize: 13, fontWeight: 700,
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-          }}>{"←"}</button>
+        {/* Barre de période sticky (style Zenchef) : toujours visible en scrollant,
+            flèches au pas de la période affichée (jour, semaine, mois...) */}
+        <div className="ventes-periodbar" style={{
+          position: "sticky", top: 0, zIndex: 60,
+          display: "flex", justifyContent: "center", alignItems: "center", gap: 8,
+          margin: "-16px -16px 10px", padding: "10px 16px",
+          background: "rgba(242,237,228,0.88)",
+          backdropFilter: "blur(14px) saturate(160%)", WebkitBackdropFilter: "blur(14px) saturate(160%)",
+          borderBottom: "1px solid rgba(0,0,0,0.05)",
+        }}>
+          <button type="button" aria-label="Période précédente" onClick={() => setRange(shiftRange(range, -1))} style={{
+            width: 32, height: 32, borderRadius: 10, border: "1px solid #e0d8ce",
+            background: "#fff", color: accent, fontSize: 14, fontWeight: 700,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
           <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
-          <button type="button" onClick={() => {
+          <button type="button" aria-label="Période suivante" onClick={() => {
             if (range.to >= new Date().toISOString().slice(0, 10)) return;
             setRange(shiftRange(range, 1));
           }} style={{
-            width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
+            width: 32, height: 32, borderRadius: 10, border: "1px solid #e0d8ce",
             background: range.to >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : "#fff",
             color: range.to >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
-            fontSize: 13, fontWeight: 700,
+            fontSize: 14, fontWeight: 700,
             cursor: range.to >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>{"→"}</button>
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
         </div>
 
         {(<>
-
-        {/* DateRangePicker mobile — top. Même pas de navigation que le desktop */}
-        <div className="mobile-only" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 10 }}>
-          <button type="button" onClick={() => setRange(shiftRange(range, -1))} style={{
-            width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
-            background: "#fff", color: accent, fontSize: 13, fontWeight: 700,
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-          }}>{"<"}</button>
-          <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
-          <button type="button" onClick={() => {
-            if (range.to >= new Date().toISOString().slice(0, 10)) return;
-            setRange(shiftRange(range, 1));
-          }} style={{
-            width: 30, height: 30, borderRadius: 8, border: "1px solid #e0d8ce",
-            background: range.to >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : "#fff",
-            color: range.to >= new Date().toISOString().slice(0, 10) ? "#ccc" : accent,
-            fontSize: 13, fontWeight: 700,
-            cursor: range.to >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>{">"}</button>
-        </div>
 
         {/* TTC/HT toggle + actions desktop */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
@@ -2144,6 +2134,9 @@ function PerformancesPage() {
       </div>
 
       <style>{`
+        @media (max-width: 767px) {
+          .ventes-periodbar { top: calc(52px + env(safe-area-inset-top, 0px)) !important; }
+        }
         .ventes-nav-btn:hover, .ventes-nav-btn:active {
           background: rgba(0,0,0,0.06) !important;
         }

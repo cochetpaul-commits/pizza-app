@@ -563,9 +563,59 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export function Sidebar() {
   return (
-    <aside className="sidebar-desktop" style={{ position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 40, overflowY: "auto", overflowX: "hidden" }}>
-      <SidebarContent />
-    </aside>
+    <>
+      <aside className="sidebar-desktop" style={{ position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 40, overflowY: "auto", overflowX: "hidden" }}>
+        <SidebarContent />
+      </aside>
+      <SidebarToggle />
+    </>
+  );
+}
+
+/** Bouton replier/déplier la sidebar (desktop + tablette), persisté */
+function SidebarToggle() {
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebar-collapsed") === "1";
+    if (saved) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCollapsed(true);
+      document.documentElement.classList.add("sidebar-collapsed");
+    }
+    return () => { document.documentElement.classList.remove("sidebar-collapsed"); };
+  }, []);
+
+  const toggle = () => {
+    setCollapsed(c => {
+      const next = !c;
+      document.documentElement.classList.toggle("sidebar-collapsed", next);
+      try { localStorage.setItem("sidebar-collapsed", next ? "1" : "0"); } catch { /* */ }
+      return next;
+    });
+  };
+
+  return (
+    <button
+      type="button"
+      className="sidebar-toggle-btn"
+      onClick={toggle}
+      title={collapsed ? "Ouvrir le menu" : "Replier le menu"}
+      aria-label={collapsed ? "Ouvrir le menu" : "Replier le menu"}
+      style={{
+        width: 34, height: 34, borderRadius: 10,
+        border: "1px solid rgba(0,0,0,0.08)",
+        background: collapsed ? "#fff" : "transparent",
+        boxShadow: collapsed ? "0 2px 10px rgba(0,0,0,0.10)" : "none",
+        color: "#8d8577", cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}
+    >
+      <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <line x1="9" y1="4" x2="9" y2="20" />
+      </svg>
+    </button>
   );
 }
 
