@@ -1268,9 +1268,9 @@ export function CatalogueContent() {
                           {sg.items.map((recipe, recipeIdx) => {
                           const color = tg.color;
                 const isOpen = openId === recipe.id;
-                const canProduce = !!recipe.emp_data
-                  || (recipe.type === "pizza" || (recipe.type === "cuisine" && recipe.category !== "preparation"))
-                  || !!recipe.pivot_ingredient_id;
+                // Mode production disponible sur toutes les recettes (sauf vins) :
+                // pivot si defini, sinon multiplication par portions
+                const canProduce = recipe.type !== "vin";
 
                 return (
                   <Draggable key={recipe.id} draggableId={recipe.id} index={recipeIdx} isDragDisabled={!canWrite}>
@@ -1513,7 +1513,7 @@ export function CatalogueContent() {
         const pivotLine = !isEmp && modalRecipe.pivot_ingredient_id
           ? modalRecipe.lines.find(l => l.ingredient_id === modalRecipe.pivot_ingredient_id) ?? null
           : null;
-        const usePortionMode = !isEmp && !pivotLine && (modalRecipe.type === "pizza" || modalRecipe.type === "cuisine");
+        const usePortionMode = !isEmp && !pivotLine && modalRecipe.type !== "vin";
         const basePortions = modalRecipe.portions_count ?? 1;
 
         // Pivot mode
