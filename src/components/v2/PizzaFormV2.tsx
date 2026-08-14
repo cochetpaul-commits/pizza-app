@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRecipeDraft } from "@/lib/useRecipeDraft";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
@@ -110,6 +111,24 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+
+  // Brouillon en cache : l'edition d'un ingredient depuis la recette navigue
+  // vers /ingredients puis revient — on restaure le travail en cours.
+  const { clearDraft } = useRecipeDraft({
+    key: `recette-draft:pizza:${pizzaId ?? "new"}`,
+    ready: status === "ok",
+    snapshot: { name, doughRecipeId, ballWeightG, notes, photoUrl, sellPrice, sellCoeff, nbParts, cookedWeightG, sellPriceEmporter, vatEmporter, sellPricePerKg, sellPricePerPortion, preLines, postLines, steps, vatRate, fcTarget, pivotIngredientId, prodQty },
+    restore: (d) => {
+      setName(d.name); setDoughRecipeId(d.doughRecipeId); setBallWeightG(d.ballWeightG);
+      setNotes(d.notes); setPhotoUrl(d.photoUrl);
+      setSellPrice(d.sellPrice); setSellCoeff(d.sellCoeff); setNbParts(d.nbParts);
+      setCookedWeightG(d.cookedWeightG); setSellPriceEmporter(d.sellPriceEmporter); setVatEmporter(d.vatEmporter);
+      setSellPricePerKg(d.sellPricePerKg); setSellPricePerPortion(d.sellPricePerPortion);
+      setPreLines(d.preLines); setPostLines(d.postLines); setSteps(d.steps);
+      setVatRate(d.vatRate); setFcTarget(d.fcTarget);
+      setPivotIngredientId(d.pivotIngredientId); setProdQty(d.prodQty);
+    },
+  });
 
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -546,6 +565,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         if (lErr) throw lErr;
       }
 
+      clearDraft();
       if (!isEdit) router.push(`/recettes/pizza/${pid}`);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : (err as { message?: string })?.message ?? JSON.stringify(err));
@@ -559,6 +579,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
     if (!window.confirm("Supprimer cette fiche pizza ?")) return;
     await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", pizzaId);
     await supabase.from("kitchen_recipes").delete().eq("id", pizzaId);
+    clearDraft();
     router.push("/recettes?tab=pizza");
   }
 

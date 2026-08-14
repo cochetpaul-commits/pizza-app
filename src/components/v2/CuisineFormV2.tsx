@@ -12,6 +12,7 @@ import type { LatestOffer } from "@/types/ingredients";
 import { compressImage } from "@/lib/compressImage";
 
 import { fetchApi } from "@/lib/fetchApi";
+import { useRecipeDraft } from "@/lib/useRecipeDraft";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
@@ -149,6 +150,22 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   // Track the actually-saved recipe id across renders to prevent re-inserting
   // on subsequent Save clicks when the component stays mounted.
   const savedIdRef = useRef<string | null>(recipeId ?? null);
+
+  // Brouillon en cache : corriger un ingrédient (lien "edit" d'une ligne)
+  // navigue vers /ingredients puis revient — sans cache, la recette en cours
+  // était perdue. Restauré silencieusement au retour.
+  const { clearDraft } = useRecipeDraft({
+    key: `recette-draft:cuisine:${etab?.slug ?? "etab"}:${recipeId ?? "new"}`,
+    ready: status === "ok",
+    snapshot: { name, category, ficheType, yieldGrams, portionsCount, photoUrl, lines, steps, meta, vatRate, fcTarget, sellCoeff, pricingMode, pivotIngredientId, prodQty, indexIngredientId },
+    restore: (d) => {
+      setName(d.name); setCategory(d.category); setFicheType(d.ficheType);
+      setYieldGrams(d.yieldGrams); setPortionsCount(d.portionsCount); setPhotoUrl(d.photoUrl);
+      setLines(d.lines); setSteps(d.steps); setMeta(d.meta);
+      setVatRate(d.vatRate); setFcTarget(d.fcTarget); setSellCoeff(d.sellCoeff); setPricingMode(d.pricingMode);
+      setPivotIngredientId(d.pivotIngredientId); setProdQty(d.prodQty); setIndexIngredientId(d.indexIngredientId);
+    },
+  });
 
   // Computed allergens
   const computedAllergens = useMemo(() => {
@@ -608,6 +625,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         console.warn("[SYNC] failed:", e);
       }
 
+      clearDraft();
       if (!isEdit && !recipeId) router.replace(`/recettes/cuisine/${rid}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message
@@ -623,6 +641,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
     if (!window.confirm("Supprimer cette fiche cuisine ?")) return;
     await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", recipeId);
     await supabase.from("kitchen_recipes").delete().eq("id", recipeId);
+    clearDraft();
     router.push("/recettes?tab=cuisine");
   }
 
@@ -779,6 +798,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                 if (!confirm("Supprimer cette recette ? Cette action est irreversible.")) return;
                 const { error } = await supabase.from("kitchen_recipes").delete().eq("id", recipeId);
                 if (error) { alert(error.message); return; }
+                clearDraft();
                 router.push("/recettes");
               }}>Supprimer</HeroDangerBtn>
             )}

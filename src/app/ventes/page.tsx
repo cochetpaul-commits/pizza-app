@@ -768,7 +768,7 @@ function PerformancesPage() {
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
               </svg>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Rapport Popina</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>{etab?.slug?.includes("piccola") ? "Rapport de ventes" : "Rapport Popina"}</div>
                 <div style={{ fontSize: 11, color: "#999", fontWeight: 400 }}>{importing ? "Import en cours..." : "Excel ou CSV"}</div>
               </div>
             </label>
@@ -821,7 +821,11 @@ function PerformancesPage() {
             <div style={{ ...S.card, textAlign: "center", padding: 60 }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
               <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Aucune donnee pour cette periode</div>
-              <div style={{ fontSize: 12, color: "#777" }}>Les ventes seront synchronisees automatiquement chaque matin depuis Popina.</div>
+              <div style={{ fontSize: 12, color: "#777" }}>
+                {etab?.slug?.includes("piccola")
+                  ? "Importez un rapport de ventes pour alimenter cette periode."
+                  : "Les ventes seront synchronisees automatiquement chaque matin depuis Popina."}
+              </div>
             </div>
           );
         })()}

@@ -1660,7 +1660,8 @@ export default function PilotagePage() {
               </svg>
               {pdfLoading ? "Generation..." : "Rapport PDF de la semaine"}
             </button>
-            <button type="button" onClick={async () => {
+            {/* Popina = Bello Mio uniquement, Piccola Mia n'utilise pas ce logiciel */}
+            {!etab.current?.slug?.includes("piccola") && <button type="button" onClick={async () => {
               try {
                 const res = await fetch("/api/popina-catalogue/sync", { method: "POST" });
                 const d = await res.json();
@@ -1680,7 +1681,7 @@ export default function PilotagePage() {
                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
               </svg>
               Sync Popina
-            </button>
+            </button>}
           </div>
         </BottomSheet>
       </>

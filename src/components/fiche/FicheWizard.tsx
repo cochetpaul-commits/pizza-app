@@ -303,6 +303,46 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2600); };
 
+  // ── Brouillon en cache ──────────────────────────────────────────────
+  // Corriger un ingrédient depuis la recette navigue vers /ingredients puis
+  // revient : sans cache, la recette en cours était perdue. On persiste le
+  // brouillon en localStorage (6 h) et on le restaure au retour.
+  const DRAFT_TTL_MS = 6 * 60 * 60 * 1000;
+  const draftKey = `fiche-draft:${etabSlug}:${recipeId ?? "new"}`;
+  const draftReady = useRef(false);
+
+  useEffect(() => {
+    if (loading || draftReady.current) return;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const d = JSON.parse(raw) as { ts?: number; step?: number; fiche?: FicheState; linkedPopina?: string | null };
+        if (d?.fiche && Date.now() - (d.ts ?? 0) < DRAFT_TTL_MS) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setFiche(d.fiche);
+          if (typeof d.step === "number") setStep(d.step);
+          if (d.linkedPopina !== undefined) setLinkedPopina(d.linkedPopina);
+          showToast("Brouillon restauré");
+        } else {
+          localStorage.removeItem(draftKey);
+        }
+      }
+    } catch { /* localStorage indisponible : tant pis, pas de cache */ }
+    draftReady.current = true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  useEffect(() => {
+    if (!draftReady.current) return;
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ ts: Date.now(), step, fiche, linkedPopina }));
+    } catch { /* quota plein ou stockage bloqué : non bloquant */ }
+  }, [fiche, step, linkedPopina, draftKey]);
+
+  const clearDraft = useCallback(() => {
+    try { localStorage.removeItem(draftKey); } catch { /* */ }
+  }, [draftKey]);
+
   // ── Save to DB ──
   async function handleSave() {
     if (!fiche.nom.trim()) { showToast("Le nom est requis"); return; }
@@ -387,6 +427,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
     }
 
     setSaving(false);
+    clearDraft();
     showToast("Fiche sauvegardee");
   }
 
@@ -838,6 +879,79 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
             })()}
           </div>
 
+          {/* Traiteur · prix au kilo : coût matière/kg, coeff et prix TTC/kg */}
+          {(() => {
+            const wCru = fiche.lignes.reduce((a: number, l: LigneIngredient) => {
+              if (!l.quantite || l.quantite <= 0) return a;
+              const u = (l.unite ?? "g").toLowerCase();
+              return u === "g" ? a + l.quantite : u === "kg" ? a + l.quantite * 1000 : a;
+            }, 0) + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
+            const wRef = fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? fiche.cooked_weight_g : wCru;
+            if (wRef <= 0 || totalCost <= 0) return null;
+            const coutKg = (totalCost / wRef) * 1000;
+            const ttcKg = fiche.sell_price_per_kg;
+            const coeffKg = ttcKg != null && ttcKg > 0 ? ttcKg / coutKg : null;
+            const htKg = ttcKg != null ? ttcKg / (1 + fiche.tva / 100) : null;
+            const margeKg = htKg != null ? htKg - coutKg : null;
+            const conseilleKg = prixConseille(coutKg, fam.objectif_fc, fiche.tva);
+            return (
+              <div style={{ marginTop: 18, background: "rgba(255,255,255,0.8)", borderRadius: 14, border: "1px solid rgba(0,0,0,0.06)", padding: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: ".08em" }}>
+                    Traiteur · Prix au kilo
+                  </div>
+                  <span style={{ fontSize: 11, color: "#aaa" }}>
+                    base {fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? "poids cuit" : "poids cru"} : {wRef >= 1000 ? `${(wRef / 1000).toFixed(2)} kg` : `${Math.round(wRef)} g`}
+                  </span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
+                  <KPI label="Cout / kg" value={eur(coutKg)} color={COLORS.bordeaux} sub="matiere" />
+                  <KPI label="Coeff kilo" value={coeffKg != null ? `x${coeffKg.toFixed(2)}` : "—"} color="#6b4fd8" sub="TTC / cout" />
+                  <KPI label="Prix vente TTC / kg" value={ttcKg != null ? eur(ttcKg) : "—"} sub={htKg != null ? `${eur(htKg)} HT, TVA ${fiche.tva} %` : `TVA ${fiche.tva} %`} />
+                  <KPI label="Marge brute / kg" value={margeKg != null ? eur(margeKg) : "—"} color={COLORS.ok} />
+                </div>
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
+                  <div style={{ minWidth: 150 }}>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Coefficient kilo</label>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <input type="number" step="0.01" value={coeffKg != null ? coeffKg.toFixed(2) : ""}
+                        placeholder="x"
+                        onChange={e => {
+                          const c = Number(e.target.value);
+                          update({ sell_price_per_kg: c > 0 ? Math.round(coutKg * c * 100) / 100 : null });
+                        }}
+                        style={{ width: 86, textAlign: "center", fontWeight: 800, color: "#6b4fd8", fontSize: 17, border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "9px", background: "#fffdf9", fontFamily: "inherit" }} />
+                      {[2.5, 3, 3.5].map(c => (
+                        <button key={c} onClick={() => update({ sell_price_per_kg: Math.round(coutKg * c * 100) / 100 })}
+                          style={{ border: `1.5px solid ${COLORS.line}`, background: "#fffdf9", borderRadius: 999, padding: "6px 13px", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, cursor: "pointer", fontFamily: "inherit" }}>
+                          x{c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 150 }}>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Prix TTC / kg : ajuste le coeff</label>
+                    <input type="number" step="0.5" value={ttcKg ?? ""}
+                      placeholder={conseilleKg > 0 ? conseilleKg.toFixed(2) : ""}
+                      onChange={e => update({ sell_price_per_kg: e.target.value ? Number(e.target.value) : null })}
+                      style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit", boxSizing: "border-box" }} />
+                  </div>
+                </div>
+                {conseilleKg > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12.5, color: COLORS.green, fontWeight: 700 }}>
+                      Prix conseille (objectif {fam.objectif_fc} % de food cost) : {eur(conseilleKg)} TTC / kg
+                    </span>
+                    <button onClick={() => { update({ sell_price_per_kg: Math.round(conseilleKg * 100) / 100 }); showToast("Prix au kilo conseille applique"); }}
+                      style={{ border: `1.5px solid ${COLORS.green}`, background: "transparent", color: COLORS.green, borderRadius: 999, padding: "6px 14px", fontSize: 11.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                      Appliquer
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Lignes de prix multi-mode */}
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1.5px solid ${COLORS.line}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -1123,7 +1237,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
         {/* Row 2: secondary actions */}
         <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
           <button onClick={() => {
-              if (confirm("Quitter sans sauvegarder ?")) router.push("/recettes");
+              if (confirm("Quitter sans sauvegarder ?")) { clearDraft(); router.push("/recettes"); }
             }}
             style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", background: "transparent", color: COLORS.muted, fontFamily: "inherit" }}>
             Annuler
@@ -1133,6 +1247,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                 if (!confirm(`Supprimer la recette "${fiche.nom}" ?`)) return;
                 await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", fiche.id!);
                 await supabase.from("kitchen_recipes").delete().eq("id", fiche.id!);
+                clearDraft();
                 router.push("/recettes");
               }}
               style={{ border: `1.5px solid ${COLORS.warn}`, borderRadius: 999, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", background: "transparent", color: COLORS.warn, fontFamily: "inherit" }}>

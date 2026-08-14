@@ -340,14 +340,17 @@ function StockContent() {
 
         {/* Actions bar */}
         <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
-          <button onClick={syncVentes} disabled={syncing}
-            style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#2563EB", color: "#fff", border: "none", cursor: "pointer", opacity: syncing ? 0.6 : 1 }}>
-            {syncing ? "Sync..." : "Sync ventes (30j)"}
-          </button>
-          <button onClick={loadDoseSuggestions} disabled={doseLoading}
-            style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#7C3AED", color: "#fff", border: "none", cursor: "pointer", opacity: doseLoading ? 0.6 : 1 }}>
-            {doseLoading ? "..." : "Auto-doses Popina"}
-          </button>
+          {/* Popina = Bello Mio uniquement, Piccola Mia n'utilise pas ce logiciel */}
+          {!etab?.slug?.includes("piccola") && <>
+            <button onClick={syncVentes} disabled={syncing}
+              style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#2563EB", color: "#fff", border: "none", cursor: "pointer", opacity: syncing ? 0.6 : 1 }}>
+              {syncing ? "Sync..." : "Sync ventes (30j)"}
+            </button>
+            <button onClick={loadDoseSuggestions} disabled={doseLoading}
+              style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#7C3AED", color: "#fff", border: "none", cursor: "pointer", opacity: doseLoading ? 0.6 : 1 }}>
+              {doseLoading ? "..." : "Auto-doses Popina"}
+            </button>
+          </>}
           {syncMsg && <span style={{ fontSize: 12, color: "#4a6741", fontWeight: 600 }}>{syncMsg}</span>}
         </div>
 

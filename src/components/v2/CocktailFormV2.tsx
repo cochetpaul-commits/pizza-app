@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRecipeDraft } from "@/lib/useRecipeDraft";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
@@ -97,6 +98,20 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+
+  // Brouillon en cache : l'edition d'un ingredient depuis la recette navigue
+  // vers /ingredients puis revient — on restaure le travail en cours.
+  const { clearDraft } = useRecipeDraft({
+    key: `recette-draft:cocktail:${cocktailId ?? "new"}`,
+    ready: status === "ok",
+    snapshot: { name, type, glass, garnish, method, baseAlcool, sellCoeff, imageUrl, lines, steps, vatRate, fcTarget, pivotIngredientId, prodQty },
+    restore: (d) => {
+      setName(d.name); setType(d.type); setGlass(d.glass); setGarnish(d.garnish);
+      setMethod(d.method); setBaseAlcool(d.baseAlcool); setSellCoeff(d.sellCoeff); setImageUrl(d.imageUrl);
+      setLines(d.lines); setSteps(d.steps); setVatRate(d.vatRate); setFcTarget(d.fcTarget);
+      setPivotIngredientId(d.pivotIngredientId); setProdQty(d.prodQty);
+    },
+  });
 
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -427,6 +442,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
         if (lErr) throw lErr;
       }
 
+      clearDraft();
       if (!isEdit) router.push(`/recettes/cocktail/${cid}`);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : (err as { message?: string })?.message ?? JSON.stringify(err));
@@ -440,6 +456,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
     if (!window.confirm("Supprimer ce cocktail ?")) return;
     await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", cocktailId);
     await supabase.from("kitchen_recipes").delete().eq("id", cocktailId);
+    clearDraft();
     router.push("/recettes?tab=cocktail");
   }
 
