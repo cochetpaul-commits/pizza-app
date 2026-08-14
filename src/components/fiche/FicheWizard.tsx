@@ -814,7 +814,10 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
 
           {/* Contrôles coeff / prix / TVA */}
           <div style={{ background: "rgba(255,255,255,0.8)", borderRadius: 14, border: "1px solid rgba(0,0,0,0.06)", padding: 16, marginBottom: 14 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>Parametres de calcul</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: ".08em" }}>Prix de vente · a la portion</div>
+            <span style={{ fontSize: 11, color: "#aaa" }}>Prix TTC = cout portion ({eur(costPerPortion)}) × coefficient</span>
+          </div>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 150 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Coefficient</label>
@@ -887,7 +890,18 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
               return u === "g" ? a + l.quantite : u === "kg" ? a + l.quantite * 1000 : a;
             }, 0) + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
             const wRef = fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? fiche.cooked_weight_g : wCru;
-            if (wRef <= 0 || totalCost <= 0) return null;
+            if (wRef <= 0 || totalCost <= 0) {
+              return (
+                <div style={{ marginTop: 18, background: "rgba(255,255,255,0.8)", borderRadius: 14, border: "1px dashed rgba(0,0,0,0.12)", padding: 16 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>
+                    Prix de vente · au kilo (traiteur)
+                  </div>
+                  <div style={{ fontSize: 12, color: "#aaa" }}>
+                    Renseignez des quantites en g ou kg dans les ingredients pour calculer le cout matiere au kilo.
+                  </div>
+                </div>
+              );
+            }
             const coutKg = (totalCost / wRef) * 1000;
             const ttcKg = fiche.sell_price_per_kg;
             const coeffKg = ttcKg != null && ttcKg > 0 ? ttcKg / coutKg : null;
@@ -898,10 +912,10 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
               <div style={{ marginTop: 18, background: "rgba(255,255,255,0.8)", borderRadius: 14, border: "1px solid rgba(0,0,0,0.06)", padding: 16 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: ".08em" }}>
-                    Traiteur · Prix au kilo
+                    Prix de vente · au kilo (traiteur)
                   </div>
                   <span style={{ fontSize: 11, color: "#aaa" }}>
-                    base {fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? "poids cuit" : "poids cru"} : {wRef >= 1000 ? `${(wRef / 1000).toFixed(2)} kg` : `${Math.round(wRef)} g`}
+                    Prix TTC/kg = cout/kg ({eur(coutKg)}) × coeff kilo · base {fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? "poids cuit" : "poids cru"} : {wRef >= 1000 ? `${(wRef / 1000).toFixed(2)} kg` : `${Math.round(wRef)} g`}
                   </span>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
