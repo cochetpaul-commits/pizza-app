@@ -24,6 +24,8 @@ export type NavItemV2 = {
   href: string;
   icon?: string;
   roles?: Role[];
+  /** Optional permission key — item hidden if user lacks this permission */
+  permission?: string;
 };
 
 export type NavSubSection = {
@@ -73,11 +75,11 @@ export type SidebarEntry = NavEtabGroup | NavSettingsGroup | NavStandaloneItem |
 
 // PILOTAGE (analyse & performance)
 const PILOTAGE_ITEMS: NavItemV2[] = [
-  { label: "Tableau de bord", href: "/pilotage", icon: "dashboard" },
-  { label: "Ventes", href: "/ventes", icon: "barChart" },
-  { label: "Produits", href: "/ventes/marges", icon: "wallet" },
-  { label: "Masse salariale", href: "/rh/masse-salariale", icon: "calculator" },
-  { label: "Tresorerie", href: "/tresorerie", icon: "wallet" },
+  { label: "Tableau de bord", href: "/pilotage", icon: "dashboard", permission: "performances.pilotage" },
+  { label: "Ventes", href: "/ventes", icon: "barChart", permission: "performances.view" },
+  { label: "Produits", href: "/ventes/marges", icon: "wallet", permission: "performances.pilotage" },
+  { label: "Masse salariale", href: "/rh/masse-salariale", icon: "calculator", permission: "performances.pilotage" },
+  { label: "Tresorerie", href: "/tresorerie", icon: "wallet", permission: "performances.pilotage" },
 ];
 
 // PERSONNEL (RH)

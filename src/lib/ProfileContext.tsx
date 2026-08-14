@@ -57,21 +57,30 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       const profileRole = data ? normalizeRole(data.role as string) : "equipier";
       setDisplayName(data?.display_name ?? null);
 
-      // Load custom permissions + role from employes table (linked by auth_user_id)
-      const { data: empData } = await supabase
+      // Load custom permissions + role from employes table (linked by auth_user_id).
+      // Un employé peut avoir une fiche par établissement : maybeSingle()
+      // échouait alors et TOUTES les permissions accordées étaient ignorées.
+      const { data: empRows } = await supabase
         .from("employes")
         .select("custom_permissions, role")
         .eq("auth_user_id", userId)
-        .eq("actif", true)
-        .maybeSingle();
-      if (!cancelled && empData?.custom_permissions) {
-        setCustomPerms(empData.custom_permissions as Record<string, boolean>);
+        .eq("actif", true);
+      if (cancelled) return;
+
+      const mergedPerms: Record<string, boolean> = {};
+      let bestEmpRole: Role = "equipier";
+      const ROLE_RANK: Record<Role, number> = { group_admin: 3, manager: 2, equipier: 1 };
+      for (const emp of empRows ?? []) {
+        const perms = (emp.custom_permissions ?? {}) as Record<string, boolean>;
+        // En cas de conflit entre fiches, l'accès accordé l'emporte
+        for (const [k, v] of Object.entries(perms)) mergedPerms[k] = mergedPerms[k] === true ? true : v;
+        const r = emp.role ? normalizeRole(emp.role as string) : "equipier";
+        if (ROLE_RANK[r] > ROLE_RANK[bestEmpRole]) bestEmpRole = r;
       }
+      setCustomPerms(mergedPerms);
 
       // Use the highest role between profiles and employes
-      const empRole = empData?.role ? normalizeRole(empData.role as string) : "equipier";
-      const ROLE_RANK: Record<Role, number> = { group_admin: 3, manager: 2, equipier: 1 };
-      const effectiveRole = ROLE_RANK[empRole] > ROLE_RANK[profileRole] ? empRole : profileRole;
+      const effectiveRole = ROLE_RANK[bestEmpRole] > ROLE_RANK[profileRole] ? bestEmpRole : profileRole;
       setRole(effectiveRole);
 
       setLoading(false);

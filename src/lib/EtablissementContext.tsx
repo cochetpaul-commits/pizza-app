@@ -63,6 +63,18 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
         : false;
       const accessIds: string[] = profile?.etablissements_access ?? [];
 
+      // Une fiche employé active donne aussi accès à son établissement :
+      // l'écran RH ne remplit pas profiles.etablissements_access, sans ce
+      // complément l'employé retombait sur l'accueil groupe.
+      const { data: empRows } = await supabase
+        .from("employes")
+        .select("etablissement_id")
+        .eq("auth_user_id", u.user.id)
+        .eq("actif", true);
+      for (const r of empRows ?? []) {
+        if (r.etablissement_id && !accessIds.includes(r.etablissement_id)) accessIds.push(r.etablissement_id);
+      }
+
       setIsGroupAdmin(groupAdmin);
 
       // Fetch all active establishments

@@ -242,6 +242,8 @@ type Tab = {
   href: string;
   match: string[];
   icon: () => React.ReactNode;
+  /** Optional permission key — tab hidden if user lacks this permission */
+  permission?: string;
 };
 
 type TabSection = {
@@ -275,11 +277,11 @@ const SECTION_PILOTAGE: TabSection = {
   icon: () => <IconWallet />,
   permission: "performances.view",
   tabs: [
-    { label: "Tableau", href: "/pilotage", match: ["/pilotage"], icon: () => <IconBarChart /> },
-    { label: "Ventes", href: "/ventes", match: ["/ventes"], icon: () => <IconWallet /> },
-    { label: "Produits", href: "/ventes/marges", match: ["/ventes/marges"], icon: () => <IconTag /> },
-    { label: "Masse sal.", href: "/rh/masse-salariale", match: ["/rh/masse-salariale"], icon: () => <IconTrendingUp /> },
-    { label: "Tresorerie", href: "/tresorerie", match: ["/tresorerie"], icon: () => <IconTrendingUp /> },
+    { label: "Tableau", href: "/pilotage", match: ["/pilotage"], icon: () => <IconBarChart />, permission: "performances.pilotage" },
+    { label: "Ventes", href: "/ventes", match: ["/ventes"], icon: () => <IconWallet />, permission: "performances.view" },
+    { label: "Produits", href: "/ventes/marges", match: ["/ventes/marges"], icon: () => <IconTag />, permission: "performances.pilotage" },
+    { label: "Masse sal.", href: "/rh/masse-salariale", match: ["/rh/masse-salariale"], icon: () => <IconTrendingUp />, permission: "performances.pilotage" },
+    { label: "Tresorerie", href: "/tresorerie", match: ["/tresorerie"], icon: () => <IconTrendingUp />, permission: "performances.pilotage" },
   ],
 };
 
@@ -691,12 +693,19 @@ export function BottomTabBar() {
   const closeMenu = () => setMenuState(null);
 
   const handleSectionTap = (section: TabSection) => {
-    if (section.tabs.length === 0) {
+    // Ne proposer que les onglets permis a l'utilisateur
+    const allowedTabs = section.tabs.filter(t => !t.permission || can(t.permission));
+    if (allowedTabs.length === 0) {
       router.push(section.href);
       closeMenu();
       return;
     }
-    setMenuState(section);
+    if (allowedTabs.length === 1) {
+      router.push(allowedTabs[0].href);
+      closeMenu();
+      return;
+    }
+    setMenuState({ ...section, tabs: allowedTabs });
   };
 
   const handleTabTap = (href: string) => {

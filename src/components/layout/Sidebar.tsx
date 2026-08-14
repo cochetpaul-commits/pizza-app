@@ -122,13 +122,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           ...(isPiccola ? [EVENEMENTIEL_SECTION] : []),
           PERSONNEL_SECTION,
         ]
-    : [];
+    // Equipiers : la section Pilotage s'affiche si des permissions le
+    // permettent (items filtres par permission) — sinon rien ne changeait
+    // visuellement quand on accordait un acces.
+    : [PILOTAGE_SECTION];
 
   /* ── Render nav item (level 3) ── */
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
   const renderItem = (item: NavItemV2) => {
     if (!isRoleAllowed(item.roles, role)) return null;
+    if (item.permission && !can(item.permission)) return null;
     const active = isActive(item.href);
     const itemKey = item.href;
     const hovered = hoveredItem === itemKey;
@@ -164,7 +168,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const _renderHub = (sub: NavSubSection) => {
     if (!isRoleAllowed(sub.roles, role)) return null;
     if (sub.permission && !can(sub.permission)) return null;
-    const items = sub.items.filter(i => isRoleAllowed(i.roles, role));
+    const items = sub.items.filter(i => isRoleAllowed(i.roles, role) && (!i.permission || can(i.permission)));
     if (items.length === 0 && !sub.href) return null;
 
     const hubKey = sub.label;
