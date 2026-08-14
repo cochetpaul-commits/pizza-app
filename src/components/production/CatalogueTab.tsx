@@ -1706,8 +1706,19 @@ export function CatalogueContent() {
                     <span style={{ fontSize: 13, fontWeight: 700, color: "#2D6A4F" }}>
                       {modalRecipe.type === "pizza" ? "Pizzas" : "Portions"}
                     </span>
+                    <button type="button" onClick={() => {
+                      const cur = portionOverrides[modalRecipe.id] ?? basePortions;
+                      const next = Math.max(1, Math.round(cur - 1));
+                      setPortionOverrides(prev => ({ ...prev, [modalRecipe.id]: next }));
+                    }} style={{
+                      width: 38, height: 38, borderRadius: "50%", border: "none",
+                      background: "rgba(139,26,26,0.08)", color: "#8B1A1A",
+                      fontSize: 18, fontWeight: 800, cursor: "pointer", flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>−</button>
                     <input
                       type="number"
+                      inputMode="decimal"
                       value={portionOverrides[modalRecipe.id] ?? ""}
                       placeholder={String(basePortions)}
                       onChange={e => {
@@ -1724,6 +1735,16 @@ export function CatalogueContent() {
                         background: "#fff", color: "#1a1a1a", outline: "none",
                       }}
                     />
+                    <button type="button" onClick={() => {
+                      const cur = portionOverrides[modalRecipe.id] ?? basePortions;
+                      const next = Math.round(cur + 1);
+                      setPortionOverrides(prev => ({ ...prev, [modalRecipe.id]: next }));
+                    }} style={{
+                      width: 38, height: 38, borderRadius: "50%", border: "none",
+                      background: "rgba(45,106,79,0.12)", color: "#2D6A4F",
+                      fontSize: 18, fontWeight: 800, cursor: "pointer", flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>+</button>
                     {portionFactor !== 1 && (
                       <span style={{
                         fontSize: 13, fontWeight: 800, color: "#2D6A4F", marginLeft: "auto",
