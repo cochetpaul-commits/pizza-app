@@ -951,6 +951,26 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                       style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit", boxSizing: "border-box" }} />
                   </div>
                 </div>
+                {/* Food cost au kilo */}
+                {htKg != null && htKg > 0 && (() => {
+                  const fcKg = (coutKg / htKg) * 100;
+                  const fcKgCol = fcColor(fcKg, fam.objectif_fc);
+                  return (
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: COLORS.muted, fontWeight: 700, alignItems: "center" }}>
+                        <span>FOOD COST KILO <b style={{ color: fcKgCol === "ok" ? COLORS.ok : fcKgCol === "warn" ? COLORS.amber : COLORS.warn, fontSize: 15 }}>{fcKg.toFixed(0)} %</b></span>
+                        <span>objectif {fam.label} : {fam.objectif_fc} %</span>
+                      </div>
+                      <div style={{ height: 8, borderRadius: 99, background: "#eee6d7", overflow: "hidden", marginTop: 8 }}>
+                        <div style={{
+                          height: "100%", borderRadius: 99, transition: ".3s",
+                          width: `${Math.min(100, (fam.objectif_fc > 0 ? fcKg / fam.objectif_fc : 0) * 50)}%`,
+                          background: fcKgCol === "ok" ? COLORS.ok : fcKgCol === "warn" ? COLORS.amber : COLORS.warn,
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })()}
                 {conseilleKg > 0 && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 12.5, color: COLORS.green, fontWeight: 700 }}>
