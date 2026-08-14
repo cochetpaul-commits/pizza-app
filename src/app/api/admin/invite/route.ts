@@ -115,20 +115,20 @@ export async function POST(req: NextRequest) {
 
   // Update profile role + establishment access
   if (inviteData.user) {
-    // Auto-detect establishment from employes table if not explicitly provided
+    // Lier TOUTES les fiches employés à cet email (un employé peut exister
+    // dans les deux établissements) et en déduire les accès.
     let etabAccess = etablissementsAccess ?? [];
-    if (etabAccess.length === 0) {
-      const { data: emp } = await supabaseAdmin
-        .from("employes")
-        .select("id, etablissement_id")
-        .eq("email", email)
-        .eq("actif", true)
-        .limit(1)
-        .maybeSingle();
-      if (emp?.etablissement_id) {
-        etabAccess = [emp.etablissement_id];
-        // Link auth_user_id
-        await supabaseAdmin.from("employes").update({ auth_user_id: inviteData.user.id }).eq("id", emp.id);
+    const { data: emps } = await supabaseAdmin
+      .from("employes")
+      .select("id, etablissement_id")
+      .ilike("email", email)
+      .eq("actif", true);
+    if (emps && emps.length > 0) {
+      await supabaseAdmin.from("employes")
+        .update({ auth_user_id: inviteData.user.id })
+        .in("id", emps.map(e => e.id));
+      if (etabAccess.length === 0) {
+        etabAccess = [...new Set(emps.map(e => e.etablissement_id).filter(Boolean))] as string[];
       }
     }
 

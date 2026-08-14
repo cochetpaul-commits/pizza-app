@@ -60,12 +60,37 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       // Load custom permissions + role from employes table (linked by auth_user_id).
       // Un employé peut avoir une fiche par établissement : maybeSingle()
       // échouait alors et TOUTES les permissions accordées étaient ignorées.
-      const { data: empRows } = await supabase
+      let { data: empRows } = await supabase
         .from("employes")
         .select("custom_permissions, role")
         .eq("auth_user_id", userId)
         .eq("actif", true);
       if (cancelled) return;
+
+      // Aucune fiche liée ? Tenter l'auto-liaison par email (rattrape les
+      // comptes créés sans invitation), puis relire.
+      if (!empRows || empRows.length === 0) {
+        try {
+          const { data: sess } = await supabase.auth.getSession();
+          const token = sess?.session?.access_token;
+          if (token) {
+            const res = await fetch("/api/auth/link-employe", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const d = await res.json().catch(() => null);
+            if (d?.linked > 0) {
+              const { data: retry } = await supabase
+                .from("employes")
+                .select("custom_permissions, role")
+                .eq("auth_user_id", userId)
+                .eq("actif", true);
+              empRows = retry;
+            }
+          }
+        } catch { /* auto-liaison best-effort */ }
+        if (cancelled) return;
+      }
 
       const mergedPerms: Record<string, boolean> = {};
       let bestEmpRole: Role = "equipier";
