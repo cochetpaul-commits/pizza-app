@@ -835,6 +835,20 @@ export function CatalogueContent() {
     return result;
   }, [groups, catOrder, subCatOrders, groupLabel, groupColor]);
 
+  // URL de création de recette pré-ciblée depuis une catégorie / sous-catégorie
+  const newRecipeHref = useCallback((sgKey: string): string | null => {
+    const parts = sgKey.split(":");
+    const type = parts[0];
+    if (type === "vin" || type === "empatement") return null; // formulaires dédiés
+    const cat = parts[1] ?? "";
+    const sc = parts[2] && parts[2] !== "_none" ? parts[2] : null;
+    const catSlug = type === "pizza" ? "pizza"
+      : type === "cocktail" ? "cocktail"
+      : type === "production" ? "preparation"
+      : (cat || type);
+    return `/fiche/new?cat=${encodeURIComponent(catSlug)}${sc ? `&sub=${encodeURIComponent(sc)}` : ""}`;
+  }, []);
+
   // Track open types separately
   const [openTypes, setOpenTypes] = useState<Set<string>>(new Set());
   const toggleType = useCallback((type: string) => {
@@ -1133,17 +1147,34 @@ export function CatalogueContent() {
                 <div style={{ marginTop: 6 }}>
                   {/* CTA + Sous-catégorie */}
                   {canWrite && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); setNewSubCatType(tg.type); setShowNewSubCatModal(true); }}
-                      style={{
-                        padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                        border: `1.5px solid ${tg.color}40`, background: `${tg.color}08`, color: tg.color,
-                        cursor: "pointer", marginBottom: 8,
-                      }}
-                    >
-                      + Sous-categorie
-                    </button>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setNewSubCatType(tg.type); setShowNewSubCatModal(true); }}
+                        style={{
+                          padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                          border: `1.5px solid ${tg.color}40`, background: `${tg.color}08`, color: tg.color,
+                          cursor: "pointer",
+                        }}
+                      >
+                        + Sous-categorie
+                      </button>
+                      {(() => {
+                        const sg0 = tg.subGroups[0];
+                        const href = sg0 ? newRecipeHref(sg0.key.split(":").slice(0, 2).join(":")) : null;
+                        if (!href) return null;
+                        return (
+                          <Link href={href} onClick={(e) => e.stopPropagation()}
+                            style={{
+                              padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                              border: "none", background: tg.color, color: "#fff",
+                              cursor: "pointer", textDecoration: "none", display: "inline-block",
+                            }}>
+                            + Nouvelle recette
+                          </Link>
+                        );
+                      })()}
+                    </div>
                   )}
                   <Droppable droppableId={`subcats:${tg.type}`} type="subcategories">
                     {(subCatDropProvided) => (
@@ -1192,8 +1223,24 @@ export function CatalogueContent() {
                             <span style={{ fontSize: 11, fontWeight: 700, color: sg.color, opacity: 0.6 }}>
                               {sg.items.length}
                             </span>
+                            {canWrite && (() => {
+                              const href = newRecipeHref(sg.key);
+                              if (!href) return null;
+                              return (
+                                <Link href={href} onClick={(e) => e.stopPropagation()}
+                                  title="Nouvelle recette dans cette sous-categorie"
+                                  style={{
+                                    marginLeft: "auto", width: 24, height: 24, borderRadius: 7,
+                                    border: `1.5px solid ${sg.color}50`, background: "#fff", color: sg.color,
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    textDecoration: "none", fontSize: 14, fontWeight: 800, flexShrink: 0,
+                                  }}>
+                                  +
+                                </Link>
+                              );
+                            })()}
                             <span style={{
-                              marginLeft: "auto", fontSize: 9, color: "#b0a894",
+                              marginLeft: canWrite ? 8 : "auto", fontSize: 9, color: "#b0a894",
                               transition: "transform 0.2s",
                               transform: subOpen ? "rotate(0)" : "rotate(-90deg)",
                             }}>

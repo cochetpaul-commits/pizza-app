@@ -98,6 +98,19 @@ export function unitsFor(base: "g" | "cl" | "pc"): string[] {
   return Object.keys(UNITS).filter(u => UNITS[u].base === base);
 }
 
+/**
+ * Poids d'une ligne en grammes, liquides inclus (1 ml ≈ 1 g, donc 3 L = 3 kg).
+ * Les pièces (pc) ne sont pas comptées faute de poids unitaire.
+ */
+export function ligneWeightG(l: { quantite: number | null; unite?: string | null }): number {
+  if (!l.quantite || l.quantite <= 0) return 0;
+  const u = UNITS[(l.unite ?? "g")] ?? UNITS[(l.unite ?? "g").toLowerCase()];
+  if (!u) return 0;
+  if (u.base === "g") return l.quantite * u.factor;
+  if (u.base === "cl") return l.quantite * u.factor * 10; // 1 cl = 10 ml ≈ 10 g
+  return 0; // pc
+}
+
 // ── Les 14 allergènes réglementaires ──
 export const ALLERGENES_14 = [
   "Gluten", "Crustaces", "Oeufs", "Poisson", "Arachides", "Soja",

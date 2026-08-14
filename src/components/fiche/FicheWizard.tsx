@@ -12,7 +12,7 @@ import {
   UNITS, unitsFor, ALLERGENES_14, PATON_BASE,
   coutLigne, coutRecetteTotal, coutPaton, coutPortion, prixTTC, prixHT,
   foodCostPct, margeBrute, prixConseille, fcColor, allergenesActifs, resumeAuto,
-  eur, tmpKey, defaultFiche,
+  eur, tmpKey, defaultFiche, ligneWeightG,
 } from "./ficheTypes";
 import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
@@ -28,9 +28,12 @@ const COLORS = {
 type Props = {
   recipeId?: string;
   recipeType?: "pizza" | "cuisine" | "cocktail";
+  /** Pré-sélection quand on crée depuis une catégorie / sous-catégorie */
+  initialCategorie?: string;
+  initialSousCategorie?: string;
 };
 
-export default function FicheWizard({ recipeId, recipeType }: Props) {
+export default function FicheWizard({ recipeId, recipeType, initialCategorie, initialSousCategorie }: Props) {
   const router = useRouter();
   const { current: etab, etablissements } = useEtablissement();
   const { canWrite } = useProfile();
@@ -38,7 +41,11 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
   const etabSlug = resolvedEtab?.slug?.includes("piccola") ? "piccola" : "bello_mio";
 
   const [step, setStep] = useState(0);
-  const [fiche, setFiche] = useState<FicheState>(defaultFiche(etabSlug));
+  const [fiche, setFiche] = useState<FicheState>(() => ({
+    ...defaultFiche(etabSlug),
+    ...(initialCategorie ? { categorie_slug: initialCategorie } : {}),
+    ...(initialSousCategorie ? { sous_categorie: initialSousCategorie } : {}),
+  }));
   const [categories, setCategories] = useState<Categorie[]>([]);
   const [familles, setFamilles] = useState<Famille[]>([]);
   const [mercuriale, setMercuriale] = useState<IngredientRef[]>([]);
@@ -310,7 +317,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
   // revient : sans cache, la recette en cours était perdue. On persiste le
   // brouillon en localStorage (6 h) et on le restaure au retour.
   const DRAFT_TTL_MS = 6 * 60 * 60 * 1000;
-  const draftKey = `fiche-draft:${etabSlug}:${recipeId ?? "new"}`;
+  const draftKey = `fiche-draft:${etabSlug}:${recipeId ?? `new:${initialCategorie ?? ""}:${initialSousCategorie ?? ""}`}`;
   const draftReady = useRef(false);
 
   useEffect(() => {
@@ -692,13 +699,8 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
               <span style={{ color: COLORS.bordeaux, fontSize: 18 }}>{eur(totalCost)}</span>
             </div>
             {(() => {
-              const wG = fiche.lignes.reduce((acc: number, l: LigneIngredient) => {
-                if (!l.quantite || l.quantite <= 0) return acc;
-                const u = (l.unite ?? "g").toLowerCase();
-                if (u === "g") return acc + l.quantite;
-                if (u === "kg") return acc + l.quantite * 1000;
-                return acc;
-              }, 0) + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
+              const wG = fiche.lignes.reduce((acc: number, l: LigneIngredient) => acc + ligneWeightG(l), 0)
+                + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
               if (wG <= 0) return null;
               return (
                 <div style={{ display: "flex", gap: 16, fontSize: 12, color: "#888" }}>
@@ -775,13 +777,9 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
 
           {/* Poids total + Prix/kg + Cuisson */}
           {(() => {
-            const weightG = fiche.lignes.reduce((acc: number, l: LigneIngredient) => {
-              if (!l.quantite || l.quantite <= 0) return acc;
-              const u = (l.unite ?? "g").toLowerCase();
-              if (u === "g") return acc + l.quantite;
-              if (u === "kg") return acc + l.quantite * 1000;
-              return acc;
-            }, 0) + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
+            // Liquides inclus : 3 L comptent 3 kg
+            const weightG = fiche.lignes.reduce((acc: number, l: LigneIngredient) => acc + ligneWeightG(l), 0)
+              + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
             if (weightG <= 0) return null;
             const pricePerKg = totalCost > 0 ? totalCost / weightG * 1000 : 0;
             return (
@@ -874,11 +872,7 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
               <span style={{ fontSize: 12, color: "#999" }}>g</span>
             </div>
             {fiche.cooked_weight_g != null && fiche.cooked_weight_g > 0 && (() => {
-              const wCru = fiche.lignes.reduce((a: number, l: LigneIngredient) => {
-                if (!l.quantite) return a;
-                const u = (l.unite ?? "g").toLowerCase();
-                return u === "g" ? a + l.quantite : u === "kg" ? a + l.quantite * 1000 : a;
-              }, 0);
+              const wCru = fiche.lignes.reduce((a: number, l: LigneIngredient) => a + ligneWeightG(l), 0);
               const reduction = wCru > 0 ? ((1 - fiche.cooked_weight_g / wCru) * 100).toFixed(0) : 0;
               return <span style={{ fontSize: 12, color: COLORS.terra, fontWeight: 700 }}>Reduction : {reduction}%</span>;
             })()}
@@ -886,11 +880,8 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
 
           {/* Traiteur · prix au kilo : coût matière/kg, coeff et prix TTC/kg */}
           {(() => {
-            const wCru = fiche.lignes.reduce((a: number, l: LigneIngredient) => {
-              if (!l.quantite || l.quantite <= 0) return a;
-              const u = (l.unite ?? "g").toLowerCase();
-              return u === "g" ? a + l.quantite : u === "kg" ? a + l.quantite * 1000 : a;
-            }, 0) + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
+            const wCru = fiche.lignes.reduce((a: number, l: LigneIngredient) => a + ligneWeightG(l), 0)
+              + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
             const wRef = fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? fiche.cooked_weight_g : wCru;
             if (wRef <= 0 || totalCost <= 0) {
               return (
