@@ -1,6 +1,6 @@
 /* Service Worker — Cache + Push Notifications + App Badge */
 
-const CACHE_NAME = "ifratelli-v1";
+const CACHE_NAME = "ifratelli-v2";
 
 // Pre-cache app shell on install
 self.addEventListener("install", (event) => {
@@ -31,9 +31,13 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   if (url.pathname.startsWith("/api/")) return;
   if (url.hostname.includes("supabase")) return;
+  // JAMAIS intercepter le code Next (/_next/) : le cache-first servait
+  // d'anciens chunks JS a l'infini → l'app restait figee sur une vieille
+  // version malgre les deploiements. Next gere son propre cache (hashes).
+  if (url.pathname.startsWith("/_next/")) return;
 
-  // Static assets (JS, CSS, images, fonts) → cache-first
-  if (url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|woff2?|ico)$/)) {
+  // Static assets (images, fonts, icones) → cache-first
+  if (url.pathname.match(/\.(png|jpg|jpeg|svg|woff2?|ico)$/)) {
     event.respondWith(
       caches.match(event.request).then((cached) => {
         if (cached) return cached;
