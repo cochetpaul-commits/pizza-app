@@ -248,6 +248,20 @@ body {
   }
 }
 
+/* ── Barre de période sticky (style Zenchef) ──────── */
+.period-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: rgba(242, 237, 228, 0.88);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+@media (max-width: 767px) {
+  .period-sticky { top: calc(52px + env(safe-area-inset-top, 0px)); }
+}
+
 /* ── Sidebar repliable (desktop + tablette) ───────── */
 .sidebar-desktop { transition: transform 0.25s ease; }
 .app-main { transition: margin-left 0.25s ease; }

@@ -174,6 +174,26 @@ function formatLabel(range: DateRange, format: "short" | "long" = "short"): stri
   return `${f.getDate()} ${MONTH_SHORT_FR[f.getMonth()]} ${f.getFullYear()} - ${t.getDate()} ${MONTH_SHORT_FR[t.getMonth()]} ${t.getFullYear()}`;
 }
 
+/**
+ * Décale une période d'un pas égal à sa durée : jour → ±1 j, semaine → ±7 j,
+ * mois calendaire complet → mois précédent/suivant (longueurs respectées).
+ */
+export function shiftRange(r: DateRange, dir: 1 | -1): DateRange {
+  const from = new Date(r.from + "T12:00:00");
+  const to = new Date(r.to + "T12:00:00");
+  const lastDayOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  if (from.getDate() === 1 && to.getDate() === lastDayOfMonth(to)) {
+    const monthsSpan = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()) + 1;
+    const nf = new Date(from.getFullYear(), from.getMonth() + dir * monthsSpan, 1, 12);
+    const nt = new Date(nf.getFullYear(), nf.getMonth() + monthsSpan, 0, 12);
+    return { from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) };
+  }
+  const days = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+  const nf = new Date(from.getTime() + dir * days * 86400000);
+  const nt = new Date(to.getTime() + dir * days * 86400000);
+  return { from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) };
+}
+
 function detectPreset(range: DateRange, presets: PresetKey[]): PresetKey | null {
   for (const k of presets) {
     const r = computePreset(k);

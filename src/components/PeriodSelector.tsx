@@ -123,7 +123,10 @@ export function PeriodSelector({
   const isNow = isCurrent(period);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+    <div className="period-sticky" style={{
+      display: "flex", flexDirection: "column", gap: 8, marginBottom: 16,
+      margin: "-20px -16px 16px", padding: "10px 16px 8px",
+    }}>
       {/* Mode tabs */}
       <div style={{ display: "flex", justifyContent: "center" }}>
         <div style={{ display: "inline-flex", gap: 2, padding: 3, background: "rgba(0,0,0,0.04)", borderRadius: 10 }}>

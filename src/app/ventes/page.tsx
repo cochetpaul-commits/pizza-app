@@ -6,7 +6,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import Chart from "chart.js/auto";
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
-import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
+import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 import { supabase } from "@/lib/supabaseClient";
@@ -91,31 +91,6 @@ function defaultRange(): DateRange {
   else if (dow === 6) d.setDate(d.getDate() - 1); // Saturday → Friday
   const iso = d.toISOString().slice(0, 10);
   return { from: iso, to: iso };
-}
-
-/**
- * Décale la période sélectionnée d'un "pas" égal à sa propre durée :
- * un jour → ±1 jour, une semaine → ±7 jours, un mois calendaire → mois
- * précédent/suivant (en respectant les longueurs de mois), etc.
- */
-function shiftRange(r: DateRange, dir: 1 | -1): DateRange {
-  const from = new Date(r.from + "T12:00:00");
-  const to = new Date(r.to + "T12:00:00");
-  const lastDayOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-
-  // Période "mois calendaire(s) complet(s)" (du 1er au dernier jour) :
-  // on saute de mois en mois plutôt que d'un nombre fixe de jours.
-  if (from.getDate() === 1 && to.getDate() === lastDayOfMonth(to)) {
-    const monthsSpan = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()) + 1;
-    const nf = new Date(from.getFullYear(), from.getMonth() + dir * monthsSpan, 1, 12);
-    const nt = new Date(nf.getFullYear(), nf.getMonth() + monthsSpan, 0, 12);
-    return { from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) };
-  }
-
-  const days = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
-  const nf = new Date(from.getTime() + dir * days * 86400000);
-  const nt = new Date(to.getTime() + dir * days * 86400000);
-  return { from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) };
 }
 
 /** Renvoie l'ensemble des dates ISO (incluses) entre from et to. */

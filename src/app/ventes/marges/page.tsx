@@ -6,7 +6,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { AiInsightCard } from "@/components/AiInsightCard";
-import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
+import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 
@@ -777,10 +777,33 @@ function MargesPage() {
             .marges-toolbar-desktop { display: none !important; }
           }
         `}</style>
-        {/* DateRangePicker — centered (desktop), hidden when embedded */}
+        {/* Barre de période sticky (style Zenchef) */}
         {!isEmbedded && (
-        <div className="desktop-only" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 10 }}>
+        <div className="period-sticky" style={{
+          display: "flex", justifyContent: "center", alignItems: "center", gap: 8,
+          margin: "-16px -16px 10px", padding: "10px 16px",
+        }}>
+          <button type="button" aria-label="Période précédente" onClick={() => setRange(shiftRange(range, -1))} style={{
+            width: 32, height: 32, borderRadius: 10, border: "1px solid #e0d8ce",
+            background: "#fff", color: COLORS.accent, fontSize: 14, fontWeight: 700,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
           <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
+          <button type="button" aria-label="Période suivante" onClick={() => {
+            if (range.to >= new Date().toISOString().slice(0, 10)) return;
+            setRange(shiftRange(range, 1));
+          }} style={{
+            width: 32, height: 32, borderRadius: 10, border: "1px solid #e0d8ce",
+            background: range.to >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : "#fff",
+            color: range.to >= new Date().toISOString().slice(0, 10) ? "#ccc" : COLORS.accent,
+            fontSize: 14, fontWeight: 700,
+            cursor: range.to >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
         </div>
         )}
 
@@ -1950,30 +1973,7 @@ function MargesPage() {
           boxShadow: "0 4px 20px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
           border: "1px solid rgba(0,0,0,0.06)",
         }}>
-          <button type="button" onClick={() => {
-            const nf = new Date(new Date(range.from + "T12:00:00").getTime() - 86400000);
-            const nt = new Date(new Date(range.to + "T12:00:00").getTime() - 86400000);
-            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
-          }} style={{
-            width: 30, height: 30, borderRadius: 8, border: "none",
-            background: COLORS.accent + "15", color: COLORS.accent, fontSize: 13, fontWeight: 700,
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>{"←"}</button>
-          <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
-          <button type="button" onClick={() => {
-            const today = new Date().toISOString().slice(0, 10);
-            if (range.from >= today) return;
-            const nf = new Date(new Date(range.from + "T12:00:00").getTime() + 86400000);
-            const nt = new Date(new Date(range.to + "T12:00:00").getTime() + 86400000);
-            setRange({ from: nf.toISOString().slice(0, 10), to: nt.toISOString().slice(0, 10) });
-          }} style={{
-            width: 30, height: 30, borderRadius: 8, border: "none",
-            background: range.from >= new Date().toISOString().slice(0, 10) ? "#f0ebe3" : COLORS.accent + "15",
-            color: range.from >= new Date().toISOString().slice(0, 10) ? "#ccc" : COLORS.accent,
-            fontSize: 13, fontWeight: 700,
-            cursor: range.from >= new Date().toISOString().slice(0, 10) ? "not-allowed" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>{"→"}</button>
+          {/* La navigation de période vit dans la barre sticky du haut */}
           <button type="button" onClick={() => setFileDrawerOpen(true)} style={{
             width: 32, height: 32, borderRadius: 10, border: "1px solid #ddd6c8",
             background: "#fff", cursor: "pointer",
