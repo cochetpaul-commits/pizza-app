@@ -22,15 +22,38 @@ type StorageZone = {
   id: string;
   name: string;
   display_order: number;
+  /** Critères : la zone AFFICHE tous les produits de ces catégories/fournisseurs */
+  category_slugs?: string[] | null;
+  supplier_ids?: string[] | null;
 };
 
 const SANS_ZONE = "__sans_zone__";
 
+/**
+ * Une zone est une VUE : elle contient les produits affectés manuellement
+ * (storage_zone) PLUS tous ceux qui matchent ses critères (catégories /
+ * fournisseurs). Un même produit peut donc apparaître dans plusieurs zones
+ * (ex : le vin en CAVE A VIN et au BAR) sans être déplacé.
+ */
+function zoneHasIngredient(zone: StorageZone, ing: Ingredient): boolean {
+  if (ing.storage_zone === zone.name) return true;
+  if ((zone.category_slugs ?? []).includes(ing.category)) return true;
+  const sups = zone.supplier_ids ?? [];
+  if (sups.length > 0 && ing.supplier_id != null && sups.includes(ing.supplier_id)) return true;
+  return false;
+}
+
+/** Zone "principale" (affectation manuelle) — pour le badge d'origine */
 function resolveZone(ing: Ingredient, zones: StorageZone[]): string {
   if (ing.storage_zone) {
     if (zones.some(z => z.name === ing.storage_zone)) return ing.storage_zone;
   }
   return SANS_ZONE;
+}
+
+/** Sans zone = n'apparaît dans AUCUNE zone (ni affectation ni critères) */
+function isUnzoned(ing: Ingredient, zones: StorageZone[]): boolean {
+  return !zones.some(z => zoneHasIngredient(z, ing));
 }
 
 function fmtDate(iso: string) {
@@ -122,6 +145,7 @@ export default function InventairePage() {
   const [addProdSel, setAddProdSel] = useState<Set<string>>(new Set());
   const [quickCreateCat, setQuickCreateCat] = useState<string>("epicerie_salee");
   const [addingProducts, setAddingProducts] = useState(false);
+  const [editCatsZoneId, setEditCatsZoneId] = useState<string | null>(null);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
 
   const [packInfo, setPackInfo] = useState<Record<string, { pack_count: number; pack_each_qty: number | null; pack_each_unit: string | null }>>({}); // ingredient_id -> pack info
@@ -483,29 +507,8 @@ export default function InventairePage() {
       setAddingZone(false);
       return;
     }
-    // Auto-assign ingredients matching supplier/category to this zone.
-    // Les produits déjà rangés ailleurs sont proposés au déplacement — sinon
-    // la zone paraît incomplète (« je n'ai pas tous les produits »).
-    if (newZoneSupplierIds.length > 0 || newZoneCategorySlugs.length > 0) {
-      const matches = (ing: Ingredient) =>
-        (newZoneSupplierIds.length > 0 && ing.supplier_id != null && newZoneSupplierIds.includes(ing.supplier_id)) ||
-        (newZoneCategorySlugs.length > 0 && newZoneCategorySlugs.includes(ing.category));
-      const matching = ingredients.filter(matches);
-      const alreadyZoned = matching.filter(ing => ing.storage_zone && ing.storage_zone !== SANS_ZONE);
-      let toUpdate = matching;
-      if (alreadyZoned.length > 0) {
-        const move = confirm(
-          `${matching.length} produit(s) correspondent aux critères, dont ${alreadyZoned.length} déjà rangé(s) dans d'autres zones.\n\n` +
-          `OK : tout déplacer vers "${name}"\nAnnuler : n'ajouter que les produits sans zone`
-        );
-        if (!move) toUpdate = matching.filter(ing => !ing.storage_zone || ing.storage_zone === SANS_ZONE);
-      }
-      if (toUpdate.length > 0) {
-        const ids = toUpdate.map(i => i.id);
-        await supabase.from("ingredients").update({ storage_zone: name }).in("id", ids);
-        setIngredients(prev => prev.map(i => ids.includes(i.id) ? { ...i, storage_zone: name } : i));
-      }
-    }
+    // Pas d'affectation : la zone AFFICHE automatiquement les produits de
+    // ses catégories/fournisseurs, sans les retirer des autres zones.
     await loadZones();
     setNewZoneName("");
     setNewZoneSupplierIds([]);
@@ -538,6 +541,15 @@ export default function InventairePage() {
     }
   }
 
+  /** Ajoute/retire une catégorie des critères d'une zone (vue mise à jour en direct) */
+  async function toggleZoneCategory(zone: StorageZone, cat: string) {
+    const cur = zone.category_slugs ?? [];
+    const next = cur.includes(cat) ? cur.filter(c => c !== cat) : [...cur, cat];
+    const { error } = await supabase.from("storage_zones").update({ category_slugs: next }).eq("id", zone.id);
+    if (error) { alert(error.message); return; }
+    setZones(prev => prev.map(z => z.id === zone.id ? { ...z, category_slugs: next } : z));
+  }
+
   async function renameZone(zone: StorageZone) {
     const name = prompt(`Nouveau nom pour la zone "${zone.name}" :`, zone.name)?.trim();
     if (!name || name === zone.name) return;
@@ -547,28 +559,6 @@ export default function InventairePage() {
     setIngredients(prev => prev.map(i => i.storage_zone === zone.name ? { ...i, storage_zone: name } : i));
     if (activeZone === zone.name) setActiveZone(name);
     await loadZones();
-  }
-
-  /** Réapplique les critères (catégories / fournisseurs) de la zone à tous les produits */
-  async function syncZone(zone: StorageZone) {
-    const catSlugs: string[] = (zone as unknown as { category_slugs?: string[] }).category_slugs ?? [];
-    const supIds: string[] = (zone as unknown as { supplier_ids?: string[] }).supplier_ids ?? [];
-    if (catSlugs.length === 0 && supIds.length === 0) {
-      alert("Cette zone n'a pas de critères (catégories ou fournisseurs). Utilisez « + Produits » pour ajouter manuellement.");
-      return;
-    }
-    const matching = ingredients.filter(ing =>
-      (supIds.length > 0 && ing.supplier_id != null && supIds.includes(ing.supplier_id)) ||
-      (catSlugs.length > 0 && catSlugs.includes(ing.category))
-    );
-    const missing = matching.filter(ing => ing.storage_zone !== zone.name);
-    if (missing.length === 0) { alert(`"${zone.name}" est déjà à jour (${matching.length} produits).`); return; }
-    const fromOther = missing.filter(i => i.storage_zone && i.storage_zone !== SANS_ZONE).length;
-    if (!confirm(`Ajouter ${missing.length} produit(s) à "${zone.name}"${fromOther > 0 ? ` (dont ${fromOther} déplacé(s) d'autres zones)` : ""} ?`)) return;
-    const ids = missing.map(i => i.id);
-    const { error } = await supabase.from("ingredients").update({ storage_zone: zone.name }).in("id", ids);
-    if (error) { alert(error.message); return; }
-    setIngredients(prev => prev.map(i => ids.includes(i.id) ? { ...i, storage_zone: zone.name } : i));
   }
 
   /** Affecte les produits cochés à la zone active */
@@ -607,7 +597,7 @@ export default function InventairePage() {
 
   const displayZones = useMemo(() => {
     const tabs: { id: string; nom: string }[] = zones.map(z => ({ id: z.name, nom: z.name }));
-    const hasUnassigned = ingredients.some(i => resolveZone(i, zones) === SANS_ZONE);
+    const hasUnassigned = ingredients.some(i => isUnzoned(i, zones));
     if (hasUnassigned) {
       tabs.push({ id: SANS_ZONE, nom: "Sans zone" });
     }
@@ -615,7 +605,10 @@ export default function InventairePage() {
   }, [zones, ingredients]);
 
   const zoneIngredients = useMemo(() => {
-    return ingredients.filter((ing) => resolveZone(ing, zones) === activeZone);
+    if (activeZone === SANS_ZONE) return ingredients.filter((ing) => isUnzoned(ing, zones));
+    const zone = zones.find(z => z.name === activeZone);
+    if (!zone) return [];
+    return ingredients.filter((ing) => zoneHasIngredient(zone, ing));
   }, [ingredients, activeZone, zones]);
 
   // Group by category
@@ -685,12 +678,19 @@ export default function InventairePage() {
   // Zone counts + progress for badges
   const zoneStats = useMemo(() => {
     const stats: Record<string, { saisis: number; total: number }> = {};
+    const bump = (key: string, saisi: boolean) => {
+      if (!stats[key]) stats[key] = { saisis: 0, total: 0 };
+      stats[key].total++;
+      if (saisi) stats[key].saisis++;
+    };
     for (const ing of ingredients) {
-      const zone = resolveZone(ing, zones);
-      if (!stats[zone]) stats[zone] = { saisis: 0, total: 0 };
-      stats[zone].total++;
       const qty = quantities[ing.id];
-      if (qty !== undefined && qty !== "") stats[zone].saisis++;
+      const saisi = qty !== undefined && qty !== "";
+      let inAny = false;
+      for (const z of zones) {
+        if (zoneHasIngredient(z, ing)) { bump(z.name, saisi); inAny = true; }
+      }
+      if (!inAny) bump(SANS_ZONE, saisi);
     }
     return stats;
   }, [ingredients, quantities, zones]);
@@ -1094,39 +1094,65 @@ export default function InventairePage() {
               Zones de stockage
             </div>
             {zones.map((z) => {
-              const count = ingredients.filter(i => i.storage_zone === z.name).length;
+              const nbVisible = ingredients.filter(i => zoneHasIngredient(z, i)).length;
+              const nbCats = (z.category_slugs ?? []).length;
+              const editing = editCatsZoneId === z.id;
               return (
-                <div key={z.id} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "6px 0", borderBottom: "1px solid #f0ebe2",
-                }}>
-                  <div>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{z.name}</span>
-                    <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>
-                      {count} ingrédient{count !== 1 ? "s" : ""}
-                    </span>
+                <div key={z.id} style={{ borderBottom: "1px solid #f0ebe2" }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "6px 0",
+                  }}>
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{z.name}</span>
+                      <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>
+                        {nbVisible} produit{nbVisible !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", gap: 2 }}>
+                      <button type="button" onClick={() => setEditCatsZoneId(editing ? null : z.id)}
+                        style={{ fontSize: 11, color: editing ? "#fff" : "#8B6914", background: editing ? "#8B6914" : "none", border: "none", borderRadius: 6, cursor: "pointer", padding: "4px 8px", fontWeight: 600 }}>
+                        Catégories{nbCats > 0 ? ` (${nbCats})` : ""}
+                      </button>
+                      <button type="button" onClick={() => renameZone(z)}
+                        style={{ fontSize: 11, color: "#2563EB", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>
+                        Renommer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteZone(z)}
+                        style={{
+                          fontSize: 11, color: "#DC2626", background: "none", border: "none",
+                          cursor: "pointer", padding: "4px 8px",
+                        }}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: "flex", gap: 2 }}>
-                    <button type="button" onClick={() => renameZone(z)}
-                      style={{ fontSize: 11, color: "#2563EB", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>
-                      Renommer
-                    </button>
-                    <button type="button" onClick={() => syncZone(z)}
-                      title="Réaffecter tous les produits correspondant aux catégories/fournisseurs de la zone"
-                      style={{ fontSize: 11, color: "#2D6A4F", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>
-                      Synchroniser
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteZone(z)}
-                      style={{
-                        fontSize: 11, color: "#DC2626", background: "none", border: "none",
-                        cursor: "pointer", padding: "4px 8px",
-                      }}
-                    >
-                      Supprimer
-                    </button>
-                  </div>
+                  {editing && (
+                    <div style={{ padding: "2px 0 10px" }}>
+                      <div style={{ fontSize: 10.5, color: "#999", marginBottom: 6 }}>
+                        La zone affiche automatiquement tous les produits des catégories cochées (sans les retirer des autres zones).
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                        {CATEGORIES.map(cat => {
+                          const sel = (z.category_slugs ?? []).includes(cat);
+                          return (
+                            <button key={cat} type="button" onClick={() => toggleZoneCategory(z, cat)}
+                              style={{
+                                padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                                border: sel ? "1.5px solid #D4775A" : "1.5px solid #e0d8ce",
+                                background: sel ? "rgba(212,119,90,0.10)" : "#fff",
+                                color: sel ? "#D4775A" : "#777",
+                              }}>
+                              {CAT_LABELS[cat]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1136,8 +1162,9 @@ export default function InventairePage() {
         {/* Modal : ajouter des produits à la zone active */}
         {showAddProducts && (() => {
           const q = addProdSearch.trim().toLowerCase();
+          const activeZoneObj = zones.find(z => z.name === activeZone);
           const candidates = ingredients
-            .filter(i => resolveZone(i, zones) !== activeZone)
+            .filter(i => !activeZoneObj || !zoneHasIngredient(activeZoneObj, i))
             .filter(i => !q || i.name.toLowerCase().includes(q))
             .slice(0, 60);
           const exactExists = ingredients.some(i => i.name.trim().toLowerCase() === q);
