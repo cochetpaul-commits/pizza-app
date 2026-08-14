@@ -57,6 +57,8 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
   const [popinaSearch, setPopinaSearch] = useState("");
   const [showPopinaList, setShowPopinaList] = useState(false);
   const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
+  // Saisie en cours du coefficient kilo (null = affichage dérivé du prix)
+  const [coeffKgDraft, setCoeffKgDraft] = useState<string | null>(null);
 
   // ── Load data ──
   useEffect(() => {
@@ -928,12 +930,19 @@ export default function FicheWizard({ recipeId, recipeType }: Props) {
                   <div style={{ minWidth: 150 }}>
                     <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Coefficient kilo</label>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <input type="number" step="0.01" value={coeffKg != null ? coeffKg.toFixed(2) : ""}
+                      <input type="number" step="0.01"
+                        value={coeffKgDraft ?? (coeffKg != null ? coeffKg.toFixed(2) : "")}
                         placeholder="x"
+                        onFocus={() => setCoeffKgDraft(coeffKg != null ? String(Math.round(coeffKg * 100) / 100) : "")}
                         onChange={e => {
-                          const c = Number(e.target.value);
-                          update({ sell_price_per_kg: c > 0 ? Math.round(coutKg * c * 100) / 100 : null });
+                          // Garder la frappe telle quelle et appliquer le prix en direct
+                          setCoeffKgDraft(e.target.value);
+                          const c = Number(e.target.value.replace(",", "."));
+                          if (Number.isFinite(c) && c > 0) {
+                            update({ sell_price_per_kg: Math.round(coutKg * c * 100) / 100 });
+                          }
                         }}
+                        onBlur={() => setCoeffKgDraft(null)}
                         style={{ width: 86, textAlign: "center", fontWeight: 800, color: "#6b4fd8", fontSize: 17, border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "9px", background: "#fffdf9", fontFamily: "inherit" }} />
                       {[2.5, 3, 3.5].map(c => (
                         <button key={c} onClick={() => update({ sell_price_per_kg: Math.round(coutKg * c * 100) / 100 })}
