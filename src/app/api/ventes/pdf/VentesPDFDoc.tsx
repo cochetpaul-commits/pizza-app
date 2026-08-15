@@ -1057,60 +1057,6 @@ function ZonesRow({ stats }: { stats: any }) {
   );
 }
 
-function _MargeCard({ stats }: { stats: any }) {
-  const W = stats;
-  const margeTotal = W.marge_total ?? 0;
-  const margePct = W.marge_pct ?? 0;
-  if (margeTotal === 0 && margePct === 0) return null;
-  const dayMarge: number[] = W.day_marge ?? [];
-  const dayTM: number[] = W.day_taux_marque ?? [];
-  const avgTM = dayTM.filter((v) => v > 0).length > 0
-    ? dayTM.filter((v) => v > 0).reduce((acc, v) => acc + v, 0) / dayTM.filter((v) => v > 0).length
-    : 0;
-  const maxMarge = Math.max(...dayMarge, 1);
-  const labels: string[] = W.days ?? [];
-
-  return (
-    <View style={s.card} wrap={false}>
-      <Text style={s.sec}>Marge & taux de marque</Text>
-      <View style={{ flexDirection: "row", gap: 6, marginBottom: 8 }}>
-        <View style={{ ...s.kpi, flex: 1 }}>
-          <Text style={{ ...s.kpiVal, color: c.green }}>{fmt(margeTotal)}</Text>
-          <Text style={s.kpiLabel}>Marge totale</Text>
-        </View>
-        <View style={{ ...s.kpi, flex: 1 }}>
-          <Text style={{ ...s.kpiVal, color: margePct >= 25 ? c.green : margePct >= 15 ? "#e65100" : c.bad }}>{margePct.toFixed(1)}%</Text>
-          <Text style={s.kpiLabel}>Marge / CA HT</Text>
-        </View>
-        <View style={{ ...s.kpi, flex: 1 }}>
-          <Text style={{ ...s.kpiVal, color: c.accent }}>{(avgTM * 100).toFixed(1)}%</Text>
-          <Text style={s.kpiLabel}>Taux de marque moy.</Text>
-        </View>
-      </View>
-      {dayMarge.length > 1 && (
-        <View>
-          <Text style={{ ...s.sec, marginBottom: 4 }}>Marge par jour</Text>
-          {dayMarge.map((m, i) => {
-            const tm = dayTM[i] ?? 0;
-            const pct = maxMarge > 0 ? (m / maxMarge) * 100 : 0;
-            const tmColor = tm >= 0.25 ? c.green : tm >= 0.15 ? "#e65100" : c.bad;
-            return (
-              <View key={i} style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
-                <Text style={{ width: 40, fontSize: 6 }}>{labels[i] ?? ""}</Text>
-                <View style={{ flex: 1, ...s.barBg }}>
-                  <View style={{ ...s.barFill, width: `${pct}%`, backgroundColor: c.green }} />
-                </View>
-                <Text style={{ width: 42, textAlign: "right", fontSize: 11, fontFamily: "Helvetica-Bold", color: c.green }}>{fmt(m)}</Text>
-                <Text style={{ width: 30, textAlign: "right", fontSize: 8, fontFamily: "Helvetica-Bold", color: tmColor }}>{(tm * 100).toFixed(1)}%</Text>
-              </View>
-            );
-          })}
-        </View>
-      )}
-    </View>
-  );
-}
-
 function HourlyCard({ stats }: { stats: any }) {
   const h: number[] = stats.hourly_ttc ?? stats.hourly_totals ?? [];
   if (!h.length || !h.some((v) => v > 0)) return null;

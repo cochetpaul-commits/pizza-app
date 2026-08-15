@@ -5,6 +5,6 @@ import { useRouter } from "next/navigation";
 
 export default function PiccolaMiaPlanningPage() {
   const router = useRouter();
-  useEffect(() => { router.replace("/plannings"); }, [router]);
+  useEffect(() => { router.replace("/rh/conges"); }, [router]);
   return null;
 }

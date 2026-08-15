@@ -19,3 +19,4 @@ supabase/remote_schema_live.sql
 scripts/
 .vercel
 .env*.local
+tsconfig.tsbuildinfo

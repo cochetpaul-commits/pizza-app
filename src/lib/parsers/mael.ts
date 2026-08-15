@@ -73,8 +73,6 @@ const RE_DLC_PREFIX = /^(?:NC|(?:\d+\*)?(?:\d{2}\/){1,2}\d{2,4}(?:\s+(?:\d+\*)?(
 const RE_REMISE = /\s*REMISE\s+.*$/i;
 
 // TVA code → rate mapping
-const _TVA_MAP: Record<string, number> = { "2": 5.5, "5": 20.0 };
-void _TVA_MAP;
 
 // ── Parser ──────────────────────────────────────────────────────────────────
 

@@ -2209,28 +2209,6 @@ function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets,
   );
 }
 
-function _UpsellCardMini({ label, emoji, data, totalTables, color, mode, onClick, active }: {
-  label: string; emoji: string; data: UpsellData; totalTables: number; color: string; mode: string;
-  onClick?: () => void; active?: boolean;
-}) {
-  const pct = totalTables > 0 ? Math.round(data.tables / totalTables * 100) : 0;
-  const ca = mode === "ttc" ? data.ca_ttc : data.ca_ht;
-  return (
-    <div onClick={onClick} style={{ padding: "12px 14px", background: active ? `${color}10` : "#f9f6f0", borderRadius: 10, cursor: onClick ? "pointer" : "default", border: active ? `1.5px solid ${color}30` : "1.5px solid transparent", transition: "all 0.15s" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-        <span style={{ fontSize: 14 }}>{emoji}</span>
-        <span style={{ fontSize: 11, fontWeight: 600 }}>{label}</span>
-      </div>
-      <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color, lineHeight: 1, marginBottom: 4 }}>{pct}%</div>
-      <div style={{ fontSize: 10, color: "#777", marginBottom: 6 }}>{data.tables}/{totalTables} tables</div>
-      <div style={{ height: 5, background: "rgba(0,0,0,.07)", borderRadius: 3, overflow: "hidden", marginBottom: 4 }}>
-        <div style={{ height: "100%", width: `${Math.min(100, pct)}%`, background: color, borderRadius: 3 }} />
-      </div>
-      <div style={{ fontSize: 11, fontWeight: 600, color }}>{fmt(ca)}</div>
-    </div>
-  );
-}
-
 function PlaceBlock({ label, color, ca, pct, couverts, tm, onClick, active }: { label: string; color: string; ca: number; pct: number; couverts: number; tm: string; onClick?: () => void; active?: boolean }) {
   return (
     <div style={{ flex: 1, cursor: onClick ? "pointer" : "default", padding: 8, margin: -8, borderRadius: 10, background: active ? `${color}08` : "transparent", border: active ? `1.5px solid ${color}30` : "1.5px solid transparent", transition: "all 0.15s" }} onClick={onClick}>

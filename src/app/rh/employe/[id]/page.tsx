@@ -48,19 +48,6 @@ type Absence = {
   note: string | null;
 };
 
-type Shift = {
-  employe_id: string;
-  date: string;
-  heure_debut: string;
-  heure_fin: string;
-  pause_minutes: number;
-  start_time?: string;
-  end_time?: string;
-};
-
-type MainTab = "infos" | "dossier" | "acces" | "conges" | "documents" | "roles";
-
-
 /* ── Constants ─────────────────────────────────────────────────── */
 
 const CONTRAT_LABELS: Record<string, string> = {
@@ -73,11 +60,6 @@ const ABSENCE_LABELS: Record<string, string> = {
   absence_injustifiee: "Absence injustifiee", ferie: "Ferie",
   repos_compensateur: "Repos compensateur", formation: "Formation",
   evenement_familial: "Evenement familial",
-};
-
-const ELEMENT_LABELS: Record<string, string> = {
-  prime: "Prime", transport: "Transport",
-  acompte: "Acompte", mutuelle_dispense: "Dispense mutuelle",
 };
 
 /* ── Component ─────────────────────────────────────────────────── */
@@ -93,7 +75,6 @@ export default function EmployeDetailPage() {
   const [saveOk, setSaveOk] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
-  const [mainTab] = useState<MainTab>("infos");
 
   // ── Employee fields ──
   const [emp, setEmp] = useState<Record<string, unknown>>({});
@@ -137,9 +118,8 @@ export default function EmployeDetailPage() {
 
   // ── Related data ──
   const [contrats, setContrats] = useState<Contrat[]>([]);
-  const [elements, setElements] = useState<ContratElement[]>([]);
+  const [, setElements] = useState<ContratElement[]>([]);
   const [absences, setAbsences] = useState<Absence[]>([]);
-  const [shifts, setShifts] = useState<Shift[]>([]);
 
   // ── Absence modal ──
   const [showAbsenceModal, setShowAbsenceModal] = useState(false);
@@ -312,17 +292,15 @@ export default function EmployeDetailPage() {
       }
 
       // Load related
-      const [contratsRes, absRes, shiftsRes] = await Promise.all([
+      const [contratsRes, absRes] = await Promise.all([
         supabase.from("contrats").select("*").eq("employe_id", id).order("date_debut", { ascending: false }),
         supabase.from("absences").select("*").eq("employe_id", id).order("date_debut", { ascending: false }),
-        supabase.from("shifts").select("*").eq("employe_id", id).order("date", { ascending: false }).limit(200),
       ]);
 
       if (cancelled) return;
       const cList = contratsRes.data ?? [];
       setContrats(cList);
       setAbsences(absRes.data ?? []);
-      setShifts(shiftsRes.data ?? []);
 
       // Load elements for all contrats
       if (cList.length > 0) {
@@ -515,14 +493,6 @@ export default function EmployeDetailPage() {
   };
 
   /* ── Terminate contrat ── */
-  const handleTerminateContrat = async (contratId: string) => {
-    if (!confirm("Terminer ce contrat ? La date de fin sera fixee a aujourd'hui.")) return;
-    const today = new Date().toISOString().slice(0, 10);
-    await supabase.from("contrats").update({ actif: false, date_fin: today }).eq("id", contratId);
-    const { data } = await supabase.from("contrats").select("*").eq("employe_id", id).order("date_debut", { ascending: false });
-    setContrats(data ?? []);
-  };
-
   /* ── Save absence ── */
   const handleSaveAbsence = async () => {
     if (!id || !etab) return;
@@ -574,23 +544,6 @@ export default function EmployeDetailPage() {
     setCHeures(c.heures_semaine);
     setCJours(c.jours_semaine);
     setCActif(c.actif);
-    setCSmic(false);
-    setContratTab("contrat");
-    loadContratEquipes();
-    setShowContratModal(true);
-  };
-
-  const openNewContrat = () => {
-    setEditContratId(null);
-    setCType("CDI");
-    setCDebut(new Date().toISOString().slice(0, 10));
-    setCFin("");
-    setCRemuneration(0);
-    setCEmploi("");
-    setCQualification("");
-    setCHeures(39);
-    setCJours(5);
-    setCActif(true);
     setCSmic(false);
     setContratTab("contrat");
     loadContratEquipes();
@@ -976,187 +929,6 @@ export default function EmployeDetailPage() {
           })()}
         </AccordionSection>
 
-        {/* ═══ TAB: CONTRATS (hidden — kept for legacy) ═══ */}
-        {mainTab === "dossier" && (
-          <>
-            {/* Contrat en cours — inline editable */}
-            <AccordionSection
-              title={activeContrat ? `Contrat en cours — ${CONTRAT_LABELS[activeContrat.type] ?? activeContrat.type}` : "Contrat en cours"}
-              icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>}
-              iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
-              defaultOpen
-            >
-              {activeContrat ? (
-                <>
-                  {/* Inline editable contract fields */}
-                  <div style={grid2}>
-                    <FieldSelect label="Type de contrat" value={cType} onChange={setCType} disabled={!canWrite} tag="DPAE"
-                      options={Object.entries(CONTRAT_LABELS).map(([k, v]) => [k, v])} />
-                    <Field label="Emploi / Poste" value={cEmploi} onChange={setCEmploi} disabled={!canWrite} tag="DPAE" />
-                  </div>
-                  <div style={grid2}>
-                    <Field label="Date de debut" type="date" value={cDebut} onChange={setCDebut} disabled={!canWrite} tag="DPAE" />
-                    <Field label="Date de fin" type="date" value={cFin} onChange={setCFin} disabled={!canWrite} />
-                  </div>
-                  <div style={grid2}>
-                    <Field label="Remuneration brute mensuelle (EUR)" type="number" value={String(cRemuneration)} onChange={(v) => setCRemuneration(Number(v))} disabled={!canWrite} tag="DPAE" />
-                    <Field label="Qualification" value={cQualification} onChange={setCQualification} disabled={!canWrite} />
-                  </div>
-                  <div style={grid2}>
-                    <Field label="Heures / semaine" type="number" value={String(cHeures)} onChange={(v) => setCHeures(Number(v))} disabled={!canWrite} tag="DPAE" />
-                    <Field label="Jours / semaine" type="number" value={String(cJours)} onChange={(v) => setCJours(Number(v))} disabled={!canWrite} />
-                  </div>
-
-                  {/* Etablissement + Equipe */}
-                  <div style={grid2}>
-                    <div style={fieldRow}>
-                      <label style={labelSt}>Etablissement <span style={tagStyle("DPAE")}>DPAE</span></label>
-                      <select id="contrat-etab" style={inputSt} defaultValue={(emp as Record<string, unknown>).etablissement_id as string ?? ""} disabled={!canWrite}>
-                        {etablissements.map((e) => <option key={e.id} value={e.id}>{e.nom}</option>)}
-                      </select>
-                    </div>
-                    <div style={fieldRow}>
-                      <label style={labelSt}>Equipe</label>
-                      <select id="contrat-equipe" style={inputSt} defaultValue={((emp as Record<string, unknown>).equipes_access as string[] ?? [])[0] ?? ""} disabled={!canWrite}>
-                        <option value="">— Selectionner —</option>
-                        {contratEquipes.map((eq) => <option key={eq} value={eq}>{eq}</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  {canWrite && (
-                    <div style={{ display: "flex", gap: 8, marginTop: 12, paddingTop: 12, borderTop: "1px solid #f0ebe3" }}>
-                      <button type="button" onClick={handleSaveContrat} disabled={saving} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: saving ? 0.5 : 1 }}>
-                        {saving ? "..." : "Enregistrer le contrat"}
-                      </button>
-                      <button type="button" onClick={() => handleTerminateContrat(activeContrat.id)} style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid rgba(220,38,38,0.3)", background: "rgba(220,38,38,0.06)", color: "#DC2626", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                        Terminer le contrat
-                      </button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div style={{ textAlign: "center", padding: 20, color: "#999", fontSize: 13 }}>
-                  Aucun contrat actif.
-                  {canWrite && (
-                    <button type="button" onClick={openNewContrat} style={{ display: "block", margin: "10px auto 0", padding: "8px 18px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                      + Creer un contrat
-                    </button>
-                  )}
-                </div>
-              )}
-            </AccordionSection>
-
-            {/* Nouveau contrat (si pas de contrat actif ou demande) */}
-            {showContratModal && !editContratId && (
-              <AccordionSection
-                title="Nouveau contrat"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>}
-                iconColor="#2D6A4F" iconBg="rgba(45,106,79,0.1)"
-                defaultOpen
-              >
-                <div style={grid2}>
-                  <FieldSelect label="Type de contrat" value={cType} onChange={setCType} tag="DPAE"
-                    options={Object.entries(CONTRAT_LABELS).map(([k, v]) => [k, v])} />
-                  <Field label="Emploi / Poste" value={cEmploi} onChange={setCEmploi} tag="DPAE" />
-                </div>
-                <div style={grid2}>
-                  <Field label="Date de debut" type="date" value={cDebut} onChange={setCDebut} tag="DPAE" />
-                  <Field label="Date de fin" type="date" value={cFin} onChange={setCFin} />
-                </div>
-                <div style={grid2}>
-                  <Field label="Remuneration brute mensuelle (EUR)" type="number" value={String(cRemuneration)} onChange={(v) => setCRemuneration(Number(v))} tag="DPAE" />
-                  <Field label="Qualification" value={cQualification} onChange={setCQualification} />
-                </div>
-                <div style={grid2}>
-                  <Field label="Heures / semaine" type="number" value={String(cHeures)} onChange={(v) => setCHeures(Number(v))} tag="DPAE" />
-                  <Field label="Jours / semaine" type="number" value={String(cJours)} onChange={(v) => setCJours(Number(v))} />
-                </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 12, paddingTop: 12, borderTop: "1px solid #f0ebe3" }}>
-                  <button type="button" onClick={handleSaveContrat} disabled={saving} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: saving ? 0.5 : 1 }}>
-                    {saving ? "..." : "Creer le contrat"}
-                  </button>
-                  <button type="button" onClick={() => setShowContratModal(false)} style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                    Annuler
-                  </button>
-                </div>
-              </AccordionSection>
-            )}
-
-            {/* Historique */}
-            {contrats.length > 1 && (
-              <AccordionSection
-                title={`Historique des contrats (${contrats.length})`}
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>}
-                iconColor="#A0845C" iconBg="rgba(160,132,92,0.1)"
-              >
-                {contrats.map(c => (
-                  <div key={c.id} style={{ marginBottom: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                      <span style={contratPill(c.type)}>{CONTRAT_LABELS[c.type] ?? c.type}</span>
-                      <span style={{ fontSize: 12, color: "#999" }}>du {fmtDate(c.date_debut)}{c.date_fin ? ` au ${fmtDate(c.date_fin)}` : ""}</span>
-                      {c.actif && <span style={{ fontSize: 10, fontWeight: 700, color: "#2D6A4F", background: "#e8ede6", padding: "2px 6px", borderRadius: 4 }}>Actif</span>}
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: "8px 12px", background: "#faf7f2", borderRadius: 8, fontSize: 12 }}>
-                      <div><span style={{ color: "#999" }}>Remuneration</span><br /><strong>{c.remuneration.toLocaleString("fr-FR")} EUR</strong></div>
-                      <div><span style={{ color: "#999" }}>Heures/sem</span><br /><strong>{c.heures_semaine}h</strong></div>
-                      <div><span style={{ color: "#999" }}>Emploi</span><br /><strong>{c.emploi ?? "\u2014"}</strong></div>
-                    </div>
-                  </div>
-                ))}
-              </AccordionSection>
-            )}
-
-            {/* Mutuelle */}
-            <AccordionSection
-              title="Mutuelle"
-              icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0L12 5.34l-.77-.76a5.4 5.4 0 0 0-7.65 7.65L12 20.7l8.42-8.42a5.4 5.4 0 0 0 0-7.65z" /></svg>}
-              iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
-            >
-              <p style={{ fontSize: 13, color: "#999", textAlign: "center", margin: 0 }}>
-                Aucune dispense de mutuelle enregistree. Le collaborateur est considere comme couvert.
-              </p>
-            </AccordionSection>
-
-            {/* Primes et acomptes */}
-            <AccordionSection
-              title={`Primes et acomptes (${elements.length})`}
-              icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>}
-              iconColor="#A0845C" iconBg="rgba(160,132,92,0.1)"
-            >
-              {elements.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#999", textAlign: "center", margin: 0 }}>Aucune prime ou acompte</p>
-              ) : (
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                  <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                    <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Date</th>
-                    <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Type</th>
-                    <th style={{ textAlign: "right", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Montant</th>
-                  </tr></thead>
-                  <tbody>
-                    {elements.map(el => (
-                      <tr key={el.id} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                        <td style={{ padding: "8px 0" }}>{el.date_debut ? fmtDate(el.date_debut) : "\u2014"}</td>
-                        <td style={{ padding: "8px 0" }}>{ELEMENT_LABELS[el.type] ?? el.type} — {el.libelle}</td>
-                        <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 600 }}>{el.montant ? `${el.montant} EUR` : "\u2014"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </AccordionSection>
-
-            {/* Bouton nouveau contrat */}
-            {canWrite && !showContratModal && (
-              <div style={{ marginTop: 10 }}>
-                <button type="button" onClick={openNewContrat} style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#1a1a1a" }}>
-                  + Nouveau contrat
-                </button>
-              </div>
-            )}
-          </>
-        )}
 
         {/* ═══ CONGES ET ABSENCES ═══ */}
         {(() => {
@@ -1213,82 +985,6 @@ export default function EmployeDetailPage() {
                     </tbody>
                   </table>
                 )}
-              </AccordionSection>
-            </>
-          );
-        })()}
-
-        {/* ═══ TAB: Documents ═══ */}
-        {mainTab === "documents" && (() => {
-          const DOSSIERS = [
-            { key: "contrats", label: "Contrats de travail" },
-            { key: "fiches_paie", label: "Fiches de paie" },
-            { key: "documents_sociaux", label: "Documents sociaux" },
-            { key: "arrets_maladie", label: "Arrets maladie" },
-            { key: "formations", label: "Formations" },
-            { key: "autres", label: "Autres documents" },
-          ];
-          const uploadFile = (folder: string) => {
-            const input = document.createElement("input");
-            input.type = "file";
-            input.accept = ".pdf,.jpg,.jpeg,.png,.doc,.docx";
-            input.onchange = async (e) => {
-              const file = (e.target as HTMLInputElement).files?.[0];
-              if (!file) return;
-              const path = `employes/${emp.id}/${folder}/${Date.now()}_${file.name}`;
-              await supabase.storage.from("public").upload(path, file, { upsert: true });
-              setSaveOk(true); setTimeout(() => setSaveOk(false), 2000);
-            };
-            input.click();
-          };
-
-          return (
-            <>
-              <AccordionSection
-                title="Documents"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>}
-                iconColor="#2563eb" iconBg="rgba(37,99,235,0.1)"
-                defaultOpen
-              >
-                <div style={{ textAlign: "center", padding: "16px 0", color: "#999", fontSize: 13 }}>
-                  Aucun document. Utilisez les dossiers ci-dessous pour deposer vos fichiers.
-                </div>
-                <button type="button" onClick={() => uploadFile("documents")} style={{ display: "block", margin: "0 auto", padding: "8px 18px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                  + Ajouter un document
-                </button>
-              </AccordionSection>
-
-              <AccordionSection
-                title="Bulletins de paie"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>}
-                iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
-              >
-                <div style={{ textAlign: "center", padding: "16px 0", color: "#999", fontSize: 13 }}>
-                  Aucun bulletin de paie importe.
-                </div>
-              </AccordionSection>
-
-              <AccordionSection
-                title="Dossiers"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>}
-                iconColor="#A0845C" iconBg="rgba(160,132,92,0.1)"
-                defaultOpen
-              >
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                  {DOSSIERS.map(d => (
-                    <div key={d.key} onClick={() => uploadFile(d.key)}
-                      style={{ padding: 14, borderRadius: 10, border: "1px solid #f0ebe3", background: "#faf7f2", textAlign: "center", cursor: "pointer", transition: "background 0.12s" }}
-                      onMouseOver={e => (e.currentTarget.style.background = "#f0ebe3")}
-                      onMouseOut={e => (e.currentTarget.style.background = "#faf7f2")}
-                    >
-                      <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="1.5" style={{ marginBottom: 6 }}>
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                      </svg>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>{d.label}</div>
-                      <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Cliquez pour deposer</div>
-                    </div>
-                  ))}
-                </div>
               </AccordionSection>
             </>
           );
@@ -1443,172 +1139,6 @@ export default function EmployeDetailPage() {
                   Supprimer le compte
                 </button>
               </div>
-            </>
-          );
-        })()}
-
-        {mainTab === "acces" && (() => {
-          const empEquipes = ((emp as Record<string, unknown>).equipes_access as string[] ?? []);
-          const affichagePlanning = (emp as Record<string, unknown>).affichage_planning !== false;
-          const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
-
-          return (
-            <>
-              <AccordionSection
-                title="Acces aux equipes"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>}
-                iconColor="#2D6A4F" iconBg="rgba(45,106,79,0.1)"
-                defaultOpen
-              >
-                <p style={{ fontSize: 12, color: "#999", marginBottom: 10 }}>Equipes sur lesquelles le salarie peut etre planifie.</p>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {empEquipes.length > 0 ? empEquipes.map(eq => (
-                    <span key={eq} style={{ padding: "4px 10px", borderRadius: 6, background: "#e8ede6", fontSize: 12, fontWeight: 600, color: "#2D6A4F" }}>{eq}</span>
-                  )) : <span style={{ color: "#999", fontSize: 13 }}>Aucune equipe assignee</span>}
-                </div>
-              </AccordionSection>
-
-              <AccordionSection
-                title="Affichage planning"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>}
-                iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
-                defaultOpen
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#faf7f2", borderRadius: 8, marginBottom: 8 }}>
-                  <div>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>Afficher sur le planning</span>
-                    <p style={{ fontSize: 11, color: "#999", margin: "2px 0 0" }}>Apparait aux dates du contrat. Desactiver cache l&apos;historique.</p>
-                  </div>
-                  <button type="button" onClick={async () => {
-                    const next = !affichagePlanning;
-                    await supabase.from("employes").update({ affichage_planning: next }).eq("id", emp.id);
-                    setEmp((prev: Record<string, unknown>) => ({ ...prev, affichage_planning: next }));
-                  }} style={{
-                    width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
-                    background: affichagePlanning ? "#2D6A4F" : "#ddd6c8", position: "relative", flexShrink: 0,
-                  }}>
-                    <span style={{ position: "absolute", top: 2, left: affichagePlanning ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
-                  </button>
-                </div>
-              </AccordionSection>
-
-              <AccordionSection
-                title="Temps de travail (6 derniers mois)"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#A0845C" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>}
-                iconColor="#A0845C" iconBg="rgba(160,132,92,0.1)"
-              >
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                  <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                    <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Periode</th>
-                    <th style={{ textAlign: "right", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Heures</th>
-                  </tr></thead>
-                  <tbody>
-                    {(() => {
-                      const now = new Date();
-                      const monthlyHours: Record<string, number> = {};
-                      for (const s of shifts) {
-                        const d = new Date(s.date);
-                        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-                        const start = s.heure_debut ?? s.start_time ?? "00:00";
-                        const end = s.heure_fin ?? s.end_time ?? "00:00";
-                        const [sh, sm] = start.split(":").map(Number);
-                        const [eh, em] = end.split(":").map(Number);
-                        let dur = (eh * 60 + em) - (sh * 60 + sm);
-                        if (dur < 0) dur += 1440;
-                        dur -= (s.pause_minutes ?? 0);
-                        monthlyHours[key] = (monthlyHours[key] ?? 0) + dur / 60;
-                      }
-                      return Array.from({ length: 6 }, (_, i) => {
-                        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-                        const h = monthlyHours[key] ?? 0;
-                        const hh = Math.floor(h);
-                        const mm = Math.round((h - hh) * 60);
-                        return (
-                          <tr key={i} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                            <td style={{ padding: "8px 0", textTransform: "capitalize" }}>{d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</td>
-                            <td style={{ padding: "8px 0", textAlign: "right", fontWeight: h > 0 ? 600 : 400, color: h > 0 ? "#1a1a1a" : "#999" }}>
-                              {h > 0 ? `${hh}h${mm > 0 ? String(mm).padStart(2, "0") : "00"}` : "\u2014"}
-                            </td>
-                          </tr>
-                        );
-                      });
-                    })()}
-                  </tbody>
-                </table>
-              </AccordionSection>
-
-              <AccordionSection
-                title="Disponibilites"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>}
-                iconColor="#2563eb" iconBg="rgba(37,99,235,0.1)"
-                defaultOpen
-              >
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                  <thead><tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                    <th style={{ textAlign: "left", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", width: 100 }}>Jour</th>
-                    <th style={{ textAlign: "center", padding: "6px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Disponibilite</th>
-                  </tr></thead>
-                  <tbody>
-                    {JOURS.map((j, idx) => {
-                      const dispos = ((emp as Record<string, unknown>).disponibilites as Record<string, unknown>) ?? {};
-                      const val = String(dispos[String(idx)] ?? "journee");
-                      return (
-                        <tr key={j} style={{ borderBottom: "1px solid #f0ebe3" }}>
-                          <td style={{ padding: "8px 0", fontWeight: 500 }}>{j}</td>
-                          <td style={{ padding: "4px 0", textAlign: "center" }}>
-                            <select id={`dispo-inline-${idx}`} defaultValue={val === "false" || val === "indisponible" ? "indisponible" : val === "matin" ? "matin" : val === "soir" ? "soir" : "journee"} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 12, cursor: "pointer" }}>
-                              <option value="journee">Journee</option>
-                              <option value="matin">Matin</option>
-                              <option value="soir">Soir</option>
-                              <option value="indisponible">Indisponible</option>
-                            </select>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
-                  <button type="button" onClick={async () => {
-                    const dispos: Record<string, string> = {};
-                    for (let i = 0; i < 7; i++) {
-                      const sel = document.getElementById(`dispo-inline-${i}`) as HTMLSelectElement;
-                      if (sel) dispos[String(i)] = sel.value;
-                      }
-                      await supabase.from("employes").update({ disponibilites: dispos }).eq("id", emp.id);
-                      setEmp((prev: Record<string, unknown>) => ({ ...prev, disponibilites: dispos }));
-                      setSaveOk(true); setTimeout(() => setSaveOk(false), 2000);
-                    }} style={{
-                      padding: "6px 14px", borderRadius: 6, border: "none",
-                      background: "#1a1a1a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    }}>
-                      Enregistrer
-                    </button>
-                  </div>
-              </AccordionSection>
-
-              <AccordionSection
-                title="Invitation"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-10 7L2 7" /></svg>}
-                iconColor="#2563eb" iconBg="rgba(37,99,235,0.1)"
-              >
-                <p style={{ fontSize: 12, color: "#999", marginBottom: 10 }}>Envoyer une invitation par email pour acceder a l&apos;application.</p>
-                <button type="button" onClick={async () => {
-                  if (!email) return;
-                  const { data: { session } } = await supabase.auth.getSession();
-                  const res = await fetch("/api/admin/invite", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
-                    body: JSON.stringify({ email, displayName: `${prenom} ${nom}`, role: (emp as Record<string, unknown>).role ?? "employe" }),
-                  });
-                  if (res.ok) alert("Invitation envoyee a " + email);
-                  else alert("Erreur: " + (await res.text()));
-                }} style={addBtnStyle} disabled={!email}>
-                  Envoyer une invitation
-                </button>
-                {!email && <p style={{ fontSize: 12, color: "#e27f57", marginTop: 6 }}>Ajoutez un email pour pouvoir envoyer une invitation.</p>}
-              </AccordionSection>
             </>
           );
         })()}

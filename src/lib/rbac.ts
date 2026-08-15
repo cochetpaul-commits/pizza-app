@@ -28,7 +28,6 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/haccp":        MANAGERS,
   "/fournisseurs": ALL,
   "/rh/conges":    MANAGERS,
-  "/plannings":    MANAGERS,
   "/rh":           MANAGERS,
   "/personnel":    MANAGERS,
   // Manager + Admin: pilotage, ventes, RH, événements

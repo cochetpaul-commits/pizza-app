@@ -13,14 +13,12 @@
     "clean": "rm -rf .next node_modules/.cache"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
+    "@anthropic-ai/sdk": "^0.117.1",
     "@hello-pangea/dnd": "^18.0.1",
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/supabase-js": "^2.89.0",
-    "@tanstack/react-virtual": "^3.13.21",
     "chart.js": "^4.5.1",
     "dotenv": "^17.3.1",
-    "imapflow": "^1.2.14",
     "lucide-react": "1.7.0",
     "next": "^15.5.19",
     "pdfjs-dist": "^5.5.207",
@@ -29,13 +27,11 @@
     "react-easy-crop": "^5.5.6",
     "recharts": "^3.8.0",
     "resend": "^6.10.0",
-    "swr": "^2.4.1",
     "unpdf": "^1.6.2",
     "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.80.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

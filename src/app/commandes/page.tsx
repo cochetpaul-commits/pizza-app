@@ -177,20 +177,6 @@ function groupCatalog(items: CatalogItem[]): Record<string, { favoris: CatalogIt
   return result;
 }
 
-function _starBtnStyle(isFav: boolean): React.CSSProperties {
-  return {
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    fontSize: 15,
-    padding: 0,
-    lineHeight: 1,
-    opacity: isFav ? 1 : 0.25,
-    filter: isFav ? "none" : "grayscale(100%)",
-    flexShrink: 0,
-  };
-}
-
 type OfferRow = {
   price_kind: string | null;
   unit: string | null;
