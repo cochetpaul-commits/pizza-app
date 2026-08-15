@@ -7,7 +7,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { AllergenBadges } from "@/components/AllergenBadges";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 import { offerRowToCpu, enrichCpuWithConversions } from "@/lib/offerPricing";
-import { formatCpuLabel, formatIngredientPriceLine } from "@/lib/formatPrice";
+import { formatCpuLabel, formatRecipeParamsLine } from "@/lib/formatPrice";
+import { buildRecipeMeta, type RecipeIngredientMeta } from "@/lib/recipeMeta";
 import type { LatestOffer } from "@/types/ingredients";
 import { compressImage } from "@/lib/compressImage";
 
@@ -90,6 +91,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, CpuByUnit>>({});
   const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
+  const [metaByIngredient, setMetaByIngredient] = useState<Record<string, RecipeIngredientMeta>>({});
   const [, setSupplierByIngredient] = useState<Record<string, string | null>>({});
   const [lines, setLines] = useState<IngredientLine[]>([]);
 
@@ -366,19 +368,23 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
       setSupplierByIngredient(supplierByIng);
 
       // Pour le LABEL on utilise la même fonction que la page /ingredients
-      // (formatIngredientPriceLine via formatIngredientPrice → fromOffer/fromLegacy),
+      // (formatRecipeParamsLine via formatIngredientPrice → fromOffer/fromLegacy),
       // garantissant la cohérence d'affichage (€/kg, €/L) et l'utilisation correcte
       // de piece_weight_g / piece_volume_ml depuis l'offre OU l'ingrédient.
       const labelMap: Record<string, string> = {};
+      const metaMap: Record<string, RecipeIngredientMeta> = {};
       for (const i of ingList) {
         const off = offerByIng[i.id] ?? null;
         if (off) {
-          labelMap[i.id] = formatIngredientPriceLine(i, off, supplierByIng[i.id] ?? null);
+          labelMap[i.id] = formatRecipeParamsLine(i, off);
         } else {
-          labelMap[i.id] = formatCpuLabel(pm[i.id] ?? {}, metaM[i.id] ?? {}, i.piece_volume_ml ?? null, supplierByIng[i.id] ?? null);
+          labelMap[i.id] = formatCpuLabel(pm[i.id] ?? {}, metaM[i.id] ?? {}, i.piece_volume_ml ?? null, null);
         }
+        metaMap[i.id] = buildRecipeMeta(i, off, supplierByIng[i.id] ?? null);
+        if (!metaMap[i.id].prix && labelMap[i.id] !== "Prix ND") metaMap[i.id].prix = labelMap[i.id];
       }
       setPriceLabelByIngredient(labelMap);
+      setMetaByIngredient(metaMap);
 
       // Load existing recipe if editing
       if (recipeId) {
@@ -1072,6 +1078,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                     units={CUISINE_UNITS}
                     onChange={setLines}
                     priceLabelByIngredient={priceLabelByIngredient}
+                    metaByIngredient={metaByIngredient}
                     pivotId={pivotIngredientId}
                     onPivotChange={setPivotIngredientId}
                     returnUrl={typeof window !== "undefined" ? window.location.pathname + window.location.search : ""}

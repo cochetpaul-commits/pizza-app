@@ -1,8 +1,11 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import type { Ingredient } from "@/types/ingredients";
+import type { RecipeIngredientMeta } from "@/lib/recipeMeta";
+import { ALLERGEN_SHORT } from "@/lib/allergens";
 import type { CpuByUnit } from "@/lib/offerPricing";
 import { StepperInput } from "@/components/StepperInput";
 
@@ -22,6 +25,8 @@ interface Props {
   units: string[];
   onChange: (items: IngredientLine[]) => void;
   priceLabelByIngredient?: Record<string, string>;
+  /** Paramètres produit structurés (charte) : pastilles cond/fournisseur + allergènes */
+  metaByIngredient?: Record<string, RecipeIngredientMeta>;
   /** id of the pivot ingredient; shows ★/☆ on each row */
   pivotId?: string | null;
   onPivotChange?: (id: string | null) => void;
@@ -91,7 +96,7 @@ function computeCost(line: IngredientLine, cpu: CpuByUnit | undefined, ing?: Ing
 export function IngredientListDnD({
   droppableId = "ingredients",
   items, ingredients, priceByIngredient, units, onChange, priceLabelByIngredient,
-  pivotId, onPivotChange, externalDragContext, returnUrl,
+  metaByIngredient, pivotId, onPivotChange, externalDragContext, returnUrl,
 }: Props) {
   const ingredientOptions: SmartSelectOption[] = ingredients.map(i => {
     const isMaison = i.source === "recette_maison";
@@ -147,9 +152,9 @@ export function IngredientListDnD({
                         ref={drag.innerRef}
                         {...drag.draggableProps}
                         style={{
-                          display: "flex", flexDirection: "column", gap: 4,
+                          display: "flex", flexDirection: "column", gap: 3,
                           background: snapshot.isDragging ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.55)",
-                          borderRadius: 10, padding: "8px 10px",
+                          borderRadius: 10, padding: "6px 10px",
                           border: "1px solid rgba(217,199,182,0.7)",
                           ...drag.draggableProps.style,
                         }}
@@ -211,15 +216,43 @@ export function IngredientListDnD({
                           )}
                         </div>
 
-                        {/* Supplier + price label */}
-                        {line.ingredient_id && priceLabelByIngredient?.[line.ingredient_id] && (
+                        {/* Paramètres produit (charte) : prix · pastilles cond/fournisseur, allergènes dessous */}
+                        {line.ingredient_id && metaByIngredient?.[line.ingredient_id] ? (() => {
+                          const m = metaByIngredient[line.ingredient_id];
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 24 }}>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                                {m.prix && (
+                                  <span style={{ fontSize: 10.5, color: "#9a8f84", fontWeight: 600 }}>
+                                    {m.prix}{m.perKg ? ` · ${m.perKg}` : ""}
+                                  </span>
+                                )}
+                                {m.cond && <span className="pastille-cadre">{m.cond}</span>}
+                                {m.fournisseur && (
+                                  <span className="pastille" style={{ "--pastille-c": m.fournisseurColor ?? "#b0a894" } as CSSProperties}>
+                                    {m.fournisseur}
+                                  </span>
+                                )}
+                              </div>
+                              {m.allergenes.length > 0 && (
+                                <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+                                  {m.allergenes.map(a => (
+                                    <span key={a} title={a} style={{ fontSize: 8.5, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.2)" }}>
+                                      {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })() : line.ingredient_id && priceLabelByIngredient?.[line.ingredient_id] ? (
                           <div style={{ fontSize: 11, color: "#9a8f84", paddingLeft: 24, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {priceLabelByIngredient[line.ingredient_id]}
                           </div>
-                        )}
+                        ) : null}
 
-                        {/* Row 2: Qty + Unit + Cost + Remove */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 24 }}>
+                        {/* Row 2 : − qté + centrés, coût en pastille, croix à droite */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                           <StepperInput
                             value={line.qty}
                             onChange={v => updateLine(line.id, { qty: v })}
@@ -239,7 +272,7 @@ export function IngredientListDnD({
                             {units.map(u => <option key={u} value={u}>{u}</option>)}
                           </select>
 
-                          <span style={{ fontSize: 12, color: cost != null ? "#4a6741" : "#9a8f84", fontWeight: 700, minWidth: 50, flexShrink: 0 }}>
+                          <span className={cost != null ? "pastille-ronde" : undefined} style={{ fontSize: 11, padding: cost != null ? "2px 9px" : undefined, color: cost != null ? undefined : "#9a8f84", fontWeight: 700, flexShrink: 0 }}>
                             {cost != null ? `${fmtMoney(cost)} €` : "—"}
                           </span>
 

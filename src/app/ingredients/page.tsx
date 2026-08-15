@@ -1115,18 +1115,20 @@ function IngredientsPageInner() {
             borderRadius: 16, border: "1px solid #ece4d4",
             display: "flex", flexDirection: "column", gap: 12,
           }}>
-            {/* Row 1 — Tabs */}
-            <div style={{ display: "flex", justifyContent: "center", overflowX: "auto", scrollbarWidth: "none" }}>
-              <div style={{ display: "inline-flex", gap: 4, padding: 3, background: "#ece4d4", borderRadius: 10, flexShrink: 0 }}>
+            {/* Row 1 — Tabs : 3 onglets égaux, jamais tronqués sur mobile */}
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <div style={{ display: "flex", gap: 4, padding: 3, background: "#ece4d4", borderRadius: 10, width: "100%", maxWidth: 430 }}>
                 {TABS_MAIN.map(({ t, label, count }) => (
                   <button key={t} onClick={() => setTab(t)} style={{
-                    flexShrink: 0, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                    flex: 1, minWidth: 0, padding: "5px 4px", fontSize: 12, fontWeight: 700, cursor: "pointer",
                     borderRadius: 8, whiteSpace: "nowrap", border: "none",
                     background: tab === t ? (etab?.couleur ? etab.couleur + "20" : "#fff") : "transparent",
                     color: tab === t ? "#1a1a1a" : "#999",
                     boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
                     transition: "all 0.15s",
-                  }}>{label} ({count})</button>
+                  }}>
+                    {label} <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.75 }}>({count})</span>
+                  </button>
                 ))}
               </div>
             </div>

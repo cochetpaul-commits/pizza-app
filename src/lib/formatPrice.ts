@@ -173,3 +173,59 @@ export function formatIngredientPriceLine(
   if (!supplierName || price === "Prix ND") return price;
   return `${supplierName} · ${price}`;
 }
+
+/** Prix ramené au kg ou au litre, si calculable et pas déjà exprimé ainsi. */
+function derivePerKgOrL(
+  ingredient: IngredientPriceFields,
+  offer: LatestOffer | null | undefined
+): string | null {
+  // Prix unitaire à la pièce + poids/volume connu → €/kg ou €/L
+  const pcPrice =
+    offer?.price_kind === "unit" && offer.unit === "pc" && offer.unit_price != null
+      ? offer.unit_price
+      : (ingredient.purchase_unit_label ?? "").toLowerCase() === "pc" && ingredient.purchase_price != null
+        ? ingredient.purchase_price
+        : null;
+  if (pcPrice == null || !(pcPrice > 0)) return null;
+  const w = offer?.piece_weight_g ?? ingredient.piece_weight_g;
+  if (w && w > 0) return `${fmtMoney((pcPrice / w) * 1000)} €/kg`;
+  const v = ingredient.piece_volume_ml;
+  if (v && v > 0) return `${fmtMoney((pcPrice / v) * 1000)} €/L`;
+  return null;
+}
+
+/**
+ * Paramètres produit pour les recettes (charte affichage produit),
+ * en morceaux séparés pour l'affichage en pastilles :
+ * - prix : prix d'achat + contenu ("1,89 € pc 400g")
+ * - perKg : équivalent au kilo/litre si calculable ("4,73 €/kg")
+ * - cond : conditionnement ("crt 12 × 1 pc")
+ */
+export function recipeParamsParts(
+  ingredient: IngredientPriceFields,
+  offer: LatestOffer | null | undefined
+): { prix: string | null; perKg: string | null; cond: string | null } {
+  const achat = formatIngredientPrice(ingredient, offer);
+  const prix = achat !== "Prix ND" ? achat : null;
+  const perKg = prix && !/€\/(kg|L)/.test(prix) ? derivePerKgOrL(ingredient, offer) : null;
+  let cond: string | null = null;
+  if (offer?.pack_count && offer.pack_count > 0) {
+    const eachQty = offer.pack_each_qty ?? 1;
+    const eachUnit = offer.pack_each_unit ?? "pc";
+    cond = `crt ${offer.pack_count} × ${n2(eachQty)} ${eachUnit}`;
+  }
+  return { prix, perKg, cond };
+}
+
+/**
+ * Ligne de paramètres produit pour les recettes :
+ * "prix d'achat · contenu · prix/kg · conditionnement"
+ */
+export function formatRecipeParamsLine(
+  ingredient: IngredientPriceFields,
+  offer: LatestOffer | null | undefined
+): string {
+  const p = recipeParamsParts(ingredient, offer);
+  const parts = [p.prix, p.perKg, p.cond].filter(Boolean) as string[];
+  return parts.length ? parts.join(" · ") : "Prix ND";
+}

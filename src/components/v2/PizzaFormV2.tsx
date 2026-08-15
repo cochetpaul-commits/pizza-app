@@ -9,7 +9,8 @@ import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
 import { AllergenBadges } from "@/components/AllergenBadges";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 import { offerRowToCpu, enrichCpuWithConversions } from "@/lib/offerPricing";
-import { formatCpuLabel, formatIngredientPriceLine } from "@/lib/formatPrice";
+import { formatCpuLabel, formatRecipeParamsLine } from "@/lib/formatPrice";
+import { buildRecipeMeta, type RecipeIngredientMeta } from "@/lib/recipeMeta";
 import type { LatestOffer } from "@/types/ingredients";
 import { compressImage } from "@/lib/compressImage";
 
@@ -84,6 +85,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, CpuByUnit>>({});
   const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
+  const [metaByIngredient, setMetaByIngredient] = useState<Record<string, RecipeIngredientMeta>>({});
   const [, setSupplierByIngredient] = useState<Record<string, string | null>>({});
 
   // Pre/post ingredient lines
@@ -415,15 +417,19 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       setSupplierByIngredient(supplierByIng);
 
       const labelMap: Record<string, string> = {};
+      const metaMap: Record<string, RecipeIngredientMeta> = {};
       for (const i of ingList) {
         const off = offerByIng[i.id] ?? null;
         if (off) {
-          labelMap[i.id] = formatIngredientPriceLine(i, off, supplierByIng[i.id] ?? null);
+          labelMap[i.id] = formatRecipeParamsLine(i, off);
         } else {
-          labelMap[i.id] = formatCpuLabel(pm[i.id] ?? {}, metaM[i.id] ?? {}, i.piece_volume_ml ?? null, supplierByIng[i.id] ?? null);
+          labelMap[i.id] = formatCpuLabel(pm[i.id] ?? {}, metaM[i.id] ?? {}, i.piece_volume_ml ?? null, null);
         }
+        metaMap[i.id] = buildRecipeMeta(i, off, supplierByIng[i.id] ?? null);
+        if (!metaMap[i.id].prix && labelMap[i.id] !== "Prix ND") metaMap[i.id].prix = labelMap[i.id];
       }
       setPriceLabelByIngredient(labelMap);
+      setMetaByIngredient(metaMap);
 
       if (pizzaId) {
         const [{ data: piz }, { data: pLines }] = await Promise.all([
@@ -855,6 +861,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                       units={PIZZA_UNITS}
                       onChange={setPreLines}
                       priceLabelByIngredient={priceLabelByIngredient}
+                    metaByIngredient={metaByIngredient}
                       pivotId={pivotIngredientId}
                       onPivotChange={setPivotIngredientId}
                       externalDragContext
@@ -874,6 +881,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                       units={PIZZA_UNITS}
                       onChange={setPostLines}
                       priceLabelByIngredient={priceLabelByIngredient}
+                    metaByIngredient={metaByIngredient}
                       pivotId={pivotIngredientId}
                       onPivotChange={setPivotIngredientId}
                       externalDragContext

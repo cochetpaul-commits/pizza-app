@@ -19,6 +19,7 @@ import {
   fmtQty,
 } from "@/lib/offers";
 import { formatIngredientPrice } from "@/lib/formatPrice";
+import { cachedSupplierColor } from "@/lib/supplierColors";
 import { ALLERGENS, ALLERGEN_SHORT, parseAllergens } from "@/lib/allergens";
 import type { PriceAlert } from "@/lib/priceAlerts";
 import { IngredientAvatar } from "@/components/IngredientAvatar";
@@ -364,11 +365,13 @@ export const IngredientRow = React.memo(function IngredientRow({
           <span className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: catAccent, flex: "1 1 0", minWidth: 0 }}>{x.name}</span>
           {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", flexShrink: 0 }}>DERIVE</span>}
           {alert && <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", flexShrink: 0 }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", flexShrink: 0 }}>{price}</span>
+          <span className="pastille-ronde" style={{ fontSize: 11, padding: "2px 9px", flexShrink: 0 }}>{price}</span>
           <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: sb.bg, color: sb.color, flexShrink: 0 }}>{sb.label}</span>
+          {/* Carte d'identité : catégorie ET fournisseur, toujours les deux */}
+          <span className="pastille" style={{ "--pastille-c": catAccent, flexShrink: 0 } as React.CSSProperties}>{CAT_LABELS[x.category]}</span>
           {supplierName && supplierIdForDisplay ? (
-            <button onClick={(e) => { e.stopPropagation(); onOpenSupplier?.(supplierIdForDisplay); }} style={{ color: "#888", textDecoration: "underline dotted", textUnderlineOffset: 2, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }}>{supplierName}</button>
-          ) : <span style={{ fontSize: 11, color: "#ccc", flexShrink: 0 }}>{CAT_LABELS[x.category]}</span>}
+            <button className="pastille" onClick={(e) => { e.stopPropagation(); onOpenSupplier?.(supplierIdForDisplay); }} style={{ "--pastille-c": cachedSupplierColor(supplierName), border: "none", cursor: "pointer", flexShrink: 0 } as React.CSSProperties}>{supplierName}</button>
+          ) : <span style={{ fontSize: 11, color: "#ccc", flexShrink: 0 }}>—</span>}
           <button onClick={(e) => { e.stopPropagation(); onToggleEstablishment?.(x.id, "bellomio", ingEstabs); }} style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasBM ? "rgba(212,119,90,0.1)" : "rgba(0,0,0,0.04)", color: hasBM ? "#D4775A" : "#ccc", border: "none", cursor: "pointer", flexShrink: 0 }}>BM</button>
           <button onClick={(e) => { e.stopPropagation(); onToggleEstablishment?.(x.id, "piccola", ingEstabs); }} style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasPM ? "rgba(212,160,60,0.1)" : "rgba(0,0,0,0.04)", color: hasPM ? "#D4A03C" : "#ccc", border: "none", cursor: "pointer", flexShrink: 0 }}>PM</button>
           {alg.length > 0 && (
@@ -419,14 +422,8 @@ export const IngredientRow = React.memo(function IngredientRow({
             />
           )}
           {!compactMode && <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={30} editable />}
-          <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-            <div style={{
-              fontWeight: 600, fontSize: 13, color: catAccent,
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>{x.name}</div>
-          </div>
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>{price}</div>
+          <div className="produit-main">
+            <div className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: catAccent }}>{x.name}</div>
           </div>
           <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} style={{
             width: 24, height: 24, borderRadius: 6, border: "none",
@@ -435,13 +432,17 @@ export const IngredientRow = React.memo(function IngredientRow({
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>x</button>
         </div>
-        {/* Row 2: Meta */}
+        {/* Row 2: carte d'identité — statut · catégorie (sous-cat) · fournisseur, toujours les trois */}
         {!compactMode && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, flexWrap: "wrap", paddingLeft: onToggleSelect ? 54 : 38 }}>
-            {x.sub_category && <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 4, background: `${catAccent}12`, color: catAccent }}>{x.sub_category}</span>}
             <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 999, background: sb.bg, color: sb.color }}>{sb.label}</span>
+            <span className="pastille" style={{ "--pastille-c": catAccent } as React.CSSProperties}>
+              {CAT_LABELS[x.category]}{x.sub_category ? ` · ${x.sub_category}` : ""}
+            </span>
             {alert && <span style={{ fontSize: 9, fontWeight: 700, color: alert.direction === "up" ? "#DC2626" : "#16A34A" }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
-            <span style={{ fontSize: 10, color: "#aaa" }}>{supplierName || CAT_LABELS[x.category]}</span>
+            {supplierName
+              ? <span className="pastille" style={{ "--pastille-c": cachedSupplierColor(supplierName) } as React.CSSProperties}>{supplierName}</span>
+              : <span style={{ fontSize: 10, color: "#aaa" }}>— sans fournisseur</span>}
           </div>
         )}
         {/* Row 3: Price comparison */}
@@ -459,6 +460,12 @@ export const IngredientRow = React.memo(function IngredientRow({
           </div>
         )}
         {!compactMode && !hasPrice && <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", marginTop: 4, paddingLeft: onToggleSelect ? 54 : 38 }}>prix manquant</div>}
+        {/* Prix : pastille ronde en bas à droite (charte) */}
+        {hasPrice && (
+          <div className="produit-footer">
+            <span className="pastille-ronde">{price}</span>
+          </div>
+        )}
       </div>
 
       {/* ── DUPLICATE ALERT ── */}

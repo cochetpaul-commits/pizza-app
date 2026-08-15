@@ -8,7 +8,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { AllergenBadges } from "@/components/AllergenBadges";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 import { offerRowToCpu, enrichCpuWithConversions } from "@/lib/offerPricing";
-import { formatIngredientPriceLine } from "@/lib/formatPrice";
+import { formatRecipeParamsLine } from "@/lib/formatPrice";
+import { buildRecipeMeta, type RecipeIngredientMeta } from "@/lib/recipeMeta";
 import type { LatestOffer } from "@/types/ingredients";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
@@ -74,6 +75,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [priceByIngredient, setPriceByIngredient] = useState<Record<string, CpuByUnit>>({});
   const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
+  const [metaByIngredient, setMetaByIngredient] = useState<Record<string, RecipeIngredientMeta>>({});
   const [supplierByIngredient, setSupplierByIngredient] = useState<Record<string, string | null>>({});
   const [lines, setLines] = useState<IngredientLine[]>([]);
 
@@ -315,15 +317,19 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       setSupplierByIngredient(supplierByIng);
 
       const labelMap: Record<string, string> = {};
+      const metaMap: Record<string, RecipeIngredientMeta> = {};
       for (const i of ingList) {
         const off = offerByIng[i.id] ?? null;
         if (off) {
-          labelMap[i.id] = formatIngredientPriceLine(i, off, supplierByIng[i.id] ?? null);
+          labelMap[i.id] = formatRecipeParamsLine(i, off);
         } else {
-          labelMap[i.id] = formatCpuLabel(pm[i.id] ?? {}, metaM[i.id] ?? {}, i.piece_volume_ml ?? null, supplierByIng[i.id] ?? null);
+          labelMap[i.id] = formatCpuLabel(pm[i.id] ?? {}, metaM[i.id] ?? {}, i.piece_volume_ml ?? null, null);
         }
+        metaMap[i.id] = buildRecipeMeta(i, off, supplierByIng[i.id] ?? null);
+        if (!metaMap[i.id].prix && labelMap[i.id] !== "Prix ND") metaMap[i.id].prix = labelMap[i.id];
       }
       setPriceLabelByIngredient(labelMap);
+      setMetaByIngredient(metaMap);
 
       if (cocktailId) {
         const [{ data: coc }, { data: cLines }] = await Promise.all([
@@ -749,6 +755,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                     units={COCKTAIL_UNITS}
                     onChange={setLines}
                     priceLabelByIngredient={priceLabelByIngredient}
+                    metaByIngredient={metaByIngredient}
                     pivotId={pivotIngredientId}
                     onPivotChange={setPivotIngredientId}
                     returnUrl={typeof window !== "undefined" ? window.location.pathname + window.location.search : ""}

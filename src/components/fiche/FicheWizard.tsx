@@ -7,6 +7,8 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { StepsList } from "@/components/v2/StepsList";
 import { IngredientListDnD, type IngredientLine } from "@/components/v2/IngredientListDnD";
+import { buildRecipeMeta, type RecipeIngredientMeta } from "@/lib/recipeMeta";
+import type { LatestOffer } from "@/types/ingredients";
 import {
   type FicheState, type Categorie, type Famille, type IngredientRef, type LigneIngredient, type Zone, type PrixLigne,
   UNITS, unitsFor, ALLERGENES_14, PATON_BASE,
@@ -64,6 +66,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const [popinaSearch, setPopinaSearch] = useState("");
   const [showPopinaList, setShowPopinaList] = useState(false);
   const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
+  const [metaByIngredient, setMetaByIngredient] = useState<Record<string, RecipeIngredientMeta>>({});
   // Saisie en cours du coefficient kilo (null = affichage dérivé du prix)
   const [coeffKgDraft, setCoeffKgDraft] = useState<string | null>(null);
 
@@ -74,7 +77,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       supabase.from("familles").select("*"),
       supabase.from("categories").select("*").order("sort_order").order("nom")
         .or(`establishments.cs.{"${etabSlug === "piccola" ? "piccola" : "bellomio"}"},establishments.is.null`),
-      supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, purchase_price, purchase_unit, purchase_unit_label, density_g_per_ml, piece_weight_g, piece_volume_ml, establishments")
+      supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, cost_per_kg, purchase_price, purchase_unit, purchase_unit_label, density_g_per_ml, piece_weight_g, piece_volume_ml, establishments")
         .or(`establishments.cs.{"${etabSlug === "piccola" ? "piccola" : "bellomio"}"},establishments.is.null`),
       supabase.from("recipes").select("id, name").order("name"),
       supabase.from("v_latest_offers").select("*"),
@@ -110,10 +113,12 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       // Build CPU map from supplier offers
       const cpuMap: Record<string, CpuByUnit> = {};
       const offerRows = (offRes.data ?? []) as Record<string, unknown>[];
+      const offerByIng: Record<string, LatestOffer> = {};
       for (const o of offerRows) {
         const iid = String(o.ingredient_id ?? "");
         if (!iid) continue;
         cpuMap[iid] = offerRowToCpu(o);
+        offerByIng[iid] = o as unknown as LatestOffer;
       }
 
       // Fetch supplier names for dropdown display
@@ -202,6 +207,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
 
       // Build price labels for dropdown: "METRO · 9,30 €/kg"
       const labelMap: Record<string, string> = {};
+      const metaMap: Record<string, RecipeIngredientMeta> = {};
       for (const i of ingList) {
         const id = i.id as string;
         const cpu = cpuMap[id] ?? {};
@@ -210,10 +216,17 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           piece_weight_g: (i.piece_weight_g as number) ?? null,
         };
         const pvml = (i.piece_volume_ml as number) ?? null;
-        const label = formatCpuLabel(cpu, meta, pvml, supByIng[id] ?? null);
+        const label = formatCpuLabel(cpu, meta, pvml, null);
         if (label && label !== "Prix ND") labelMap[id] = label;
+        metaMap[id] = buildRecipeMeta(
+          i as unknown as Parameters<typeof buildRecipeMeta>[0],
+          offerByIng[id] ?? null,
+          supByIng[id] ?? null,
+        );
+        if (!metaMap[id].prix && labelMap[id]) metaMap[id].prix = labelMap[id];
       }
       setPriceLabelByIngredient(labelMap);
+      setMetaByIngredient(metaMap);
 
       // Load existing recipe if recipeId is provided
       if (recipeId) {
@@ -681,13 +694,13 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
                 {isPizza && (
                   <>
                     <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "18px 0 8px" }}>Avant four</div>
-                    <IngredientListDnD droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} units={units} onChange={lines => updateZone(lines, "avant_four")} returnUrl={currentUrl} />
+                    <IngredientListDnD droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "avant_four")} returnUrl={currentUrl} />
                   </>
                 )}
                 <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "18px 0 8px" }}>
                   {isPizza ? "Apres four" : isBar ? "Composition" : "Ingredients"}
                 </div>
-                <IngredientListDnD droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} units={units} onChange={lines => updateZone(lines, "apres_four")} returnUrl={currentUrl} />
+                <IngredientListDnD droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "apres_four")} returnUrl={currentUrl} />
               </>
             );
           })()}

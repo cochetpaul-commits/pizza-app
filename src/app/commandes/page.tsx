@@ -58,6 +58,7 @@ type CatalogItem = {
   pack_each_qty: number | null;
   stock_objectif: number | null;
   stock_min: number | null;
+  storage_zone: string | null;
 };
 
 type StockInfo = { stock: number; unit: string | null; avg_daily: number; qty_to_order: number };
@@ -556,6 +557,18 @@ function CommandesPage() {
   // Stock data (current stock + theoretical order qty per ingredient)
   const [stockData, setStockData] = useState<Record<string, StockInfo>>({});
 
+  // Couleurs des zones de stockage (pastilles de la charte produit)
+  const [zoneColors, setZoneColors] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!etab?.id) return;
+    supabase.from("storage_zones").select("name, couleur").eq("etablissement_id", etab.id)
+      .then(({ data }) => {
+        const map: Record<string, string> = {};
+        for (const z of data ?? []) if (z.couleur) map[z.name] = z.couleur;
+        setZoneColors(map);
+      });
+  }, [etab?.id]);
+
   // Confirmation banner
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
@@ -794,7 +807,7 @@ function CommandesPage() {
     let items: CatalogItem[] = [];
     if (allIds.length > 0) {
       // Try with favori_commande, fallback without if column doesn't exist
-      const selectCols = "id, name, category, sub_category, default_unit, favori_commande, order_unit_label, order_quantity, stock_objectif, stock_min";
+      const selectCols = "id, name, category, sub_category, default_unit, favori_commande, order_unit_label, order_quantity, stock_objectif, stock_min, storage_zone";
       let ingDataQ = supabase
         .from("ingredients")
         .select(selectCols)
@@ -809,7 +822,7 @@ function CommandesPage() {
         console.warn("[commandes] ingredient query error, retrying without favori_commande:", ingErr.message);
         let fallbackQ = supabase
           .from("ingredients")
-          .select("id, name, category, sub_category, default_unit, order_unit_label, order_quantity, stock_objectif, stock_min")
+          .select("id, name, category, sub_category, default_unit, order_unit_label, order_quantity, stock_objectif, stock_min, storage_zone")
           .in("id", allIds)
           .order("category")
           .order("name");
@@ -836,6 +849,7 @@ function CommandesPage() {
           pack_each_qty: offer?.pack_each_qty ?? null,
           stock_objectif: ing.stock_objectif ?? null,
           stock_min: ing.stock_min ?? null,
+          storage_zone: ing.storage_zone ?? null,
         };
       });
     }
@@ -1375,13 +1389,6 @@ function CommandesPage() {
     const packEach = item.pack_each_qty ?? 1;
     const indiv = individualUnitLabel(item);
     const obj = item.stock_objectif;
-    const min = item.stock_min ?? 0;
-    // Stock color: rouge → orange → vert
-    let stockColor = "#d32f2f"; // rouge par défaut (rien commandé)
-    if ((obj ?? 0) > 0) {
-      if (qty >= (obj ?? 0)) stockColor = "#2e7d32"; // vert: objectif atteint
-      else if (qty >= min && qty > 0) stockColor = "#e65100"; // orange: entre min et objectif
-    }
 
     // Conditioning label — reprend la logique produit
     const orderU = (item.order_unit_label ?? item.order_unit ?? "").toLowerCase();
@@ -1412,126 +1419,87 @@ function CommandesPage() {
       }
     }
 
-    // Unit price (per individual unit)
-    const unitPrice = item.prix_commande != null && packCount > 0 && isPackUnit
-      ? item.prix_commande / packCount
-      : item.prix_commande;
 
     return (
       <div key={item.id} style={{
-        background: "#fff", borderRadius: 16, border: hasQty ? "2px solid #D4775A" : "1.5px solid #e5ddd0",
-        display: "flex", flexDirection: "row", overflow: "hidden",
+        background: "#fff", borderRadius: 14, border: hasQty ? "2px solid #D4775A" : "1.5px solid #e5ddd0",
+        padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6,
         boxShadow: hasQty ? "0 4px 16px rgba(212,119,90,0.2)" : "0 2px 10px rgba(0,0,0,0.07)",
         transition: "all 0.15s",
       }}>
-        {/* Left: Image */}
-        <div style={{
-          position: "relative", background: "#faf7f2", display: "flex", alignItems: "center", justifyContent: "center",
-          width: 140, minHeight: 160, flexShrink: 0, padding: 14,
-        }}>
-          <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={100} />
+        {/* Ligne 1 : photo compacte + nom sur toute la largeur + favori */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={44} />
+          <div className="produit-main">
+            <div className="produit-name" style={{ fontSize: 13.5, fontWeight: 700, color: "#1a1a1a" }}>{item.name}</div>
+          </div>
           <button type="button" onClick={() => toggleFavori(item.id, isFav)}
-            style={{ position: "absolute", top: 6, left: 6, background: "none", border: "none", fontSize: 14, cursor: "pointer", opacity: isFav ? 1 : 0.3 }}>
+            style={{ background: "none", border: "none", fontSize: 14, cursor: "pointer", opacity: isFav ? 1 : 0.3, flexShrink: 0, padding: 0 }}>
             &#x2B50;
           </button>
         </div>
 
-        {/* Right: Info */}
-        <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 0 }}>
-          {/* Name */}
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-            {item.name}
+        {/* Ligne 2 : pastilles — conditionnement · unité de commande · zone */}
+        {(condLabel || item.order_unit || item.storage_zone) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+            {condLabel && <span className="pastille-cadre">{condLabel}</span>}
+            {item.order_unit && <span className="pastille-cadre">cmd : {item.order_unit}</span>}
+            {item.storage_zone && (
+              <span className="pastille" style={{ "--pastille-c": zoneColors[item.storage_zone] ?? "#b0a894" } as React.CSSProperties}>
+                {item.storage_zone}
+              </span>
+            )}
           </div>
+        )}
 
-          {/* Price */}
-          <div style={{ fontSize: 17, fontWeight: 700, fontFamily: "var(--font-oswald), Oswald, sans-serif", color: "#1a1a1a" }}>
-            {item.prix_commande != null ? `${item.prix_commande.toFixed(2).replace(".", ",")}€ HT` : "—"}
-          </div>
-
-          {/* Conditioning badge */}
-          {condLabel && (
-            <div style={{
-              display: "inline-flex", padding: "4px 12px", border: "1.5px solid #ddd6c8",
-              borderRadius: 8, fontSize: 11, fontWeight: 600, color: "#555", alignSelf: "flex-start",
-              background: "#fff",
-            }}>
-              {condLabel}
-            </div>
-          )}
-
-          {/* Stock ideal — toujours affiché en unités individuelles */}
-          {obj != null && obj > 0 && (() => {
-            // Convertir le stock objectif en unités individuelles si pack
-            const objIndiv = packCount > 0 ? obj * packCount : obj;
-            // Déterminer le label de l'unité individuelle
-            let stockUnitLabel: string;
-            const baseUnit = (item.default_unit ?? "").toLowerCase();
-            if (baseUnit.includes("bouteille") || baseUnit === "bt" || baseUnit === "btl") stockUnitLabel = "Btl";
-            else if (baseUnit === "pc" || baseUnit === "pcs" || baseUnit.includes("piece") || baseUnit.includes("pièce")) stockUnitLabel = "Btl";
-            else if (baseUnit.includes("sachet")) stockUnitLabel = "Sac";
-            else if (baseUnit.includes("barquette")) stockUnitLabel = "Barq";
-            else if (baseUnit.includes("boite") || baseUnit.includes("boîte")) stockUnitLabel = "Bte";
-            else if (packCount > 0) stockUnitLabel = "Btl";
-            else stockUnitLabel = indiv;
-            return (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: stockColor }}>Stock idéal</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: stockColor, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                  {objIndiv} {stockUnitLabel}{objIndiv > 1 ? "." : ""}
+        {/* Ligne 3 : jauge de stock + ligne stock compacte */}
+        {(() => {
+          const si = stockData[item.id];
+          const min = item.stock_min ?? 0;
+          const objG = item.stock_objectif ?? 0;
+          const objIndiv = packCount > 0 && obj != null ? obj * packCount : obj;
+          if (!si && !(objG > 0)) return null;
+          const stockVal = si ? Math.round(si.stock * 10) / 10 : null;
+          const color = si == null ? "#999" : si.stock <= min ? "#DC2626" : objG > 0 && si.stock < objG ? "#b45309" : "#2D6A4F";
+          const pct = si && objG > 0 ? Math.max(0, Math.min(100, (si.stock / objG) * 100)) : 0;
+          return (
+            <div>
+              {objG > 0 && (
+                <div style={{ height: 6, borderRadius: 3, background: "#f0ebe3", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3 }} />
                 </div>
+              )}
+              <div style={{ fontSize: 10.5, color: "#999", marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "baseline" }}>
+                {stockVal != null && <span style={{ fontWeight: 700, color }}>Stock {stockVal}</span>}
+                {objG > 0 && <span>min {min} · objectif {objG}{objIndiv && packCount > 0 ? ` (${objIndiv} ${indiv}s)` : ""}</span>}
+                {si && si.avg_daily > 0 && <span>{Math.round(si.avg_daily * 10) / 10}/j</span>}
               </div>
-            );
-          })()}
+            </div>
+          );
+        })()}
 
-          {/* Stock actuel + Commande théorique */}
+        {/* Ligne 4 : à commander (gauche) + prix en pastille ronde (bas droite) */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {(() => {
             const si = stockData[item.id];
-            if (!si) return null;
+            if (!si || !(si.qty_to_order > 0)) return <span />;
             return (
-              <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-                <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Stock</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: si.stock <= (item.stock_min ?? 0) ? "#DC2626" : "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                    {Math.round(si.stock * 10) / 10}
-                  </div>
-                </div>
-                {si.qty_to_order > 0 && (
-                  <div>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "#2563EB", textTransform: "uppercase" }}>A commander</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#2563EB", fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>
-                      {si.qty_to_order} {si.unit ?? ""}
-                    </div>
-                  </div>
-                )}
-                {si.avg_daily > 0 && (
-                  <div>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Conso/j</div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#777" }}>
-                      {(Math.round(si.avg_daily * 10) / 10)}/j
-                    </div>
-                  </div>
-                )}
-              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#2563EB" }}>
+                À commander : {si.qty_to_order} {si.unit ?? ""}
+              </span>
             );
           })()}
-
-          {/* Unit price */}
-          {unitPrice != null && (
-            <div style={{ fontSize: 11, color: "#999" }}>
-              {unitPrice.toFixed(2).replace(".", ",")}€ HT
-            </div>
+          {item.prix_commande != null && (
+            <span className="pastille-ronde" style={{ marginLeft: "auto" }}>
+              {item.prix_commande.toFixed(2).replace(".", ",")} € HT{item.order_unit ? ` · ${item.order_unit}` : ""}
+            </span>
           )}
+        </div>
 
-          {/* Label + Stepper row */}
-          <div style={{ fontSize: 11, color: "#999", fontStyle: "italic", marginTop: 2 }}>
-            Prix par unité de vente
-          </div>
-          <div style={{ marginTop: 2 }}>
-            <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
-          </div>
-
-          {/* Unit toggle */}
-          {packCount > 0 && <div>{unitToggle(item)}</div>}
+        {/* Ligne 5 : stepper + bascule d'unité */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+          {packCount > 0 && unitToggle(item)}
         </div>
       </div>
     );

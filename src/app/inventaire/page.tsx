@@ -22,6 +22,7 @@ type StorageZone = {
   id: string;
   name: string;
   display_order: number;
+  couleur?: string | null;
   /** Critères : la zone AFFICHE tous les produits de ces catégories/fournisseurs */
   category_slugs?: string[] | null;
   supplier_ids?: string[] | null;
@@ -166,6 +167,7 @@ export default function InventairePage() {
   const [addingProducts, setAddingProducts] = useState(false);
   const [editCatsZoneId, setEditCatsZoneId] = useState<string | null>(null);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [ingSupplier, setIngSupplier] = useState<Record<string, { name: string; color: string | null }>>({});
 
   const [packInfo, setPackInfo] = useState<Record<string, { pack_count: number; pack_each_qty: number | null; pack_each_unit: string | null }>>({}); // ingredient_id -> pack info
 
@@ -219,25 +221,33 @@ export default function InventairePage() {
       if (etabId) zq = zq.eq("etablissement_id", etabId);
       const packQ = supabase
         .from("supplier_offers")
-        .select("ingredient_id, pack_count, pack_each_qty, pack_each_unit")
-        .eq("is_active", true)
-        .not("pack_count", "is", null);
+        .select("ingredient_id, supplier_id, pack_count, pack_each_qty, pack_each_unit")
+        .eq("is_active", true);
       let supQ = supabase.from("suppliers").select("id, name").eq("is_active", true).order("name");
       if (etabId) supQ = supQ.eq("etablissement_id", etabId);
-      const [{ data, error }, { data: zData }, { data: packData }, { data: supData }] = await Promise.all([q, zq, packQ, supQ]);
+      // Tous les fournisseurs (les 2 etablissements) pour la pastille produit
+      const supAllQ = supabase.from("suppliers").select("id, name, color").eq("is_active", true);
+      const [{ data, error }, { data: zData }, { data: packData }, { data: supData }, { data: supAllData }] = await Promise.all([q, zq, packQ, supQ, supAllQ]);
       if (error) { console.error("ingredients query:", error); }
       setIngredients((data ?? []) as Ingredient[]);
       const zList = (zData ?? []) as StorageZone[];
       setZones(zList);
       if (zList.length > 0) setActiveZone(zList[0].name);
-      // Build pack info map
+      // Build pack info map + fournisseur par produit (pastille de la charte)
+      const supById: Record<string, { name: string; color: string | null }> = {};
+      for (const sa of supAllData ?? []) supById[sa.id] = { name: sa.name, color: sa.color ?? null };
       const pMap: Record<string, { pack_count: number; pack_each_qty: number | null; pack_each_unit: string | null }> = {};
+      const isMap: Record<string, { name: string; color: string | null }> = {};
       for (const p of packData ?? []) {
         if (p.ingredient_id && p.pack_count) {
           pMap[p.ingredient_id] = { pack_count: p.pack_count, pack_each_qty: p.pack_each_qty, pack_each_unit: p.pack_each_unit };
         }
+        if (p.ingredient_id && p.supplier_id && supById[p.supplier_id]) {
+          isMap[p.ingredient_id] = supById[p.supplier_id];
+        }
       }
       setPackInfo(pMap);
+      setIngSupplier(isMap);
       setSuppliers((supData ?? []) as { id: string; name: string }[]);
     })();
   }, [etabId]);
@@ -1508,12 +1518,21 @@ export default function InventairePage() {
                                 )}
                               </div>
                               <div style={{ fontSize: 10, color: "#999", marginTop: 1, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                                <span>
+                                <span className="pastille-cadre">
                                   {pack
                                     ? `crt ${pack.pack_count} × ${pack.pack_each_qty ?? 1}${packUnit}`
                                     : (ing.default_unit ?? "pcs")}
-                                  {hasQty && pack && <span style={{ color: "#7C3AED" }}> = {rawQtyNum} {packUnit}</span>}
                                 </span>
+                                {ing.storage_zone && (() => {
+                                  const z = zones.find(zz => zz.name === ing.storage_zone);
+                                  const zc = z?.couleur ?? "#b0a894";
+                                  return <span className="pastille" style={{ "--pastille-c": zc } as React.CSSProperties}>{ing.storage_zone}</span>;
+                                })()}
+                                {ingSupplier[ing.id] && (
+                                  <span className="pastille" style={{ "--pastille-c": ingSupplier[ing.id].color ?? "#b0a894" } as React.CSSProperties}>
+                                    {ingSupplier[ing.id].name}
+                                  </span>
+                                )}
                                 {/* Previous inventory comparison */}
                                 {hasQty && prevQuantities[ing.id] != null && (() => {
                                   const prev = prevQuantities[ing.id];
@@ -1540,7 +1559,7 @@ export default function InventairePage() {
                                       background: Math.abs(ecart) > theo * 0.2 ? "rgba(220,38,38,0.10)" : "rgba(212,160,60,0.10)",
                                       color: Math.abs(ecart) > theo * 0.2 ? "#DC2626" : "#D4A03C",
                                     }}>
-                                      theo {theo} ({ecart > 0 ? "+" : ""}{ecart})
+                                      stock théorique {theo} · écart {ecart > 0 ? "+" : ""}{ecart}
                                     </span>
                                   );
                                 })()}
@@ -1636,6 +1655,15 @@ export default function InventairePage() {
                                   fontWeight: 700, cursor: "pointer", display: "flex",
                                   alignItems: "center", justifyContent: "center",
                                 }}>+</button>
+                              </div>
+                            )}
+
+                            {/* Total compté : pastille ronde en bas à droite (charte) */}
+                            {hasQty && (
+                              <div className="produit-footer" style={{ flexBasis: "100%", marginTop: 4 }}>
+                                <span className="pastille-ronde" style={{ background: "rgba(109,40,217,0.10)", color: "#6d28d9" }}>
+                                  = {rawQtyNum} {packUnit}
+                                </span>
                               </div>
                             )}
                           </div>

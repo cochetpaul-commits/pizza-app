@@ -270,6 +270,53 @@ body {
   .produit-main { flex-basis: 100%; }
 }
 
+/* Pastilles de la charte produit :
+   - .pastille          : pastille colorée (catégorie, zone, fournisseur) —
+     passer la couleur via style={{ "--pastille-c": couleur }}
+   - .pastille-cadre    : encadré léger neutre (conditionnement)
+   - .pastille-ronde    : la valeur clé du menu (prix, total compté) —
+     pastille bien ronde, en bas à droite de la tuile (via .produit-footer) */
+.pastille {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--pastille-c, #b0a894) 13%, white);
+  color: var(--pastille-c, #b0a894);
+  white-space: nowrap;
+}
+.pastille-cadre {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 600;
+  border: 1px solid #ddd6c8;
+  background: #fff;
+  color: #6f6a61;
+  white-space: nowrap;
+}
+.produit-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+.pastille-ronde {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 800;
+  background: rgba(212, 119, 90, 0.13);
+  color: #b0562f;
+  white-space: nowrap;
+}
+
 /* ── Barre de période sticky (style Zenchef) ──────── */
 .period-sticky {
   position: sticky;

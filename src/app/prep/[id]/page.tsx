@@ -430,7 +430,7 @@ export default function PrepRecipeDetailPage() {
         const iid = getString(io["id"] as unknown, "");
         if (!iid) return;
         const pvm = typeof io["piece_volume_ml"] === "number" ? (io["piece_volume_ml"] as number) : null;
-        priceLabelMap[iid] = formatCpuLabel(priceMap[iid] ?? {}, {}, pvm, infoMap[iid]?.supplier ?? null);
+        priceLabelMap[iid] = formatCpuLabel(priceMap[iid] ?? {}, {}, pvm, null);
       });
       setPriceLabelByIngredient(priceLabelMap);
 
