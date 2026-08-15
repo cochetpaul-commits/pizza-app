@@ -36,16 +36,14 @@ type Employe = {
   role: string | null;
   code_pin: string | null;
   auth_user_id: string | null;
+  postes?: { nom: string; equipe: string | null } | null;
 };
 
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Administrateur",
-  manager: "Manager",
-  employe: "Employe",
-};
+// Libelles/couleurs identiques a la fiche employe (Compte & acces)
+import { mapToPermRole, ROLE_INFO } from "@/lib/permissions";
 
 function getInitials(prenom: string, nom: string): string {
   return ((prenom?.[0] ?? "") + (nom?.[0] ?? "")).toUpperCase();
@@ -126,7 +124,7 @@ export default function EquipePage() {
       setLoading(true);
       const empRes = await supabase
         .from("employes")
-        .select("*")
+        .select("*, postes(nom, equipe)")
         .contains("etablissements_ids", [etab.id])
         .order("nom", { ascending: true });
       if (cancelled) return;
@@ -269,9 +267,19 @@ export default function EquipePage() {
                         </div>
                       </td>
 
-                      {/* Role */}
-                      <td style={{ ...tdStyle, color: "#6f6a61", fontSize: 13 }} className="hide-mobile">
-                        {ROLE_LABELS[role] ?? role}
+                      {/* Role + poste */}
+                      <td style={{ ...tdStyle, fontSize: 13 }} className="hide-mobile">
+                        {(() => {
+                          const info = ROLE_INFO[mapToPermRole(role)];
+                          return (
+                            <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, background: info.bg, color: info.color }}>
+                                {info.label}
+                              </span>
+                              {emp.postes?.nom && <span className="pastille-cadre">{emp.postes.nom}</span>}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Code PIN */}
@@ -344,7 +352,7 @@ export default function EquipePage() {
                                   const res = await fetch("/api/admin/invite", {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-                                    body: JSON.stringify({ email: emp.email, displayName: `${emp.prenom} ${emp.nom}`, role: emp.role ?? "equipier" }),
+                                    body: JSON.stringify({ email: emp.email, displayName: `${emp.prenom} ${emp.nom}`, role: emp.role ?? "equipier", etablissementsAccess: emp.etablissement_id ? [emp.etablissement_id] : [] }),
                                   });
                                   if (res.ok) {
                                     setInviteStatus(prev => ({ ...prev, [emp.id]: "sent" }));
