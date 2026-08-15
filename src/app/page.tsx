@@ -27,13 +27,17 @@ export default function RootPage() {
       return;
     }
 
-    // Employees → their affiliated establishment home
+    // Dans leur etablissement : equipiers → tableau perso ;
+    // managers → accueil entreprise (KPI + tous les menus)
     if (etablissements.length > 0) {
       const etab = etablissements[0];
       setGroupView(false);
       setCurrent(etab);
-      const slug = etab.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio";
-      router.replace(slug);
+      if (role === "manager") {
+        router.replace(etab.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio");
+      } else {
+        router.replace("/mon-tableau");
+      }
       return;
     }
 

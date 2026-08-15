@@ -1533,6 +1533,15 @@ export default function InventairePage() {
                                     {ingSupplier[ing.id].name}
                                   </span>
                                 )}
+                                <a
+                                  href={`/ingredients?edit=${ing.id}&back=${encodeURIComponent("/inventaire")}`}
+                                  title="Modifier la fiche produit"
+                                  className="pastille-cadre"
+                                  style={{ textDecoration: "none", cursor: "pointer" }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  ✎
+                                </a>
                                 {/* Previous inventory comparison */}
                                 {hasQty && prevQuantities[ing.id] != null && (() => {
                                   const prev = prevQuantities[ing.id];

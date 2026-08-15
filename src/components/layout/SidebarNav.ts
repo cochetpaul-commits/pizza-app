@@ -61,7 +61,6 @@ const PILOTAGE_ITEMS: NavItemV2[] = [
   // "Mon tableau" : managers (vue equipe) et employes (vue perso par poste).
   // Les admins ont la vision globale via /pilotage — pas de tableau personnalise.
   { label: "Mon tableau", href: "/mon-tableau", icon: "dashboard", roles: ["manager", "equipier"] },
-  { label: "Tableau de bord", href: "/pilotage", icon: "dashboard", permission: "performances.pilotage" },
   { label: "Ventes", href: "/ventes", icon: "barChart", permission: "performances.view" },
   { label: "Produits", href: "/ventes/marges", icon: "wallet", permission: "performances.pilotage" },
   { label: "Masse salariale", href: "/rh/masse-salariale", icon: "calculator", permission: "performances.pilotage" },

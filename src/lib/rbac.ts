@@ -32,7 +32,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/rh":           MANAGERS,
   "/personnel":    MANAGERS,
   // Manager + Admin: pilotage, ventes, RH, événements
-  "/pilotage":        MANAGERS,
+  "/pilotage":        ALL, // redirection (page supprimee le 15/08)
   "/ventes":          MANAGERS,
   "/finances":        MANAGERS,
   "/variations-prix": MANAGERS,

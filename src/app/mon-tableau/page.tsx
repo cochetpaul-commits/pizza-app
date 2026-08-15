@@ -176,8 +176,8 @@ export default function MonTableauPage() {
         if (cancelled) return;
         if (!res.ok) { setErr(json.error ?? "Erreur"); setData(null); }
         else if ((json as ApiData).admin) {
-          // Admins : vision globale — redirection vers le tableau de bord general
-          router.replace("/pilotage");
+          // Admins : vision globale — redirection vers l'accueil groupe
+          router.replace("/dashboard");
           return;
         }
         else setData(json as ApiData);

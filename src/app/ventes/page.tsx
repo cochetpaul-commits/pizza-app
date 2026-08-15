@@ -971,6 +971,139 @@ function PerformancesPage() {
               </div>
             </div>
 
+            {/* Recap table */}
+            {W.services.length > 0 && (
+              <div style={S.card}>
+                <div style={S.sec}>Par service · {mode.toUpperCase()} · couverts</div>
+                {/* Desktop: table classique */}
+                <div className="desktop-only" style={{ overflow: "hidden", borderRadius: 8, border: "1px solid #e0d8ce" }}>
+                  <RecapTable services={W.services} mode={mode} meteo={meteo} dates={W.dates} days={W.days} useWeeks={W.dates.length > 14} />
+                </div>
+                {/* Mobile: transposed table (rows=zones, cols=midi/soir) per day */}
+                <div className="mobile-only" style={{ flexDirection: "column", gap: 10 }}>
+                  {(() => {
+                    const byDay: Record<string, typeof W.services> = {};
+                    const dayOrder: string[] = [];
+                    for (const s of W.services) {
+                      if (!byDay[s.jour]) { byDay[s.jour] = []; dayOrder.push(s.jour); }
+                      byDay[s.jour].push(s);
+                    }
+                    // Find dayToDate for meteo
+                    const dayToDate: Record<string, string> = {};
+                    for (let i = 0; i < W.days.length; i++) {
+                      if (W.days[i] && W.dates[i]) dayToDate[W.days[i]] = W.dates[i];
+                    }
+                    const cellSt = { padding: "10px 8px", textAlign: "center" as const, fontSize: 13, fontWeight: 600 as const, borderBottom: "1px solid rgba(0,0,0,0.04)" };
+                    const labelSt = { padding: "10px 12px", textAlign: "left" as const, fontSize: 12, fontWeight: 600 as const, color: "#777", borderBottom: "1px solid rgba(0,0,0,0.04)" };
+                    return dayOrder.map(jour => {
+                      const svcs = byDay[jour];
+                      const midi = svcs.find(s => s.svc === "midi");
+                      const soir = svcs.find(s => s.svc !== "midi");
+                      const zM = midi ? (mode === "ttc" ? midi.z_ttc : midi.z_ht) : null;
+                      const zS = soir ? (mode === "ttc" ? soir.z_ttc : soir.z_ht) : null;
+                      const dateKey = dayToDate[jour];
+                      const meteoM = dateKey ? meteo[`${dateKey}:midi`] : null;
+                      const meteoS = dateKey ? meteo[`${dateKey}:soir`] : null;
+                      const dash = <span style={{ color: "#ddd" }}>—</span>;
+                      const fmtCell = (v: number | undefined, color?: string) => v && v > 0
+                        ? <span style={{ color: color ?? "#1a1a1a" }}>{fmt(v)}</span>
+                        : dash;
+                      return (
+                        <div key={jour} style={{
+                          background: "#fff", borderRadius: 14, border: "1px solid #e8e0d0",
+                          overflow: "hidden",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+                        }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <thead>
+                              <tr style={{ background: "linear-gradient(180deg, #faf7f2 0%, #f5f0e8 100%)" }}>
+                                <th style={{
+                                  padding: "12px 12px", textAlign: "left",
+                                  fontSize: 14, fontWeight: 800, color: "#1a1a1a",
+                                  fontFamily: "var(--font-oswald), Oswald, sans-serif",
+                                  textTransform: "uppercase", letterSpacing: "0.04em",
+                                  borderBottom: "1px solid rgba(0,0,0,0.06)",
+                                }}>{jour}</th>
+                                <th style={{
+                                  padding: "12px 8px", textAlign: "center",
+                                  fontSize: 10, fontWeight: 700, color: "#5e8278",
+                                  textTransform: "uppercase", letterSpacing: "0.12em",
+                                  borderBottom: "1px solid rgba(0,0,0,0.06)",
+                                }}>Midi</th>
+                                <th style={{
+                                  padding: "12px 8px", textAlign: "center",
+                                  fontSize: 10, fontWeight: 700, color: "#1a1a1a",
+                                  textTransform: "uppercase", letterSpacing: "0.12em",
+                                  borderBottom: "1px solid rgba(0,0,0,0.06)",
+                                }}>Soir</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td style={labelSt}>Meteo</td>
+                                <td style={{ ...cellSt, fontSize: 18 }}>{meteoM ? <span title={`${meteoM.desc} ${meteoM.temp}°`}>{meteoM.emoji}</span> : dash}</td>
+                                <td style={{ ...cellSt, fontSize: 18 }}>{meteoS ? <span title={`${meteoS.desc} ${meteoS.temp}°`}>{meteoS.emoji}</span> : dash}</td>
+                              </tr>
+                              <tr style={{ background: "rgba(94,130,120,0.03)" }}>
+                                <td style={{ ...labelSt, color: ZC.Salle }}>Salle</td>
+                                <td style={cellSt}>{fmtCell(zM?.Salle, ZC.Salle)}</td>
+                                <td style={cellSt}>{fmtCell(zS?.Salle, ZC.Salle)}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ ...labelSt, color: ZC.Pergolas }}>Pergolas</td>
+                                <td style={cellSt}>{fmtCell(zM?.Pergolas, ZC.Pergolas)}</td>
+                                <td style={cellSt}>{fmtCell(zS?.Pergolas, ZC.Pergolas)}</td>
+                              </tr>
+                              <tr style={{ background: "rgba(196,168,130,0.04)" }}>
+                                <td style={{ ...labelSt, color: ZC.Terrasse }}>Terrasse</td>
+                                <td style={cellSt}>{fmtCell(zM?.Terrasse, ZC.Terrasse)}</td>
+                                <td style={cellSt}>{fmtCell(zS?.Terrasse, ZC.Terrasse)}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ ...labelSt, color: ZC.emp }}>Emporter</td>
+                                <td style={cellSt}>{fmtCell(zM?.emp, ZC.emp)}</td>
+                                <td style={cellSt}>{fmtCell(zS?.emp, ZC.emp)}</td>
+                              </tr>
+                              <tr style={{ background: "rgba(212,119,90,0.08)" }}>
+                                <td style={{ ...labelSt, fontWeight: 800, color: accent, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Total</td>
+                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 15, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{midi ? fmt(mode === "ttc" ? midi.ttc : midi.ht) : dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 15, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{soir ? fmt(mode === "ttc" ? soir.ttc : soir.ht) : dash}</td>
+                              </tr>
+                              <tr>
+                                <td style={labelSt}>Cvts</td>
+                                <td style={{ ...cellSt, fontWeight: 700, color: "#1a1a1a" }}>{midi?.cov ?? dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 700, color: "#1a1a1a" }}>{soir?.cov ?? dash}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ ...labelSt, color: "#46655a" }}>SP</td>
+                                <td style={{ ...cellSt, fontWeight: 600, color: "#46655a" }}>{midi?.sp_cov || dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 600, color: "#46655a" }}>{soir?.sp_cov || dash}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ ...labelSt, color: "#46655a" }}>CVT M SP</td>
+                                <td style={{ ...cellSt, color: "#46655a" }}>{midi ? `${(mode === "ttc" ? midi.tm_sp_ttc : midi.tm_sp_ht).toFixed(2)}€` : dash}</td>
+                                <td style={{ ...cellSt, color: "#46655a" }}>{soir ? `${(mode === "ttc" ? soir.tm_sp_ttc : soir.tm_sp_ht).toFixed(2)}€` : dash}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ ...labelSt, color: "#D4775A" }}>EMP</td>
+                                <td style={{ ...cellSt, fontWeight: 600, color: "#D4775A" }}>{midi ? (midi.cov - midi.sp_cov > 0 ? midi.cov - midi.sp_cov : dash) : dash}</td>
+                                <td style={{ ...cellSt, fontWeight: 600, color: "#D4775A" }}>{soir ? (soir.cov - soir.sp_cov > 0 ? soir.cov - soir.sp_cov : dash) : dash}</td>
+                              </tr>
+                              <tr style={{ background: "rgba(0,0,0,0.015)" }}>
+                                <td style={{ ...labelSt, borderBottom: "none", color: "#D4775A" }}>CVT M EMP</td>
+                                <td style={{ ...cellSt, borderBottom: "none", color: "#D4775A" }}>{(() => { if (!midi) return dash; const ec = midi.cov - midi.sp_cov; if (ec <= 0) return dash; const empCa = mode === "ttc" ? midi.emp_ttc : midi.emp_ht; return `${Math.round(empCa / ec)}€`; })()}</td>
+                                <td style={{ ...cellSt, borderBottom: "none", color: "#D4775A" }}>{(() => { if (!soir) return dash; const ec = soir.cov - soir.sp_cov; if (ec <= 0) return dash; const empCa = mode === "ttc" ? soir.emp_ttc : soir.emp_ht; return `${Math.round(empCa / ec)}€`; })()}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+
             {/* Marge card (daily_sales source) */}
             {dataSource === "daily_sales" && W.day_marge && W.day_marge.length > 0 && (() => {
               const margeTotal = W.marge_total ?? 0;
@@ -1868,138 +2001,6 @@ function PerformancesPage() {
               );
             })()}
 
-            {/* Recap table */}
-            {W.services.length > 0 && (
-              <div style={S.card}>
-                <div style={S.sec}>Par service · {mode.toUpperCase()} · couverts</div>
-                {/* Desktop: table classique */}
-                <div className="desktop-only" style={{ overflow: "hidden", borderRadius: 8, border: "1px solid #e0d8ce" }}>
-                  <RecapTable services={W.services} mode={mode} meteo={meteo} dates={W.dates} days={W.days} useWeeks={W.dates.length > 14} />
-                </div>
-                {/* Mobile: transposed table (rows=zones, cols=midi/soir) per day */}
-                <div className="mobile-only" style={{ flexDirection: "column", gap: 10 }}>
-                  {(() => {
-                    const byDay: Record<string, typeof W.services> = {};
-                    const dayOrder: string[] = [];
-                    for (const s of W.services) {
-                      if (!byDay[s.jour]) { byDay[s.jour] = []; dayOrder.push(s.jour); }
-                      byDay[s.jour].push(s);
-                    }
-                    // Find dayToDate for meteo
-                    const dayToDate: Record<string, string> = {};
-                    for (let i = 0; i < W.days.length; i++) {
-                      if (W.days[i] && W.dates[i]) dayToDate[W.days[i]] = W.dates[i];
-                    }
-                    const cellSt = { padding: "10px 8px", textAlign: "center" as const, fontSize: 13, fontWeight: 600 as const, borderBottom: "1px solid rgba(0,0,0,0.04)" };
-                    const labelSt = { padding: "10px 12px", textAlign: "left" as const, fontSize: 12, fontWeight: 600 as const, color: "#777", borderBottom: "1px solid rgba(0,0,0,0.04)" };
-                    return dayOrder.map(jour => {
-                      const svcs = byDay[jour];
-                      const midi = svcs.find(s => s.svc === "midi");
-                      const soir = svcs.find(s => s.svc !== "midi");
-                      const zM = midi ? (mode === "ttc" ? midi.z_ttc : midi.z_ht) : null;
-                      const zS = soir ? (mode === "ttc" ? soir.z_ttc : soir.z_ht) : null;
-                      const dateKey = dayToDate[jour];
-                      const meteoM = dateKey ? meteo[`${dateKey}:midi`] : null;
-                      const meteoS = dateKey ? meteo[`${dateKey}:soir`] : null;
-                      const dash = <span style={{ color: "#ddd" }}>—</span>;
-                      const fmtCell = (v: number | undefined, color?: string) => v && v > 0
-                        ? <span style={{ color: color ?? "#1a1a1a" }}>{fmt(v)}</span>
-                        : dash;
-                      return (
-                        <div key={jour} style={{
-                          background: "#fff", borderRadius: 14, border: "1px solid #e8e0d0",
-                          overflow: "hidden",
-                          boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-                        }}>
-                          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                            <thead>
-                              <tr style={{ background: "linear-gradient(180deg, #faf7f2 0%, #f5f0e8 100%)" }}>
-                                <th style={{
-                                  padding: "12px 12px", textAlign: "left",
-                                  fontSize: 14, fontWeight: 800, color: "#1a1a1a",
-                                  fontFamily: "var(--font-oswald), Oswald, sans-serif",
-                                  textTransform: "uppercase", letterSpacing: "0.04em",
-                                  borderBottom: "1px solid rgba(0,0,0,0.06)",
-                                }}>{jour}</th>
-                                <th style={{
-                                  padding: "12px 8px", textAlign: "center",
-                                  fontSize: 10, fontWeight: 700, color: "#5e8278",
-                                  textTransform: "uppercase", letterSpacing: "0.12em",
-                                  borderBottom: "1px solid rgba(0,0,0,0.06)",
-                                }}>Midi</th>
-                                <th style={{
-                                  padding: "12px 8px", textAlign: "center",
-                                  fontSize: 10, fontWeight: 700, color: "#1a1a1a",
-                                  textTransform: "uppercase", letterSpacing: "0.12em",
-                                  borderBottom: "1px solid rgba(0,0,0,0.06)",
-                                }}>Soir</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr>
-                                <td style={labelSt}>Meteo</td>
-                                <td style={{ ...cellSt, fontSize: 18 }}>{meteoM ? <span title={`${meteoM.desc} ${meteoM.temp}°`}>{meteoM.emoji}</span> : dash}</td>
-                                <td style={{ ...cellSt, fontSize: 18 }}>{meteoS ? <span title={`${meteoS.desc} ${meteoS.temp}°`}>{meteoS.emoji}</span> : dash}</td>
-                              </tr>
-                              <tr style={{ background: "rgba(94,130,120,0.03)" }}>
-                                <td style={{ ...labelSt, color: ZC.Salle }}>Salle</td>
-                                <td style={cellSt}>{fmtCell(zM?.Salle, ZC.Salle)}</td>
-                                <td style={cellSt}>{fmtCell(zS?.Salle, ZC.Salle)}</td>
-                              </tr>
-                              <tr>
-                                <td style={{ ...labelSt, color: ZC.Pergolas }}>Pergolas</td>
-                                <td style={cellSt}>{fmtCell(zM?.Pergolas, ZC.Pergolas)}</td>
-                                <td style={cellSt}>{fmtCell(zS?.Pergolas, ZC.Pergolas)}</td>
-                              </tr>
-                              <tr style={{ background: "rgba(196,168,130,0.04)" }}>
-                                <td style={{ ...labelSt, color: ZC.Terrasse }}>Terrasse</td>
-                                <td style={cellSt}>{fmtCell(zM?.Terrasse, ZC.Terrasse)}</td>
-                                <td style={cellSt}>{fmtCell(zS?.Terrasse, ZC.Terrasse)}</td>
-                              </tr>
-                              <tr>
-                                <td style={{ ...labelSt, color: ZC.emp }}>Emporter</td>
-                                <td style={cellSt}>{fmtCell(zM?.emp, ZC.emp)}</td>
-                                <td style={cellSt}>{fmtCell(zS?.emp, ZC.emp)}</td>
-                              </tr>
-                              <tr style={{ background: "rgba(212,119,90,0.08)" }}>
-                                <td style={{ ...labelSt, fontWeight: 800, color: accent, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.06em" }}>Total</td>
-                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 15, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{midi ? fmt(mode === "ttc" ? midi.ttc : midi.ht) : dash}</td>
-                                <td style={{ ...cellSt, fontWeight: 800, color: accent, fontSize: 15, fontFamily: "var(--font-oswald), Oswald, sans-serif" }}>{soir ? fmt(mode === "ttc" ? soir.ttc : soir.ht) : dash}</td>
-                              </tr>
-                              <tr>
-                                <td style={labelSt}>Cvts</td>
-                                <td style={{ ...cellSt, fontWeight: 700, color: "#1a1a1a" }}>{midi?.cov ?? dash}</td>
-                                <td style={{ ...cellSt, fontWeight: 700, color: "#1a1a1a" }}>{soir?.cov ?? dash}</td>
-                              </tr>
-                              <tr>
-                                <td style={{ ...labelSt, color: "#46655a" }}>SP</td>
-                                <td style={{ ...cellSt, fontWeight: 600, color: "#46655a" }}>{midi?.sp_cov || dash}</td>
-                                <td style={{ ...cellSt, fontWeight: 600, color: "#46655a" }}>{soir?.sp_cov || dash}</td>
-                              </tr>
-                              <tr>
-                                <td style={{ ...labelSt, color: "#46655a" }}>CVT M SP</td>
-                                <td style={{ ...cellSt, color: "#46655a" }}>{midi ? `${(mode === "ttc" ? midi.tm_sp_ttc : midi.tm_sp_ht).toFixed(2)}€` : dash}</td>
-                                <td style={{ ...cellSt, color: "#46655a" }}>{soir ? `${(mode === "ttc" ? soir.tm_sp_ttc : soir.tm_sp_ht).toFixed(2)}€` : dash}</td>
-                              </tr>
-                              <tr>
-                                <td style={{ ...labelSt, color: "#D4775A" }}>EMP</td>
-                                <td style={{ ...cellSt, fontWeight: 600, color: "#D4775A" }}>{midi ? (midi.cov - midi.sp_cov > 0 ? midi.cov - midi.sp_cov : dash) : dash}</td>
-                                <td style={{ ...cellSt, fontWeight: 600, color: "#D4775A" }}>{soir ? (soir.cov - soir.sp_cov > 0 ? soir.cov - soir.sp_cov : dash) : dash}</td>
-                              </tr>
-                              <tr style={{ background: "rgba(0,0,0,0.015)" }}>
-                                <td style={{ ...labelSt, borderBottom: "none", color: "#D4775A" }}>CVT M EMP</td>
-                                <td style={{ ...cellSt, borderBottom: "none", color: "#D4775A" }}>{(() => { if (!midi) return dash; const ec = midi.cov - midi.sp_cov; if (ec <= 0) return dash; const empCa = mode === "ttc" ? midi.emp_ttc : midi.emp_ht; return `${Math.round(empCa / ec)}€`; })()}</td>
-                                <td style={{ ...cellSt, borderBottom: "none", color: "#D4775A" }}>{(() => { if (!soir) return dash; const ec = soir.cov - soir.sp_cov; if (ec <= 0) return dash; const empCa = mode === "ttc" ? soir.emp_ttc : soir.emp_ht; return `${Math.round(empCa / ec)}€`; })()}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-            )}
 
             {/* Top 10 */}
             {W.top10_names.length > 0 && (
@@ -2013,7 +2014,7 @@ function PerformancesPage() {
             {W.top3_cats.length > 0 && (
               <div style={S.card}>
                 <div style={S.sec}>Top 3 par categorie · CA {mode.toUpperCase()}</div>
-                <div className="ventes-top3-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                <div className="ventes-top3-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
                   {W.top3_cats.filter(c => !c.cat.toLowerCase().includes("bambini")).map((cat, ci) => (
                     <div key={ci} style={{ background: "#fff", borderRadius: 10, padding: "12px 14px", border: "1px solid rgba(0,0,0,.08)" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>

@@ -1439,18 +1439,26 @@ function CommandesPage() {
           </button>
         </div>
 
-        {/* Ligne 2 : pastilles — conditionnement · unité de commande · zone */}
-        {(condLabel || item.order_unit || item.storage_zone) && (
-          <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-            {condLabel && <span className="pastille-cadre">{condLabel}</span>}
-            {item.order_unit && <span className="pastille-cadre">cmd : {item.order_unit}</span>}
-            {item.storage_zone && (
-              <span className="pastille" style={{ "--pastille-c": zoneColors[item.storage_zone] ?? "#b0a894" } as React.CSSProperties}>
-                {item.storage_zone}
-              </span>
-            )}
-          </div>
-        )}
+        {/* Ligne 2 : pastilles — conditionnement · unité de commande · zone + raccourci produit */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+          {condLabel && <span className="pastille-cadre">{condLabel}</span>}
+          {item.order_unit && <span className="pastille-cadre">cmd : {item.order_unit}</span>}
+          {item.storage_zone && (
+            <span className="pastille" style={{ "--pastille-c": zoneColors[item.storage_zone] ?? "#b0a894" } as React.CSSProperties}>
+              {item.storage_zone}
+            </span>
+          )}
+          {/* Raccourci : modifier la fiche produit (conditionnement, commande & stock) et revenir ici */}
+          <a
+            href={`/ingredients?edit=${item.id}&back=${encodeURIComponent("/commandes")}`}
+            title="Modifier la fiche produit"
+            className="pastille-cadre"
+            style={{ textDecoration: "none", cursor: "pointer" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            ✎ produit
+          </a>
+        </div>
 
         {/* Ligne 3 : jauge de stock + ligne stock compacte */}
         {(() => {
