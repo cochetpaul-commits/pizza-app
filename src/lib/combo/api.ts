@@ -94,6 +94,22 @@ export async function getPlannings(locationId: string, startDate: string, endDat
   return comboGet(`plannings?location_id=${locationId}&start_date=${startDate}&end_date=${endExcl}`);
 }
 
+export type ComboRest = {
+  id: string;
+  contract_id: string;
+  location_id: string;
+  rest_type: string; // paid_leave, sick_leave, unpaid_leave, ...
+  starts_at: string; // ISO datetime
+  ends_at: string;
+  custom_value: number | null;
+};
+
+/** Absences / congés (lecture seule côté API partenaire). end_date optionnelle. */
+export async function getRests(locationId: string, startDate: string, endDate?: string): Promise<ComboRest[]> {
+  const end = endDate ? `&end_date=${endDate}` : "";
+  return comboGet(`rests?location_id=${locationId}&start_date=${startDate}${end}`);
+}
+
 // ── Location IDs ──
 export const COMBO_LOCATIONS: Record<string, string> = {
   bello_mio: "a0b6d3e9-1964-410d-aeaa-91fa07279420",

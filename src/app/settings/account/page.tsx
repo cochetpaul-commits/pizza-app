@@ -198,13 +198,22 @@ export default function MonComptePage() {
         <div style={{ fontSize: 10.5, color: "#999", marginTop: 10 }}>
           Touche la photo pour la changer. Rôle et poste sont gérés par le restaurant.
         </div>
-        <a href="/mon-tableau" style={{
-          display: "block", textAlign: "center", marginTop: 12, padding: "10px 0",
-          borderRadius: 8, background: "rgba(212,119,90,0.10)", color: "#b0562f",
-          fontSize: 13, fontWeight: 700, textDecoration: "none",
-        }}>
-          Voir mon tableau de bord →
-        </a>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
+          <a href="/mon-tableau" style={{
+            textAlign: "center", padding: "10px 0",
+            borderRadius: 8, background: "rgba(212,119,90,0.10)", color: "#b0562f",
+            fontSize: 13, fontWeight: 700, textDecoration: "none",
+          }}>
+            Mon tableau →
+          </a>
+          <a href="/mes-conges" style={{
+            textAlign: "center", padding: "10px 0",
+            borderRadius: 8, background: "rgba(45,106,79,0.10)", color: "#2D6A4F",
+            fontSize: 13, fontWeight: 700, textDecoration: "none",
+          }}>
+            Mes congés →
+          </a>
+        </div>
       </div>
 
       {/* ── Coordonnées (modifiables par l'employé) ── */}

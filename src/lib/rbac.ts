@@ -25,6 +25,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/piccola-mia":  ALL,
   "/dashboard":    ALL,
   "/mon-tableau":  ALL,
+  "/mes-conges":   ALL,
   "/haccp":        MANAGERS,
   "/fournisseurs": ALL,
   "/rh/conges":    MANAGERS,

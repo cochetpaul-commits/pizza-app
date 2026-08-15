@@ -606,27 +606,48 @@ export default function CongesPage() {
 
   /* ── Approve / refuse ───────────────────────────────────────── */
 
+  // Decision via API : met a jour + notifie l'employe concerne
+  const decide = async (id: string, action: "valide" | "refuse", motif?: string) => {
+    const { data: sess } = await supabase.auth.getSession();
+    const res = await fetch("/api/conges/decision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
+      body: JSON.stringify({ id, action, motif }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      alert("Erreur : " + (j.error ?? res.status));
+      return false;
+    }
+    return true;
+  };
+
   const handleApprove = async (id: string) => {
-    const { error } = await supabase
-      .from("absences")
-      .update({ statut: "valide" })
-      .eq("id", id);
-    if (!error) loadData();
-    else alert("Erreur : " + error.message);
+    if (await decide(id, "valide")) loadData();
   };
 
   const handleRefuse = async (id: string) => {
-    const { error } = await supabase
-      .from("absences")
-      .update({ statut: "refuse", motif_refus: refuseReason || null })
-      .eq("id", id);
-    if (!error) {
+    if (await decide(id, "refuse", refuseReason || undefined)) {
       setRefuseId(null);
       setRefuseReason("");
       loadData();
-    } else {
-      alert("Erreur : " + error.message);
     }
+  };
+
+  // Rapatrier les conges valides depuis Combo
+  const [comboSyncing, setComboSyncing] = useState(false);
+  const syncCombo = async () => {
+    setComboSyncing(true);
+    const { data: sess } = await supabase.auth.getSession();
+    const res = await fetch("/api/combo/sync-rests", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) alert("Erreur Combo : " + (j.error ?? res.status));
+    else alert(`Synchro Combo : ${j.synced ?? 0} congé(s) rapatrié(s)${j.unmatched ? `, ${j.unmatched} non rattaché(s)` : ""}`);
+    setComboSyncing(false);
+    loadData();
   };
 
   /* ── Determine visual end for hover preview ─────────────────── */
@@ -688,8 +709,21 @@ export default function CongesPage() {
   };
 
   return (
-    <RequireRole allowedRoles={["group_admin", "equipier"]}>
+    <RequireRole allowedRoles={["group_admin", "manager", "equipier"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
+
+        {/* ── Synchro Combo ──────────────────────────────────── */}
+        {!isEquipier && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+            <button type="button" onClick={syncCombo} disabled={comboSyncing} style={{
+              padding: "8px 16px", borderRadius: 10, border: "1px solid #ddd6c8",
+              background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+              cursor: "pointer", opacity: comboSyncing ? 0.6 : 1,
+            }}>
+              {comboSyncing ? "Synchronisation…" : "⟳ Synchroniser les congés Combo"}
+            </button>
+          </div>
+        )}
 
         {/* ── KPI Cards ───────────────────────────────────────── */}
         {!loading && etab && (

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getContracts, getPlannings, getLocations, COMBO_LOCATIONS } from "@/lib/combo/api";
+import { syncRestsFromCombo } from "@/lib/combo/syncRests";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -154,10 +155,19 @@ export async function GET(req: NextRequest) {
       syncPeriod(prevWeek.from, prevWeek.to),
     ]);
 
+    // Conges/absences depuis Combo (source de verite des conges valides)
+    let rests: { synced: number; unmatched: number } | { error: string };
+    try {
+      rests = await syncRestsFromCombo();
+    } catch (e) {
+      rests = { error: e instanceof Error ? e.message : "erreur rests" };
+    }
+
     return NextResponse.json({
       ok: true,
       current_week: { ...currentWeek, inserted: currentCount },
       prev_week: { ...prevWeek, inserted: prevCount },
+      rests,
       synced_at: now.toISOString(),
     });
   } catch (err) {

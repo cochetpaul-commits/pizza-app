@@ -262,13 +262,14 @@ type TabSection = {
 
 const SECTION_MY_PLANNING: TabSection = {
   label: "Personnel",
-  href: "/rh/conges",
-  match: ["/rh/conges", "/rh/equipe", "/rh/employe"],
+  href: "/mes-conges",
+  match: ["/mes-conges", "/rh/conges", "/rh/equipe", "/rh/employe"],
   icon: () => <IconUsers />,
-  roles: ["group_admin", "manager"],
+  // Ouvert a tous : les equipiers y trouvent "Mes conges"
   tabs: [
-    { label: "Employes", href: "/rh/equipe", match: ["/rh/equipe", "/rh/employe"], icon: () => <IconUsers /> },
-    { label: "Conges", href: "/rh/conges", match: ["/rh/conges"], icon: () => <IconBeach /> },
+    { label: "Mes conges", href: "/mes-conges", match: ["/mes-conges"], icon: () => <IconBeach /> },
+    { label: "Employes", href: "/rh/equipe", match: ["/rh/equipe", "/rh/employe"], icon: () => <IconUsers />, roles: ["group_admin", "manager"] },
+    { label: "Conges equipe", href: "/rh/conges", match: ["/rh/conges"], icon: () => <IconBeach />, roles: ["group_admin", "manager"] },
   ],
 };
 

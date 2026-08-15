@@ -72,6 +72,7 @@ const PILOTAGE_ITEMS: NavItemV2[] = [
 export const PLANNING_ITEMS: NavItemV2[] = [
   { label: "Employes", href: "/rh/equipe", icon: "users" },
   { label: "Conges", href: "/rh/conges", icon: "beach" },
+  { label: "Mes congés", href: "/mes-conges", icon: "beach" },
 ];
 
 // PRODUCTION (fiches techniques, catalogue, articles de vente)
@@ -131,6 +132,7 @@ export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Evenementiel", icon
 /* ── Simplified nav for employee roles ─────────────────── */
 
 export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
+  { kind: "item", label: "Mes congés", href: "/mes-conges", icon: "beach" },
   { kind: "item", label: "Recettes", href: "/recettes", icon: "fileText" },
   { kind: "item", label: "Catalogue", href: "/catalogue", icon: "book" },
   { kind: "item", label: "Inventaire", href: "/inventaire", icon: "clipboard" },

@@ -871,8 +871,8 @@ export default function EmployeDetailPage() {
                             <td style={{ padding: "10px 0" }}>{new Date(a.date_debut).toLocaleDateString("fr-FR")}</td>
                             <td style={{ padding: "10px 0" }}>{new Date(a.date_fin).toLocaleDateString("fr-FR")}</td>
                             <td style={{ padding: "10px 0" }}>
-                              <span style={{ fontSize: 11, fontWeight: 600, color: a.statut === "approuve" ? "#2D6A4F" : a.statut === "refuse" ? "#DC2626" : "#D4775A" }}>
-                                {a.statut === "approuve" ? "Approuve" : a.statut === "refuse" ? "Refuse" : "En attente"}
+                              <span style={{ fontSize: 11, fontWeight: 600, color: a.statut === "valide" ? "#2D6A4F" : a.statut === "refuse" ? "#DC2626" : "#D4775A" }}>
+                                {a.statut === "valide" ? "Approuve" : a.statut === "refuse" ? "Refuse" : "En attente"}
                               </span>
                             </td>
                           </tr>
