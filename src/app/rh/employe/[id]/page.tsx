@@ -68,13 +68,11 @@ export default function EmployeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { current: etab, etablissements } = useEtablissement();
   const [empEtab, setEmpEtab] = useState<{ id: string; nom: string; couleur: string } | null>(null);
-  const { canWrite } = useProfile();
+  const { canWrite, isGroupAdmin } = useProfile();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState("");
 
   // ── Employee fields ──
   const [emp, setEmp] = useState<Record<string, unknown>>({});
@@ -392,48 +390,6 @@ export default function EmployeDetailPage() {
     setTimeout(() => setSaveOk(false), 2000);
   };
 
-  /* ── Combo sync ── */
-  const handleComboSync = async () => {
-    if (!id) return;
-    setSyncing(true);
-    setSyncMsg("");
-    try {
-      const res = await fetch("/api/combo/sync-employee", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employe_id: id }),
-      });
-      const data = await res.json();
-      if (!data.ok) {
-        setSyncMsg(data.error ?? "Erreur inconnue");
-        setSyncing(false);
-        return;
-      }
-      // Update local state from synced data
-      const e = data.employee;
-      setEmp(e);
-      setPrenom(e.prenom ?? "");
-      setNom(e.nom ?? "");
-      setEmail(e.email ?? "");
-      setTelMobile(e.tel_mobile ?? "");
-      setAdresse(e.adresse ?? "");
-      setCodePostal(e.code_postal ?? "");
-      setVille(e.ville ?? "");
-      setNumeroSecu(e.numero_secu ?? "");
-      setMatricule(e.matricule ?? "");
-      setActif(e.actif ?? true);
-
-      // Update contrats
-      setContrats(data.contrats ?? []);
-
-      setSyncMsg("OK");
-      setTimeout(() => setSyncMsg(""), 3000);
-    } catch (err) {
-      setSyncMsg(err instanceof Error ? err.message : "Erreur");
-    }
-    setSyncing(false);
-  };
-
   /* ── Save contrat ── */
   const handleSaveContrat = async () => {
     if (!id) return;
@@ -568,7 +524,7 @@ export default function EmployeDetailPage() {
 
   if (loading) {
     return (
-      <RequireRole allowedRoles={["group_admin"]}>
+      <RequireRole allowedRoles={["group_admin", "manager"]}>
         <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Chargement...</div>
       </RequireRole>
     );
@@ -578,7 +534,7 @@ export default function EmployeDetailPage() {
   const initDisplay = initiales || ((prenom?.[0] ?? "") + (nom?.[0] ?? "")).toUpperCase();
 
   return (
-    <RequireRole allowedRoles={["group_admin"]}>
+    <RequireRole allowedRoles={["group_admin", "manager"]}>
       <div style={pageStyle}>
         {/* ── Back link ── */}
         <a href="/settings/employes" style={{ fontSize: 13, color: "#1a1a1a", textDecoration: "none", display: "flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
@@ -624,24 +580,11 @@ export default function EmployeDetailPage() {
             </div>
             <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
               {canWrite && (
-                <>
-                  <button type="button" onClick={handleComboSync} disabled={syncing} style={{
-                    padding: "6px 14px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-                    background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)",
-                    color: "#fff", cursor: syncing ? "wait" : "pointer", opacity: syncing ? 0.5 : 1,
-                    fontFamily: "var(--font-oswald), Oswald, sans-serif", textTransform: "uppercase", letterSpacing: ".04em",
-                  }}>
-                    {syncing ? "Sync..." : syncMsg === "OK" ? "Synced" : "Sync Combo"}
-                  </button>
-                  <button type="button" onClick={handleSave} disabled={saving} style={{
-                    ...saveBtnStyle, background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.3)",
-                  }}>
-                    {saving ? "..." : saveOk ? "OK" : "Sauvegarder"}
-                  </button>
-                </>
-              )}
-              {syncMsg && syncMsg !== "OK" && (
-                <span style={{ fontSize: 10, color: "#fca5a5", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{syncMsg}</span>
+                <button type="button" onClick={handleSave} disabled={saving} style={{
+                  ...saveBtnStyle, background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.3)",
+                }}>
+                  {saving ? "..." : saveOk ? "OK" : "Sauvegarder"}
+                </button>
               )}
             </div>
           </div>
@@ -661,7 +604,7 @@ export default function EmployeDetailPage() {
 
         {/* ═══ TUILE: ETABLISSEMENT — parametrable, 2 etabs ═══ */}
         <AccordionSection
-          title="Etablissement"
+          title="Travail"
           icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /></svg>}
           iconColor="#D4775A" iconBg="rgba(212,119,90,0.10)"
         >
@@ -789,7 +732,7 @@ export default function EmployeDetailPage() {
             );
           })()}
 
-          {/* Type contrat + Salaire */}
+          {/* Type contrat + Salaire (salaire : admins uniquement) */}
           <div style={grid2}>
             <FieldSelect
               label="Type de contrat"
@@ -798,137 +741,89 @@ export default function EmployeDetailPage() {
               disabled={!canWrite}
               options={Object.entries(CONTRAT_LABELS).map(([k, v]) => [k, v])}
             />
-            <Field
-              label="Salaire brut mensuel (EUR)"
-              type="number"
-              value={String(cRemuneration)}
-              onChange={(v) => setCRemuneration(Number(v))}
-              disabled={!canWrite}
-            />
+            {isGroupAdmin ? (
+              <Field
+                label="Salaire brut mensuel (EUR)"
+                type="number"
+                value={String(cRemuneration)}
+                onChange={(v) => setCRemuneration(Number(v))}
+                disabled={!canWrite}
+              />
+            ) : <div />}
           </div>
-        </AccordionSection>
 
-        {/* ═══ REGISTRE UNIQUE DU PERSONNEL ═══ */}
-        <AccordionSection
-          title="Registre Unique du Personnel (RUP)"
-          icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>}
-          iconColor="#2563EB" iconBg="rgba(37,99,235,0.08)"
-        >
+          {/* Dates d'entree / sortie */}
           {(() => {
             const e = emp as Record<string, unknown>;
-            const dateEntree = (e.date_entree as string) ?? "";
-            const dateSortie = (e.date_sortie as string) ?? "";
-            const motifSortie = (e.motif_sortie as string) ?? "";
-            const authType = (e.autorisation_travail_type as string) ?? "";
-            const authNum = (e.autorisation_travail_numero as string) ?? "";
-            const authFin = (e.autorisation_travail_fin as string) ?? "";
-            const isEtranger = travailleurEtranger;
-
-            const updateRup = async (field: string, value: unknown) => {
+            const updateDates = async (field: string, value: string) => {
               await supabase.from("employes").update({ [field]: value || null }).eq("id", emp.id);
               setEmp((prev: Record<string, unknown>) => ({ ...prev, [field]: value || null }));
             };
-
-            // RUP completeness check
-            const rupFields = [
-              prenom, nom, dateNaissance, genre, nationalite,
-              cType, cEmploi, dateEntree,
-            ];
-            if (isEtranger) rupFields.push(authType, authNum);
-            const filled = rupFields.filter(f => f && f !== "").length;
-            const total = rupFields.length;
-
             return (
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                  <span style={{ fontSize: 11, color: filled === total ? "#2D6A4F" : "#D4775A", fontWeight: 700 }}>
-                    {filled}/{total} champs remplis
-                  </span>
-                  {filled === total && (
-                    <span style={{ fontSize: 10, color: "#2D6A4F", fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: "rgba(45,106,79,0.08)" }}>Complet</span>
-                  )}
+              <div style={grid2}>
+                <div style={fieldRow}>
+                  <label style={labelSt}>Date d&apos;entree</label>
+                  <input type="date" style={inputSt} value={(e.date_entree as string) ?? ""} onChange={(ev) => updateDates("date_entree", ev.target.value)} disabled={!canWrite} />
                 </div>
-
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>IDENTITE</div>
-                <div style={grid2}>
-                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Nom</div><div style={{ fontSize: 13, fontWeight: 600 }}>{nom || "—"}</div></div>
-                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Prenom</div><div style={{ fontSize: 13, fontWeight: 600 }}>{prenom || "—"}</div></div>
-                </div>
-                <div style={{ ...grid2, marginTop: 8 }}>
-                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Date de naissance</div><div style={{ fontSize: 13, fontWeight: 600 }}>{dateNaissance || "—"}</div></div>
-                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Sexe</div><div style={{ fontSize: 13, fontWeight: 600 }}>{genre === "M" ? "Masculin" : genre === "F" ? "Feminin" : genre || "—"}</div></div>
-                </div>
-                <div style={{ ...grid2, marginTop: 8 }}>
-                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Nationalite</div><div style={{ fontSize: 13, fontWeight: 600 }}>{nationalite || "—"}</div></div>
-                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>N° Securite sociale</div><div style={{ fontSize: 13, fontWeight: 600 }}>{numeroSecu || "—"}</div></div>
-                </div>
-
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 16 }}>EMPLOI</div>
-                <div style={grid2}>
-                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Type de contrat</div><div style={{ fontSize: 13, fontWeight: 600 }}>{CONTRAT_LABELS[cType] ?? (cType || "—")}</div></div>
-                  <div><div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Emploi / Qualification</div><div style={{ fontSize: 13, fontWeight: 600 }}>{cEmploi || cQualification || "—"}</div></div>
-                </div>
-                <div style={{ ...grid2, marginTop: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Date d&apos;entree</div>
-                    <input type="date" style={inputSt} value={dateEntree} onChange={(e) => updateRup("date_entree", e.target.value)} disabled={!canWrite} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Date de sortie</div>
-                    <input type="date" style={inputSt} value={dateSortie} onChange={(e) => updateRup("date_sortie", e.target.value)} disabled={!canWrite} />
-                  </div>
-                </div>
-                {dateSortie && (
-                  <div style={{ marginTop: 8 }}>
-                    <div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Motif de sortie</div>
-                    <select style={inputSt} value={motifSortie} onChange={(e) => updateRup("motif_sortie", e.target.value)} disabled={!canWrite}>
-                      <option value="">—</option>
-                      <option value="demission">Demission</option>
-                      <option value="licenciement">Licenciement</option>
-                      <option value="rupture_conventionnelle">Rupture conventionnelle</option>
-                      <option value="fin_cdd">Fin de CDD</option>
-                      <option value="fin_periode_essai">Fin de periode d&apos;essai</option>
-                      <option value="depart_retraite">Depart en retraite</option>
-                      <option value="autre">Autre</option>
-                    </select>
-                  </div>
-                )}
-
-                {isEtranger && (
-                  <>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 16 }}>AUTORISATION DE TRAVAIL</div>
-                    <div style={grid2}>
-                      <div>
-                        <div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Type d&apos;autorisation</div>
-                        <select style={inputSt} value={authType} onChange={(e) => updateRup("autorisation_travail_type", e.target.value)} disabled={!canWrite}>
-                          <option value="">—</option>
-                          <option value="titre_sejour">Titre de sejour</option>
-                          <option value="autorisation_provisoire">Autorisation provisoire de travail</option>
-                          <option value="visa_long_sejour">Visa long sejour</option>
-                          <option value="carte_resident">Carte de resident</option>
-                          <option value="recepisse">Recepisse</option>
-                        </select>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Numero</div>
-                        <input style={inputSt} value={authNum} onChange={(e) => updateRup("autorisation_travail_numero", e.target.value)} disabled={!canWrite} placeholder="N° du titre" />
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 8 }}>
-                      <div style={{ fontSize: 11, color: "#999", marginBottom: 2, fontWeight: 600 }}>Date de fin de validite</div>
-                      <input type="date" style={inputSt} value={authFin} onChange={(e) => updateRup("autorisation_travail_fin", e.target.value)} disabled={!canWrite} />
-                    </div>
-                  </>
-                )}
-
-                <div style={{ marginTop: 16, padding: 10, borderRadius: 8, background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.12)", fontSize: 11, color: "#2563EB", lineHeight: 1.5 }}>
-                  Le Registre Unique du Personnel est obligatoire (art. L1221-13 du Code du travail). Il doit contenir l&apos;identite, l&apos;emploi, les dates d&apos;entree/sortie, et pour les travailleurs etrangers, le type et numero d&apos;autorisation de travail.
+                <div style={fieldRow}>
+                  <label style={labelSt}>Date de sortie</label>
+                  <input type="date" style={inputSt} value={(e.date_sortie as string) ?? ""} onChange={(ev) => updateDates("date_sortie", ev.target.value)} disabled={!canWrite} />
                 </div>
               </div>
             );
           })()}
         </AccordionSection>
 
+        {/* ═══ COMPTE & ACCES ═══ */}
+        <AccordionSection
+          title="Compte & acces"
+          icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>}
+          iconColor="#7C3AED" iconBg="rgba(124,58,237,0.08)"
+          defaultOpen
+        >
+          <CompteAcces
+            emp={emp as Record<string, unknown>}
+            setEmp={setEmp}
+            isGroupAdmin={isGroupAdmin}
+            etabIds={((emp as Record<string, unknown>).etablissements_ids as string[] | null) ?? ((emp as Record<string, unknown>).etablissement_id ? [(emp as Record<string, unknown>).etablissement_id as string] : [])}
+            prenom={prenom}
+            nom={nom}
+            email={email}
+          />
+        </AccordionSection>
+
+        {/* ═══ DOSSIER (paie / legal — replie) ═══ */}
+        <AccordionSection
+          title="Dossier (paie & legal)"
+          defaultOpen={false}
+          icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>}
+          iconColor="#2563EB" iconBg="rgba(37,99,235,0.08)"
+        >
+          <div style={grid2}>
+            <Field label="Adresse" value={adresse} onChange={setAdresse} disabled={!canWrite} />
+            <Field label="Code postal" value={codePostal} onChange={setCodePostal} disabled={!canWrite} />
+          </div>
+          <div style={grid2}>
+            <Field label="Ville" value={ville} onChange={setVille} disabled={!canWrite} />
+            <Field label="Date de naissance" type="date" value={dateNaissance} onChange={setDateNaissance} disabled={!canWrite} />
+          </div>
+          <div style={grid2}>
+            <Field label="N° Securite sociale" value={numeroSecu} onChange={setNumeroSecu} disabled={!canWrite} />
+            <Field label="Matricule (paie)" value={matricule} onChange={setMatricule} disabled={!canWrite} />
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <a
+              href={`/api/rh/rup?etab=${(emp as Record<string, unknown>).etablissement_id ?? ""}`}
+              target="_blank" rel="noreferrer"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, color: "#1a1a1a", textDecoration: "none" }}
+            >
+              Exporter le Registre Unique du Personnel
+            </a>
+            <div style={{ fontSize: 10, color: "#999", marginTop: 4 }}>
+              Obligation legale (art. L1221-13) — genere a la demande a partir des fiches.
+            </div>
+          </div>
+        </AccordionSection>
 
         {/* ═══ CONGES ET ABSENCES ═══ */}
         {(() => {
@@ -951,6 +846,7 @@ export default function EmployeDetailPage() {
               {/* Historique absences */}
               <AccordionSection
                 title={`Historique des absences (${absences.length})`}
+                defaultOpen={false}
                 icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>}
                 iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
               >
@@ -1912,9 +1808,179 @@ function PlanifEquipes({ etabId, currentAccess, empId, onUpdate }: {
 
 /* ── InfosTab — Accordion-based layout ─────────────────────────── */
 
-function AccordionSection({ title, icon, iconBg, children }: {
+
+/* ── Compte & accès : etat du compte, role unique, exceptions ── */
+function CompteAcces({ emp, setEmp, isGroupAdmin, etabIds, prenom, nom, email }: {
+  emp: Record<string, unknown>;
+  setEmp: React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
+  isGroupAdmin: boolean;
+  etabIds: string[];
+  prenom: string;
+  nom: string;
+  email: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const hasAccount = !!emp.auth_user_id;
+  const role = String(emp.role ?? "equipier");
+  const permRole = mapToPermRole(role);
+  const custom = (emp.custom_permissions as Record<string, boolean> | null) ?? {};
+
+  const ROLE_CHOICES: { perm: PermRole; app: string }[] = [
+    { perm: "equipier", app: "equipier" },
+    { perm: "manager", app: "manager" },
+    { perm: "admin", app: "group_admin" },
+  ];
+
+  const setRole = async (appRole: string) => {
+    if (!isGroupAdmin || busy) return;
+    setBusy(true); setMsg("");
+    const { data: sess } = await supabase.auth.getSession();
+    const res = await fetch("/api/admin/set-role", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
+      body: JSON.stringify({ employeId: emp.id, role: appRole }),
+    });
+    const json = await res.json();
+    if (!res.ok) setMsg(json.error ?? "Erreur");
+    else {
+      setEmp(prev => ({ ...prev, role: appRole }));
+      setMsg(json.compteLie ? "Role mis a jour (fiche + compte)" : "Role mis a jour (fiche — pas encore de compte)");
+    }
+    setBusy(false);
+    setTimeout(() => setMsg(""), 4000);
+  };
+
+  const sendInvite = async () => {
+    if (!email) { setMsg("Renseigne d'abord un email dans Identite"); return; }
+    if (!confirm(`Envoyer l'invitation a ${email} ?`)) return;
+    setBusy(true); setMsg("");
+    const { data: sess } = await supabase.auth.getSession();
+    const res = await fetch("/api/admin/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
+      body: JSON.stringify({ email, role, displayName: `${prenom} ${nom}`.trim(), etablissementsAccess: etabIds }),
+    });
+    const json = await res.json();
+    setMsg(res.ok ? `Invitation envoyee a ${email}` : (json.error ?? "Erreur d'envoi"));
+    setBusy(false);
+  };
+
+  const togglePerm = async (key: string) => {
+    if (!isGroupAdmin) return;
+    const defaultVal = DEFAULT_PERMS[permRole]?.[key] === true;
+    const current = key in custom ? custom[key] : defaultVal;
+    const next = { ...custom };
+    if (!current === defaultVal) delete next[key]; // retour au defaut → pas d'exception
+    else next[key] = !current;
+    const value = Object.keys(next).length > 0 ? next : null;
+    await supabase.from("employes").update({ custom_permissions: value }).eq("id", emp.id);
+    setEmp(prev => ({ ...prev, custom_permissions: value }));
+  };
+
+  const resetPerms = async () => {
+    if (!confirm("Supprimer toutes les exceptions et revenir aux permissions du role ?")) return;
+    await supabase.from("employes").update({ custom_permissions: null }).eq("id", emp.id);
+    setEmp(prev => ({ ...prev, custom_permissions: null }));
+  };
+
+  return (
+    <div>
+      {/* Etat du compte */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+        {hasAccount ? (
+          <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 999, background: "rgba(45,106,79,0.10)", color: "#2D6A4F" }}>
+            Compte actif
+          </span>
+        ) : (
+          <>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 999, background: "rgba(180,83,9,0.10)", color: "#b45309" }}>
+              Jamais invite
+            </span>
+            {isGroupAdmin && (
+              <button type="button" onClick={sendInvite} disabled={busy} style={{
+                padding: "6px 14px", borderRadius: 8, border: "none", background: "#D4775A",
+                color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1,
+              }}>
+                Envoyer l&apos;invitation
+              </button>
+            )}
+          </>
+        )}
+        <span style={{ fontSize: 11, color: "#999" }}>{email || "— pas d'email"}</span>
+      </div>
+
+      {/* Role — source unique */}
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6 }}>Role</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
+        {ROLE_CHOICES.map(({ perm, app }) => {
+          const info = ROLE_INFO[perm];
+          const active = mapToPermRole(role) === perm;
+          return (
+            <button key={perm} type="button" onClick={() => setRole(app)} disabled={!isGroupAdmin || busy} style={{
+              padding: "7px 14px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+              border: active ? `1.5px solid ${info.color}` : "1px solid #ddd6c8",
+              background: active ? info.bg : "#fff", color: active ? info.color : "#999",
+              cursor: isGroupAdmin ? "pointer" : "default",
+            }}>
+              {info.label}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 10.5, color: "#999", marginBottom: 4 }}>{ROLE_INFO[permRole].description}</div>
+      {msg && <div style={{ fontSize: 11, fontWeight: 600, color: msg.startsWith("Erreur") || msg.startsWith("Renseigne") ? "#DC2626" : "#2D6A4F", marginBottom: 6 }}>{msg}</div>}
+
+      {/* Exceptions de permissions (admins) */}
+      {isGroupAdmin && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61" }}>Exceptions de permissions</span>
+            {Object.keys(custom).length > 0 && (
+              <button type="button" onClick={resetPerms} style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6, border: "1px solid #ddd6c8", background: "#fff", color: "#999", cursor: "pointer" }}>
+                Reinitialiser ({Object.keys(custom).length})
+              </button>
+            )}
+          </div>
+          {PERM_SECTIONS.map(sec => (
+            <div key={sec.label} style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 9.5, fontWeight: 700, color: "#b0a894", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 3 }}>{sec.label}</div>
+              {sec.permissions.map(p => {
+                const defaultVal = DEFAULT_PERMS[permRole]?.[p.key] === true;
+                const effective = p.key in custom ? custom[p.key] : defaultVal;
+                const isException = p.key in custom;
+                return (
+                  <button key={p.key} type="button" onClick={() => togglePerm(p.key)} style={{
+                    display: "flex", alignItems: "center", gap: 8, width: "100%",
+                    padding: "5px 8px", borderRadius: 8, border: "none",
+                    background: isException ? "rgba(124,58,237,0.05)" : "transparent",
+                    cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                  }}>
+                    <span style={{
+                      width: 30, height: 17, borderRadius: 999, flexShrink: 0, position: "relative",
+                      background: effective ? "#2D6A4F" : "#ddd6c8", transition: "background .15s",
+                    }}>
+                      <span style={{ position: "absolute", top: 2, left: effective ? 15 : 2, width: 13, height: 13, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+                    </span>
+                    <span style={{ fontSize: 12, color: "#1a1a1a", flex: 1 }}>{p.label}</span>
+                    {isException && <span style={{ fontSize: 9, fontWeight: 700, color: "#7C3AED" }}>modifie</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AccordionSection({ title, icon, iconBg, defaultOpen = true, children }: {
   title: string; icon: React.ReactNode; iconColor?: string; iconBg?: string; defaultOpen?: boolean; children: React.ReactNode;
 }) {
+  // Vraie section repliable : defaultOpen={false} pour les blocs secondaires
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{
       border: "1px solid #e0d8ce",
@@ -1924,10 +1990,15 @@ function AccordionSection({ title, icon, iconBg, children }: {
       boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
       overflow: "hidden",
     }}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 10, width: "100%",
-        padding: "16px 18px 12px",
-      }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: "flex", alignItems: "center", gap: 10, width: "100%",
+          padding: open ? "16px 18px 12px" : "16px 18px",
+          background: "none", border: "none", cursor: "pointer", fontFamily: "inherit",
+        }}
+      >
         <span style={{
           width: 28, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
           background: iconBg ?? "rgba(212,119,90,0.1)", flexShrink: 0,
@@ -1941,10 +2012,13 @@ function AccordionSection({ title, icon, iconBg, children }: {
           textTransform: "uppercase", letterSpacing: ".05em",
           color: "#1a1a1a",
         }}>{title}</span>
-      </div>
-      <div style={{ padding: "0 18px 18px" }}>
-        {children}
-      </div>
+        <span style={{ fontSize: 10, color: "#b0a894", transform: open ? "rotate(0)" : "rotate(-90deg)", transition: "transform .2s" }}>&#x25BC;</span>
+      </button>
+      {open && (
+        <div style={{ padding: "0 18px 18px" }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

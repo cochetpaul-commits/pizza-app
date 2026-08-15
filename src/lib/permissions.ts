@@ -1,10 +1,13 @@
 /**
- * Permission system for iFratelli
+ * Systeme de permissions iFratelli
  *
- * 3 roles (ascending access):
- *   employe → manager → admin
+ * 3 roles (acces croissant) : equipier → manager → admin
+ * Le role donne les permissions par defaut ; la fiche employe peut porter
+ * des exceptions (custom_permissions : { cle: true|false }).
  *
- * Each permission: true (granted), false (denied), "toggle" (configurable per user)
+ * Purge du 15/08/2026 : les ~20 cles planning/heures/paie heritees du
+ * chantier Combo (aucun ecran ne les lisait) ont ete supprimees. Il reste
+ * les 11 cles reellement verifiees par l'application.
  */
 
 export type AppRole = "group_admin" | "manager" | "equipier";
@@ -16,17 +19,17 @@ export const PERM_ROLES: PermRole[] = ["equipier", "manager", "admin"];
 export const ROLE_INFO: Record<PermRole, { label: string; description: string; color: string; bg: string }> = {
   equipier: {
     label: "Equipier",
-    description: "Acces production (fiches techniques, catalogue, recettes), inventaire, base produits, commandes et fournisseurs.",
+    description: "Production (recettes, catalogue), inventaire, base produits, commandes, fournisseurs et son tableau de bord perso.",
     color: "#2D6A4F", bg: "rgba(45,106,79,0.08)",
   },
   manager: {
     label: "Manager",
-    description: "Acces equipier + pilotage, ventes, validation commandes, gestion equipe, evenements.",
+    description: "Equipier + pilotage et ventes, validation des commandes, fiches de l'equipe, pointage, tableau de bord equipe.",
     color: "#2563EB", bg: "rgba(37,99,235,0.06)",
   },
   admin: {
     label: "Administrateur",
-    description: "Acces complet a toutes les fonctionnalites.",
+    description: "Acces complet, y compris parametres, factures et salaires.",
     color: "#DC2626", bg: "rgba(220,38,38,0.05)",
   },
 };
@@ -38,6 +41,8 @@ export type PermSection = {
   permissions: { key: string; label: string }[];
 };
 
+/** Les permissions affichees dans la grille d'exceptions — uniquement des
+ *  cles reellement verifiees par un ecran. */
 export const PERM_SECTIONS: PermSection[] = [
   {
     label: "Pilotage",
@@ -45,20 +50,6 @@ export const PERM_SECTIONS: PermSection[] = [
       { key: "performances.view", label: "Ventes et indicateurs" },
       { key: "performances.pilotage", label: "Marges et pilotage" },
       { key: "performances.show_money", label: "Voir les valeurs monetaires (CA, marges, euros)" },
-    ],
-  },
-  {
-    label: "Personnel",
-    permissions: [
-      { key: "planning.view_own", label: "Voir le planning" },
-      { key: "planning.edit", label: "Creer et modifier les plannings" },
-      { key: "planning.validate_shifts", label: "Valider les shifts" },
-      { key: "heures.register_own", label: "Saisir ses heures" },
-      { key: "heures.edit_team", label: "Saisir les heures de l'equipe" },
-      { key: "profil.view_team", label: "Voir les fiches employes" },
-      { key: "profil.view_all", label: "Voir tous les employes (tous etabs)" },
-      { key: "absences.edit_cp", label: "Modifier les compteurs de conges" },
-      { key: "paie.manage", label: "Gestion de la paie" },
     ],
   },
   {
@@ -71,62 +62,40 @@ export const PERM_SECTIONS: PermSection[] = [
   {
     label: "Achats",
     permissions: [
-      { key: "achats.view", label: "Stats achats et factures" },
+      { key: "achats.view", label: "Stats achats et variations de prix" },
       { key: "achats.edit", label: "Creer et modifier des commandes" },
       { key: "commandes.valider", label: "Valider les commandes" },
       { key: "achats.inventaire", label: "Inventaire et stock" },
     ],
   },
   {
-    label: "Parametres",
+    label: "Personnel",
     permissions: [
-      { key: "settings.etablissements", label: "Configurer les etablissements" },
-      { key: "settings.employes", label: "Gerer les employes et invitations" },
-      { key: "settings.roles", label: "Modifier les roles et permissions" },
+      { key: "profil.view_team", label: "Voir les fiches employes" },
+      { key: "heures.edit_team", label: "Pointage de l'equipe" },
     ],
   },
 ];
 
-/** Default permission matrix per role */
+/** Matrice des permissions par defaut de chaque role */
 export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
   equipier: {
-    "planning.view_own": false, "planning.view_draft": false, "planning.view_other": false,
-    "planning.view_alerts": false, "planning.edit": false, "planning.validate_shifts": false, "planning.view_ratios": false,
-    "heures.register_own": false, "heures.edit_team": false, "heures.validate_own": false,
-    "heures.edit_all": false, "heures.unvalidate": false, "heures.revalorize_absences": false,
-    "profil.view_own": true, "profil.edit_own": true, "profil.view_feuilles": true,
-    "profil.view_team": false, "profil.view_managers": false, "profil.view_all": false, "profil.delete": false,
-    "absences.edit_cp": false, "paie.manage": false,
-    "achats.view": false, "achats.edit": true, "achats.inventaire": true,
-    "operations.recettes": true, "operations.edit_recettes": false, "operations.commandes": true, "commandes.valider": false,
     "performances.view": true, "performances.pilotage": false, "performances.show_money": false,
-    "settings.etablissements": false, "settings.employes": false, "settings.roles": false,
+    "operations.recettes": true, "operations.edit_recettes": false,
+    "achats.view": false, "achats.edit": true, "commandes.valider": false, "achats.inventaire": true,
+    "profil.view_team": false, "heures.edit_team": false,
   },
   manager: {
-    "planning.view_own": false, "planning.view_draft": false, "planning.view_other": false,
-    "planning.view_alerts": false, "planning.edit": false, "planning.validate_shifts": false, "planning.view_ratios": false,
-    "heures.register_own": false, "heures.edit_team": false, "heures.validate_own": false,
-    "heures.edit_all": false, "heures.unvalidate": false, "heures.revalorize_absences": false,
-    "profil.view_own": true, "profil.edit_own": true, "profil.view_feuilles": true,
-    "profil.view_team": true, "profil.view_managers": true, "profil.view_all": false, "profil.delete": false,
-    "absences.edit_cp": false, "paie.manage": false,
-    "achats.view": false, "achats.edit": true, "achats.inventaire": true,
-    "operations.recettes": true, "operations.edit_recettes": true, "operations.commandes": true, "commandes.valider": true,
     "performances.view": true, "performances.pilotage": true, "performances.show_money": true,
-    "settings.etablissements": false, "settings.employes": false, "settings.roles": false,
+    "operations.recettes": true, "operations.edit_recettes": true,
+    "achats.view": true, "achats.edit": true, "commandes.valider": true, "achats.inventaire": true,
+    "profil.view_team": true, "heures.edit_team": true,
   },
   admin: {
-    "planning.view_own": true, "planning.view_draft": true, "planning.view_other": true,
-    "planning.view_alerts": true, "planning.edit": true, "planning.validate_shifts": true, "planning.view_ratios": true,
-    "heures.register_own": true, "heures.edit_team": true, "heures.validate_own": true,
-    "heures.edit_all": true, "heures.unvalidate": true, "heures.revalorize_absences": true,
-    "profil.view_own": true, "profil.edit_own": true, "profil.view_feuilles": true,
-    "profil.view_team": true, "profil.view_managers": true, "profil.view_all": true, "profil.delete": true,
-    "absences.edit_cp": true, "paie.manage": true,
-    "achats.view": true, "achats.edit": true, "achats.inventaire": true,
-    "operations.recettes": true, "operations.edit_recettes": true, "operations.commandes": true, "commandes.valider": true,
     "performances.view": true, "performances.pilotage": true, "performances.show_money": true,
-    "settings.etablissements": true, "settings.employes": true, "settings.roles": true,
+    "operations.recettes": true, "operations.edit_recettes": true,
+    "achats.view": true, "achats.edit": true, "commandes.valider": true, "achats.inventaire": true,
+    "profil.view_team": true, "heures.edit_team": true,
   },
 };
 
