@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { PeriodSelector, currentPeriod, type PeriodValue, type PeriodMode } from "@/components/PeriodSelector";
 
@@ -18,13 +19,21 @@ type CatLine = { cat: string; ca: number; qty: number; prevCa: number };
 type ProdLine = { name: string; ca: number; qty: number; cat: string };
 
 type ApiData = {
-  employe: { prenom: string; poste: string | null; equipe: string | null; operateur: string | null; profile: "bar" | "cuisine" | "salle" };
-  period: { from: string; to: string };
-  empty: boolean;
+  admin?: boolean;
+  employe?: { prenom: string; poste: string | null; equipe: string | null; operateur: string | null; profile: "manager" | "bar" | "cuisine" | "salle" };
+  period?: { from: string; to: string };
+  empty?: boolean;
   error?: string;
   bar?: { caBoissons: number; prevCaBoissons: number; caTotal: number; pctBoissons: number; parCategorie: CatLine[]; topProduits: ProdLine[] };
   cuisine?: { caFood: number; prevCaFood: number; caTotal: number; pctFood: number; parCategorie: CatLine[]; topProduits: ProdLine[] };
   salle?: { me: OpStats | null; team: OpStats | null; teamSize: number; attacheGroups: AttacheGroup[]; hasOperateur: boolean };
+  manager?: {
+    totals: { ca: number; prevCa: number; tickets: number; couverts: number; ticketMoyen: number; caParCouvert: number };
+    operateurs: ({ op: string } & OpStats)[];
+    teamAvgAttaches: Record<string, number>;
+    attacheGroups: AttacheGroup[];
+    myOp: string | null;
+  };
 };
 
 /* ── Helpers ──────────────────────────────────────────────── */
@@ -145,6 +154,7 @@ function TopProduits({ prods, unit }: { prods: ProdLine[]; unit: "ca" | "qty" })
 /* ── Page ─────────────────────────────────────────────────── */
 
 export default function MonTableauPage() {
+  const router = useRouter();
   const [period, setPeriod] = useState<PeriodValue>(() => currentPeriod("semaine"));
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -165,6 +175,11 @@ export default function MonTableauPage() {
         const json = await res.json();
         if (cancelled) return;
         if (!res.ok) { setErr(json.error ?? "Erreur"); setData(null); }
+        else if ((json as ApiData).admin) {
+          // Admins : vision globale — redirection vers le tableau de bord general
+          router.replace("/pilotage");
+          return;
+        }
         else setData(json as ApiData);
       } catch {
         if (!cancelled) setErr("Erreur réseau");
@@ -172,6 +187,7 @@ export default function MonTableauPage() {
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period.from, period.to]);
 
   const onModeChange = (mode: PeriodMode) => setPeriod(currentPeriod(mode));
@@ -186,8 +202,8 @@ export default function MonTableauPage() {
       {data?.employe && (
         <div style={{ marginBottom: 18 }}>
           <h1 style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>
-            {profile === "bar" ? "🍸 " : profile === "cuisine" ? "👨‍🍳 " : "🍽️ "}
-            Mon tableau de bord
+            {profile === "manager" ? "📊 Tableau de mon équipe"
+              : `${profile === "bar" ? "🍸" : profile === "cuisine" ? "👨‍🍳" : "🍽️"} Mon tableau de bord`}
           </h1>
           <div style={{ fontSize: 13, color: "#999", marginTop: 2 }}>
             {data.employe.prenom}
@@ -211,6 +227,61 @@ export default function MonTableauPage() {
           (Piccola Mia n&apos;est pas encore connectée à la caisse Kezia — les chiffres arrivent avec Bello Mio.)
         </div>
       )}
+
+      {/* ═══ MANAGER : vue équipe ═══ */}
+      {!loading && !err && data?.manager && (() => {
+        const m = data.manager!;
+        const d = delta(m.totals.ca, m.totals.prevCa);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+              <KpiCard label="CA de la période" value={fmtEur(m.totals.ca)} sub={d?.txt} subColor={d?.color} />
+              <KpiCard label="Tickets" value={String(m.totals.tickets)} sub={`${m.totals.couverts} couverts`} />
+              <KpiCard label="Ticket moyen" value={fmtEur2(m.totals.ticketMoyen)} sub={`panier/couvert : ${fmtEur2(m.totals.caParCouvert)}`} />
+            </div>
+
+            <SectionTitle>Par serveur</SectionTitle>
+            <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: "6px 16px", overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 420 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #ddd6c8" }}>
+                    <th style={{ textAlign: "left", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Serveur</th>
+                    <th style={{ textAlign: "right", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>CA</th>
+                    <th style={{ textAlign: "right", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Tickets</th>
+                    <th style={{ textAlign: "right", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Couverts</th>
+                    <th style={{ textAlign: "right", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Ticket moy.</th>
+                    <th style={{ textAlign: "right", padding: "8px 0", fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase" }}>Desserts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {m.operateurs.map(o => {
+                    const isMe = m.myOp && o.op === m.myOp;
+                    return (
+                      <tr key={o.op} style={{ borderBottom: "1px solid #f0ebe3", background: isMe ? "rgba(212,119,90,0.06)" : "transparent" }}>
+                        <td style={{ padding: "9px 0", fontWeight: isMe ? 700 : 600, color: isMe ? ACCENT : "#1a1a1a" }}>
+                          {o.op}{isMe ? " (moi)" : ""}
+                        </td>
+                        <td style={{ padding: "9px 0", textAlign: "right", fontWeight: 700 }}>{fmtEur(o.ca)}</td>
+                        <td style={{ padding: "9px 0", textAlign: "right" }}>{o.tickets}</td>
+                        <td style={{ padding: "9px 0", textAlign: "right" }}>{o.couverts}</td>
+                        <td style={{ padding: "9px 0", textAlign: "right" }}>{fmtEur2(o.ticketMoyen)}</td>
+                        <td style={{ padding: "9px 0", textAlign: "right" }}>{fmtPct(o.attaches.dolci ?? 0)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <SectionTitle>Attaches de l&apos;équipe (moyenne)</SectionTitle>
+            <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: "14px 16px" }}>
+              {m.attacheGroups.map(g => (
+                <VsBar key={g.key} label={g.label} mine={m.teamAvgAttaches[g.key] ?? 0} team={null} fmt={fmtPct} />
+              ))}
+            </div>
+          </>
+        );
+      })()}
 
       {/* ═══ BAR ═══ */}
       {!loading && !err && data?.bar && (() => {

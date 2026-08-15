@@ -75,8 +75,9 @@ export type SidebarEntry = NavEtabGroup | NavSettingsGroup | NavStandaloneItem |
 
 // PILOTAGE (analyse & performance)
 const PILOTAGE_ITEMS: NavItemV2[] = [
-  // "Mon tableau" : visible par tous les employes lies a une fiche — pas de permission
-  { label: "Mon tableau", href: "/mon-tableau", icon: "dashboard" },
+  // "Mon tableau" : managers (vue equipe) et employes (vue perso par poste).
+  // Les admins ont la vision globale via /pilotage — pas de tableau personnalise.
+  { label: "Mon tableau", href: "/mon-tableau", icon: "dashboard", roles: ["manager", "equipier"] },
   { label: "Tableau de bord", href: "/pilotage", icon: "dashboard", permission: "performances.pilotage" },
   { label: "Ventes", href: "/ventes", icon: "barChart", permission: "performances.view" },
   { label: "Produits", href: "/ventes/marges", icon: "wallet", permission: "performances.pilotage" },

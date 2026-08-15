@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { normalizeRole, type Role } from "@/lib/rbac";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -164,21 +165,43 @@ export async function GET(req: NextRequest) {
   const to = searchParams.get("to");
   if (!from || !to) return NextResponse.json({ error: "from, to requis" }, { status: 400 });
 
+  // ── Rôle effectif (profil + fiches) : les enjeux different par rôle ──
+  const { data: profileRow } = await supabaseAdmin
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
   // ── Fiche employé + poste ──
   let empQ = await supabaseAdmin
     .from("employes")
-    .select("id, prenom, popina_operateur, etablissement_id, poste_id, postes(nom, equipe)")
+    .select("id, prenom, role, popina_operateur, etablissement_id, poste_id, postes(nom, equipe)")
     .eq("auth_user_id", user.id)
     .eq("actif", true);
   let emps = empQ.data ?? [];
   if (emps.length === 0 && user.email) {
     empQ = await supabaseAdmin
       .from("employes")
-      .select("id, prenom, popina_operateur, etablissement_id, poste_id, postes(nom, equipe)")
+      .select("id, prenom, role, popina_operateur, etablissement_id, poste_id, postes(nom, equipe)")
       .ilike("email", user.email)
       .eq("actif", true);
     emps = empQ.data ?? [];
   }
+
+  const RANK: Record<Role, number> = { equipier: 0, manager: 1, group_admin: 2 };
+  let effectiveRole: Role = profileRow?.role ? normalizeRole(profileRow.role as string) : "equipier";
+  for (const e of emps) {
+    if (e.role) {
+      const r = normalizeRole(e.role as string);
+      if (RANK[r] > RANK[effectiveRole]) effectiveRole = r;
+    }
+  }
+
+  // Admins : vision globale via /pilotage — pas de tableau personnalisé
+  if (effectiveRole === "group_admin") {
+    return NextResponse.json({ admin: true });
+  }
+
   if (emps.length === 0) {
     return NextResponse.json({ error: "Aucune fiche employé liée à ce compte" }, { status: 404 });
   }
@@ -188,8 +211,10 @@ export async function GET(req: NextRequest) {
 
   const posteNom = poste?.nom ?? "";
   const equipe = poste?.equipe ?? "";
-  let profile: "bar" | "cuisine" | "salle" = "salle";
-  if (posteNom.toLowerCase().includes("bar")) profile = "bar";
+  // Le rôle prime (manager = vue équipe), le poste affine pour les employés
+  let profile: "manager" | "bar" | "cuisine" | "salle" = "salle";
+  if (effectiveRole === "manager") profile = "manager";
+  else if (posteNom.toLowerCase().includes("bar")) profile = "bar";
   else if (equipe === "Cuisine") profile = "cuisine";
 
   const etabId = emp.etablissement_id as string | null;
@@ -225,6 +250,47 @@ export async function GET(req: NextRequest) {
   }
 
   const caTotal = lines.reduce((s, l) => s + (l.ttc ?? 0), 0);
+
+  // ── MANAGER : vue équipe (globaux + détail par opérateur) ──
+  if (profile === "manager") {
+    const tickets = buildTickets(lines);
+    const prevCa = prevLines.reduce((s, l) => s + (l.ttc ?? 0), 0);
+
+    let nbTickets = 0, couverts = 0;
+    for (const t of tickets.values()) { nbTickets++; couverts += t.couverts; }
+
+    const opTicketCount = new Map<string, number>();
+    for (const t of tickets.values()) {
+      if (t.owner) opTicketCount.set(t.owner, (opTicketCount.get(t.owner) ?? 0) + 1);
+    }
+    const teamOps = [...opTicketCount.entries()].filter(([, n]) => n >= 5).map(([op]) => op);
+    const operateurs = teamOps
+      .map(op => ({ op, ...statsForOperator(tickets, op) }))
+      .sort((a, b) => b.ca - a.ca);
+
+    const teamAvgAttaches = Object.fromEntries(ATTACHE_GROUPS.map(g => [
+      g.key,
+      operateurs.length > 0 ? operateurs.reduce((s, o) => s + o.attaches[g.key], 0) / operateurs.length : 0,
+    ]));
+
+    return NextResponse.json({
+      ...base,
+      manager: {
+        totals: {
+          ca: caTotal,
+          prevCa,
+          tickets: nbTickets,
+          couverts,
+          ticketMoyen: nbTickets > 0 ? caTotal / nbTickets : 0,
+          caParCouvert: couverts > 0 ? caTotal / couverts : 0,
+        },
+        operateurs,
+        teamAvgAttaches,
+        attacheGroups: ATTACHE_GROUPS.map(g => ({ key: g.key, label: g.label })),
+        myOp: (emp.popina_operateur ?? "").trim() || null,
+      },
+    });
+  }
 
   // ── BAR : les boissons ──
   if (profile === "bar") {
