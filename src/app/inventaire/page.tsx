@@ -1462,13 +1462,12 @@ export default function InventairePage() {
                               flexWrap: "wrap",
                             }}
                           >
-                            {/* Name + unit + delete */}
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                <span style={{
+                            {/* Name + unit + delete — affichage produit canonique */}
+                            <div className="produit-main" style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
+                                <span className="produit-name" style={{
                                   fontSize: 13, fontWeight: hasQty ? 700 : 500,
                                   color: hasQty ? "#1a1a1a" : isZeroConfirmed ? "#999" : "#666",
-                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                                   textDecoration: isZeroConfirmed ? "line-through" : "none",
                                   flex: 1, minWidth: 0,
                                 }}>

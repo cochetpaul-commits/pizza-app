@@ -248,6 +248,28 @@ body {
   }
 }
 
+/* ── Affichage produit canonique ─────────────────────
+   Base commune à TOUTES les listes de produits (inventaire, commandes,
+   recettes, base produits...) :
+   - .produit-main  : bloc nom + méta — prend toute la largeur sur mobile,
+     les contrôles (steppers, prix, boutons) passent à la ligne dessous
+     (le conteneur parent doit être en flex + flex-wrap: wrap)
+   - .produit-name  : le nom n'est JAMAIS tronqué en « … » illisible —
+     il s'étale sur 2 lignes maximum */
+.produit-main { flex: 1; min-width: 0; }
+.produit-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal !important;
+  word-break: break-word;
+  line-height: 1.25;
+}
+@media (max-width: 767px) {
+  .produit-main { flex-basis: 100%; }
+}
+
 /* ── Barre de période sticky (style Zenchef) ──────── */
 .period-sticky {
   position: sticky;

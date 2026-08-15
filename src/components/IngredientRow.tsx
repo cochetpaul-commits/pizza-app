@@ -361,7 +361,7 @@ export const IngredientRow = React.memo(function IngredientRow({
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={28} editable />
-          <span style={{ fontWeight: 600, fontSize: 13, color: catAccent, flex: "1 1 0", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.name}</span>
+          <span className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: catAccent, flex: "1 1 0", minWidth: 0 }}>{x.name}</span>
           {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", flexShrink: 0 }}>DERIVE</span>}
           {alert && <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", flexShrink: 0 }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
           <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", flexShrink: 0 }}>{price}</span>
