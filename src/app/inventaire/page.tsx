@@ -618,7 +618,15 @@ export default function InventairePage() {
   // ── Computed ───────────────────────────────────────────────
 
   const displayZones = useMemo(() => {
-    const tabs: { id: string; nom: string }[] = zones.map(z => ({ id: z.name, nom: z.name }));
+    // Deduplique par nom : sans etablissement selectionne, les zones des
+    // deux restos peuvent porter le meme nom (ex. CHAMBRE FROIDE)
+    const seen = new Set<string>();
+    const tabs: { id: string; nom: string }[] = [];
+    for (const z of zones) {
+      if (seen.has(z.name)) continue;
+      seen.add(z.name);
+      tabs.push({ id: z.name, nom: z.name });
+    }
     const hasUnassigned = ingredients.some(i => isUnzoned(i, zones));
     if (hasUnassigned) {
       tabs.push({ id: SANS_ZONE, nom: "Sans zone" });
@@ -1370,7 +1378,8 @@ export default function InventairePage() {
               let catValue = 0;
               for (const ing of items) {
                 const v = quantities[qk(ing.id, activeZone)];
-                if (Number(v ?? 0) > 0 || v === 0) catSaisis++;
+                const qty = Number(v ?? 0);
+                if (qty > 0 || v === 0) catSaisis++;
                 if (qty > 0 && ing.cost_per_unit != null) catValue += qty * ing.cost_per_unit;
               }
               const catNonSaisis = items.length - catSaisis;
@@ -1410,11 +1419,13 @@ export default function InventairePage() {
                       {catSaisis}/{items.length}
                       {catValue > 0 && ` · ${fmtMoney(catValue)}`}
                     </span>
-                    {/* Tout à 0 button */}
+                    {/* Tout à 0 — span cliquable (un <button> ne peut pas etre imbrique dans le <button> d'en-tete) */}
                     {isActive && catNonSaisis > 0 && (
-                      <button
-                        type="button"
+                      <span
+                        role="button"
+                        tabIndex={0}
                         onClick={(e) => { e.stopPropagation(); markCategoryZero(items); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); markCategoryZero(items); } }}
                         style={{
                           fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6,
                           border: "1px solid #ddd6c8", background: "#fff", color: "#999",
@@ -1423,7 +1434,7 @@ export default function InventairePage() {
                         title="Confirmer tous les articles non saisis comme 0"
                       >
                         Tout à 0
-                      </button>
+                      </span>
                     )}
                     {/* Chevron */}
                     <span style={{ marginLeft: isActive && catNonSaisis > 0 ? 0 : "auto", fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>&#x25BC;</span>
