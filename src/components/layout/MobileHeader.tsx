@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useTopBar } from "@/components/layout/TopBarContext";
 import { supabase } from "@/lib/supabaseClient";
 
 /* ── Helpers ────────────────────────────────────── */
@@ -271,6 +272,8 @@ function UserAvatar() {
 /* ── Main component ──────────────────────────────── */
 
 export function MobileHeader() {
+  // Zone centrale pilotee par les pages (ex. date-ranker de Ventes)
+  const { state } = useTopBar();
   return (
     <header className="mobile-header" style={{
       display: "none",
@@ -284,9 +287,13 @@ export function MobileHeader() {
       borderBottom: "1px solid rgba(0,0,0,0.05)",
     }}>
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "flex-end",
+        display: "flex", alignItems: "center",
         height: 52, padding: "0 12px", gap: 10,
       }}>
+        {/* Centre : contenu injecte par la page (date-ranker...) */}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {state.actions ?? null}
+        </div>
         {/* Right: bell + avatar */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           <NotifBell />

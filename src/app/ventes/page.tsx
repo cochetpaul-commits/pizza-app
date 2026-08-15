@@ -7,6 +7,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import Chart from "chart.js/auto";
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
 import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
+import { useTopBar } from "@/components/layout/TopBarContext";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 import { supabase } from "@/lib/supabaseClient";
@@ -628,6 +629,39 @@ function PerformancesPage() {
   const activePrev = prev;
   const activePrevWeek = prevWeek;
   const ca = W ? (mode === "ttc" ? W.ca_ttc : W.ca_ht) : 0;
+
+  // Date-ranker dans le bandeau du haut sur mobile (demande Paul 15/08) :
+  // le header mobile rend ce contenu au centre, la barre sticky de page
+  // est masquee en-dessous de 768px.
+  const topBar = useTopBar();
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const atToday = range.to >= today;
+    topBar.set({
+      actions: (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button type="button" aria-label="Période précédente" onClick={() => setRange(shiftRange(range, -1))} style={{
+            width: 28, height: 28, borderRadius: 8, border: "1px solid #e0d8ce",
+            background: "#fff", color: accent, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0,
+          }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+          <DateRangePicker value={range} onChange={(r) => setRange(r)} format="short" />
+          <button type="button" aria-label="Période suivante" onClick={() => { if (!atToday) setRange(shiftRange(range, 1)); }} style={{
+            width: 28, height: 28, borderRadius: 8, border: "1px solid #e0d8ce",
+            background: atToday ? "#f0ebe3" : "#fff", color: atToday ? "#ccc" : accent,
+            cursor: atToday ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0,
+          }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
+        </div>
+      ),
+    });
+    return () => topBar.clear();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range.from, range.to, accent]);
 
   // Register PDF action in the bottom tab bar FAB
   useBottomBarActions(() => [{
@@ -2110,7 +2144,7 @@ function PerformancesPage() {
 
       <style>{`
         @media (max-width: 767px) {
-          .ventes-periodbar { top: calc(52px + env(safe-area-inset-top, 0px)) !important; }
+          .ventes-periodbar { display: none !important; }
         }
         .ventes-nav-btn:hover, .ventes-nav-btn:active {
           background: rgba(0,0,0,0.06) !important;
