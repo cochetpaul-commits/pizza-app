@@ -39,7 +39,13 @@ export async function GET(req: NextRequest) {
     .eq("etablissement_id", inv.etablissement_id).eq("is_active", true);
 
   const ingMap = new Map((ings ?? []).map(i => [i.id, i]));
-  const qtyMap = new Map((lignes ?? []).map(l => [l.ingredient_id, { qty: l.quantite, unit: l.unite, cpu: l.cout_unitaire }]));
+  // Plusieurs lignes par produit (une par zone) : consolider les quantités
+  const qtyMap = new Map<string, { qty: number; unit: string | null; cpu: number | null }>();
+  for (const l of lignes ?? []) {
+    const prev = qtyMap.get(l.ingredient_id);
+    if (prev) prev.qty += l.quantite;
+    else qtyMap.set(l.ingredient_id, { qty: l.quantite, unit: l.unite, cpu: l.cout_unitaire });
+  }
 
   // Group by zone then category
   type Line = { name: string; qty: number; unit: string; value: number };

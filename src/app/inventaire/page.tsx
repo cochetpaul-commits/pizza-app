@@ -29,6 +29,11 @@ type StorageZone = {
 
 const SANS_ZONE = "__sans_zone__";
 
+/** Clé de zone en base ('' = sans zone) */
+const zoneDbKey = (z: string) => (z === SANS_ZONE ? "" : z);
+/** Clé de saisie : une quantité par produit ET par zone */
+const qk = (id: string, z: string) => `${id}|${zoneDbKey(z)}`;
+
 /**
  * Une zone est une VUE : elle contient les produits affectés manuellement
  * (storage_zone) PLUS tous ceux qui matchent ses critères (catégories /
@@ -132,6 +137,20 @@ export default function InventairePage() {
 
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number | "">>({});
+
+  // Totaux consolidés par produit (somme de toutes les zones)
+  const ingTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    const saisi = new Set<string>();
+    for (const [key, v] of Object.entries(quantities)) {
+      if (v === "" || v === undefined) continue;
+      const id = key.split("|")[0];
+      saisi.add(id);
+      totals[id] = (totals[id] ?? 0) + Number(v || 0);
+    }
+    return { totals, saisi };
+  }, [quantities]);
+
   const [zones, setZones] = useState<StorageZone[]>([]);
   const [activeZone, setActiveZone] = useState<string>(SANS_ZONE);
   const [showAddZone, setShowAddZone] = useState(false);
@@ -249,13 +268,13 @@ export default function InventairePage() {
       if (active) {
         const { data: lignes, error: ligErr } = await supabase
           .from("inventaire_lignes")
-          .select("ingredient_id, quantite")
+          .select("ingredient_id, quantite, zone")
           .eq("inventaire_id", active.id);
         if (ligErr) { console.error("inventaire_lignes query:", ligErr); }
         if (!cancelled) {
           const qMap: Record<string, number | ""> = {};
-          for (const l of lignes ?? []) {
-            if (l.ingredient_id && l.quantite > 0) qMap[l.ingredient_id] = l.quantite;
+          for (const l of (lignes ?? []) as { ingredient_id: string; quantite: number; zone?: string | null }[]) {
+            if (l.ingredient_id && l.quantite > 0) qMap[`${l.ingredient_id}|${l.zone ?? ""}`] = l.quantite;
           }
           setQuantities(qMap);
         }
@@ -268,7 +287,7 @@ export default function InventairePage() {
             .eq("inventaire_id", prevClosed.id);
           const pMap: Record<string, number> = {};
           for (const l of prevLignes ?? []) {
-            if (l.ingredient_id && l.quantite > 0) pMap[l.ingredient_id] = l.quantite;
+            if (l.ingredient_id && l.quantite > 0) pMap[l.ingredient_id] = (pMap[l.ingredient_id] ?? 0) + l.quantite;
           }
           if (!cancelled) setPrevQuantities(pMap);
 
@@ -313,17 +332,18 @@ export default function InventairePage() {
         table: "inventaire_lignes",
         filter: `inventaire_id=eq.${session.id}`,
       }, (payload) => {
-        const row = (payload.new ?? payload.old) as { ingredient_id: string; quantite: number } | undefined;
+        const row = (payload.new ?? payload.old) as { ingredient_id: string; quantite: number; zone?: string | null } | undefined;
         if (!row?.ingredient_id) return;
+        const key = `${row.ingredient_id}|${row.zone ?? ""}`;
         // Skip if this was our own write (avoid echo)
-        if (localWriteRef.current.has(row.ingredient_id)) {
-          localWriteRef.current.delete(row.ingredient_id);
+        if (localWriteRef.current.has(key)) {
+          localWriteRef.current.delete(key);
           return;
         }
         if (payload.eventType === "DELETE") {
-          setQuantities(prev => { const n = { ...prev }; delete n[row.ingredient_id]; return n; });
+          setQuantities(prev => { const n = { ...prev }; delete n[key]; return n; });
         } else {
-          setQuantities(prev => ({ ...prev, [row.ingredient_id]: row.quantite }));
+          setQuantities(prev => ({ ...prev, [key]: row.quantite }));
         }
         setLastSyncEvent(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
       })
@@ -353,35 +373,39 @@ export default function InventairePage() {
 
   // ── Save line (debounced upsert) ──────────────────────────
 
-  const upsertLigne = useCallback(async (sessionId: string, ingredientId: string, qty: number, ing: Ingredient) => {
-    localWriteRef.current.add(ingredientId);
+  const upsertLigne = useCallback(async (sessionId: string, ingredientId: string, qty: number, ing: Ingredient, zoneDb: string) => {
+    localWriteRef.current.add(`${ingredientId}|${zoneDb}`);
     if (qty <= 0) {
       await supabase.from("inventaire_lignes")
         .delete()
         .eq("inventaire_id", sessionId)
-        .eq("ingredient_id", ingredientId);
+        .eq("ingredient_id", ingredientId)
+        .eq("zone", zoneDb);
       return;
     }
     await supabase.from("inventaire_lignes").upsert({
       inventaire_id: sessionId,
       ingredient_id: ingredientId,
+      zone: zoneDb,
       quantite: qty,
       unite: ing.default_unit ?? null,
       cout_unitaire: ing.cost_per_unit ?? null,
-    }, { onConflict: "inventaire_id,ingredient_id" });
+    }, { onConflict: "inventaire_id,ingredient_id,zone" });
   }, []);
 
   function handleQtyChange(id: string, val: string) {
     const parsed = val === "" ? "" : parseFloat(val);
     if (val !== "" && isNaN(parsed as number)) return;
-    setQuantities((prev) => ({ ...prev, [id]: parsed }));
+    const zoneDb = zoneDbKey(activeZone);
+    const key = qk(id, activeZone);
+    setQuantities((prev) => ({ ...prev, [key]: parsed }));
 
     if (!session) return;
-    clearTimeout(debounceRef.current[id]);
-    debounceRef.current[id] = setTimeout(() => {
+    clearTimeout(debounceRef.current[key]);
+    debounceRef.current[key] = setTimeout(() => {
       const qty = typeof parsed === "number" ? parsed : 0;
       const ing = ingredients.find((i) => i.id === id);
-      if (ing) upsertLigne(session.id, id, qty, ing);
+      if (ing) upsertLigne(session.id, id, qty, ing, zoneDb);
     }, 600);
   }
 
@@ -389,13 +413,13 @@ export default function InventairePage() {
 
   function markCategoryZero(catIngredients: Ingredient[]) {
     if (!session) return;
-    const nonSaisis = catIngredients.filter(i => !quantities[i.id] || quantities[i.id] === "" || Number(quantities[i.id]) === 0);
+    const nonSaisis = catIngredients.filter(i => { const v = quantities[qk(i.id, activeZone)]; return !v || v === "" || Number(v) === 0; });
     if (nonSaisis.length === 0) return;
     const ok = confirm(`Marquer ${nonSaisis.length} article(s) non saisis comme "0" ?`);
     if (!ok) return;
     const newQ = { ...quantities };
     for (const ing of nonSaisis) {
-      newQ[ing.id] = 0;
+      newQ[qk(ing.id, activeZone)] = 0;
       // Actually we don't save 0 — it means "counted, nothing in stock"
       // But we need to persist it. Let's save as a tiny epsilon or just delete.
       // Actually the UX intent is "confirm this category is empty". We mark as 0.
@@ -416,9 +440,10 @@ export default function InventairePage() {
 
     setSaving(true);
 
+    // Valeur totale : somme des quantités de TOUTES les zones par produit
     let total = 0;
     for (const ing of ingredients) {
-      const qty = Number(quantities[ing.id] ?? 0);
+      const qty = ingTotals.totals[ing.id] ?? 0;
       if (qty > 0 && ing.cost_per_unit != null) {
         total += qty * ing.cost_per_unit;
       }
@@ -435,15 +460,12 @@ export default function InventairePage() {
 
     // Create stock movements from inventory (adjustment to match real stock)
     const movements = ingredients
-      .filter(ing => {
-        const qty = Number(quantities[ing.id] ?? 0);
-        return qty > 0;
-      })
+      .filter(ing => (ingTotals.totals[ing.id] ?? 0) > 0)
       .map(ing => ({
         etablissement_id: etab?.id,
         ingredient_id: ing.id,
         type: "inventaire",
-        quantity: Number(quantities[ing.id] ?? 0),
+        quantity: ingTotals.totals[ing.id] ?? 0,
         unit: ing.purchase_unit_label || "pcs",
         reference_type: `inventaire_${session.id}`,
         note: `Inventaire du ${new Date().toLocaleDateString("fr-FR")}`,
@@ -466,12 +488,12 @@ export default function InventairePage() {
     setViewingId(inv.id);
     const { data: lignes, error: ligErr } = await supabase
       .from("inventaire_lignes")
-      .select("ingredient_id, quantite")
+      .select("ingredient_id, quantite, zone")
       .eq("inventaire_id", inv.id);
     if (ligErr) { console.error("inventaire_lignes view query:", ligErr); }
     const qMap: Record<string, number | ""> = {};
-    for (const l of lignes ?? []) {
-      if (l.ingredient_id && l.quantite > 0) qMap[l.ingredient_id] = l.quantite;
+    for (const l of (lignes ?? []) as { ingredient_id: string; quantite: number; zone?: string | null }[]) {
+      if (l.ingredient_id && l.quantite > 0) qMap[`${l.ingredient_id}|${l.zone ?? ""}`] = l.quantite;
     }
     setQuantities(qMap);
   }
@@ -619,8 +641,8 @@ export default function InventairePage() {
       items = ingredients.filter(i => i.name.toLowerCase().includes(q)); // search across all zones
     } else if (filterNonSaisis) {
       items = items.filter(i => {
-        const qty = Number(quantities[i.id] ?? 0);
-        return qty === 0 && quantities[i.id] !== 0;
+        const v = quantities[qk(i.id, activeZone)];
+        return Number(v ?? 0) === 0 && v !== 0;
       });
     }
     const map = new Map<Category, Ingredient[]>();
@@ -638,7 +660,7 @@ export default function InventairePage() {
         color: CAT_COLORS[cat],
         items: map.get(cat)!,
       }));
-  }, [zoneIngredients, filterNonSaisis, quantities, searchInv, ingredients]);
+  }, [zoneIngredients, filterNonSaisis, quantities, searchInv, ingredients, activeZone]);
 
   const isActive = !!session && !viewingId;
   const isPaused = isActive && session?.statut === "en_pause";
@@ -652,28 +674,29 @@ export default function InventairePage() {
     let value = 0;
     for (const ing of zoneIngredients) {
       articles++;
-      const qty = Number(quantities[ing.id] ?? 0);
-      if (qty > 0 || quantities[ing.id] === 0) {
+      const v = quantities[qk(ing.id, activeZone)];
+      const qty = Number(v ?? 0);
+      if (qty > 0 || v === 0) {
         saisis++;
         if (qty > 0 && ing.cost_per_unit != null) value += qty * ing.cost_per_unit;
       }
     }
     return { articles, saisis, value };
-  }, [zoneIngredients, quantities]);
+  }, [zoneIngredients, quantities, activeZone]);
 
   // Global summary
   const totalSummary = useMemo(() => {
     let saisis = 0;
     let value = 0;
     for (const ing of ingredients) {
-      const qty = Number(quantities[ing.id] ?? 0);
+      const qty = ingTotals.totals[ing.id] ?? 0;
       if (qty > 0) {
         saisis++;
         if (ing.cost_per_unit != null) value += qty * ing.cost_per_unit;
       }
     }
     return { saisis, value };
-  }, [ingredients, quantities]);
+  }, [ingredients, ingTotals]);
 
   // Zone counts + progress for badges
   const zoneStats = useMemo(() => {
@@ -684,13 +707,18 @@ export default function InventairePage() {
       if (saisi) stats[key].saisis++;
     };
     for (const ing of ingredients) {
-      const qty = quantities[ing.id];
-      const saisi = qty !== undefined && qty !== "";
       let inAny = false;
       for (const z of zones) {
-        if (zoneHasIngredient(z, ing)) { bump(z.name, saisi); inAny = true; }
+        if (zoneHasIngredient(z, ing)) {
+          const v = quantities[qk(ing.id, z.name)];
+          bump(z.name, v !== undefined && v !== "");
+          inAny = true;
+        }
       }
-      if (!inAny) bump(SANS_ZONE, saisi);
+      if (!inAny) {
+        const v = quantities[qk(ing.id, SANS_ZONE)];
+        bump(SANS_ZONE, v !== undefined && v !== "");
+      }
     }
     return stats;
   }, [ingredients, quantities, zones]);
@@ -924,7 +952,7 @@ export default function InventairePage() {
                   {(() => {
                     let delta = 0;
                     for (const ing of ingredients) {
-                      const cur = Number(quantities[ing.id] ?? 0);
+                      const cur = ingTotals.totals[ing.id] ?? 0;
                       const prev = prevQuantities[ing.id] ?? 0;
                       if (cur > 0 && prev > 0 && ing.cost_per_unit) delta += (cur - prev) * ing.cost_per_unit;
                     }
@@ -941,7 +969,7 @@ export default function InventairePage() {
           {/* Stock alerts count */}
           {(() => {
             const alerts = ingredients.filter(ing => {
-              const qty = Number(quantities[ing.id] ?? 0);
+              const qty = ingTotals.totals[ing.id] ?? 0;
               return qty > 0 && ing.stock_min != null && qty < ing.stock_min;
             });
             if (alerts.length === 0) return null;
@@ -1341,8 +1369,8 @@ export default function InventairePage() {
               let catSaisis = 0;
               let catValue = 0;
               for (const ing of items) {
-                const qty = Number(quantities[ing.id] ?? 0);
-                if (qty > 0 || quantities[ing.id] === 0) catSaisis++;
+                const v = quantities[qk(ing.id, activeZone)];
+                if (Number(v ?? 0) > 0 || v === 0) catSaisis++;
                 if (qty > 0 && ing.cost_per_unit != null) catValue += qty * ing.cost_per_unit;
               }
               const catNonSaisis = items.length - catSaisis;
@@ -1406,10 +1434,11 @@ export default function InventairePage() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
                       {items.map((ing) => {
                         const pack = packInfo[ing.id];
-                        const rawQty = quantities[ing.id];
+                        const rawQty = quantities[qk(ing.id, activeZone)];
+                        const totalAllZones = ingTotals.totals[ing.id] ?? 0;
                         const rawQtyNum = typeof rawQty === "number" ? rawQty : 0;
                         const hasQty = rawQtyNum > 0;
-                        const isZeroConfirmed = quantities[ing.id] === 0;
+                        const isZeroConfirmed = quantities[qk(ing.id, activeZone)] === 0;
                         const valeur = hasQty && ing.cost_per_unit != null
                           ? rawQtyNum * ing.cost_per_unit : null;
 
@@ -1502,12 +1531,18 @@ export default function InventairePage() {
                                   );
                                 })()}
                                 {/* Stock alerts */}
-                                {hasQty && ing.stock_min != null && rawQtyNum < ing.stock_min && (
+                                {totalAllZones > rawQtyNum && (
+                                  <span style={{ fontSize: 9, fontWeight: 700, padding: "0 5px", borderRadius: 4, background: "rgba(37,99,235,0.10)", color: "#2563EB" }}
+                                    title="Ce produit est aussi compté dans d'autres zones">
+                                    Total {totalAllZones}
+                                  </span>
+                                )}
+                                {hasQty && ing.stock_min != null && totalAllZones < ing.stock_min && (
                                   <span style={{ fontSize: 9, fontWeight: 700, padding: "0 5px", borderRadius: 4, background: "rgba(220,38,38,0.10)", color: "#DC2626" }}>
                                     Sous min ({ing.stock_min})
                                   </span>
                                 )}
-                                {hasQty && ing.stock_max != null && rawQtyNum > ing.stock_max && (
+                                {hasQty && ing.stock_max != null && totalAllZones > ing.stock_max && (
                                   <span style={{ fontSize: 9, fontWeight: 700, padding: "0 5px", borderRadius: 4, background: "rgba(212,160,60,0.10)", color: "#D4A03C" }}>
                                     Sur-stock ({ing.stock_max})
                                   </span>
