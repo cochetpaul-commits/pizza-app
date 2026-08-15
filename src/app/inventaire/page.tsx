@@ -413,7 +413,11 @@ export default function InventairePage() {
 
   function markCategoryZero(catIngredients: Ingredient[]) {
     if (!session) return;
-    const nonSaisis = catIngredients.filter(i => { const v = quantities[qk(i.id, activeZone)]; return !v || v === "" || Number(v) === 0; });
+    const nonSaisis = catIngredients.filter(i => {
+      // L'index peut etre absent (undefined), vide ("") ou 0 — tous "non saisis"
+      const v = quantities[qk(i.id, activeZone)] as number | "" | undefined;
+      return v === undefined || v === "" || Number(v) === 0;
+    });
     if (nonSaisis.length === 0) return;
     const ok = confirm(`Marquer ${nonSaisis.length} article(s) non saisis comme "0" ?`);
     if (!ok) return;
