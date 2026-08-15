@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 type ThemeMode = "auto" | "light" | "dark";
 
@@ -49,15 +49,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [mode]);
 
-  const setMode = (m: ThemeMode) => {
+  const setMode = useCallback((m: ThemeMode) => {
     setModeState(m);
     localStorage.setItem("theme-mode", m);
-  };
+  }, []);
 
   const isDark = mode === "dark" || (mode === "auto" && systemDark);
 
+  // Valeur stable pour les consommateurs
+  const value = useMemo(() => ({ mode, setMode, isDark }), [mode, setMode, isDark]);
+
   return (
-    <ThemeContext.Provider value={{ mode, setMode, isDark }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );

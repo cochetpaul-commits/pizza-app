@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
 
 type TopBarState = {
   title?: string;
@@ -27,8 +27,10 @@ export function TopBarProvider({ children }: { children: ReactNode }) {
   const set = useCallback((s: TopBarState) => setState(s), []);
   const clear = useCallback(() => setState({}), []);
 
+  const value = useMemo(() => ({ state, set, clear }), [state, set, clear]);
+
   return (
-    <TopBarContext.Provider value={{ state, set, clear }}>
+    <TopBarContext.Provider value={value}>
       {children}
     </TopBarContext.Provider>
   );

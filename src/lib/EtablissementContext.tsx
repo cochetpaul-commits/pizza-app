@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { normalizeRole } from "@/lib/rbac";
 import type { Etablissement } from "@/types/etablissement";
@@ -33,6 +33,9 @@ const EtablissementContext = createContext<EtablissementCtx>({
 });
 
 export function EtablissementProvider({ children }: { children: ReactNode }) {
+  // Meme garde que ProfileContext : supabase re-emet SIGNED_IN pour le meme
+  // utilisateur (ex. getSession() d'une page) — ne pas refaire init() alors.
+  const lastUserIdRef = useRef<string | null>(null);
   const [etablissements, setEtablissements] = useState<Etablissement[]>([]);
   const [current, setCurrentRaw] = useState<Etablissement | null>(null);
   const [isGroupView, setGroupViewRaw] = useState(false);
@@ -45,6 +48,7 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
     async function init() {
       const { data: u } = await supabase.auth.getUser();
       if (cancelled || !u.user) { setLoading(false); return; }
+      lastUserIdRef.current = u.user.id;
 
       // Fetch profile for role + access list
       const { data: profile, error: profileErr } = await supabase
@@ -137,10 +141,13 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
       // et fait sauter les formulaires en cours de saisie apres inactivite.
       if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") return;
       if (session?.user) {
+        // Meme utilisateur deja initialise → rien a refaire
+        if (session.user.id === lastUserIdRef.current) return;
         // User just signed in — re-fetch establishments
         cancelled = false;
         init();
       } else {
+        lastUserIdRef.current = null;
         setEtablissements([]);
         setCurrentRaw(null);
         setGroupViewRaw(false);
@@ -170,16 +177,19 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
     if (b) setCurrentRaw(null);
   }, []);
 
+  // Valeur stable : evite de re-rendre tous les consommateurs a chaque render
+  const value = useMemo(() => ({
+    current,
+    setCurrent,
+    etablissements,
+    isGroupView,
+    setGroupView,
+    isGroupAdmin,
+    loading,
+  }), [current, setCurrent, etablissements, isGroupView, setGroupView, isGroupAdmin, loading]);
+
   return (
-    <EtablissementContext.Provider value={{
-      current,
-      setCurrent,
-      etablissements,
-      isGroupView,
-      setGroupView,
-      isGroupAdmin,
-      loading,
-    }}>
+    <EtablissementContext.Provider value={value}>
       {children}
     </EtablissementContext.Provider>
   );

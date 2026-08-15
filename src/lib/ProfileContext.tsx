@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { normalizeRole, type Role } from "@/lib/rbac";
 import { hasPermission } from "@/lib/permissions";
@@ -154,12 +154,23 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const isGroupAdmin = role === "group_admin";
-  const cw = role === "group_admin" || role === "manager";
-  const can = (permission: string) => role ? hasPermission(role, permission, customPerms) : false;
+  const can = useCallback(
+    (permission: string) => role ? hasPermission(role, permission, customPerms) : false,
+    [role, customPerms],
+  );
+
+  // Valeur stable : evite de re-rendre tous les consommateurs a chaque render
+  const value = useMemo(() => ({
+    role,
+    displayName,
+    loading,
+    isGroupAdmin: role === "group_admin",
+    canWrite: role === "group_admin" || role === "manager",
+    can,
+  }), [role, displayName, loading, can]);
 
   return (
-    <ProfileContext.Provider value={{ role, displayName, loading, isGroupAdmin, canWrite: cw, can }}>
+    <ProfileContext.Provider value={value}>
       {children}
     </ProfileContext.Provider>
   );

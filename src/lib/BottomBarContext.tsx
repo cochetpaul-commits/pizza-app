@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from "react";
 
 export type BottomBarAction = {
   key: string;
@@ -29,8 +29,9 @@ export function BottomBarProvider({ children }: { children: React.ReactNode }) {
   const [actions, setActionsState] = useState<BottomBarAction[]>([]);
   const setActions = useCallback((a: BottomBarAction[]) => setActionsState(a), []);
   const clearActions = useCallback(() => setActionsState([]), []);
+  const value = useMemo(() => ({ actions, setActions, clearActions }), [actions, setActions, clearActions]);
   return (
-    <BottomBarContext.Provider value={{ actions, setActions, clearActions }}>
+    <BottomBarContext.Provider value={value}>
       {children}
     </BottomBarContext.Provider>
   );
