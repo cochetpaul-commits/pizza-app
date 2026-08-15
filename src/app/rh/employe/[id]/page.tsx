@@ -132,6 +132,8 @@ export default function EmployeDetailPage() {
   const [photoUrl, setPhotoUrl] = useState("");
   const [role, setRole] = useState("");
   const [note, setNote] = useState("");
+  const [popinaOperateur, setPopinaOperateur] = useState("");
+  const [popinaOps, setPopinaOps] = useState<string[]>([]);
 
   // ── Related data ──
   const [contrats, setContrats] = useState<Contrat[]>([]);
@@ -290,6 +292,24 @@ export default function EmployeDetailPage() {
       setPhotoUrl(empData.photo_url ?? "");
       setRole(empData.role ?? "");
       setNote(empData.note ?? "");
+      setPopinaOperateur(empData.popina_operateur ?? "");
+
+      // Suggestions : operateurs presents dans les ventes des 90 derniers jours
+      if (empData.etablissement_id) {
+        const since = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+        supabase
+          .from("ventes_lignes")
+          .select("operateur")
+          .eq("etablissement_id", empData.etablissement_id)
+          .gte("date_service", since)
+          .not("operateur", "is", null)
+          .limit(2000)
+          .then(({ data: opRows }) => {
+            if (cancelled) return;
+            const ops = [...new Set((opRows ?? []).map(r => (r.operateur as string).trim()).filter(Boolean))].sort();
+            setPopinaOps(ops);
+          });
+      }
 
       // Load related
       const [contratsRes, absRes, shiftsRes] = await Promise.all([
@@ -346,6 +366,7 @@ export default function EmployeDetailPage() {
       matricule: matricule || null, date_anciennete: dateAnciennete || null,
       travailleur_etranger: travailleurEtranger, actif,
       poste_id: posteId || null,
+      popina_operateur: popinaOperateur.trim() || null,
     };
 
     // Only include note if the column exists (graceful handling)
@@ -681,6 +702,8 @@ export default function EmployeDetailPage() {
           nom={nom} setNom={setNom}
           email={email} setEmail={setEmail}
           telMobile={telMobile} setTelMobile={setTelMobile}
+          popinaOperateur={popinaOperateur} setPopinaOperateur={setPopinaOperateur}
+          popinaOps={popinaOps}
         />
 
         {/* ═══ TUILE: ETABLISSEMENT — parametrable, 2 etabs ═══ */}
@@ -1158,7 +1181,6 @@ export default function EmployeDetailPage() {
                 title={`Historique des absences (${absences.length})`}
                 icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>}
                 iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
-                defaultOpen
               >
                 {absences.length === 0 ? (
                   <p style={{ fontSize: 13, color: "#999", textAlign: "center", margin: 0 }}>Aucune absence enregistree</p>
@@ -2433,6 +2455,8 @@ function InfosTab(props: {
   nom: string; setNom: (v: string) => void;
   email: string; setEmail: (v: string) => void;
   telMobile: string; setTelMobile: (v: string) => void;
+  popinaOperateur: string; setPopinaOperateur: (v: string) => void;
+  popinaOps: string[];
 }) {
   const p = props;
   const cw = p.canWrite;
@@ -2451,6 +2475,25 @@ function InfosTab(props: {
       <div style={grid2}>
         <Field label="Email" type="email" value={p.email} onChange={p.setEmail} disabled={!cw} />
         <Field label="Tel. mobile" value={p.telMobile} onChange={p.setTelMobile} disabled={!cw} />
+      </div>
+      <div style={grid2}>
+        <div style={fieldRow}>
+          <label style={labelSt}>Caisse Popina (nom d&apos;operateur)</label>
+          <input
+            style={inputSt}
+            value={p.popinaOperateur}
+            onChange={(e) => p.setPopinaOperateur(e.target.value)}
+            disabled={!cw}
+            list="popina-ops"
+            placeholder="ex. Elise, Pierrot, Polo…"
+          />
+          <datalist id="popina-ops">
+            {p.popinaOps.map(op => <option key={op} value={op} />)}
+          </datalist>
+          <div style={{ fontSize: 10, color: "#999", marginTop: 3 }}>
+            Relie la fiche aux ventes de la caisse — necessaire pour « Mon tableau ».
+          </div>
+        </div>
       </div>
     </AccordionSection>
   );

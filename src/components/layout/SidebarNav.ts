@@ -75,6 +75,8 @@ export type SidebarEntry = NavEtabGroup | NavSettingsGroup | NavStandaloneItem |
 
 // PILOTAGE (analyse & performance)
 const PILOTAGE_ITEMS: NavItemV2[] = [
+  // "Mon tableau" : visible par tous les employes lies a une fiche — pas de permission
+  { label: "Mon tableau", href: "/mon-tableau", icon: "dashboard" },
   { label: "Tableau de bord", href: "/pilotage", icon: "dashboard", permission: "performances.pilotage" },
   { label: "Ventes", href: "/ventes", icon: "barChart", permission: "performances.view" },
   { label: "Produits", href: "/ventes/marges", icon: "wallet", permission: "performances.pilotage" },
@@ -137,7 +139,9 @@ export const PERFORMANCES_ITEMS: NavItemV2[] = [];
 export const OPERATIONS_ITEMS = PRODUCTION_ITEMS;
 
 // Sections
-export const PILOTAGE_SECTION: NavSubSection = { label: "Pilotage", icon: "barChart", href: "/pilotage", permission: "performances.view", items: PILOTAGE_ITEMS };
+// Pas de permission au niveau section : "Mon tableau" est accessible a tous,
+// les autres items restent filtres individuellement par permission.
+export const PILOTAGE_SECTION: NavSubSection = { label: "Pilotage", icon: "barChart", href: "/mon-tableau", items: PILOTAGE_ITEMS };
 export const PERSONNEL_SECTION: NavSubSection = { label: "Personnel", icon: "users", href: "/rh/equipe", roles: ["group_admin", "manager"], items: PLANNING_ITEMS };
 export const PRODUCTION_SECTION: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin", "manager", "equipier"], items: PRODUCTION_ITEMS };
 export const PRODUCTION_SECTION_PICCOLA: NavSubSection = { label: "Production", icon: "package", roles: ["group_admin", "manager", "equipier"], items: PRODUCTION_ITEMS_PICCOLA };
@@ -299,6 +303,7 @@ export const SIDEBAR_NAV: NavSection[] = [
 /** Title map: pathname → page title for TopBar */
 export const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Accueil",
+  "/mon-tableau": "Mon tableau",
   "/rh/equipe": "Personnel",
   "/personnel": "Personnel",
   "/ventes": "Pilotage",
@@ -372,6 +377,7 @@ export const PAGE_TITLES: Record<string, string> = {
 
 /** Section name map: pathname → parent section label for TopBar subtitle */
 const PAGE_SECTIONS: Record<string, string> = {
+  "/mon-tableau": "Pilotage",
   "/rh/equipe": "Personnel",
   "/rh/pointage": "Personnel",
   "/rh/conges": "Personnel",

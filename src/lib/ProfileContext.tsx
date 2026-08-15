@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { normalizeRole, type Role } from "@/lib/rbac";
 import { hasPermission } from "@/lib/permissions";
@@ -29,6 +29,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [customPerms, setCustomPerms] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  // Dernier utilisateur charge — evite de recharger (et de demonter toute
+  // l'app via loading=true) quand supabase re-emet SIGNED_IN pour le meme
+  // utilisateur (ex. a chaque getSession() d'une page).
+  const lastUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,6 +118,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     supabase.auth.getUser().then(({ data }) => {
       if (cancelled) return;
       if (data.user) {
+        lastUserIdRef.current = data.user.id;
         fetchProfile(data.user.id);
       } else {
         setLoading(false);
@@ -127,10 +132,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       // demonte tout le contenu (perte du state des formulaires en cours).
       if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") return;
       if (session?.user) {
+        // Meme utilisateur deja charge → ne rien faire (SIGNED_IN est
+        // re-emis par supabase-js sans changement reel de session)
+        if (session.user.id === lastUserIdRef.current) return;
+        lastUserIdRef.current = session.user.id;
         setLoading(true);
         setCustomPerms({});
         fetchProfile(session.user.id);
       } else {
+        lastUserIdRef.current = null;
         setRole(null);
         setDisplayName(null);
         setCustomPerms({});
