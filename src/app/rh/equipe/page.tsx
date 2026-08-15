@@ -9,15 +9,6 @@ import { AddCollaborateurModal } from "@/components/rh/AddCollaborateurModal";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
-type Contrat = {
-  id: string;
-  employe_id: string;
-  type: string;
-  heures_semaine: number;
-  emploi: string | null;
-  actif: boolean;
-};
-
 type Employe = {
   id: string;
   prenom: string;
@@ -55,50 +46,6 @@ function getEtabColor(etabSlug?: string): string {
   return "#D4775A";
 }
 
-function computeCompletude(emp: Employe, hasActiveContrat: boolean): number {
-  let filled = 0;
-  const total = 9;
-  // Basic (4)
-  if (emp.prenom) filled++;
-  if (emp.nom) filled++;
-  if (emp.email) filled++;
-  if (emp.tel_mobile) filled++;
-  // Personal (4)
-  if (emp.date_naissance) filled++;
-  if (emp.adresse) filled++;
-  if (emp.code_postal) filled++;
-  if (emp.ville) filled++;
-  // Contract (1)
-  if (hasActiveContrat) filled++;
-  return Math.round((filled / total) * 100);
-}
-
-function progressColor(pct: number): string {
-  if (pct >= 80) return "#4a6741";
-  if (pct >= 50) return "#d4920a";
-  return "#c0392b";
-}
-
-/* ── Eye Icon SVG ──────────────────────────────────────────────── */
-
-function EyeIcon({ open }: { open: boolean }) {
-  if (open) {
-    return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-        <circle cx="12" cy="12" r="3" />
-      </svg>
-    );
-  }
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-      <line x1="1" y1="1" x2="23" y2="23" />
-    </svg>
-  );
-}
-
 /* ── Component ─────────────────────────────────────────────────── */
 
 export default function EquipePage() {
@@ -106,9 +53,7 @@ export default function EquipePage() {
   const { current: etab } = useEtablissement();
 
   const [employes, setEmployes] = useState<Employe[]>([]);
-  const [contrats, setContrats] = useState<Contrat[]>([]);
   const [loading, setLoading] = useState(true);
-  const [revealedPins, setRevealedPins] = useState<Set<string>>(new Set());
 
   // ── Modal state ──
   const [showModal, setShowModal] = useState(false);
@@ -131,39 +76,13 @@ export default function EquipePage() {
       const emps = empRes.data ?? [];
       setEmployes(emps);
 
-      const empIds = emps.map((e: Employe) => e.id);
-      if (empIds.length > 0) {
-        const contratRes = await supabase
-          .from("contrats")
-          .select("id, employe_id, type, heures_semaine, emploi, actif")
-          .eq("actif", true)
-          .in("employe_id", empIds);
-        if (cancelled) return;
-        setContrats(contratRes.data ?? []);
-      } else {
-        setContrats([]);
-      }
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [etab]);
 
-  /* ── Helpers for contrats ── */
-  const hasActiveContrat = (empId: string) => {
-    return contrats.some((c) => c.employe_id === empId && c.actif);
-  };
-
   /* ── Active employees only ── */
   const filtered = employes.filter((e) => e.actif);
-
-  const togglePin = (id: string) => {
-    setRevealedPins((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   const loadData = () => {
     window.location.reload();
@@ -218,18 +137,14 @@ export default function EquipePage() {
                 <tr>
                   <th style={{ ...thStyle, textAlign: "left" }}>Nom</th>
                   <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Role</th>
-                  <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Code PIN</th>
                   <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Email</th>
                   <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Telephone</th>
-                  <th style={{ ...thStyle, textAlign: "center" }} className="hide-mobile">Completude</th>
                   <th style={{ ...thStyle, textAlign: "center" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((emp) => {
                   const initials = emp.initiales || getInitials(emp.prenom, emp.nom);
-                  const pct = computeCompletude(emp, hasActiveContrat(emp.id));
-                  const pinRevealed = revealedPins.has(emp.id);
                   const role = emp.role ?? "employe";
 
                   return (
@@ -282,27 +197,6 @@ export default function EquipePage() {
                         })()}
                       </td>
 
-                      {/* Code PIN */}
-                      <td style={{ ...tdStyle, textAlign: "center" }} className="hide-mobile">
-                        {emp.code_pin ? (
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ fontFamily: "monospace", fontSize: 13, letterSpacing: 2 }}>
-                              {pinRevealed ? emp.code_pin : "••••"}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); togglePin(emp.id); }}
-                              style={eyeBtnStyle}
-                              title={pinRevealed ? "Masquer" : "Afficher"}
-                            >
-                              <EyeIcon open={pinRevealed} />
-                            </button>
-                          </div>
-                        ) : (
-                          <span style={{ color: "#ccc" }}>—</span>
-                        )}
-                      </td>
-
                       {/* Email */}
                       <td style={{ ...tdStyle, fontSize: 13, color: "#6f6a61", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} className="hide-mobile">
                         {emp.email ?? <span style={{ color: "#ccc" }}>—</span>}
@@ -311,18 +205,6 @@ export default function EquipePage() {
                       {/* Telephone */}
                       <td style={{ ...tdStyle, fontSize: 13, color: "#6f6a61" }} className="hide-mobile">
                         {emp.tel_mobile ?? <span style={{ color: "#ccc" }}>—</span>}
-                      </td>
-
-                      {/* Dossier RH */}
-                      <td style={{ ...tdStyle, textAlign: "center", minWidth: 120 }} className="hide-mobile">
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                          <div style={progressBarBg}>
-                            <div style={{ ...progressBarFill, width: `${pct}%`, background: progressColor(pct) }} />
-                          </div>
-                          <span style={{ fontSize: 11, color: progressColor(pct), fontWeight: 600 }}>
-                            {pct}% — {pct >= 100 ? "Complet" : "Incomplet"}
-                          </span>
-                        </div>
                       </td>
 
                       {/* Actions */}
@@ -467,30 +349,5 @@ const avatarImgStyle: React.CSSProperties = {
   borderRadius: "50%",
   objectFit: "cover",
   flexShrink: 0,
-};
-
-const eyeBtnStyle: React.CSSProperties = {
-  background: "none",
-  border: "none",
-  cursor: "pointer",
-  padding: 2,
-  color: "#999",
-  display: "inline-flex",
-  alignItems: "center",
-};
-
-const progressBarBg: React.CSSProperties = {
-  width: "100%",
-  maxWidth: 80,
-  height: 4,
-  borderRadius: 2,
-  background: "#eee",
-  overflow: "hidden",
-};
-
-const progressBarFill: React.CSSProperties = {
-  height: "100%",
-  borderRadius: 2,
-  transition: "width 0.3s",
 };
 
