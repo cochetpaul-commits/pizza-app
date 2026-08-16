@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { RequireRole } from "@/components/RequireRole";
 import { PeriodSelector, currentPeriod, type PeriodValue, type PeriodMode } from "@/components/PeriodSelector";
@@ -55,6 +57,10 @@ function Statut({ s }: { s: Ligne["statut"] }) {
 
 export default function RentabilitePage() {
   const { current: etab } = useEtablissement();
+  const { isGroupAdmin } = useProfile();
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+  const [reload, setReload] = useState(0);
   const [period, setPeriod] = useState<PeriodValue>(() => currentPeriod("mois"));
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(false);
@@ -80,9 +86,31 @@ export default function RentabilitePage() {
       .catch(() => { if (!cancelled) setErr("Erreur réseau"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [etab?.id, period.from, period.to]);
+  }, [etab?.id, period.from, period.to, reload]);
 
   const onModeChange = (m: PeriodMode) => setPeriod(currentPeriod(m));
+
+  // Rapatrie les factures et charges Pennylane du mois affiché
+  const syncPennylane = async () => {
+    if (!etab?.id || syncing) return;
+    setSyncing(true); setSyncMsg("");
+    const { data: sess } = await supabase.auth.getSession();
+    try {
+      const res = await fetch("/api/pennylane/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
+        body: JSON.stringify({ etablissement_id: etab.id, mois: period.from.slice(0, 8) + "01" }),
+      });
+      const json = await res.json();
+      if (!res.ok) setSyncMsg(json.error ?? "Erreur");
+      else {
+        const r = json.resultats?.[0];
+        setSyncMsg(r?.erreur ? `Erreur : ${r.erreur}` : `${r?.factures ?? 0} factures rapatriées`);
+        setReload(n => n + 1);
+      }
+    } catch { setSyncMsg("Erreur réseau"); }
+    setSyncing(false);
+  };
 
   return (
     <RequireRole permission="performances.pilotage">
@@ -95,9 +123,23 @@ export default function RentabilitePage() {
         }}>
           Rentabilité
         </h1>
-        <p style={{ fontSize: 12.5, color: "#999", margin: "0 0 18px" }}>
-          {etab?.nom} · du chiffre d&apos;affaires réel à la marge, source par source.
-        </p>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap", margin: "0 0 18px" }}>
+          <p style={{ fontSize: 12.5, color: "#999", margin: 0 }}>
+            {etab?.nom} · du chiffre d&apos;affaires réel à la marge, source par source.
+          </p>
+          {isGroupAdmin && etab && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {syncMsg && <span style={{ fontSize: 11, color: syncMsg.startsWith("Erreur") ? "#DC2626" : "#2D6A4F", fontWeight: 600 }}>{syncMsg}</span>}
+              <button type="button" onClick={syncPennylane} disabled={syncing} style={{
+                padding: "7px 14px", borderRadius: 9, border: "1px solid #ddd6c8",
+                background: "#fff", fontSize: 12, fontWeight: 700, color: "#1a1a1a",
+                cursor: syncing ? "wait" : "pointer", opacity: syncing ? 0.6 : 1,
+              }}>
+                {syncing ? "Synchronisation…" : "⟳ Synchroniser Pennylane"}
+              </button>
+            </div>
+          )}
+        </div>
 
         {loading && <p style={{ color: "#999", fontSize: 13 }}>Calcul en cours…</p>}
         {!loading && !etab && (

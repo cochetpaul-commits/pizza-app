@@ -26,6 +26,10 @@
     {
       "path": "/api/cron/stock-sync",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/pennylane/sync",
+      "schedule": "0 6 * * *"
     }
   ]
 }

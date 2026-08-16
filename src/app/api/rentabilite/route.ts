@@ -156,12 +156,15 @@ export async function GET(req: NextRequest) {
     : { poste: "Masse salariale chargée", montant: null, statut: "manquant", source: "Silae / DSN",
         detail: "Combo donne les heures, pas le coût employeur — import de la paie nécessaire" };
 
-  const POSTES_EXPLOITATION = ["loyer", "energie", "commissions_cb", "entretien", "assurances", "honoraires", "locations", "autres_charges"];
+  const POSTES_EXPLOITATION = ["loyer", "energie", "commissions_cb", "entretien", "assurances", "honoraires", "locations", "autres_charges", "a_categoriser", "remuneration_gerants"];
   const exploitationDetail: { libelle: string; montant: number }[] = [];
   let exploitationTotal = 0;
   for (const p of POSTES_EXPLOITATION) {
     const e = parPoste.get(p);
-    if (e) { exploitationTotal += e.total; exploitationDetail.push(...e.detail); }
+    if (e && Math.abs(e.total) > 0.5) {
+      exploitationTotal += e.total;
+      exploitationDetail.push({ libelle: e.detail[0]?.libelle ?? p, montant: e.total });
+    }
   }
   const exploitation: Ligne = exploitationTotal > 0
     ? { poste: "Charges d'exploitation", montant: exploitationTotal, statut: "ok", source: "Pennylane" }

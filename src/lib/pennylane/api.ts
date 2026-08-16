@@ -17,13 +17,27 @@ export function pennylaneConfigured(): boolean {
   return !!process.env.PENNYLANE_API_KEY;
 }
 
-async function plGet<T = unknown>(path: string): Promise<T> {
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/**
+ * GET Pennylane avec réessai : l'API limite le débit (429) et demande
+ * d'attendre quelques secondes — sans ce retry, une synchro d'un mois
+ * complet échoue au milieu.
+ */
+async function plGet<T = unknown>(path: string, tentative = 0): Promise<T> {
   const key = process.env.PENNYLANE_API_KEY;
   if (!key) throw new Error("PENNYLANE_API_KEY manquante");
   const res = await fetch(BASE_URL + path, {
     headers: { Authorization: `Bearer ${key.trim()}`, Accept: "application/json" },
     cache: "no-store",
   });
+  if (res.status === 429 && tentative < 5) {
+    const txt = await res.text().catch(() => "");
+    const m = /retry in (\d+)/i.exec(txt);
+    const attente = (m ? Number(m[1]) : 2) * 1000 + tentative * 500;
+    await sleep(attente);
+    return plGet<T>(path, tentative + 1);
+  }
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     throw new Error(`Pennylane ${res.status}: ${txt.slice(0, 200)}`);
@@ -65,18 +79,50 @@ export async function getSupplierInvoices(from: string, to: string): Promise<PlS
 }
 
 /** Catégories analytiques d'une facture (une facture peut en avoir plusieurs). */
-export async function getInvoiceCategories(invoiceId: number): Promise<{ label: string; amount?: string }[]> {
+export async function getInvoiceCategories(invoiceId: number): Promise<{ label: string; weight: number }[]> {
   try {
-    const data = await plGet<Paged<{ label?: string; category?: { label?: string }; amount?: string }>>(
+    const data = await plGet<Paged<{ label?: string; category?: { label?: string }; weight?: string }>>(
       `supplier_invoices/${invoiceId}/categories`,
     );
     return (data.items ?? []).map(c => ({
-      label: c.label ?? c.category?.label ?? "Sans catégorie",
-      amount: c.amount,
+      label: c.label ?? c.category?.label ?? "En attente de catégorisation",
+      weight: Number(c.weight) || 1,
     }));
   } catch {
     return [];
   }
+}
+
+export type PlTransaction = {
+  id: number;
+  date: string;
+  label: string;
+  amount: string;
+  categories?: { label?: string; weight?: string }[];
+  matched_invoices?: unknown;
+};
+
+/**
+ * Transactions bancaires d'une période, avec leurs catégories.
+ * Sert à capter les charges SANS facture fournisseur (salaires, URSSAF,
+ * loyer prélevé…). Les transactions déjà rapprochées à une facture sont
+ * exclues à l'usage pour ne pas compter deux fois.
+ */
+export async function getTransactions(from: string, to: string): Promise<PlTransaction[]> {
+  const filter = encodeURIComponent(JSON.stringify([
+    { field: "date", operator: "gteq", value: from },
+    { field: "date", operator: "lteq", value: to },
+  ]));
+  const out: PlTransaction[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 30; page++) {
+    const q = `transactions?filter=${filter}&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+    const data: Paged<PlTransaction> = await plGet(q);
+    out.push(...(data.items ?? []));
+    if (!data.has_more || !data.next_cursor) break;
+    cursor = data.next_cursor;
+  }
+  return out;
 }
 
 export async function getSuppliers(): Promise<{ id: number; name: string }[]> {
