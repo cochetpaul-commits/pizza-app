@@ -276,13 +276,14 @@ const SECTION_MY_PLANNING: TabSection = {
 const SECTION_PILOTAGE: TabSection = {
   label: "Pilotage",
   href: "/mon-tableau",
-  match: ["/mon-tableau", "/pilotage", "/ventes", "/tresorerie", "/rh/masse-salariale"],
+  match: ["/mon-tableau", "/pilotage", "/ventes", "/rentabilite", "/tresorerie", "/rh/masse-salariale"],
   icon: () => <IconWallet />,
   // Pas de permission : "Mon tableau" est ouvert a tous les employes
   tabs: [
     // Admins : vision globale via "Tableau", pas de tableau personnalise
     { label: "Mon tableau", href: "/mon-tableau", match: ["/mon-tableau"], icon: () => <IconBarChart />, roles: ["manager", "equipier"] },
     { label: "Ventes", href: "/ventes", match: ["/ventes"], icon: () => <IconWallet />, permission: "performances.view" },
+    { label: "Rentabilite", href: "/rentabilite", match: ["/rentabilite"], icon: () => <IconTrendingUp />, permission: "performances.pilotage" },
     { label: "Produits", href: "/ventes/marges", match: ["/ventes/marges"], icon: () => <IconTag />, permission: "performances.pilotage" },
     { label: "Masse sal.", href: "/rh/masse-salariale", match: ["/rh/masse-salariale"], icon: () => <IconTrendingUp />, permission: "performances.pilotage" },
     { label: "Tresorerie", href: "/tresorerie", match: ["/tresorerie"], icon: () => <IconTrendingUp />, permission: "performances.pilotage" },
