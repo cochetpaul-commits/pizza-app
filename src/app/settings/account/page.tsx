@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import { useTheme } from "@/lib/ThemeContext";
 import { mapToPermRole, ROLE_INFO } from "@/lib/permissions";
 import { compressImage } from "@/lib/compressImage";
 
@@ -50,7 +49,6 @@ const btnPrimary: React.CSSProperties = {
 };
 
 export default function MonComptePage() {
-  const { mode, setMode, isDark } = useTheme();
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -113,7 +111,9 @@ export default function MonComptePage() {
     setSaving(true); setMsg("");
     try {
       const compressed = await compressImage(file, 400, 0.8);
-      const path = `avatars/${me.userId}.jpg`;
+      // La policy du bucket exige que le 1er dossier soit l'uid de l'utilisateur
+      // (storage.foldername(name)[1] = auth.uid()) — sinon l'upload est refusé.
+      const path = `${me.userId}/avatar.jpg`;
       const { error: upErr } = await supabase.storage.from("recipe-images").upload(path, compressed, { upsert: true, contentType: "image/jpeg" });
       if (upErr) throw upErr;
       const { data: urlData } = supabase.storage.from("recipe-images").getPublicUrl(path);
@@ -252,26 +252,11 @@ export default function MonComptePage() {
         {pwMsg && <div style={{ fontSize: 12, fontWeight: 600, marginTop: 8, color: pwMsg === "Mot de passe modifié" ? "#2D6A4F" : "#DC2626" }}>{pwMsg}</div>}
       </div>
 
-      {/* ── Réglages ── */}
-      <div style={card}>
-        <div style={secTitle}>Réglages</div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Thème</span>
-          <div style={{ display: "inline-flex", gap: 2, padding: 3, background: "#f0ebe3", borderRadius: 10 }}>
-            {([["auto", "Auto"], ["light", "Clair"], ["dark", "Sombre"]] as const).map(([m, label]) => (
-              <button key={m} type="button" onClick={() => setMode(m)} style={{
-                padding: "5px 12px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 700,
-                background: mode === m ? "#fff" : "transparent",
-                color: mode === m ? "#1a1a1a" : "#999", cursor: "pointer",
-                boxShadow: mode === m ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-              }}>{label}</button>
-            ))}
-          </div>
-        </div>
-        <div style={{ fontSize: 10.5, color: "#999", marginTop: 6 }}>
-          {isDark ? "Thème sombre actif" : "Thème clair actif"}
-        </div>
-      </div>
+      {/* Le sélecteur de thème a été retiré : il posait bien l'attribut
+          data-theme sur <html>, mais aucune feuille de style ne le lit
+          (l'app utilise des couleurs écrites en dur). Il ne changeait
+          donc rien à l'écran. À rebrancher le jour où un vrai thème
+          sombre sera implémenté. */}
 
       {/* ── Déconnexion ── */}
       <button type="button" onClick={logout} style={{ ...btnPrimary, width: "100%", background: "#fff", color: "#DC2626", border: "1px solid rgba(220,38,38,0.3)" }}>

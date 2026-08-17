@@ -49,6 +49,34 @@ import { useBottomBarActions } from "@/lib/BottomBarContext";
 
 type OfferPayload = Record<string, unknown>;
 
+/**
+ * Écrit l'offre active d'un ingrédient : désactive les précédentes puis
+ * insère la nouvelle. Si une offre active subsiste malgré tout (deux
+ * enregistrements concurrents), on la met à jour en place au lieu
+ * d'échouer sur l'index unique (ingredient_id, supplier_id) WHERE is_active.
+ * Retourne un message d'erreur, ou null si tout s'est bien passé.
+ */
+async function writeActiveOffer(payload: OfferPayload): Promise<string | null> {
+  const ingredientId = payload.ingredient_id as string;
+  const supplierId = payload.supplier_id as string;
+  const off = await supabase.from("supplier_offers")
+    .update({ is_active: false })
+    .eq("ingredient_id", ingredientId).eq("is_active", true);
+  if (off.error) return off.error.message;
+
+  const ins = await supabase.from("supplier_offers").insert(payload);
+  if (!ins.error) return null;
+  if ((ins.error as { code?: string }).code !== "23505") return ins.error.message;
+
+  const { data: restante } = await supabase.from("supplier_offers")
+    .select("id")
+    .eq("ingredient_id", ingredientId).eq("supplier_id", supplierId)
+    .eq("is_active", true).limit(1).maybeSingle();
+  if (!restante) return ins.error.message;
+  const upd = await supabase.from("supplier_offers").update(payload).eq("id", restante.id);
+  return upd.error ? upd.error.message : null;
+}
+
 type IngredientPatch = Partial<
   Pick<Ingredient, "status" | "status_note" | "validated_at" | "validated_by">
 >;
@@ -390,6 +418,9 @@ function IngredientsPageInner() {
   const [packPieceWeightG, setPackPieceWeightG] = useState("");
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Anti double-enregistrement : sur mobile un double tap lançait deux
+  // sauvegardes en parallèle, la seconde violait l'unicité des offres actives.
+  const savingRef = useRef(false);
   const [edit, setEdit] = useState<EditState | null>(null);
 
   function handleNewNameChange(value: string) {
@@ -541,15 +572,8 @@ function IngredientsPageInner() {
       if (!userId) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return; }
       const offerPayload = buildOfferFromCreate(ingredient_id, userId);
       if (!offerPayload) return;
-      const dPrev = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", ingredient_id).eq("supplier_id", supplier_id).eq("is_active", true);
-      if (dPrev.error) { alert(dPrev.error.message); return; }
-      let off = await supabase.from("supplier_offers").insert(offerPayload);
-      if (off.error && (off.error as { code?: string }).code === "23505") {
-        const dPrev2 = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", ingredient_id).eq("supplier_id", supplier_id).eq("is_active", true);
-        if (dPrev2.error) { alert(dPrev2.error.message); return; }
-        off = await supabase.from("supplier_offers").insert(offerPayload);
-      }
-      if (off.error) { alert(off.error.message); return; }
+      const erreur = await writeActiveOffer(offerPayload);
+      if (erreur) { alert(erreur); return; }
     }
     setNewName(""); setNewCategory("preparation"); setNewSupplierId(""); setPriceKind("unit"); resetCreatePriceBlocks();
     await mutate();
@@ -819,7 +843,7 @@ function IngredientsPageInner() {
     return summary;
   }, [edit]);
 
-  const saveEdit = useCallback(async () => {
+  const runSaveEdit = useCallback(async () => {
     if (!editingId || !edit) return;
     const name = edit.name.trim();
     if (!name) { alert("Nom obligatoire."); return; }
@@ -887,11 +911,9 @@ function IngredientsPageInner() {
       const editedIng = items.find((i) => i.id === editingId);
       const offerPayload = buildOfferFromEdit(editingId, userId, editedIng?.etablissement_id);
       if (offerPayload) {
-        // Désactiver TOUTES les offres actives de cet ingrédient (tous fournisseurs)
-        const dPrev = await supabase.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", editingId).eq("is_active", true);
-        if (dPrev.error) { alert(dPrev.error.message); return; }
-        const off = await supabase.from("supplier_offers").insert(offerPayload);
-        if (off.error) { alert(off.error.message); return; }
+        // Désactive TOUTES les offres actives de cet ingrédient (tous fournisseurs)
+        const erreur = await writeActiveOffer(offerPayload);
+        if (erreur) { alert(erreur); return; }
 
         // Mettre à jour les ingrédients dérivés si le prix unitaire a changé
         if (edit.pricePerBaseUnit) {
@@ -925,6 +947,14 @@ function IngredientsPageInner() {
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId, edit, userId, items, offersByIngredientId, backUrl, router, mutate, mutateOne]);
+
+  /** Un seul enregistrement à la fois : deux appels concurrents créaient
+   *  deux offres actives pour le même couple ingrédient/fournisseur. */
+  const saveEdit = useCallback(async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    try { await runSaveEdit(); } finally { savingRef.current = false; }
+  }, [runSaveEdit]);
 
   const del = useCallback(async (id: string, name: string) => {
     if (!confirm(`Supprimer "${name}" ?`)) return;

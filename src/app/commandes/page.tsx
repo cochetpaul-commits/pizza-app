@@ -2018,6 +2018,25 @@ function CommandesPage() {
           </button>
         )}
 
+        {/* Échéance de commande — en haut : en bas elle recouvrait la barre d'actions */}
+        {!loading && selectedSupplierId && currentSupplier && (() => {
+          const estimate = getDeliveryEstimate();
+          if (!estimate) return null;
+          return (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              marginTop: 8, padding: "8px 14px",
+              background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10,
+              fontSize: 11.5, fontWeight: 600, color: "#666",
+            }}>
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>{estimate}</span>
+            </div>
+          );
+        })()}
+
         {/* Portail fournisseur + Mercuriale buttons */}
         {currentSupplier && (
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -2676,34 +2695,6 @@ function CommandesPage() {
             )}
           </div>
         )}
-
-        {/* Delivery estimate */}
-        {session && session.status === "brouillon" && (() => {
-          const estimate = getDeliveryEstimate();
-          if (!estimate) return null;
-          return (
-            <div style={{
-              position: "fixed",
-              bottom: activeCount > 0 ? "calc(120px + env(safe-area-inset-bottom, 0px))" : "calc(70px + env(safe-area-inset-bottom, 0px))",
-              left: "50%",
-              transform: "translateX(-50%)",
-              background: "#fff",
-              border: "1.5px solid #ddd6c8",
-              borderRadius: 10,
-              padding: "8px 16px",
-              fontSize: 11,
-              fontWeight: 600,
-              color: "#666",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-              zIndex: 109,
-              whiteSpace: "nowrap",
-              maxWidth: "90vw",
-              textAlign: "center",
-            }}>
-              {estimate}
-            </div>
-          );
-        })()}
 
         {/* Floating actions — draft in progress */}
         {session && session.status === "brouillon" && (
