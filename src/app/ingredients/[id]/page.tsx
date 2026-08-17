@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect, useMemo, useRef } from "react";
+import dynamic from "next/dynamic";
 import { RequireRole } from "@/components/RequireRole";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -9,10 +10,8 @@ import { StepperInput } from "@/components/StepperInput";
 import { compressImage } from "@/lib/compressImage";
 import { computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import { CAT_COLORS } from "@/types/ingredients";
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer,
-} from "recharts";
+
+const PriceEvolutionChart = dynamic(() => import("./PriceEvolutionChart"), { ssr: false });
 
 type Ingredient = {
   id: string; name: string; category: string;
@@ -54,9 +53,6 @@ type Offer = {
   establishment: string | null;
   price_kind: string | null;
 };
-
-// Colors for suppliers in the chart
-const LINE_COLORS = ["#8B1A1A", "#1E40AF", "#5C7A4E", "#7C3AED", "#92400E", "#EA580C"];
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "2-digit" });
@@ -476,32 +472,7 @@ function IngredientDetailInner() {
         {chartData.length >= 2 && supplierList.length > 0 && (
           <div className="card" style={{ marginBottom: 12, padding: "14px 16px" }}>
             <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 14 }}>Évolution des prix</div>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={chartData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.07)" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip
-                  contentStyle={{ borderRadius: 10, border: "1px solid rgba(217,199,182,0.95)", background: "#FAF7F2", fontSize: 12 }}
-                  formatter={(value: unknown, name: unknown) => {
-                    const supName = supplierList.find(([id]) => id === name)?.[1] ?? String(name);
-                    return [`${Number(value).toFixed(2)} €`, supName];
-                  }}
-                />
-                {supplierList.length > 1 && <Legend formatter={(value) => supplierList.find(([id]) => id === value)?.[1] ?? value} wrapperStyle={{ fontSize: 11 }} />}
-                {supplierList.map(([supId], idx) => (
-                  <Line
-                    key={supId}
-                    type="monotone"
-                    dataKey={supId}
-                    stroke={LINE_COLORS[idx % LINE_COLORS.length]}
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    connectNulls={false}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+            <PriceEvolutionChart chartData={chartData} supplierList={supplierList} />
           </div>
         )}
 

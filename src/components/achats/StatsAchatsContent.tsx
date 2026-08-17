@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts, PriceAlert, ALERT_THRESHOLD } from "@/lib/priceAlerts";
@@ -9,10 +10,8 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import { CAT_COLORS, type Category } from "@/types/ingredients";
 import Link from "next/link";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer,
-} from "recharts";
+
+const PriceVariationsChart = dynamic(() => import("./PriceVariationsChart"), { ssr: false });
 
 // ─── Snooze helpers ───────────────────────────────────────────────────────────
 
@@ -455,17 +454,7 @@ export function StatsAchatsContent() {
                 {/* Chart */}
                 <div className="card" style={{ marginBottom: 12, padding: "16px 14px" }}>
                   <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 14 }}>Évolution sur 12 mois</div>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.07)" />
-                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                      <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid rgba(217,199,182,0.95)", background: "#FAF7F2", fontSize: 13 }} />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
-                      <Bar dataKey="hausses" name="Hausses" fill="#DC2626" radius={[4,4,0,0]} />
-                      <Bar dataKey="baisses" name="Baisses" fill="#16A34A" radius={[4,4,0,0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <PriceVariationsChart chartData={chartData} />
                 </div>
 
                 {/* Sort + list */}

@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, LineChart, Line, Legend, ReferenceLine,
-} from "recharts";
 import { fetchApi } from "@/lib/fetchApi";
+
+const FoodCostTrendChart = dynamic(() => import("./FoodCostTrendChart"), { ssr: false });
+const CategoryProfitChart = dynamic(() => import("./CategoryProfitChart"), { ssr: false });
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -249,40 +249,6 @@ function PeriodSelector({ mode, weekStr, monthStr, currentWeek, currentMonth, on
   );
 }
 
-// ── Tooltips ─────────────────────────────────────────────────────────────
-
-function TrendTooltip({ active, payload, label }: {
-  active?: boolean; payload?: Array<{ value: number; dataKey: string; color: string }>; label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10, padding: "10px 14px", fontSize: 13, minWidth: 120 }}>
-      <p style={{ margin: 0, fontWeight: 700, color: "#1a1a1a" }}>{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} style={{ margin: "4px 0 0", color: p.color, fontWeight: 600 }}>
-          {p.dataKey === "foodCostPct" ? `${p.value?.toFixed(1)}%` : fmtEuroInt(p.value)}
-        </p>
-      ))}
-    </div>
-  );
-}
-
-function CatBarTooltip({ active, payload, label }: {
-  active?: boolean; payload?: Array<{ value: number; dataKey: string; name: string }>; label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10, padding: "10px 14px", fontSize: 13, minWidth: 140 }}>
-      <p style={{ margin: 0, fontWeight: 700, color: "#1a1a1a" }}>{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} style={{ margin: "4px 0 0", color: p.dataKey === "ca" ? ACCENT : "#999", fontWeight: 600 }}>
-          {p.dataKey === "ca" ? "CA" : "Coût"} : {fmtEuroInt(p.value)}
-        </p>
-      ))}
-    </div>
-  );
-}
-
 // ── Sort options for product table ──────────────────────────────────────
 
 type SortKey = "ca" | "foodCostPct" | "margin" | "quantity";
@@ -440,24 +406,7 @@ export default function FinancesPage() {
                 <>
                   <p style={sectionLabel}>&Eacute;VOLUTION FOOD COST</p>
                   <div style={{ ...card, marginBottom: 20, padding: "16px 8px 12px" }}>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <LineChart data={d.weeklyTrend} margin={{ top: 5, right: 16, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0ebe3" vertical={false} />
-                        <XAxis dataKey="week" tick={{ fontSize: 11, fill: "#9a8f84" }} axisLine={false} tickLine={false} />
-                        <YAxis
-                          tickFormatter={(v) => `${v}%`}
-                          tick={{ fontSize: 10, fill: "#9a8f84" }} axisLine={false} tickLine={false} width={40}
-                          domain={["dataMin - 2", "dataMax + 2"]}
-                        />
-                        <Tooltip content={<TrendTooltip />} />
-                        <Line
-                          type="monotone" dataKey="foodCostPct" stroke={ACCENT}
-                          strokeWidth={2.5} dot={{ r: 4, fill: ACCENT }} name="Food cost %"
-                          connectNulls
-                        />
-                        <ReferenceLine y={30} stroke={GREEN} strokeWidth={1} strokeDasharray="6 4" label={{ value: "30%", position: "right", fontSize: 10, fill: GREEN }} />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    <FoodCostTrendChart weeklyTrend={d.weeklyTrend} />
                   </div>
                 </>
               )}
@@ -467,17 +416,7 @@ export default function FinancesPage() {
                 <>
                   <p style={sectionLabel}>RENTABILIT&Eacute; PAR CAT&Eacute;GORIE</p>
                   <div style={{ ...card, marginBottom: 20, padding: "16px 8px 12px" }}>
-                    <ResponsiveContainer width="100%" height={Math.max(200, d.categories.length * 50)}>
-                      <BarChart data={d.categories} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0ebe3" horizontal={false} />
-                        <XAxis type="number" tickFormatter={(v) => `${Math.round(v)}€`} tick={{ fontSize: 10, fill: "#9a8f84" }} axisLine={false} tickLine={false} />
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#1a1a1a", fontWeight: 600 }} axisLine={false} tickLine={false} width={80} />
-                        <Tooltip content={<CatBarTooltip />} cursor={{ fill: "#f5f0e8" }} />
-                        <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                        <Bar dataKey="ca" name="CA" fill={ACCENT} radius={[0, 4, 4, 0]} maxBarSize={24} />
-                        <Bar dataKey="cogs" name="Coût" fill="#c9b99a" radius={[0, 4, 4, 0]} maxBarSize={24} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <CategoryProfitChart categories={d.categories} />
                   </div>
 
                   {/* Category cards */}

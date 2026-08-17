@@ -44,6 +44,21 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
    7 pages, `recharts` (~300 Ko) sur 4 autres — et les deux libs coexistent.
    Passer les graphiques en `next/dynamic({ ssr: false })` et à terme garder
    une seule lib. C'est LE plus gros gain de vitesse de chargement restant.
+   - [x] *(17/08/2026)* Les 3 pages `recharts` sont faites : le graphique de
+     chaque page est extrait dans un petit composant dédié
+     (`PriceEvolutionChart.tsx`, `PriceVariationsChart.tsx`,
+     `FoodCostTrendChart.tsx` + `CategoryProfitChart.tsx`) et chargé via
+     `next/dynamic({ ssr: false })` — `ingredients/[id]`,
+     `achats` (StatsAchatsContent), `finances`.
+   - [ ] **Reste à faire** : les 7 pages `chart.js/auto` (`ventes/marges`,
+     `ventes`, `achats`, `tresorerie`, `piccola-mia`, `dashboard`,
+     `bello-mio`). Ce sont toutes des utilisations impératives (canvas +
+     `useRef`/`useEffect`, pas du JSX déclaratif) — l'extraction est un peu
+     plus délicate que pour recharts mais suit le même principe : sortir le
+     `<canvas>` + la logique `new Chart(...)` dans un composant `"use
+     client"` séparé, importé en `next/dynamic({ ssr: false })` depuis la
+     page. À faire une poignée de pages à la fois pour rester dans le budget
+     de lignes.
 2. **`v_latest_offers` téléchargée en entier** (toutes les offres de tous les
    fournisseurs) à chaque ouverture d'un formulaire de recette — 6 composants
    concernés. Filtrer par les ingrédients affichés, comme le fait déjà
