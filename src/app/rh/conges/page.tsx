@@ -5,7 +5,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
-import { FloatingActions, FAIconPlus } from "@/components/layout/FloatingActions";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -17,7 +16,23 @@ type Employe = {
   equipes_access: string[] | null;
   etablissement_id: string | null;
   cp_n_minus_1?: { acquis?: number; pris?: number } | null;
+  etablissements?: { nom: string } | { nom: string }[] | null;
 };
+
+type Regle = {
+  id: string;
+  etablissement_id: string;
+  equipe: string;
+  max_absents: number;
+  actif: boolean;
+  etablissements?: { nom: string } | { nom: string }[] | null;
+};
+
+/** Nom d'etablissement depuis une jointure Supabase (objet ou tableau) */
+function etabNom(j: { nom: string } | { nom: string }[] | null | undefined): string {
+  if (!j) return "—";
+  return Array.isArray(j) ? (j[0]?.nom ?? "—") : j.nom;
+}
 
 type Contrat = {
   employe_id: string;
@@ -281,6 +296,7 @@ export default function CongesPage() {
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [employes, setEmployes] = useState<Employe[]>([]);
   const [contrats, setContrats] = useState<Contrat[]>([]);
+  const [regles, setRegles] = useState<Regle[]>([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
@@ -318,45 +334,60 @@ export default function CongesPage() {
 
   /* ── Data loading ───────────────────────────────────────────── */
 
+  // Vue groupe : sans etablissement selectionne, les managers voient les
+  // deux restos d'un coup (calendrier fusionne, compteurs avec badge etab)
+  const vueGroupe = !etab && !isEquipier;
+
   const loadData = useCallback(async () => {
-    if (!etab) return;
+    if (!etab && isEquipier) return;
     setLoading(true);
 
-    const [empRes, absRes, contratRes] = await Promise.all([
-      supabase
-        .from("employes")
-        .select("id, prenom, nom, email, equipes_access, etablissement_id, cp_n_minus_1")
-        .contains("etablissements_ids", [etab.id])
-        .eq("actif", true)
-        .order("nom"),
-      supabase
-        .from("absences")
-        .select("id, employe_id, type, date_debut, date_fin, nb_jours, statut, note, created_at, employes(prenom, nom)")
-        .eq("etablissement_id", etab.id)
-        .order("date_debut", { ascending: false })
-        .limit(500),
+    let empQuery = supabase
+      .from("employes")
+      .select("id, prenom, nom, email, equipes_access, etablissement_id, cp_n_minus_1, etablissements(nom)")
+      .eq("actif", true)
+      .order("nom");
+    if (etab) empQuery = empQuery.contains("etablissements_ids", [etab.id]);
+
+    let absQuery = supabase
+      .from("absences")
+      .select("id, employe_id, type, date_debut, date_fin, nb_jours, statut, note, created_at, employes(prenom, nom)")
+      .order("date_debut", { ascending: false })
+      .limit(500);
+    if (etab) absQuery = absQuery.eq("etablissement_id", etab.id);
+
+    const [empRes, absRes, contratRes, regRes] = await Promise.all([
+      empQuery,
+      absQuery,
       supabase
         .from("contrats")
         .select("employe_id, date_debut")
         .eq("actif", true)
         .order("date_debut", { ascending: true }),
+      supabase
+        .from("conges_regles")
+        .select("id, etablissement_id, equipe, max_absents, actif, etablissements(nom)")
+        .order("equipe"),
     ]);
 
-    const emps: Employe[] = empRes.data ?? [];
+    const emps: Employe[] = (empRes.data ?? []) as unknown as Employe[];
     setEmployes(emps);
     setContrats((contratRes.data ?? []) as Contrat[]);
+    const regs = ((regRes.data ?? []) as unknown as Regle[])
+      .filter(r => !etab || r.etablissement_id === etab.id);
+    setRegles(regs);
 
     const empIds = new Set(emps.map((e) => e.id));
     const raw = (absRes.data ?? []) as Absence[];
     const filtered = raw.filter((a) => empIds.has(a.employe_id));
     setAbsences(filtered);
     setLoading(false);
-  }, [etab]);
+  }, [etab, isEquipier]);
 
   useEffect(() => {
-    if (!etab) return;
+    if (!etab && isEquipier) return;
     loadData(); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [etab, loadData]);
+  }, [etab, isEquipier, loadData]);
 
   /* ── Equipier: auto-select own employee ─────────────────────── */
 
@@ -418,7 +449,7 @@ export default function CongesPage() {
         employe_id: emp.id,
         prenom: emp.prenom,
         nom: emp.nom,
-        etablissement: etab?.nom ?? "—",
+        etablissement: etabNom(emp.etablissements) === "—" ? (etab?.nom ?? "—") : etabNom(emp.etablissements),
         equipe: (emp.equipes_access ?? [])[0] ?? "—",
         acquis_n_minus_1: acquisNm1,
         pris_n_minus_1: prisNm1,
@@ -430,6 +461,12 @@ export default function CongesPage() {
       };
     });
   }, [employes, contrats, absences, cpReferencePeriod, now, etab]);
+
+  /* ── Règles d'absences simultanées ──────────────────────────── */
+  const updateRegle = useCallback(async (id: string, patch: Partial<Pick<Regle, "max_absents" | "actif">>) => {
+    setRegles((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    await supabase.from("conges_regles").update(patch).eq("id", id);
+  }, []);
 
   /* ── Save N-1 override ──────────────────────────────────────── */
   const updateNMinus1 = useCallback(async (employeId: string, field: "acquis" | "pris", value: number) => {
@@ -584,9 +621,11 @@ export default function CongesPage() {
     setSaving(true);
     const nbJours = businessDaysBetween(selectedRange.lo, selectedRange.hi);
 
+    // En vue groupe, l'etablissement est celui de l'employe choisi
+    const empEtabId = employes.find((e) => e.id === empId)?.etablissement_id ?? etab?.id;
     const { error } = await supabase.from("absences").insert({
       employe_id: empId,
-      etablissement_id: etab?.id,
+      etablissement_id: empEtabId,
       type: formType,
       date_debut: selectedRange.lo,
       date_fin: selectedRange.hi,
@@ -606,16 +645,24 @@ export default function CongesPage() {
 
   /* ── Approve / refuse ───────────────────────────────────────── */
 
-  // Decision via API : met a jour + notifie l'employe concerne
-  const decide = async (id: string, action: "valide" | "refuse", motif?: string) => {
+  // Decision via API : met a jour + notifie l'employe concerne.
+  // Si une regle d'absences simultanees serait depassee, l'API repond 409
+  // (code "regle") — on demande confirmation puis on force.
+  const decide = async (id: string, action: "valide" | "refuse", motif?: string, force = false): Promise<boolean> => {
     const { data: sess } = await supabase.auth.getSession();
     const res = await fetch("/api/conges/decision", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
-      body: JSON.stringify({ id, action, motif }),
+      body: JSON.stringify({ id, action, motif, force }),
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
+      if (res.status === 409 && j.code === "regle") {
+        if (confirm(`Règle d'équipe dépassée :\n${j.error}\n\nValider quand même ?`)) {
+          return decide(id, action, motif, true);
+        }
+        return false;
+      }
       alert("Erreur : " + (j.error ?? res.status));
       return false;
     }
@@ -726,7 +773,7 @@ export default function CongesPage() {
         )}
 
         {/* ── KPI Cards ───────────────────────────────────────── */}
-        {!loading && etab && (
+        {!loading && (etab || vueGroupe) && (
           <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
             {isEquipier && myEmploye ? (
               // Equipier: show own CP balance prominently
@@ -829,7 +876,7 @@ export default function CongesPage() {
           <p style={{ color: "#999", fontSize: 13, textAlign: "center", marginTop: 40 }}>
             Chargement...
           </p>
-        ) : !etab ? (
+        ) : !etab && !vueGroupe ? (
           <p style={{ color: "#999", fontSize: 13, textAlign: "center", marginTop: 40 }}>
             Selectionnez un etablissement
           </p>
@@ -1846,6 +1893,58 @@ export default function CongesPage() {
                 </div>
               )}
             </div>
+
+            {/* ── Règles d'absences simultanées ─────────────────── */}
+            {!isEquipier && regles.length > 0 && (
+              <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 16, padding: "18px 20px", marginTop: 24 }}>
+                <h2 style={{ ...sectionTitleStyle, marginBottom: 4 }}>Règles d&apos;absences</h2>
+                <div style={{ fontSize: 11, color: "#999", marginBottom: 14 }}>
+                  Nombre maximum d&apos;absents en même temps par équipe. Une demande qui dépasse la
+                  règle est bloquée pour l&apos;employé ; un manager peut toujours l&apos;outrepasser.
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {regles.map((r) => (
+                    <div key={r.id} style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px 12px", borderRadius: 10,
+                      background: r.actif ? "rgba(0,0,0,0.02)" : "rgba(0,0,0,0.015)",
+                      opacity: r.actif ? 1 : 0.55,
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: "#1a1a1a" }}>Équipe {r.equipe}</span>
+                        {vueGroupe && (
+                          <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>{etabNom(r.etablissements)}</span>
+                        )}
+                      </div>
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#666" }}>
+                        max
+                        <input
+                          type="number" min={0} max={20} defaultValue={r.max_absents}
+                          onBlur={(e) => {
+                            const v = Math.max(0, Number(e.target.value) || 0);
+                            if (v !== r.max_absents) updateRegle(r.id, { max_absents: v });
+                          }}
+                          style={{ ...cellInputStyle, width: 52 }}
+                        />
+                        absent{r.max_absents > 1 ? "s" : ""}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => updateRegle(r.id, { actif: !r.actif })}
+                        style={{
+                          padding: "5px 12px", borderRadius: 999, border: "none", cursor: "pointer",
+                          fontSize: 11, fontWeight: 700,
+                          background: r.actif ? "rgba(45,106,79,0.10)" : "rgba(0,0,0,0.06)",
+                          color: r.actif ? "#2D6A4F" : "#999",
+                        }}
+                      >
+                        {r.actif ? "Active" : "Désactivée"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

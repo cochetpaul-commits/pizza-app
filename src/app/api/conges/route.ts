@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { verifierReglesConges, formatViolations } from "@/lib/conges/regles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * Congés de l'employé connecté.
- *  GET    → ses absences (toutes sources) + compteurs de l'année
- *  POST   → nouvelle demande (statut en_attente) + notification managers
+ *  GET    → ses absences + compteurs + planning d'équipe (absences des
+ *           collègues du même établissement) + règles d'absences
+ *  POST   → nouvelle demande (statut en_attente) ; refusée si une règle
+ *           d'absences simultanées serait dépassée ; notifie les managers
  *  DELETE → annule une de SES demandes encore en attente
  */
 
@@ -18,7 +21,7 @@ async function getMe(req: NextRequest) {
   if (!auth?.user) return null;
   const { data: emps } = await supabaseAdmin
     .from("employes")
-    .select("id, prenom, nom, etablissement_id")
+    .select("id, prenom, nom, etablissement_id, equipes_access")
     .eq("auth_user_id", auth.user.id)
     .eq("actif", true);
   if (!emps || emps.length === 0) return null;
@@ -30,14 +33,62 @@ export async function GET(req: NextRequest) {
   if (!me) return NextResponse.json({ error: "Aucune fiche employé liée" }, { status: 404 });
 
   const empIds = me.emps.map(e => e.id);
-  const { data: absences } = await supabaseAdmin
-    .from("absences")
-    .select("id, date_debut, date_fin, type, nb_jours, statut, note, source, motif_refus, created_at")
-    .in("employe_id", empIds)
-    .order("date_debut", { ascending: false })
-    .limit(60);
+  const etabIds = [...new Set(me.emps.map(e => e.etablissement_id).filter(Boolean))] as string[];
 
-  const year = new Date().getFullYear();
+  // Fenêtre du planning : du 1er du mois précédent à +12 mois
+  const now = new Date();
+  const winFrom = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString().slice(0, 10);
+  const winTo = new Date(Date.UTC(now.getUTCFullYear() + 1, now.getUTCMonth(), 0)).toISOString().slice(0, 10);
+
+  const [{ data: absences }, { data: collegues }, { data: regles }] = await Promise.all([
+    supabaseAdmin
+      .from("absences")
+      .select("id, date_debut, date_fin, type, nb_jours, statut, note, source, motif_refus, created_at")
+      .in("employe_id", empIds)
+      .order("date_debut", { ascending: false })
+      .limit(60),
+    supabaseAdmin
+      .from("employes")
+      .select("id, prenom, nom, equipes_access, etablissement_id")
+      .in("etablissement_id", etabIds.length ? etabIds : ["-"])
+      .eq("actif", true),
+    supabaseAdmin
+      .from("conges_regles")
+      .select("etablissement_id, equipe, max_absents")
+      .in("etablissement_id", etabIds.length ? etabIds : ["-"])
+      .eq("actif", true),
+  ]);
+
+  // Absences des collègues (planning) — validées et en attente
+  const collegueIds = (collegues ?? []).map(c => c.id);
+  const { data: absPlanning } = collegueIds.length
+    ? await supabaseAdmin
+        .from("absences")
+        .select("id, employe_id, date_debut, date_fin, type, statut")
+        .in("employe_id", collegueIds)
+        .in("statut", ["valide", "en_attente"])
+        .lte("date_debut", winTo)
+        .gte("date_fin", winFrom)
+    : { data: [] };
+
+  const parId = new Map((collegues ?? []).map(c => [c.id, c]));
+  const planning = (absPlanning ?? []).map(a => {
+    const c = parId.get(a.employe_id);
+    return {
+      id: a.id,
+      employe_id: a.employe_id,
+      prenom: c?.prenom ?? "?",
+      initiales: `${(c?.prenom ?? "?").charAt(0)}${(c?.nom ?? "").charAt(0)}`.toUpperCase(),
+      equipes: (c?.equipes_access as string[] | null) ?? [],
+      type: a.type,
+      statut: a.statut,
+      date_debut: a.date_debut,
+      date_fin: a.date_fin,
+      mien: empIds.includes(a.employe_id),
+    };
+  });
+
+  const year = now.getFullYear();
   let prisCP = 0, enAttente = 0;
   for (const a of absences ?? []) {
     if (a.statut === "valide" && a.type === "CP" && String(a.date_debut).startsWith(String(year))) {
@@ -48,7 +99,10 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     prenom: me.emps[0].prenom,
+    equipes: (me.emps[0].equipes_access as string[] | null) ?? [],
     absences: absences ?? [],
+    planning,
+    regles: regles ?? [],
     stats: { prisCP, enAttente, annee: year },
   });
 }
@@ -68,6 +122,18 @@ export async function POST(req: NextRequest) {
   }
 
   const emp = me.emps[0];
+
+  // Règles d'absences simultanées : on refuse la demande d'emblée plutôt
+  // que de laisser un manager la refuser plus tard — l'employé voit tout
+  // de suite pourquoi et peut choisir d'autres dates.
+  const violations = await verifierReglesConges(emp.id, date_debut, date_fin);
+  if (violations.length > 0) {
+    return NextResponse.json(
+      { error: `Ces dates ne sont pas disponibles — ${formatViolations(violations)}. Choisis d'autres dates ou vois avec un responsable.` },
+      { status: 409 },
+    );
+  }
+
   const nbJours = Math.round((new Date(date_fin).getTime() - new Date(date_debut).getTime()) / 86400000) + 1;
 
   const { data: abs, error } = await supabaseAdmin.from("absences").insert({

@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { verifierReglesConges, formatViolations } from "@/lib/conges/regles";
 
 export const runtime = "nodejs";
 
 /**
  * POST /api/conges/decision — un manager/admin tranche une demande de congé.
- * body: { id, action: "valide" | "refuse", motif? }
+ * body: { id, action: "valide" | "refuse", motif?, force? }
+ * Si la validation dépasse une règle d'absences simultanées, renvoie 409
+ * (code "regle") — le manager peut outrepasser en renvoyant force: true.
  * Met à jour l'absence + notifie l'employé concerné.
  */
 export async function POST(req: NextRequest) {
@@ -18,9 +21,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Réservé aux managers" }, { status: 403 });
   }
 
-  const { id, action, motif } = (await req.json()) as { id?: string; action?: string; motif?: string };
+  const { id, action, motif, force } = (await req.json()) as { id?: string; action?: string; motif?: string; force?: boolean };
   if (!id || (action !== "valide" && action !== "refuse")) {
     return NextResponse.json({ error: "id et action (valide|refuse) requis" }, { status: 400 });
+  }
+
+  // À la validation : vérifier les règles d'absences simultanées.
+  // Le manager reste maître — il peut forcer en connaissance de cause.
+  if (action === "valide" && !force) {
+    const { data: demande } = await supabaseAdmin
+      .from("absences").select("employe_id, date_debut, date_fin").eq("id", id).maybeSingle();
+    if (demande) {
+      const violations = await verifierReglesConges(
+        demande.employe_id, demande.date_debut, demande.date_fin, id,
+      );
+      if (violations.length > 0) {
+        return NextResponse.json(
+          { error: formatViolations(violations), code: "regle" },
+          { status: 409 },
+        );
+      }
+    }
   }
 
   // Le valideur est la fiche employé du compte qui tranche (si elle existe)
