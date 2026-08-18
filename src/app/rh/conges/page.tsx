@@ -59,6 +59,8 @@ type Absence = {
   statut: string;
   note: string | null;
   created_at: string;
+  source?: string | null;
+  combo_rest_id?: string | null;
   employes?: { prenom: string; nom: string }[] | { prenom: string; nom: string } | null;
 };
 
@@ -362,7 +364,7 @@ export default function CongesPage() {
 
     let absQuery = supabase
       .from("absences")
-      .select("id, employe_id, type, date_debut, date_fin, nb_jours, statut, note, created_at, employes(prenom, nom)")
+      .select("id, employe_id, type, date_debut, date_fin, nb_jours, statut, note, created_at, source, combo_rest_id, employes(prenom, nom)")
       .order("date_debut", { ascending: false })
       .limit(500);
     if (etab) absQuery = absQuery.eq("etablissement_id", etab.id);
@@ -549,6 +551,16 @@ export default function CongesPage() {
   const pendingRequests = useMemo(
     () => absences.filter((a) => a.statut === "en_attente"),
     [absences]
+  );
+
+  /* ── À saisir dans Combo ────────────────────────────────────── */
+  // Congés validés côté app mais pas encore rapprochés d'un rest Combo :
+  // Paul les saisit dans Combo, la synchro de nuit les pointera.
+  const aSaisirDansCombo = useMemo(
+    () => absences.filter(
+      (a) => a.statut === "valide" && !a.combo_rest_id && a.source !== "combo" && a.date_fin >= today,
+    ),
+    [absences, today]
   );
 
   /* ── Calendar click handlers ────────────────────────────────── */
@@ -1810,6 +1822,46 @@ export default function CongesPage() {
                             </button>
                           </div>
                         )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── À saisir dans Combo ─────────────────────────── */}
+            {!isEquipier && aSaisirDansCombo.length > 0 && (
+              <div style={{
+                background: "rgba(37,99,235,0.05)", border: "1px solid rgba(37,99,235,0.25)",
+                borderRadius: 16, padding: "16px 20px", marginBottom: 24,
+              }}>
+                <h2 style={{ ...sectionTitleStyle, marginBottom: 4, color: "#1d4ed8" }}>
+                  À saisir dans Combo ({aSaisirDansCombo.length})
+                </h2>
+                <div style={{ fontSize: 11, color: "#666", marginBottom: 10 }}>
+                  Congés validés ici mais pas encore dans Combo (son API ne permet pas de les
+                  y écrire). Une fois saisis, la synchro les rapproche automatiquement — sans doublon.
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {aSaisirDansCombo.map((a) => {
+                    const emp = getEmpFromAbsence(a) ?? empMap.get(a.employe_id);
+                    return (
+                      <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                        <span style={{ fontWeight: 700, color: "#1a1a1a" }}>
+                          {emp ? `${emp.prenom} ${emp.nom}` : "Inconnu"}
+                        </span>
+                        <span style={{
+                          padding: "1px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                          background: (TYPE_BADGE_COLORS[a.type] ?? { bg: "#f0ece6", fg: "#666" }).bg,
+                          color: (TYPE_BADGE_COLORS[a.type] ?? { bg: "#f0ece6", fg: "#666" }).fg,
+                        }}>
+                          {TYPE_LABELS[a.type] ?? a.type}
+                        </span>
+                        <span style={{ color: "#666" }}>
+                          {formatDateFR(a.date_debut)}
+                          {a.date_debut !== a.date_fin && ` → ${formatDateFR(a.date_fin)}`}
+                          {a.nb_jours != null && <span style={{ color: "#999" }}> · {a.nb_jours} j</span>}
+                        </span>
                       </div>
                     );
                   })}

@@ -62,15 +62,16 @@ export async function POST(req: NextRequest) {
       validated_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .select("id, date_debut, date_fin, employe_id")
+    .select("id, date_debut, date_fin, employe_id, type, nb_jours")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Notifier l'employé s'il a un compte
+  const fmt = (d: string) => d.split("-").reverse().slice(0, 2).join("/");
   const { data: emp } = await supabaseAdmin
-    .from("employes").select("auth_user_id, prenom").eq("id", abs.employe_id).maybeSingle();
+    .from("employes").select("auth_user_id, prenom, nom").eq("id", abs.employe_id).maybeSingle();
+
+  // Notifier l'employé s'il a un compte
   if (emp?.auth_user_id) {
-    const fmt = (d: string) => d.split("-").reverse().slice(0, 2).join("/");
     await supabaseAdmin.from("notifications").insert({
       user_id: emp.auth_user_id,
       type: "conge",
@@ -78,6 +79,23 @@ export async function POST(req: NextRequest) {
       corps: `Ta demande du ${fmt(abs.date_debut)} au ${fmt(abs.date_fin)} a été ${action === "valide" ? "acceptée" : `refusée${motif ? ` : ${motif}` : ""}`}`,
       lien: "/mes-conges",
     });
+  }
+
+  // Rappel de saisie : l'API partenaire Combo est en lecture seule sur les
+  // absences — impossible de pré-remplir. On notifie donc les admins pour
+  // que le congé validé soit reporté dans Combo (la synchro de nuit le
+  // rapprochera ensuite de cette demande, sans doublon).
+  if (action === "valide") {
+    const { data: admins } = await supabaseAdmin
+      .from("profiles").select("id").eq("role", "group_admin");
+    const notifs = (admins ?? []).map(a => ({
+      user_id: a.id,
+      type: "conge",
+      titre: "À saisir dans Combo",
+      corps: `${emp?.prenom ?? "?"} ${emp?.nom ?? ""} : ${abs.type} du ${fmt(abs.date_debut)} au ${fmt(abs.date_fin)}${abs.nb_jours ? ` (${abs.nb_jours} j)` : ""}`,
+      lien: "/rh/conges",
+    }));
+    if (notifs.length) await supabaseAdmin.from("notifications").insert(notifs);
   }
 
   return NextResponse.json({ ok: true });

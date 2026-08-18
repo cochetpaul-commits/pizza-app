@@ -5,11 +5,15 @@ import { getRests, getContracts, COMBO_LOCATIONS, type ComboRest } from "@/lib/c
  * Rapatrie les absences/congés depuis Combo (GET /rests, lecture seule).
  *
  * Combo reste la source de vérité des congés VALIDÉS : chaque rest est
- * upserté dans `absences` (source='combo', statut='approuve') via son
- * combo_rest_id. Les demandes faites dans l'app (source='app') ne sont
- * jamais touchées — quand Paul les saisit dans Combo, la ligne Combo
- * arrive en plus et la demande app validée reste l'historique de la
- * demande.
+ * upserté dans `absences` (source='combo', statut='valide') via son
+ * combo_rest_id.
+ *
+ * Rapprochement anti-doublon : quand Paul saisit dans Combo un congé déjà
+ * présent dans l'app (demande validée ou saisie manager), le rest est
+ * POINTÉ sur cette ligne (combo_rest_id + dates Combo) au lieu de créer
+ * une deuxième ligne — sinon le congé compterait deux fois dans les
+ * compteurs CP. Les demandes encore en attente qui arrivent validées de
+ * Combo sont validées au passage.
  *
  * Matching employé : rests.contract_id ↔ employes.combo_contract_id,
  * complété par l'email du contrat Combo si besoin.
@@ -95,8 +99,7 @@ export async function syncRestsFromCombo(): Promise<{ synced: number; unmatched:
       const dDebut = toDate(r.starts_at);
       const dFin = toDate(r.ends_at);
       const nbJours = Math.max(1, Math.round((new Date(dFin).getTime() - new Date(dDebut).getTime()) / 86400000) + 1);
-
-      const { error } = await supabaseAdmin.from("absences").upsert({
+      const valeurs = {
         combo_rest_id: r.id,
         employe_id: emp.id,
         etablissement_id: emp.etablissement_id ?? etabId,
@@ -107,7 +110,32 @@ export async function syncRestsFromCombo(): Promise<{ synced: number; unmatched:
         statut: "valide",
         source: "combo",
         note: `Combo (${r.rest_type})`,
-      }, { onConflict: "combo_rest_id" });
+      };
+
+      // Ce rest est-il déjà importé ? Sinon, une absence app aux mêmes
+      // dates (validée ou en attente) est pointée au lieu d'être doublée.
+      const { data: dejaImporte } = await supabaseAdmin
+        .from("absences").select("id").eq("combo_rest_id", r.id).limit(1).maybeSingle();
+      if (!dejaImporte) {
+        const { data: ligneApp } = await supabaseAdmin
+          .from("absences")
+          .select("id")
+          .eq("employe_id", emp.id)
+          .is("combo_rest_id", null)
+          .in("statut", ["valide", "en_attente"])
+          .lte("date_debut", dFin)
+          .gte("date_fin", dDebut)
+          .limit(1)
+          .maybeSingle();
+        if (ligneApp) {
+          const { error } = await supabaseAdmin.from("absences").update(valeurs).eq("id", ligneApp.id);
+          if (error) details.push(`lien ${r.id}: ${error.message}`);
+          else synced++;
+          continue;
+        }
+      }
+
+      const { error } = await supabaseAdmin.from("absences").upsert(valeurs, { onConflict: "combo_rest_id" });
 
       if (error) details.push(`upsert ${r.id}: ${error.message}`);
       else synced++;
