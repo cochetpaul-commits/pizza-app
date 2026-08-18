@@ -289,6 +289,11 @@ function PerformancesPage() {
         setPrev((json.prev as WeekData) ?? null);
         setPrevWeek((json.prevWeek as WeekData) ?? null);
         setDataSource((json.source as string) ?? "ventes_lignes");
+      } else {
+        // Période vide en cache : effacer l'affichage précédent, sinon les
+        // chiffres de l'ancienne période restent sous la nouvelle étiquette
+        // (vu le 18/08 : « Lundi 17 août » avec les totaux de juillet).
+        setData(null); setPrev(null); setPrevWeek(null); setDataSource(null);
       }
       setMeteo(cached.meteo as Record<string, { emoji: string; desc: string; temp: number }>);
       setLoading(false);
