@@ -32,6 +32,44 @@ export function formatViolations(violations: ViolationRegle[]): string {
     .join(" · ");
 }
 
+export type PeriodeBloquante = {
+  type: "bloque" | "fermeture";
+  libelle: string;
+  date_debut: string;
+  date_fin: string;
+};
+
+/**
+ * Périodes qui interdisent une demande de congé sur [dateDebut, dateFin] :
+ * périodes bloquées (forte activité) et fermetures du restaurant
+ * (tout le monde est déjà en congé). etablissement_id NULL = tous.
+ */
+export async function verifierPeriodesConges(
+  etablissementId: string | null,
+  dateDebut: string,
+  dateFin: string,
+): Promise<PeriodeBloquante[]> {
+  const { data } = await supabaseAdmin
+    .from("conges_periodes")
+    .select("type, libelle, date_debut, date_fin, etablissement_id")
+    .lte("date_debut", dateFin)
+    .gte("date_fin", dateDebut);
+  return ((data ?? []) as (PeriodeBloquante & { etablissement_id: string | null })[])
+    .filter(p => p.etablissement_id === null || p.etablissement_id === etablissementId)
+    .map(({ type, libelle, date_debut, date_fin }) => ({ type, libelle, date_debut, date_fin }));
+}
+
+export function formatPeriodes(periodes: PeriodeBloquante[]): string {
+  const fmt = (d: string) => d.split("-").reverse().slice(0, 2).join("/");
+  return periodes
+    .map(p =>
+      p.type === "fermeture"
+        ? `Le restaurant est fermé du ${fmt(p.date_debut)} au ${fmt(p.date_fin)} (${p.libelle}) — pas besoin de poser de congé`
+        : `Période bloquée du ${fmt(p.date_debut)} au ${fmt(p.date_fin)} (${p.libelle}) — pas de congé possible`,
+    )
+    .join(" · ");
+}
+
 /**
  * Vérifie qu'une absence de `employeId` du `dateDebut` au `dateFin` ne
  * dépasse aucune règle de son établissement. `ignoreAbsenceId` permet de

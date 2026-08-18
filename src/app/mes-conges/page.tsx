@@ -40,6 +40,14 @@ type PlanningEntry = {
 
 type Regle = { etablissement_id: string; equipe: string; max_absents: number };
 
+type Periode = {
+  id: string;
+  type: "bloque" | "fermeture";
+  libelle: string;
+  date_debut: string;
+  date_fin: string;
+};
+
 const TYPES: { id: string; label: string }[] = [
   { id: "CP", label: "Congé payé" },
   { id: "sans_solde", label: "Sans solde" },
@@ -114,6 +122,7 @@ export default function MesCongesPage() {
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [planning, setPlanning] = useState<PlanningEntry[]>([]);
   const [regles, setRegles] = useState<Regle[]>([]);
+  const [periodes, setPeriodes] = useState<Periode[]>([]);
   const [mesEquipes, setMesEquipes] = useState<string[]>([]);
   const [stats, setStats] = useState<{ prisCP: number; enAttente: number; annee: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -144,6 +153,7 @@ export default function MesCongesPage() {
       setAbsences(json.absences);
       setPlanning(json.planning ?? []);
       setRegles(json.regles ?? []);
+      setPeriodes(json.periodes ?? []);
       setMesEquipes(json.equipes ?? []);
       setStats(json.stats);
       setErr("");
@@ -161,6 +171,12 @@ export default function MesCongesPage() {
   const absentsDuJour = useCallback((iso: string) => {
     return planning.filter(p => p.date_debut <= iso && p.date_fin >= iso);
   }, [planning]);
+
+  const periodeDuJour = useCallback((iso: string): Periode | null => {
+    // La fermeture prime sur le blocage si les deux se chevauchent
+    const duJour = periodes.filter(p => p.date_debut <= iso && p.date_fin >= iso);
+    return duJour.find(p => p.type === "fermeture") ?? duJour[0] ?? null;
+  }, [periodes]);
 
   const prevMonth = () => {
     if (calMonth === 0) { setCalYear(calYear - 1); setCalMonth(11); }
@@ -185,6 +201,22 @@ export default function MesCongesPage() {
   const nbJoursDemandes = range
     ? Math.round((new Date(range.hi).getTime() - new Date(range.lo).getTime()) / 86400000) + 1
     : 0;
+
+  /* ── Avertissement périodes bloquées / fermetures ───────────── */
+
+  const avertissementPeriode = useMemo(() => {
+    if (!range) return null;
+    const touchees = periodes.filter(p => p.date_debut <= range.hi && p.date_fin >= range.lo);
+    const fermeture = touchees.find(p => p.type === "fermeture");
+    if (fermeture) {
+      return `Le restaurant est fermé du ${fmtCourt(fermeture.date_debut)} au ${fmtCourt(fermeture.date_fin)} (${fermeture.libelle}) — tout le monde est en congé, pas besoin de faire de demande.`;
+    }
+    const bloque = touchees.find(p => p.type === "bloque");
+    if (bloque) {
+      return `Période bloquée du ${fmtCourt(bloque.date_debut)} au ${fmtCourt(bloque.date_fin)} (${bloque.libelle}) — pas de congé possible sur ces dates.`;
+    }
+    return null;
+  }, [range, periodes]);
 
   /* ── Avertissement règles (avant envoi) ─────────────────────── */
 
@@ -305,6 +337,7 @@ export default function MesCongesPage() {
             ))}
             {monthDays.map(cell => {
               const abs = cell.isCurrentMonth ? absentsDuJour(cell.iso) : [];
+              const periode = cell.isCurrentMonth ? periodeDuJour(cell.iso) : null;
               const isToday = cell.iso === today;
               const isPast = cell.iso < today;
               const isStart = cell.iso === selStart;
@@ -315,6 +348,7 @@ export default function MesCongesPage() {
 
               let bg = "transparent";
               if (isWeekend && cell.isCurrentMonth) bg = "rgba(0,0,0,0.02)";
+              if (periode) bg = periode.type === "fermeture" ? "rgba(0,0,0,0.08)" : "rgba(220,38,38,0.07)";
               if (inRange && !isEndpoint) bg = "rgba(212,119,90,0.12)";
               if (isEndpoint) bg = "#D4775A";
 
@@ -322,6 +356,7 @@ export default function MesCongesPage() {
                 <div
                   key={cell.iso}
                   onClick={() => cell.isCurrentMonth && handleDayClick(cell.iso)}
+                  title={periode ? `${periode.libelle} (${periode.type === "fermeture" ? "fermeture" : "période bloquée"})` : undefined}
                   style={{
                     minHeight: 52, padding: "3px 2px 2px",
                     border: isToday ? "2px solid #1565C0" : "1px solid #eee7db",
@@ -335,6 +370,11 @@ export default function MesCongesPage() {
                     fontSize: 11, fontWeight: isToday ? 700 : 400, textAlign: "right", paddingRight: 2,
                     color: isEndpoint ? "#fff" : isWeekend ? "#bbb" : "#1a1a1a", marginBottom: 1,
                   }}>
+                    {periode && (
+                      <span style={{ float: "left", fontSize: 8.5, lineHeight: "13px" }}>
+                        {periode.type === "fermeture" ? "🔒" : "⛔"}
+                      </span>
+                    )}
                     {cell.date.getDate()}
                   </div>
                   {abs.length > 0 && (
@@ -376,6 +416,8 @@ export default function MesCongesPage() {
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#2E7D32", opacity: 0.45, display: "inline-block" }} /> En attente
             </span>
+            {periodes.some(p => p.type === "fermeture") && <span>🔒 Fermeture</span>}
+            {periodes.some(p => p.type === "bloque") && <span>⛔ Période bloquée</span>}
           </div>
         </div>
       )}
@@ -403,13 +445,13 @@ export default function MesCongesPage() {
             }}>✕</button>
           </div>
 
-          {avertissementRegle && (
+          {(avertissementPeriode ?? avertissementRegle) && (
             <div style={{
               padding: "10px 12px", borderRadius: 10, marginBottom: 10,
               background: "rgba(220,38,38,0.07)", border: "1px solid rgba(220,38,38,0.25)",
               fontSize: 12.5, color: "#b3261e", fontWeight: 600,
             }}>
-              {avertissementRegle}
+              {avertissementPeriode ?? avertissementRegle}
             </div>
           )}
 
@@ -423,13 +465,18 @@ export default function MesCongesPage() {
             <label style={labelSt}>Message (facultatif)</label>
             <input style={inputSt} value={fNote} onChange={e => setFNote(e.target.value)} placeholder="ex. mariage de ma sœur" />
           </div>
-          <button type="button" onClick={submit} disabled={sending || !selEnd || !!avertissementRegle} style={{
-            width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-            background: avertissementRegle ? "#bbb" : "#4a6741", color: "#fff", fontSize: 14, fontWeight: 700,
-            cursor: avertissementRegle ? "not-allowed" : "pointer", opacity: sending || !selEnd ? 0.6 : 1,
-          }}>
-            {sending ? "Envoi…" : "Envoyer la demande"}
-          </button>
+          {(() => {
+            const bloque = !!(avertissementPeriode ?? avertissementRegle);
+            return (
+              <button type="button" onClick={submit} disabled={sending || !selEnd || bloque} style={{
+                width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
+                background: bloque ? "#bbb" : "#4a6741", color: "#fff", fontSize: 14, fontWeight: 700,
+                cursor: bloque ? "not-allowed" : "pointer", opacity: sending || !selEnd ? 0.6 : 1,
+              }}>
+                {sending ? "Envoi…" : "Envoyer la demande"}
+              </button>
+            );
+          })()}
         </div>
       )}
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { verifierReglesConges, formatViolations } from "@/lib/conges/regles";
+import { verifierReglesConges, formatViolations, verifierPeriodesConges, formatPeriodes } from "@/lib/conges/regles";
 
 export const runtime = "nodejs";
 
@@ -30,14 +30,19 @@ export async function POST(req: NextRequest) {
   // Le manager reste maître — il peut forcer en connaissance de cause.
   if (action === "valide" && !force) {
     const { data: demande } = await supabaseAdmin
-      .from("absences").select("employe_id, date_debut, date_fin").eq("id", id).maybeSingle();
+      .from("absences").select("employe_id, etablissement_id, date_debut, date_fin").eq("id", id).maybeSingle();
     if (demande) {
-      const violations = await verifierReglesConges(
-        demande.employe_id, demande.date_debut, demande.date_fin, id,
-      );
-      if (violations.length > 0) {
+      const [violations, periodes] = await Promise.all([
+        verifierReglesConges(demande.employe_id, demande.date_debut, demande.date_fin, id),
+        verifierPeriodesConges(demande.etablissement_id, demande.date_debut, demande.date_fin),
+      ]);
+      const messages = [
+        ...(periodes.length > 0 ? [formatPeriodes(periodes)] : []),
+        ...(violations.length > 0 ? [formatViolations(violations)] : []),
+      ];
+      if (messages.length > 0) {
         return NextResponse.json(
-          { error: formatViolations(violations), code: "regle" },
+          { error: messages.join(" · "), code: "regle" },
           { status: 409 },
         );
       }

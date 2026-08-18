@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { verifierReglesConges, formatViolations } from "@/lib/conges/regles";
+import { verifierReglesConges, formatViolations, verifierPeriodesConges, formatPeriodes } from "@/lib/conges/regles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   const winFrom = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString().slice(0, 10);
   const winTo = new Date(Date.UTC(now.getUTCFullYear() + 1, now.getUTCMonth(), 0)).toISOString().slice(0, 10);
 
-  const [{ data: absences }, { data: collegues }, { data: regles }] = await Promise.all([
+  const [{ data: absences }, { data: collegues }, { data: regles }, { data: periodes }] = await Promise.all([
     supabaseAdmin
       .from("absences")
       .select("id, date_debut, date_fin, type, nb_jours, statut, note, source, motif_refus, created_at")
@@ -57,7 +57,17 @@ export async function GET(req: NextRequest) {
       .select("etablissement_id, equipe, max_absents")
       .in("etablissement_id", etabIds.length ? etabIds : ["-"])
       .eq("actif", true),
+    supabaseAdmin
+      .from("conges_periodes")
+      .select("id, etablissement_id, type, libelle, date_debut, date_fin")
+      .lte("date_debut", winTo)
+      .gte("date_fin", winFrom),
   ]);
+
+  // Périodes de mes établissements (NULL = tous les restos)
+  const mesPeriodes = (periodes ?? []).filter(
+    p => p.etablissement_id === null || etabIds.includes(p.etablissement_id as string),
+  );
 
   // Absences des collègues (planning) — validées et en attente
   const collegueIds = (collegues ?? []).map(c => c.id);
@@ -103,6 +113,7 @@ export async function GET(req: NextRequest) {
     absences: absences ?? [],
     planning,
     regles: regles ?? [],
+    periodes: mesPeriodes,
     stats: { prisCP, enAttente, annee: year },
   });
 }
@@ -122,6 +133,15 @@ export async function POST(req: NextRequest) {
   }
 
   const emp = me.emps[0];
+
+  // Périodes bloquées ou fermetures : pas de demande possible dessus
+  const periodesBloquantes = await verifierPeriodesConges(emp.etablissement_id, date_debut, date_fin);
+  if (periodesBloquantes.length > 0) {
+    return NextResponse.json(
+      { error: formatPeriodes(periodesBloquantes) },
+      { status: 409 },
+    );
+  }
 
   // Règles d'absences simultanées : on refuse la demande d'emblée plutôt
   // que de laisser un manager la refuser plus tard — l'employé voit tout

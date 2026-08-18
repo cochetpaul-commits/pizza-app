@@ -28,6 +28,16 @@ type Regle = {
   etablissements?: { nom: string } | { nom: string }[] | null;
 };
 
+type Periode = {
+  id: string;
+  etablissement_id: string | null;
+  type: "bloque" | "fermeture";
+  libelle: string;
+  date_debut: string;
+  date_fin: string;
+  etablissements?: { nom: string } | { nom: string }[] | null;
+};
+
 /** Nom d'etablissement depuis une jointure Supabase (objet ou tableau) */
 function etabNom(j: { nom: string } | { nom: string }[] | null | undefined): string {
   if (!j) return "—";
@@ -289,7 +299,7 @@ function computeMonthsWorkedInPeriod(
 /* ── Component ─────────────────────────────────────────────────── */
 
 export default function CongesPage() {
-  const { current: etab } = useEtablissement();
+  const { current: etab, etablissements } = useEtablissement();
   const { isGroupAdmin, role } = useProfile();
   const isEquipier = role === "equipier";
 
@@ -297,6 +307,7 @@ export default function CongesPage() {
   const [employes, setEmployes] = useState<Employe[]>([]);
   const [contrats, setContrats] = useState<Contrat[]>([]);
   const [regles, setRegles] = useState<Regle[]>([]);
+  const [periodes, setPeriodes] = useState<Periode[]>([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
@@ -356,7 +367,7 @@ export default function CongesPage() {
       .limit(500);
     if (etab) absQuery = absQuery.eq("etablissement_id", etab.id);
 
-    const [empRes, absRes, contratRes, regRes] = await Promise.all([
+    const [empRes, absRes, contratRes, regRes, perRes] = await Promise.all([
       empQuery,
       absQuery,
       supabase
@@ -368,6 +379,10 @@ export default function CongesPage() {
         .from("conges_regles")
         .select("id, etablissement_id, equipe, max_absents, actif, etablissements(nom)")
         .order("equipe"),
+      supabase
+        .from("conges_periodes")
+        .select("id, etablissement_id, type, libelle, date_debut, date_fin, etablissements(nom)")
+        .order("date_debut", { ascending: true }),
     ]);
 
     const emps: Employe[] = (empRes.data ?? []) as unknown as Employe[];
@@ -376,6 +391,10 @@ export default function CongesPage() {
     const regs = ((regRes.data ?? []) as unknown as Regle[])
       .filter(r => !etab || r.etablissement_id === etab.id);
     setRegles(regs);
+    // NULL = tous les etablissements : toujours affichee
+    const pers = ((perRes.data ?? []) as unknown as Periode[])
+      .filter(p => !etab || p.etablissement_id === null || p.etablissement_id === etab.id);
+    setPeriodes(pers);
 
     const empIds = new Set(emps.map((e) => e.id));
     const raw = (absRes.data ?? []) as Absence[];
@@ -467,6 +486,37 @@ export default function CongesPage() {
     setRegles((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
     await supabase.from("conges_regles").update(patch).eq("id", id);
   }, []);
+
+  /* ── Périodes bloquées & fermetures ─────────────────────────── */
+  const [perLibelle, setPerLibelle] = useState("");
+  const [perType, setPerType] = useState<"bloque" | "fermeture">("bloque");
+  const [perDebut, setPerDebut] = useState("");
+  const [perFin, setPerFin] = useState("");
+  const [perEtab, setPerEtab] = useState<string>("tous");
+  const [perSaving, setPerSaving] = useState(false);
+
+  const addPeriode = useCallback(async () => {
+    if (!perLibelle.trim() || !perDebut || !perFin) { alert("Libellé et dates obligatoires."); return; }
+    if (perFin < perDebut) { alert("La date de fin est avant le début."); return; }
+    setPerSaving(true);
+    const { error } = await supabase.from("conges_periodes").insert({
+      etablissement_id: perEtab === "tous" ? null : perEtab,
+      type: perType,
+      libelle: perLibelle.trim(),
+      date_debut: perDebut,
+      date_fin: perFin,
+    });
+    setPerSaving(false);
+    if (error) { alert("Erreur : " + error.message); return; }
+    setPerLibelle(""); setPerDebut(""); setPerFin("");
+    loadData();
+  }, [perLibelle, perType, perDebut, perFin, perEtab, loadData]);
+
+  const deletePeriode = useCallback(async (id: string, libelle: string) => {
+    if (!confirm(`Supprimer « ${libelle} » ?`)) return;
+    await supabase.from("conges_periodes").delete().eq("id", id);
+    loadData();
+  }, [loadData]);
 
   /* ── Save N-1 override ──────────────────────────────────────── */
   const updateNMinus1 = useCallback(async (employeId: string, field: "acquis" | "pris", value: number) => {
@@ -1062,6 +1112,10 @@ export default function CongesPage() {
                   const inRange = isInRange(cell.iso, selectStart, visualEnd);
                   const isEndpoint = isStart || (selectEnd && cell.iso === selectEnd);
                   const isWeekend = cell.date.getDay() === 0 || cell.date.getDay() === 6;
+                  const periodesJour = cell.isCurrentMonth
+                    ? periodes.filter(p => p.date_debut <= cell.iso && p.date_fin >= cell.iso)
+                    : [];
+                  const periodeJour = periodesJour.find(p => p.type === "fermeture") ?? periodesJour[0] ?? null;
 
                   // Heat color
                   let heatBg = "transparent";
@@ -1069,6 +1123,7 @@ export default function CongesPage() {
                   else if (absCount >= 3 && cell.isCurrentMonth) heatBg = "rgba(198,40,40,0.07)";
                   else if (absCount === 2 && cell.isCurrentMonth) heatBg = "rgba(230,81,0,0.06)";
                   else if (absCount === 1 && cell.isCurrentMonth) heatBg = "rgba(46,125,50,0.05)";
+                  if (periodeJour) heatBg = periodeJour.type === "fermeture" ? "rgba(0,0,0,0.08)" : "rgba(220,38,38,0.07)";
 
                   // Selection background
                   let cellBg = heatBg;
@@ -1079,6 +1134,7 @@ export default function CongesPage() {
                     <div
                       key={cell.iso}
                       onClick={() => cell.isCurrentMonth && handleDayClick(cell.iso)}
+                      title={periodeJour ? `${periodeJour.libelle} (${periodeJour.type === "fermeture" ? "fermeture" : "période bloquée"})` : undefined}
                       onMouseEnter={() => {
                         if (selectStart && !selectEnd) setHoveredDate(cell.iso);
                       }}
@@ -1118,6 +1174,11 @@ export default function CongesPage() {
                           paddingRight: 2,
                         }}
                       >
+                        {periodeJour && (
+                          <span style={{ float: "left", fontSize: 9, lineHeight: "14px" }}>
+                            {periodeJour.type === "fermeture" ? "🔒" : "⛔"}
+                          </span>
+                        )}
                         {cell.date.getDate()}
                       </div>
 
@@ -1893,6 +1954,78 @@ export default function CongesPage() {
                 </div>
               )}
             </div>
+
+            {/* ── Périodes bloquées & fermetures ────────────────── */}
+            {!isEquipier && (
+              <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 16, padding: "18px 20px", marginTop: 24 }}>
+                <h2 style={{ ...sectionTitleStyle, marginBottom: 4 }}>Fermetures & périodes bloquées</h2>
+                <div style={{ fontSize: 11, color: "#999", marginBottom: 14 }}>
+                  🔒 Fermeture : le restaurant est fermé, tout le monde est en congé — aucune demande à poser.{" "}
+                  ⛔ Période bloquée : forte activité (Noël…), les demandes de congé sont refusées.
+                </div>
+
+                {periodes.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+                    {periodes.map((p) => (
+                      <div key={p.id} style={{
+                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "9px 12px", borderRadius: 10,
+                        background: p.type === "fermeture" ? "rgba(0,0,0,0.03)" : "rgba(220,38,38,0.05)",
+                      }}>
+                        <span style={{ fontSize: 14, flexShrink: 0 }}>{p.type === "fermeture" ? "🔒" : "⛔"}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{p.libelle}</span>
+                          <span style={{ fontSize: 11.5, color: "#666", marginLeft: 8 }}>
+                            {formatDateFR(p.date_debut)} → {formatDateFR(p.date_fin)}
+                          </span>
+                          <span style={{ fontSize: 10.5, color: "#999", marginLeft: 8 }}>
+                            {p.etablissement_id === null ? "Les deux restos" : etabNom(p.etablissements)}
+                          </span>
+                        </div>
+                        <button type="button" onClick={() => deletePeriode(p.id, p.libelle)} style={{
+                          width: 26, height: 26, borderRadius: 7, border: "none", flexShrink: 0,
+                          background: "rgba(220,38,38,0.08)", color: "#DC2626", fontSize: 12, cursor: "pointer",
+                        }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Ajout */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <input
+                    style={{ ...inputStyle, gridColumn: "1 / -1" }}
+                    placeholder="Libellé — ex. Vacances de Noël, Fermeture annuelle"
+                    value={perLibelle}
+                    onChange={(e) => setPerLibelle(e.target.value)}
+                  />
+                  <select style={inputStyle} value={perType} onChange={(e) => setPerType(e.target.value as "bloque" | "fermeture")}>
+                    <option value="bloque">⛔ Période bloquée (pas de congés)</option>
+                    <option value="fermeture">🔒 Fermeture (congé pour tous)</option>
+                  </select>
+                  <select style={inputStyle} value={perEtab} onChange={(e) => setPerEtab(e.target.value)}>
+                    <option value="tous">Les deux restos</option>
+                    {etablissements.map((e) => (
+                      <option key={e.id} value={e.id}>{e.nom}</option>
+                    ))}
+                  </select>
+                  <input type="date" style={inputStyle} value={perDebut} onChange={(e) => setPerDebut(e.target.value)} />
+                  <input type="date" style={inputStyle} value={perFin} min={perDebut || undefined} onChange={(e) => setPerFin(e.target.value)} />
+                  <button
+                    type="button"
+                    onClick={addPeriode}
+                    disabled={perSaving}
+                    style={{
+                      gridColumn: "1 / -1", padding: "10px 0", borderRadius: 10, border: "none",
+                      background: "#4a6741", color: "#fff", fontSize: 13, fontWeight: 700,
+                      cursor: "pointer", opacity: perSaving ? 0.6 : 1,
+                    }}
+                  >
+                    {perSaving ? "Ajout…" : "Ajouter la période"}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* ── Règles d'absences simultanées ─────────────────── */}
             {!isEquipier && regles.length > 0 && (
