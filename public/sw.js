@@ -1,14 +1,13 @@
 /* Service Worker — Cache + Push Notifications + App Badge */
 
-const CACHE_NAME = "ifratelli-v2";
+const CACHE_NAME = "ifratelli-v3";
 
-// Pre-cache app shell on install
+// Page hors-ligne minimale, embarquée : on ne sert JAMAIS une vieille
+// page en cache (elle référence des chunks Next d'un ancien déploiement
+// qui n'existent plus → « client-side exception » au chargement).
+const OFFLINE_HTML = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hors ligne</title></head><body style="font-family:-apple-system,'DM Sans',sans-serif;background:#f2ede4;margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center"><div style="text-align:center;padding:24px"><div style="font-size:34px;margin-bottom:10px">📡</div><h1 style="font-size:17px;color:#1a1a1a;margin:0 0 6px">Pas de connexion</h1><p style="color:#8a8378;font-size:13px;margin:0 0 16px">L'application a besoin d'internet.</p><a href="" style="display:inline-block;padding:10px 22px;border-radius:10px;background:#D4775A;color:#fff;text-decoration:none;font-size:14px;font-weight:700">Réessayer</a></div></body></html>`;
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) =>
-      cache.addAll(["/", "/dashboard", "/bello-mio", "/piccola-mia"])
-    )
-  );
   self.skipWaiting();
 });
 
@@ -22,8 +21,6 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Network-first with cache fallback for navigations
-// Cache-first for static assets
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
@@ -53,18 +50,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Navigation requests → network-first, cache fallback
+  // Navigations → réseau uniquement. Hors ligne : page d'attente neutre,
+  // jamais une vieille page mise en cache.
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/")))
+      fetch(event.request).catch(
+        () => new Response(OFFLINE_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } })
+      )
     );
     return;
   }
