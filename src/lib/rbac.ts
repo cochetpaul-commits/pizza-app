@@ -54,7 +54,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
 };
 
 // Routes accessible to anyone authenticated (no RBAC needed)
-const PUBLIC_ROUTES = ["/", "/login", "/auth", "/settings/account", "/mes-shifts", "/notifications"];
+const PUBLIC_ROUTES = ["/", "/login", "/auth", "/installer", "/settings/account", "/mes-shifts", "/notifications"];
 
 /** Check if a role can access a given path (prefix match) */
 export function canAccess(role: Role, path: string): boolean {

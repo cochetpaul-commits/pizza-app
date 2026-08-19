@@ -9,7 +9,7 @@ import { MobileHeader } from "./MobileHeader";
 import { BottomTabBar } from "./BottomTabBar";
 import { BottomBarProvider } from "@/lib/BottomBarContext";
 
-const EXCLUDED_PATHS = ["/login", "/auth"];
+const EXCLUDED_PATHS = ["/login", "/auth", "/installer"];
 
 function isExcluded(pathname: string): boolean {
   return EXCLUDED_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"));
