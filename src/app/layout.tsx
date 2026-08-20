@@ -58,6 +58,40 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <head>
+        {/* Mouchard de plantage : posé AVANT tout le code de l'app, en
+            syntaxe ES5 pour tourner même sur un navigateur ancien (un
+            vieux Safari qui ne parse pas le bundle moderne déclenche
+            window.onerror avec une SyntaxError → on la reçoit ici). */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function () {
+            var envoyes = 0;
+            function envoyer(msg, src, stack) {
+              if (envoyes >= 3) return;
+              envoyes++;
+              try {
+                var corps = JSON.stringify({
+                  message: String(msg || ""), source: String(src || ""),
+                  stack: String(stack || ""), ua: navigator.userAgent,
+                  url: location.href
+                });
+                if (navigator.sendBeacon) { navigator.sendBeacon("/api/client-error", corps); }
+                else {
+                  var x = new XMLHttpRequest();
+                  x.open("POST", "/api/client-error", true);
+                  x.setRequestHeader("Content-Type", "application/json");
+                  x.send(corps);
+                }
+              } catch (e) {}
+            }
+            window.addEventListener("error", function (e) {
+              envoyer(e.message, (e.filename || "") + ":" + (e.lineno || 0), e.error && e.error.stack);
+            });
+            window.addEventListener("unhandledrejection", function (e) {
+              var r = e.reason || {};
+              envoyer(r.message || String(r), "unhandledrejection", r.stack);
+            });
+          })();
+        `}} />
         <style dangerouslySetInnerHTML={{ __html: `
           @keyframes slideUp {
             from { opacity: 0; transform: translateY(12px); }
