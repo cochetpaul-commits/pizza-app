@@ -79,10 +79,12 @@ async function fetchPage(page: number, etabId?: string | null, etabSlug?: string
 }
 
 async function searchIngredients(q: string, etabId?: string | null, etabSlug?: string | null): Promise<{ items: Ingredient[]; offers: LatestOffer[]; allOffers: LatestOffer[] }> {
+  // RPC recherche_ingredients : insensible aux accents/casse/ponctuation
+  // et à l'ordre des mots — le ilike brut ratait « CÔTES DE VEAU » pour
+  // « cotes veau » et « SU'ENTU » pour « suentu ».
   let query = supabase
-    .from("ingredients")
+    .rpc("recherche_ingredients", { q })
     .select(INGREDIENT_COLS)
-    .ilike("name", `%${q}%`)
     .order("name", { ascending: true });
 
   const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
