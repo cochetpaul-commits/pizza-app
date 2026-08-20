@@ -54,6 +54,10 @@ export default function LoginPage() {
 
   return (
     <main className="container">
+      <div style={{ display: "flex", justifyContent: "center", padding: "26px 0 4px" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-ifratelli.png" alt="iFratelli Group" width={150} height={150} style={{ objectFit: "contain" }} />
+      </div>
       <TopNav title={resetMode ? "Mot de passe oublie" : "Connexion"} subtitle={resetMode ? "" : "Acces reserve"} />
 
       <div className="card" style={{ marginTop: 14 }}>

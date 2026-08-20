@@ -369,22 +369,26 @@ function GroupContent() {
         display: "flex", alignItems: "flex-end", justifyContent: "space-between",
         marginBottom: 28, gap: 20, flexWrap: "wrap",
       }}>
-        <div>
-          <div style={{
-            fontSize: 11, fontWeight: 600, textTransform: "uppercase",
-            letterSpacing: 1.5, color: GROUP_COLOR, marginBottom: 4,
-          }}>
-            Vue groupe
-          </div>
-          <h1 style={{
-            fontFamily: OSWALD, fontSize: 32, fontWeight: 700,
-            textTransform: "uppercase", letterSpacing: 1,
-            color: T.dark, margin: 0, lineHeight: 1.1,
-          }}>
-            iFratelli Group
-          </h1>
-          <div style={{ fontSize: 13, color: T.muted, marginTop: 6, fontWeight: 500 }}>
-            {periodDisplayLabel(period, today)}
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-ifratelli.png" alt="" width={64} height={64} style={{ objectFit: "contain", flexShrink: 0 }} />
+          <div>
+            <div style={{
+              fontSize: 11, fontWeight: 600, textTransform: "uppercase",
+              letterSpacing: 1.5, color: GROUP_COLOR, marginBottom: 4,
+            }}>
+              Vue groupe
+            </div>
+            <h1 style={{
+              fontFamily: OSWALD, fontSize: 32, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: 1,
+              color: T.dark, margin: 0, lineHeight: 1.1,
+            }}>
+              iFratelli Group
+            </h1>
+            <div style={{ fontSize: 13, color: T.muted, marginTop: 6, fontWeight: 500 }}>
+              {periodDisplayLabel(period, today)}
+            </div>
           </div>
         </div>
 
