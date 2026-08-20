@@ -93,7 +93,8 @@ export default function CategoriesPage() {
 
   const handleDelete = async (id: string, nom: string) => {
     if (!confirm(`Supprimer la categorie "${nom}" ? Les recettes de cette categorie ne seront pas supprimees.`)) return;
-    await supabase.from("categories").delete().eq("id", id);
+    const { error } = await supabase.from("categories").delete().eq("id", id);
+    if (error) { alert("Erreur : " + error.message); return; }
     reload();
   };
 

@@ -1129,9 +1129,18 @@ export function CatalogueContent() {
                   <button type="button" onClick={async (e) => {
                     e.stopPropagation();
                     const cat = tg.type.replace("custom:", "");
-                    if (!confirm(`Supprimer la catégorie "${tg.label}" et ses ${tg.count} recettes ?`)) return;
-                    await supabase.from("kitchen_recipes").delete().eq("category", cat);
+                    // GARDE-FOU : ce bouton a jadis supprimé les recettes de la
+                    // catégorie (les 16 pizzas y sont passées en juillet 2026).
+                    // Désormais il ne supprime que la catégorie, et seulement vide.
+                    if (tg.count > 0) {
+                      alert(`« ${tg.label} » contient ${tg.count} recette${tg.count > 1 ? "s" : ""}. Déplace-les ou supprime-les une par une d'abord — ce bouton ne supprime jamais de recettes.`);
+                      return;
+                    }
+                    if (!confirm(`Supprimer la catégorie vide « ${tg.label} » ?`)) return;
+                    const { error } = await supabase.from("categories").delete().eq("slug", cat);
+                    if (error) { alert("Erreur : " + error.message); return; }
                     fetchAllRecipes(etabSlug).then(r => setRecipes(r));
+                    window.location.reload();
                   }} style={{
                     width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(220,38,38,0.2)",
                     background: "rgba(220,38,38,0.06)", color: "#DC2626", cursor: "pointer",
