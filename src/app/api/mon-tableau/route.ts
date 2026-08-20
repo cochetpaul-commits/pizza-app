@@ -310,14 +310,17 @@ export async function GET(req: NextRequest) {
       prevByCat.set(l.categorie!, (prevByCat.get(l.categorie!) ?? 0) + (l.ttc ?? 0));
     }
 
-    const byProd = new Map<string, { ca: number; qty: number; cat: string }>();
+    const byProd = new Map<string, { ca: number; qty: number; cat: string; sousCat: string | null }>();
     for (const l of drink) {
       const name = (l.description ?? "").trim();
       if (!name) continue;
-      const p = byProd.get(name) ?? { ca: 0, qty: 0, cat: l.categorie! };
+      const p = byProd.get(name) ?? { ca: 0, qty: 0, cat: l.categorie!, sousCat: (l.sous_categorie ?? "").trim() || null };
       p.ca += l.ttc ?? 0; p.qty += l.quantite ?? 0;
       byProd.set(name, p);
     }
+    const tousProduits = [...byProd.entries()]
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.ca - a.ca);
 
     return NextResponse.json({
       ...base,
@@ -327,10 +330,9 @@ export async function GET(req: NextRequest) {
         parCategorie: [...byCat.entries()]
           .map(([cat, v]) => ({ cat, ca: v.ca, qty: v.qty, prevCa: prevByCat.get(cat) ?? 0 }))
           .sort((a, b) => b.ca - a.ca),
-        topProduits: [...byProd.entries()]
-          .map(([name, v]) => ({ name, ...v }))
-          .sort((a, b) => b.ca - a.ca)
-          .slice(0, 12),
+        topProduits: tousProduits.slice(0, 12),
+        // Détail complet : chaque boisson vendue de la période
+        detail: tousProduits,
       },
     });
   }
@@ -353,14 +355,15 @@ export async function GET(req: NextRequest) {
       prevByCat.set(l.categorie!, (prevByCat.get(l.categorie!) ?? 0) + (l.ttc ?? 0));
     }
 
-    const byProd = new Map<string, { ca: number; qty: number; cat: string }>();
+    const byProd = new Map<string, { ca: number; qty: number; cat: string; sousCat: string | null }>();
     for (const l of food) {
       const name = (l.description ?? "").trim();
       if (!name) continue;
-      const p = byProd.get(name) ?? { ca: 0, qty: 0, cat: l.categorie! };
+      const p = byProd.get(name) ?? { ca: 0, qty: 0, cat: l.categorie!, sousCat: (l.sous_categorie ?? "").trim() || null };
       p.ca += l.ttc ?? 0; p.qty += l.quantite ?? 0;
       byProd.set(name, p);
     }
+    const tousProduits = [...byProd.entries()].map(([name, v]) => ({ name, ...v }));
 
     return NextResponse.json({
       ...base,
@@ -370,10 +373,9 @@ export async function GET(req: NextRequest) {
         parCategorie: [...byCat.entries()]
           .map(([cat, v]) => ({ cat, ca: v.ca, qty: v.qty, prevCa: prevByCat.get(cat) ?? 0 }))
           .sort((a, b) => b.ca - a.ca),
-        topProduits: [...byProd.entries()]
-          .map(([name, v]) => ({ name, ...v }))
-          .sort((a, b) => b.qty - a.qty)
-          .slice(0, 12),
+        topProduits: [...tousProduits].sort((a, b) => b.qty - a.qty).slice(0, 12),
+        // Détail complet : chaque plat vendu de la période
+        detail: [...tousProduits].sort((a, b) => b.ca - a.ca),
       },
     });
   }

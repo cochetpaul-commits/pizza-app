@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { PeriodSelector, currentPeriod, type PeriodValue, type PeriodMode } from "@/components/PeriodSelector";
+import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
+import { useTopBar } from "@/components/layout/TopBarContext";
 
 /* ── Types (réponse /api/mon-tableau) ─────────────────────── */
 
@@ -16,7 +17,7 @@ type OpStats = {
 };
 
 type CatLine = { cat: string; ca: number; qty: number; prevCa: number };
-type ProdLine = { name: string; ca: number; qty: number; cat: string };
+type ProdLine = { name: string; ca: number; qty: number; cat: string; sousCat?: string | null };
 
 type ApiData = {
   admin?: boolean;
@@ -24,8 +25,8 @@ type ApiData = {
   period?: { from: string; to: string };
   empty?: boolean;
   error?: string;
-  bar?: { caBoissons: number; prevCaBoissons: number; caTotal: number; pctBoissons: number; parCategorie: CatLine[]; topProduits: ProdLine[] };
-  cuisine?: { caFood: number; prevCaFood: number; caTotal: number; pctFood: number; parCategorie: CatLine[]; topProduits: ProdLine[] };
+  bar?: { caBoissons: number; prevCaBoissons: number; caTotal: number; pctBoissons: number; parCategorie: CatLine[]; topProduits: ProdLine[]; detail?: ProdLine[] };
+  cuisine?: { caFood: number; prevCaFood: number; caTotal: number; pctFood: number; parCategorie: CatLine[]; topProduits: ProdLine[]; detail?: ProdLine[] };
   salle?: { me: OpStats | null; team: OpStats | null; teamSize: number; attacheGroups: AttacheGroup[]; hasOperateur: boolean };
   manager?: {
     totals: { ca: number; prevCa: number; tickets: number; couverts: number; ticketMoyen: number; caParCouvert: number };
@@ -151,14 +152,117 @@ function TopProduits({ prods, unit }: { prods: ProdLine[]; unit: "ca" | "qty" })
   );
 }
 
+/** Détail complet des ventes, groupé par famille — chaque famille se déplie. */
+function DetailProduits({ prods }: { prods: ProdLine[] }) {
+  const [ouverts, setOuverts] = useState<Set<string>>(() => new Set());
+  const groupes = new Map<string, ProdLine[]>();
+  for (const p of prods) {
+    const g = groupes.get(p.cat) ?? [];
+    g.push(p);
+    groupes.set(p.cat, g);
+  }
+  const ordre = [...groupes.entries()].sort(
+    (a, b) => b[1].reduce((s, p) => s + p.ca, 0) - a[1].reduce((s, p) => s + p.ca, 0),
+  );
+  const toggle = (cat: string) => setOuverts(prev => {
+    const n = new Set(prev);
+    if (n.has(cat)) n.delete(cat); else n.add(cat);
+    return n;
+  });
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {ordre.map(([cat, items]) => {
+        const caCat = items.reduce((s, p) => s + p.ca, 0);
+        const qtyCat = items.reduce((s, p) => s + p.qty, 0);
+        const color = CAT_COLORS[cat] ?? ACCENT;
+        const ouvert = ouverts.has(cat);
+        return (
+          <div key={cat} style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, overflow: "hidden" }}>
+            <button type="button" onClick={() => toggle(cat)} style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "12px 16px", border: "none", background: "none", cursor: "pointer",
+              borderLeft: `3px solid ${color}`,
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flex: 1, textAlign: "left" }}>
+                {CAT_LABELS[cat] ?? cat}
+                <span style={{ color: "#999", fontWeight: 400 }}> · {items.length} produit{items.length > 1 ? "s" : ""} · {qtyCat.toLocaleString("fr-FR")} vendus</span>
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color }}>{fmtEur(caCat)}</span>
+              <span style={{ fontSize: 11, color: "#999", transform: ouvert ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
+            </button>
+            {ouvert && (
+              <div style={{ padding: "0 16px 8px" }}>
+                {items.map((p, i) => (
+                  <div key={p.name} style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "8px 0",
+                    borderBottom: i < items.length - 1 ? "1px solid #f0ebe3" : "none",
+                  }}>
+                    <div className="produit-main">
+                      <span className="produit-name" style={{ fontSize: 12.5, fontWeight: 600, color: "#1a1a1a" }}>{p.name}</span>
+                      {p.sousCat && <span style={{ fontSize: 10, color: "#999", display: "block" }}>{p.sousCat}</span>}
+                    </div>
+                    <span style={{ fontSize: 12, color: "#999", flexShrink: 0 }}>{p.qty.toLocaleString("fr-FR")}×</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1a1a1a", flexShrink: 0, minWidth: 60, textAlign: "right" }}>{fmtEur(p.ca)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── Page ─────────────────────────────────────────────────── */
+
+function semaineCourante(): DateRange {
+  const now = new Date();
+  const lundi = new Date(now);
+  lundi.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { from: iso(lundi), to: iso(now) };
+}
 
 export default function MonTableauPage() {
   const router = useRouter();
-  const [period, setPeriod] = useState<PeriodValue>(() => currentPeriod("semaine"));
+  const [period, setPeriod] = useState<DateRange>(() => semaineCourante());
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+
+  // Même date-ranker que Pilotage/Ventes : dans le bandeau du haut sur
+  // mobile, barre sticky sur ordinateur.
+  const topBar = useTopBar();
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const atToday = period.to >= today;
+    topBar.set({
+      actions: (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button type="button" aria-label="Période précédente" onClick={() => setPeriod(shiftRange(period, -1))} style={{
+            width: 28, height: 28, borderRadius: 8, border: "1px solid #e0d8ce",
+            background: "#fff", color: ACCENT, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0,
+          }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+          <DateRangePicker value={period} onChange={setPeriod} format="short" />
+          <button type="button" aria-label="Période suivante" onClick={() => { if (!atToday) setPeriod(shiftRange(period, 1)); }} style={{
+            width: 28, height: 28, borderRadius: 8, border: "1px solid #e0d8ce",
+            background: atToday ? "#f0ebe3" : "#fff", color: atToday ? "#ccc" : ACCENT,
+            cursor: atToday ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0,
+          }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
+        </div>
+      ),
+    });
+    return () => topBar.clear();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period.from, period.to]);
 
   useEffect(() => {
     let cancelled = false;
@@ -190,13 +294,42 @@ export default function MonTableauPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period.from, period.to]);
 
-  const onModeChange = (mode: PeriodMode) => setPeriod(currentPeriod(mode));
-
   const profile = data?.employe?.profile;
+  const today = new Date().toISOString().slice(0, 10);
+  const atToday = period.to >= today;
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 60px" }}>
-      <PeriodSelector period={period} onPeriodChange={setPeriod} onModeChange={onModeChange} />
+    <div style={{ maxWidth: 720, margin: "0 auto", padding: "16px 16px 60px" }}>
+      {/* Barre de période sticky (ordinateur) — masquée sur mobile où le
+          ranker vit dans le bandeau du haut, comme sur Ventes */}
+      <div className="montableau-periodbar" style={{
+        position: "sticky", top: 0, zIndex: 60,
+        display: "flex", justifyContent: "center", alignItems: "center", gap: 8,
+        margin: "-16px -16px 12px", padding: "10px 16px",
+        background: "rgba(242,237,228,0.88)",
+        backdropFilter: "blur(14px) saturate(160%)", WebkitBackdropFilter: "blur(14px) saturate(160%)",
+        borderBottom: "1px solid rgba(0,0,0,0.05)",
+      }}>
+        <button type="button" aria-label="Période précédente" onClick={() => setPeriod(shiftRange(period, -1))} style={{
+          width: 32, height: 32, borderRadius: 10, border: "1px solid #e0d8ce",
+          background: "#fff", color: ACCENT, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <DateRangePicker value={period} onChange={setPeriod} format="short" />
+        <button type="button" aria-label="Période suivante" onClick={() => { if (!atToday) setPeriod(shiftRange(period, 1)); }} style={{
+          width: 32, height: 32, borderRadius: 10, border: "1px solid #e0d8ce",
+          background: atToday ? "#f0ebe3" : "#fff", color: atToday ? "#ccc" : ACCENT,
+          cursor: atToday ? "not-allowed" : "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+        </button>
+      </div>
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media (max-width: 767px) { .montableau-periodbar { display: none !important; } }
+      `}} />
 
       {/* En-tête */}
       {data?.employe && (
@@ -297,6 +430,12 @@ export default function MonTableauPage() {
             <CatSplit lines={b.parCategorie} total={b.caBoissons} />
             <SectionTitle>Top produits boissons</SectionTitle>
             <TopProduits prods={b.topProduits} unit="ca" />
+            {b.detail && b.detail.length > 0 && (
+              <>
+                <SectionTitle>Le détail — toutes les boissons vendues</SectionTitle>
+                <DetailProduits prods={b.detail} />
+              </>
+            )}
           </>
         );
       })()}
@@ -337,6 +476,12 @@ export default function MonTableauPage() {
             <CatSplit lines={c.parCategorie} total={c.caFood} />
             <SectionTitle>Top produits (en quantité)</SectionTitle>
             <TopProduits prods={c.topProduits} unit="qty" />
+            {c.detail && c.detail.length > 0 && (
+              <>
+                <SectionTitle>Le détail — tous les plats vendus</SectionTitle>
+                <DetailProduits prods={c.detail} />
+              </>
+            )}
           </>
         );
       })()}

@@ -63,7 +63,10 @@ function defaultRange(): DateRange {
 
 export default function PiccolaMiaDashboard() {
   return (
-    <RequireRole allowedRoles={["group_admin", "equipier"]}>
+    // "manager" manquant ici provoquait une boucle / ↔ /piccola-mia
+    // (RequireRole renvoyait vers / qui renvoyait ici) — Safari coupe
+    // après 100 redirections : « Application error » sur le Mac Piccola
+    <RequireRole allowedRoles={["group_admin", "manager", "equipier"]}>
       <PiccolaMiaContent />
     </RequireRole>
   );

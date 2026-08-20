@@ -40,7 +40,11 @@ export function RequireRole({
 
   useEffect(() => {
     if (!loading && !allowed && role !== null) {
-      router.replace("/");
+      // Jamais vers "/" : la racine redirige selon le rôle, et si elle
+      // renvoie vers une page refusée on boucle à l'infini (Safari coupe
+      // à 100 redirections → « Application error », vécu le 20/08).
+      // Destination sûre et terminale par rôle :
+      router.replace(role === "group_admin" ? "/dashboard" : "/mon-tableau");
     }
   }, [loading, allowed, role, router]);
 
