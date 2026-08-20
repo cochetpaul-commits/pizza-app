@@ -163,7 +163,8 @@ export async function POST(req: NextRequest) {
     type,
     nb_jours: nbJours,
     statut: "en_attente",
-    demandeur_id: emp.id,
+    // FK vers auth.users : le COMPTE du demandeur, pas sa fiche employé
+    demandeur_id: me.userId,
     note: note || null,
     source: "app",
   }).select("id").single();

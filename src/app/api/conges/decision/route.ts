@@ -49,16 +49,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Le valideur est la fiche employé du compte qui tranche (si elle existe)
-  const { data: valideurFiche } = await supabaseAdmin
-    .from("employes").select("id").eq("auth_user_id", auth.user.id).eq("actif", true).limit(1).maybeSingle();
-
   const { data: abs, error } = await supabaseAdmin
     .from("absences")
     .update({
       statut: action,
       motif_refus: action === "refuse" ? (motif || null) : null,
-      valideur_id: valideurFiche?.id ?? null,
+      // FK vers auth.users : le COMPTE du valideur, pas sa fiche employé
+      // (l'id de fiche violait absences_valideur_id_fkey → « Erreur »
+      // au clic Valider, vécu le 20/08)
+      valideur_id: auth.user.id,
       validated_at: new Date().toISOString(),
     })
     .eq("id", id)
