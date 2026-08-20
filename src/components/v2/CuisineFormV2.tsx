@@ -507,7 +507,9 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         metadata: Object.keys(meta).length > 0 ? meta : {},
         yield_grams: yieldGrams !== "" ? Math.round(Number(yieldGrams)) : 0,
         portions_count: portionsCount !== "" ? Math.round(Number(portionsCount)) : 0,
-        establishments: etab ? [etab.slug] : ["bellomio"],
+        // establishments : ne plus l'écraser à la sauvegarde (l'ancien code
+        // épinglait la fiche au seul resto courant → elle disparaissait de
+        // l'autre catalogue). NULL = visible partout.
         vat_rate: vatRate,
         margin_rate,
         total_cost: totalCostRounded > 0 ? totalCostRounded : null,

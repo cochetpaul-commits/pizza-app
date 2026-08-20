@@ -521,7 +521,11 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         dough_recipe_id: doughRecipeId || null,
         notes: notesValue,
         photo_url: photoUrl || null,
-        establishments: etab.current ? [etab.current.slug] : ["bellomio"],
+        // NE PAS toucher establishments à la sauvegarde : l'ancien code
+        // épinglait la pizza au seul resto sélectionné (avec en plus un
+        // slug obsolète "bellomio") → la fiche disparaissait du catalogue
+        // de l'autre établissement après chaque enregistrement.
+        // NULL à la création = visible dans les deux restos.
         total_cost: totalCost > 0 ? totalCost : null,
         ball_weight_g: ballWeightG !== "" ? Number(ballWeightG) : null,
         vat_rate: vatRate,
