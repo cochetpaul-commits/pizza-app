@@ -886,158 +886,51 @@ export default function EmployeDetailPage() {
           );
         })()}
 
-        {/* ═══ ROLE ET PERMISSIONS ═══ */}
-        {(() => {
-          const empRole = mapToPermRole((emp as Record<string, unknown>)?.role as string ?? "equipier");
-          const perms = DEFAULT_PERMS[empRole] ?? DEFAULT_PERMS.equipier;
-          const customPerms: Record<string, boolean> = ((emp as Record<string, unknown>)?.custom_permissions as Record<string, boolean>) ?? {};
-
-          const changeRole = async (newRole: PermRole) => {
-            const dbRole = newRole === "admin" ? "group_admin" : newRole === "manager" ? "manager" : "equipier";
-            await supabase.from("employes").update({ role: dbRole, custom_permissions: {} }).eq("id", emp.id);
-            setEmp((prev: Record<string, unknown>) => ({ ...prev, role: dbRole, custom_permissions: {} }));
-            // Sync profiles.role via auth_user_id
-            const authUserId = (emp as Record<string, unknown>).auth_user_id as string | null;
-            if (authUserId) {
-              await supabase.from("profiles").update({ role: dbRole }).eq("id", authUserId);
-            }
-          };
-
-          const togglePerm = async (key: string, currentOn: boolean) => {
-            const next = { ...customPerms, [key]: !currentOn };
-            await supabase.from("employes").update({ custom_permissions: next }).eq("id", emp.id);
-            setEmp((prev: Record<string, unknown>) => ({ ...prev, custom_permissions: next }));
-          };
-
-          return (
-            <>
-              <AccordionSection
-                title="Role et permissions"
-                icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#D4775A" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>}
-                iconColor="#D4775A" iconBg="rgba(212,119,90,0.1)"
-              >
-                {/* Role cards */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-                  {(["equipier", "manager", "admin"] as PermRole[]).map(r => {
-                    const info = ROLE_INFO[r];
-                    const active = empRole === r;
-                    return (
-                      <button key={r} type="button" onClick={() => changeRole(r)} style={{
-                        padding: 14, borderRadius: 12, cursor: "pointer", textAlign: "left",
-                        border: active ? `2px solid ${info.color}` : "1px solid #e0d8ce",
-                        background: active ? info.bg : "#fff",
-                        transition: "all 0.15s",
-                      }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                          <div style={{
-                            width: 16, height: 16, borderRadius: "50%",
-                            border: active ? `4px solid ${info.color}` : "2px solid #ddd6c8",
-                            background: active ? info.color : "#fff",
-                          }} />
-                          <span style={{ fontSize: 13, fontWeight: 700, color: active ? info.color : "#1a1a1a" }}>{info.label}</span>
-                        </div>
-                        <p style={{ fontSize: 11, color: "#666", lineHeight: 1.4, margin: 0 }}>{info.description}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Permissions detaillees — sub-section */}
-                <div style={{ paddingTop: 14, borderTop: "1px solid #f0ebe3" }}>
-                  <div style={{
-                    fontSize: 10, fontWeight: 700, color: "#999",
-                    textTransform: "uppercase", letterSpacing: ".08em",
-                    marginBottom: 10,
-                  }}>
-                    Permissions detaillees
-                  </div>
-                  {PERM_SECTIONS.map(sec => (
-                    <div key={sec.label} style={{ marginBottom: 10 }}>
-                      <div style={{ padding: "6px 10px", background: "#faf7f2", borderRadius: 6, marginBottom: 2 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>{sec.label}</span>
-                      </div>
-                      {sec.permissions.map(p => {
-                        const defaultVal = perms[p.key] === true;
-                        const hasCustom = p.key in customPerms;
-                        const isOn = hasCustom ? customPerms[p.key] : defaultVal;
-                        const isOverridden = hasCustom && customPerms[p.key] !== defaultVal;
-                        return (
-                          <div key={p.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderBottom: "1px solid #f0ebe3" }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <span style={{ fontSize: 12, color: "#1a1a1a" }}>{p.label}</span>
-                              {isOverridden && <span style={{ fontSize: 9, fontWeight: 700, color: "#D4775A", marginLeft: 6 }}>modifie</span>}
-                            </div>
-                            <span style={{ flexShrink: 0, marginLeft: 12 }}>
-                              <button type="button" onClick={() => {
-                                if (hasCustom && customPerms[p.key] === !defaultVal) {
-                                  // Reset to default: remove custom override
-                                  const next = { ...customPerms };
-                                  delete next[p.key];
-                                  supabase.from("employes").update({ custom_permissions: next }).eq("id", emp.id);
-                                  setEmp((prev: Record<string, unknown>) => ({ ...prev, custom_permissions: next }));
-                                } else {
-                                  togglePerm(p.key, isOn);
-                                }
-                              }} style={{
-                                width: 36, height: 20, borderRadius: 10, border: "none", cursor: "pointer",
-                                background: isOn ? "#2D6A4F" : "#ddd6c8", position: "relative",
-                              }}>
-                                <span style={{ position: "absolute", top: 2, left: isOn ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
-                              </button>
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </AccordionSection>
-
-              {/* Bouton suppression — sans tuile, avec avertissement */}
-              <div style={{
-                marginTop: 32, marginBottom: 16,
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
-              }}>
-                <p style={{
-                  fontSize: 11, color: "#999", textAlign: "center",
-                  maxWidth: 360, lineHeight: 1.5, margin: 0,
-                }}>
-                  Action irreversible. La suppression efface definitivement l&apos;employe ainsi que ses contrats, absences et shifts.
-                </p>
-                <button type="button" onClick={async () => {
-                  if (!confirm("Supprimer definitivement cet employe ? Ses contrats, absences et shifts seront aussi supprimes. Irreversible.")) return;
-                  const empId = emp.id as string;
-                  await supabase.from("contrat_elements").delete().in("contrat_id", contrats.map(c => c.id));
-                  await supabase.from("contrats").delete().eq("employe_id", empId);
-                  await supabase.from("absences").delete().eq("employe_id", empId);
-                  await supabase.from("shifts").delete().eq("employe_id", empId);
-                  await supabase.from("compteurs_employe").delete().eq("employe_id", empId);
-                  await supabase.from("combo_presences").delete().eq("employe_id", empId);
-                  await supabase.from("signatures").delete().eq("employe_id", empId);
-                  const { error } = await supabase.from("employes").delete().eq("id", empId);
-                  if (error) { alert("Erreur : " + error.message); return; }
-                  window.location.href = "/settings/employes";
-                }} style={{
-                  display: "inline-flex", alignItems: "center", gap: 8,
-                  padding: "10px 20px", borderRadius: 999,
-                  border: "1px solid rgba(220,38,38,0.4)",
-                  background: "transparent",
-                  color: "#DC2626",
-                  fontSize: 12, fontWeight: 700,
-                  fontFamily: "var(--font-oswald), Oswald, sans-serif",
-                  textTransform: "uppercase", letterSpacing: ".05em",
-                  cursor: "pointer",
-                }}>
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
-                  Supprimer le compte
-                </button>
-              </div>
-            </>
-          );
-        })()}
+        {/* La section « Rôle et permissions » vivait ici en double de
+            « Compte & accès » (elle écrivait même le rôle sans passer par
+            /api/admin/set-role) — supprimée le 20/08/2026, demande Paul. */}
+        {/* Bouton suppression — sans tuile, avec avertissement */}
+        <div style={{
+          marginTop: 32, marginBottom: 16,
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+        }}>
+          <p style={{
+            fontSize: 11, color: "#999", textAlign: "center",
+            maxWidth: 360, lineHeight: 1.5, margin: 0,
+          }}>
+            Action irreversible. La suppression efface definitivement l&apos;employe ainsi que ses contrats, absences et shifts.
+          </p>
+          <button type="button" onClick={async () => {
+            if (!confirm("Supprimer definitivement cet employe ? Ses contrats, absences et shifts seront aussi supprimes. Irreversible.")) return;
+            const empId = emp.id as string;
+            await supabase.from("contrat_elements").delete().in("contrat_id", contrats.map(c => c.id));
+            await supabase.from("contrats").delete().eq("employe_id", empId);
+            await supabase.from("absences").delete().eq("employe_id", empId);
+            await supabase.from("shifts").delete().eq("employe_id", empId);
+            await supabase.from("compteurs_employe").delete().eq("employe_id", empId);
+            await supabase.from("combo_presences").delete().eq("employe_id", empId);
+            await supabase.from("signatures").delete().eq("employe_id", empId);
+            const { error } = await supabase.from("employes").delete().eq("id", empId);
+            if (error) { alert("Erreur : " + error.message); return; }
+            window.location.href = "/settings/employes";
+          }} style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: "10px 20px", borderRadius: 999,
+            border: "1px solid rgba(220,38,38,0.4)",
+            background: "transparent",
+            color: "#DC2626",
+            fontSize: 12, fontWeight: 700,
+            fontFamily: "var(--font-oswald), Oswald, sans-serif",
+            textTransform: "uppercase", letterSpacing: ".05em",
+            cursor: "pointer",
+          }}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            Supprimer le compte
+          </button>
+        </div>
       </div>
 
       {/* ═══ MODAL: Contrat ═══ */}
