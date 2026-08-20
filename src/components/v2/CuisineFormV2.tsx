@@ -16,6 +16,7 @@ import { fetchApi } from "@/lib/fetchApi";
 import { useRecipeDraft } from "@/lib/useRecipeDraft";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { EtabsSelector, estabsFromRow, estabsToPayload, ETABS_RECETTES } from "./EtabsSelector";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
@@ -140,6 +141,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
 
   // Save state
   const [saving, setSaving] = useState(false);
+  const [estabs, setEstabs] = useState<string[]>(ETABS_RECETTES.map(e => e.slug));
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -395,6 +397,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         if (rec) {
           const r = rec as Record<string, unknown>;
           setName(String(r.name ?? ""));
+          setEstabs(estabsFromRow((r).establishments));
           setCategory(String(r.category ?? "plat_cuisine"));
           if (r.fiche_type) setFicheType(String(r.fiche_type));
           if (r.metadata && typeof r.metadata === "object") {
@@ -507,9 +510,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         metadata: Object.keys(meta).length > 0 ? meta : {},
         yield_grams: yieldGrams !== "" ? Math.round(Number(yieldGrams)) : 0,
         portions_count: portionsCount !== "" ? Math.round(Number(portionsCount)) : 0,
-        // establishments : ne plus l'écraser à la sauvegarde (l'ancien code
-        // épinglait la fiche au seul resto courant → elle disparaissait de
-        // l'autre catalogue). NULL = visible partout.
+        establishments: estabsToPayload(estabs),
         vat_rate: vatRate,
         margin_rate,
         total_cost: totalCostRounded > 0 ? totalCostRounded : null,
@@ -982,6 +983,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                       padding: 0, marginBottom: 14,
                     }}
                   />
+                  <EtabsSelector value={estabs} onChange={setEstabs} />
 
                   {/* Vin/Boisson metadata fields */}
                   {(ficheType === "vin" || ficheType === "boisson") && (

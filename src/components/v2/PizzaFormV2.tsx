@@ -18,6 +18,7 @@ import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { fetchApi } from "@/lib/fetchApi";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { EtabsSelector, estabsFromRow, estabsToPayload, ETABS_RECETTES } from "./EtabsSelector";
 import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./IngredientListDnD";
 import { StepsList } from "./StepsList";
 import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
@@ -111,6 +112,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 
   // Save state
   const [saving, setSaving] = useState(false);
+  const [estabs, setEstabs] = useState<string[]>(ETABS_RECETTES.map(e => e.slug));
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -443,6 +445,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
           setDoughRecipeId(String(p.dough_recipe_id ?? ""));
           setBallWeightG(p.ball_weight_g ? Number(p.ball_weight_g) : 264);
           setNotes(String(p.notes ?? ""));
+          setEstabs(estabsFromRow(p.establishments));
           // establishments auto-assigned from current etab context
           setPhotoUrl(String(p.photo_url ?? ""));
           if (p.photo_url) setPhotoPreview(String(p.photo_url));
@@ -521,11 +524,10 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
         dough_recipe_id: doughRecipeId || null,
         notes: notesValue,
         photo_url: photoUrl || null,
-        // NE PAS toucher establishments à la sauvegarde : l'ancien code
-        // épinglait la pizza au seul resto sélectionné (avec en plus un
-        // slug obsolète "bellomio") → la fiche disparaissait du catalogue
-        // de l'autre établissement après chaque enregistrement.
-        // NULL à la création = visible dans les deux restos.
+        // establishments : choix EXPLICITE via le sélecteur (les deux = NULL,
+        // visible partout) — jamais déduit du resto courant, qui épinglait
+        // silencieusement la fiche à un seul catalogue.
+        establishments: estabsToPayload(estabs),
         total_cost: totalCost > 0 ? totalCost : null,
         ball_weight_g: ballWeightG !== "" ? Number(ballWeightG) : null,
         vat_rate: vatRate,
@@ -824,6 +826,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                       <label className="label">Nom de la pizza</label>
                       <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom…" />
                     </div>
+                    <EtabsSelector value={estabs} onChange={setEstabs} />
                     <div>
                       <label className="label">Empatement lie</label>
                       <SmartSelect

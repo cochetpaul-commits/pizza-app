@@ -18,6 +18,7 @@ import { IngredientListDnD, normalizeUnit, type IngredientLine } from "./Ingredi
 import { StepsList } from "./StepsList";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { EtabsSelector, estabsFromRow, estabsToPayload, ETABS_RECETTES } from "./EtabsSelector";
 import { RecipeHero, HeroBtn, HeroDangerBtn } from "./RecipeHero";
 import { GestionFoodCost } from "./GestionFoodCost";
 import { StepperInput } from "@/components/StepperInput";
@@ -98,6 +99,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 
   // Save state
   const [saving, setSaving] = useState(false);
+  const [estabs, setEstabs] = useState<string[]>(ETABS_RECETTES.map(e => e.slug));
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -341,6 +343,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
           const c = coc as Record<string, unknown>;
           const meta = (c.metadata ?? {}) as Record<string, unknown>;
           setName(String(c.name ?? ""));
+          setEstabs(estabsFromRow((c).establishments));
           setType(String(meta.type ?? "long_drink"));
           setGlass(String(meta.glass ?? ""));
           setGarnish(String(meta.garnish ?? ""));
@@ -409,12 +412,11 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
         metadata: { type, glass: glass || null, garnish: garnish || null },
         sell_price: derivedSellPrice ?? null,
         photo_url: imageUrl || null,
+        establishments: estabsToPayload(estabs),
         vat_rate: vatRate,
         margin_rate,
         total_cost: totalCost > 0 ? totalCost : null,
         procedure: steps.length > 0 ? JSON.stringify(steps) : null,
-        // establishments : ne plus l'écraser à la sauvegarde (fiche épinglée
-        // au seul resto courant sinon). NULL = visible partout.
         is_draft: false,
         is_active: true,
       };
@@ -692,6 +694,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                     <div>
                       <label className="label">Nom du cocktail</label>
                       <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nom…" />
+                  <EtabsSelector value={estabs} onChange={setEstabs} />
                     </div>
 
                     <div>
