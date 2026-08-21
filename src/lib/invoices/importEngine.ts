@@ -196,10 +196,12 @@ export async function runImport(options: {
   let invoiceAlreadyImported = false;
 
   if (invoiceNumber) {
+    // Déduplication globale (fournisseur + n° de facture), PAS par utilisateur :
+    // une facture importée depuis un autre compte admin était réimportée en
+    // doublon (3 factures LMDW dupliquées le 21/08/2026).
     const { data: existing, error: exErr } = await supabase
       .from("supplier_invoices")
       .select("id")
-      .eq("user_id", userId)
       .eq("supplier_id", supplierId)
       .eq("invoice_number", invoiceNumber)
       .limit(1);
@@ -245,7 +247,6 @@ export async function runImport(options: {
     const { count: linesCount } = await supabase
       .from("supplier_invoice_lines")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
       .eq("invoice_id", invoiceId);
 
     if ((linesCount ?? 0) === 0) {

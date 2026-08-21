@@ -75,16 +75,15 @@ function parseLines(text: string): ParsedLine[] {
 
   const rows = parseText.split("\n").map(l => l.trim()).filter(Boolean);
   const result: ParsedLine[] = [];
-  const seen = new Set<string>();
+  const byCode = new Map<string, ParsedLine>();
 
   // Skip headers/footers
   const SKIP = /^(Code art|Désignation|Total|Montant|Remise|Base|Merci|HSBC|IBAN|Agent|Réf|Page|Adresse|Client|Facture|Date|Mode|Cond|Vos|SOCIETE|S\.A\.S|DIRECTION|Tél|E-mail|UE|SIRET|ACCISES|EUR|BL M3|N° cmde|SARL|Liv |57 |35400|FRANCE|escompte|Les éventuels)/i;
 
   // Product line regex:
-  // CODE(3-6 digits) NAME QTY VOL(0,xxx) [DEG] [C] PRICES... PU_HT TOTAL_HT TVA(01|02)
-  //
-  // Strategy: look for lines starting with a 3-6 digit code and ending with 01 or 02 (TVA)
-  const RE_LINE = /^(\d{3,6})\s+(.+?)\s+(\d{1,3})\s+(0,\d{3})\s+(.+?)\s+([\d\s]+,\d{2})\s+(0[12])\s*$/;
+  // CODE(3-6 digits + lettre éventuelle, ex. 3319E) NAME QTY VOL (0,700 · 3,000 pour un BIB) [DEG] [C] PRICES... PU_HT TOTAL_HT TVA(01|02)
+  // Ligne PROMO (bouteilles offertes) : "... 18,45 3,72 1,20 PROMO 4,92 01" — seuls droits + CSS facturés.
+  const RE_LINE = /^(\d{3,6}[A-Z]?)\s+(.+?)\s+(\d{1,3})\s+(\d{1,2},\d{3})\s+(.+?)\s+([\d\s]+,\d{2})\s+(0[12])\s*$/;
 
   for (const row of rows) {
     if (SKIP.test(row)) continue;
@@ -94,35 +93,51 @@ function parseLines(text: string): ParsedLine[] {
     if (!m) continue;
 
     const code = m[1];
-    if (seen.has(code)) continue;
-    seen.add(code);
-
     const name = m[2].trim();
     const qty = parseInt(m[3]);
     const vol = parseFr(m[4]);
     const totalHt = parseFr(m[6]);
     const tvaCode = m[7];
-
-    // Extract PU_HT: second-to-last comma-decimal number in the middle section
     const middlePart = m[5];
+    const isPromo = /\bPROMO\b/i.test(middlePart);
+
+    // PU_HT : dernier nombre décimal de la partie centrale (juste avant le total)
     const allDecimals = middlePart.match(/\d+,\d{2}/g) ?? [];
-    // Last decimal in middle is PU_HT (the one before totalHt)
-    const puHt = allDecimals.length > 0 ? parseFr(allDecimals[allDecimals.length - 1]) : null;
+    const puHt = !isPromo && allDecimals.length > 0 ? parseFr(allDecimals[allDecimals.length - 1]) : null;
 
     if (!name || totalHt == null) continue;
 
-    result.push({
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+    const existing = byCode.get(code);
+    if (existing) {
+      // Même article sur plusieurs lignes (dont PROMO) : on cumule, le prix
+      // unitaire devient le prix moyen réellement payé.
+      const q = (existing.quantity ?? 0) + qty;
+      const t = r2((existing.total_price ?? 0) + totalHt);
+      existing.quantity = q;
+      existing.total_price = t;
+      existing.unit_price = q > 0 ? r2(t / q) : existing.unit_price;
+      if (isPromo) {
+        const note = `dont ${qty} offerte${qty > 1 ? "s" : ""} (PROMO : droits + CSS seuls)`;
+        existing.notes = existing.notes ? `${existing.notes} · ${note}` : note;
+      }
+      continue;
+    }
+
+    const line: ParsedLine = {
       sku: code,
       name,
       quantity: qty,
       unit: "pc",
-      unit_price: puHt ?? (qty > 0 && totalHt ? Math.round((totalHt / qty) * 100) / 100 : null),
+      unit_price: puHt ?? (qty > 0 ? r2(totalHt / qty) : null),
       total_price: totalHt,
       tax_rate: tvaCode === "02" ? 5.5 : 20.0,
-      notes: null,
+      notes: isPromo ? `${qty} offerte${qty > 1 ? "s" : ""} (PROMO : droits + CSS seuls)` : null,
       piece_weight_g: null,
       piece_volume_ml: vol != null ? Math.round(vol * 1000) : null,
-    });
+    };
+    byCode.set(code, line);
+    result.push(line);
   }
 
   return result;
