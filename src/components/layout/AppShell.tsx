@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { canAccess } from "@/lib/rbac";
@@ -38,9 +38,17 @@ function AccessDenied() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { role, loading } = useProfile();
+  const excluded = isExcluded(pathname);
 
-  if (isExcluded(pathname) || loading || !role) {
+  // Pas de session (jeton expiré, déconnexion) sur une page de l'app :
+  // renvoyer vers la connexion au lieu de laisser une page blanche.
+  useEffect(() => {
+    if (!loading && !role && !excluded && pathname !== "/") router.replace("/login");
+  }, [loading, role, excluded, pathname, router]);
+
+  if (excluded || loading || !role) {
     return <>{children}</>;
   }
 

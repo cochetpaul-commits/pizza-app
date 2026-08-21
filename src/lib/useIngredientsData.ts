@@ -117,6 +117,8 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
 
   const pageRef = useRef(0);
   const fetchIdRef = useRef(0);
+  const loadingRef = useRef(false); // un chargement principal est en cours
+  const queryRef = useRef("");     // recherche en cours ("" = liste complète paginée)
   const etabRef = useRef(etablissementId);
   etabRef.current = etablissementId;
   const etabSlugRef = useRef(etablissementSlug);
@@ -165,8 +167,14 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
 
   const doLoad = useCallback(async (q: string, fetchId: number) => {
     setLoading(true);
+    loadingRef.current = true;
+    queryRef.current = q;
     setError(null);
     pageRef.current = 0;
+    // Pendant une recherche il n'y a plus de pages à charger : sinon le
+    // sentinel (visible dès que la liste se réduit) relançait fetchPage(0)
+    // et ajoutait toute la base par-dessus les résultats.
+    setHasMore(false);
 
     try {
       // Fetch total count (independent of pagination/search)
@@ -201,7 +209,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
       if (fetchIdRef.current !== fetchId) return;
       setError(e instanceof Error ? e : new Error(String(e)));
     } finally {
-      if (fetchIdRef.current === fetchId) setLoading(false);
+      if (fetchIdRef.current === fetchId) { setLoading(false); loadingRef.current = false; }
     }
   }, []);
 
@@ -212,6 +220,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
+    if (loadingRef.current || queryRef.current) return; // chargement en cours ou recherche active
     // Jeton : si une recherche ou un rechargement démarre pendant ce fetch,
     // on jette le résultat — sinon une page entière de produits venait
     // s'ajouter par-dessus les résultats de recherche.

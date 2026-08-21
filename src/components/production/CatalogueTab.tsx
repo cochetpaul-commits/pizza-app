@@ -477,7 +477,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function CatalogueContent() {
-  const { current: etab, etablissements } = useEtablissement();
+  const { current: etab, etablissements, loading: etabLoading } = useEtablissement();
   const resolvedEtab = etab ?? etablissements?.[0] ?? null;
   const etabSlug = resolvedEtab?.slug ?? null;
   const { can } = useProfile();
@@ -500,6 +500,8 @@ export function CatalogueContent() {
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
   const [q, setQ] = useState("");
   const [mainFilter] = useState<MainFilter>("tous");
   const [cuisineCatFilter] = useState<CuisineCatFilter>("all");
@@ -614,8 +616,22 @@ export function CatalogueContent() {
   };
 
   useEffect(() => {
-    fetchAllRecipes(etabSlug).then(r => { setRecipes(r); setLoading(false); });
-  }, [etabSlug]);
+    // On attend que l'établissement soit résolu : sinon un 1er chargement
+    // « tous établissements » partait avant le bon, et le plus lent des
+    // deux écrasait l'autre à l'arrivée.
+    if (etabLoading) return;
+    let cancelled = false;
+    setLoadError(null);
+    fetchAllRecipes(etabSlug)
+      .then(r => { if (!cancelled) { setRecipes(r); setLoading(false); } })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        console.error("[recettes] chargement impossible :", e);
+        setLoadError(e instanceof Error ? e.message : "Chargement impossible");
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [etabSlug, etabLoading, reloadTick]);
 
   const filtered = useMemo(() => {
     let arr = recipes;
@@ -1053,6 +1069,15 @@ export function CatalogueContent() {
 
         {/* Loading */}
         {loading && <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Chargement...</p>}
+        {!loading && loadError && (
+          <div style={{ textAlign: "center", padding: 24, color: "#b3261e", fontSize: 13 }}>
+            Les fiches n&apos;ont pas pu être chargées ({loadError}).{" "}
+            <button type="button" onClick={() => { setLoading(true); setReloadTick(t => t + 1); }}
+              style={{ border: "1px solid #ddd6c8", background: "#fff", borderRadius: 12, padding: "4px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>
+              Réessayer
+            </button>
+          </div>
+        )}
 
         {/* Empty */}
         {!loading && filtered.length === 0 && (
