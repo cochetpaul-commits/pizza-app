@@ -65,7 +65,6 @@ const PILOTAGE_ITEMS: NavItemV2[] = [
   { label: "Rentabilité", href: "/rentabilite", icon: "calculator", permission: "performances.pilotage" },
   { label: "Produits", href: "/ventes/marges", icon: "wallet", permission: "performances.pilotage" },
   { label: "Masse salariale", href: "/rh/masse-salariale", icon: "calculator", permission: "performances.pilotage" },
-  { label: "Tresorerie", href: "/tresorerie", icon: "wallet", permission: "performances.pilotage" },
 ];
 
 // PERSONNEL (RH)

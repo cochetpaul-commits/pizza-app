@@ -38,7 +38,6 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/variations-prix": MANAGERS,
   "/achats":          MANAGERS,
   "/stats-achats":    MANAGERS,
-  "/tresorerie":      MANAGERS,
   "/rentabilite":     MANAGERS,
   "/mercuriale":      MANAGERS,
   "/evenements":      MANAGERS,

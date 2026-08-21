@@ -194,7 +194,6 @@ function GroupContent() {
   const [caExercice, setCaExercice] = useState(0);
   const [achatsMonth, setAchatsMonth] = useState(0);
   const [topFournisseurs, setTopFournisseurs] = useState<SupplierTotal[]>([]);
-  const [tresoBalance, setTresoBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const chartRef = useRef<HTMLCanvasElement | null>(null);
   const chartInstance = useRef<Chart | null>(null);
@@ -274,17 +273,9 @@ function GroupContent() {
       return { total, top3 };
     })();
 
-    const tresoPromise = (async () => {
-      const monthStart = getFirstOfMonth(today);
-      const { data, error } = await supabase.from("bank_operations")
-        .select("amount").gte("operation_date", monthStart).lte("operation_date", today).in("etablissement_id", etabIds);
-      if (error || !data || data.length === 0) return null;
-      return (data as { amount: number }[]).reduce((s, r) => s + (r.amount ?? 0), 0);
-    })();
-
-    const [caResults, caPrevResults, caA1Results, dailyResult, fy, achats, treso] = await Promise.all([
+    const [caResults, caPrevResults, caA1Results, dailyResult, fy, achats] = await Promise.all([
       Promise.all(caPromises), Promise.all(caPrevPromises), Promise.all(caA1Promises),
-      dailyPromise, fyPromise, achatsPromise, tresoPromise,
+      dailyPromise, fyPromise, achatsPromise,
     ]);
 
     const result: Record<string, EtabKpis> = {};
@@ -302,7 +293,6 @@ function GroupContent() {
     setCaExercice(fy);
     setAchatsMonth(achats.total);
     setTopFournisseurs(achats.top3);
-    setTresoBalance(treso);
     setLoading(false);
   }, [etablissements, range, prevRange, a1Range, fiscalStart, today]);
 
@@ -567,12 +557,6 @@ function GroupContent() {
                 accent={T.sauge}
               />
               <PilotRow label="Masse salariale" value="A configurer" accent={T.bleu} muted />
-              <PilotRow
-                label="Tresorerie"
-                value={tresoBalance != null ? `${fmtEur(tresoBalance)} \u20AC` : "Importer un releve"}
-                accent={T.dore}
-                muted={tresoBalance == null}
-              />
             </div>
           </div>
 
@@ -703,7 +687,7 @@ function GroupContent() {
 const SHORTCUTS = [
   { href: "/ventes", label: "Rapport de vente", color: GROUP_COLOR, icon: <SvgBarChart />, sub: "Pilotage" },
   { href: "/ventes/marges", label: "Marges produits", color: T.dore, icon: <SvgTag />, sub: "Pilotage" },
-  { href: "/tresorerie", label: "Tresorerie", color: T.dore, icon: <SvgWallet />, sub: "Pilotage" },
+  { href: "/rentabilite", label: "Rentabilite", color: T.dore, icon: <SvgWallet />, sub: "Pilotage" },
   { href: "/rh/equipe", label: "Employes", color: T.bleu, icon: <SvgUsers />, sub: "Personnel" },
   { href: "/recettes", label: "Fiches techniques", color: T.terracotta, icon: <SvgBook /> , sub: "Production" },
   { href: "/commandes", label: "Commandes", color: T.sauge, icon: <SvgTruck />, sub: "Achats" },

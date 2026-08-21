@@ -8,7 +8,6 @@ const PILOTAGE_PAGES = [
   { href: "/ventes", label: "Ventes" },
   { href: "/ventes/marges", label: "Produits" },
   { href: "/rh/masse-salariale", label: "Masse sal." },
-  { href: "/tresorerie", label: "Tresorerie" },
 ];
 
 const SWIPE_THRESHOLD = 60;
