@@ -76,16 +76,13 @@ export const PLANNING_ITEMS: NavItemV2[] = [
 
 // PRODUCTION (fiches techniques, catalogue, articles de vente)
 const PRODUCTION_ITEMS: NavItemV2[] = [
-  { label: "Recettes", href: "/recettes", icon: "fileText" },
-  { label: "Catalogue", href: "/catalogue", icon: "book" },
-  { label: "Inventaire", href: "/inventaire", icon: "package" },
-];
-
-const PRODUCTION_ITEMS_PICCOLA: NavItemV2[] = [
   { label: "Fiches techniques", href: "/recettes", icon: "fileText" },
+  { label: "Catalogue", href: "/catalogue", icon: "book" },
   { label: "Prix de vente", href: "/epicerie", icon: "tag" },
   { label: "Inventaire", href: "/inventaire", icon: "package" },
 ];
+// Même arborescence dans les deux établissements (demande du 21/08/2026)
+const PRODUCTION_ITEMS_PICCOLA: NavItemV2[] = PRODUCTION_ITEMS;
 
 // ACHATS (fournisseurs & stocks)
 export const ACHATS_ITEMS: NavItemV2[] = [
@@ -132,7 +129,7 @@ export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Evenementiel", icon
 
 export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
   { kind: "item", label: "Mes congés", href: "/mes-conges", icon: "beach" },
-  { kind: "item", label: "Recettes", href: "/recettes", icon: "fileText" },
+  { kind: "item", label: "Fiches techniques", href: "/recettes", icon: "fileText" },
   { kind: "item", label: "Catalogue", href: "/catalogue", icon: "book" },
   { kind: "item", label: "Inventaire", href: "/inventaire", icon: "clipboard" },
   { kind: "item", label: "Commandes", href: "/commandes", icon: "shoppingBag" },

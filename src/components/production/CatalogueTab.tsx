@@ -1076,7 +1076,7 @@ export function CatalogueContent() {
                   border: "none", background: "#D4775A", color: "#fff",
                   cursor: "pointer", whiteSpace: "nowrap", textDecoration: "none", display: "inline-block",
                 }}>
-                + Nouvelle recette
+                + Nouvelle fiche
               </Link>
               <button type="button" onClick={() => setShowNewCatModal(true)}
                 style={{
@@ -1227,7 +1227,7 @@ export function CatalogueContent() {
                               border: "none", background: tg.color, color: "#fff",
                               cursor: "pointer", textDecoration: "none", display: "inline-block",
                             }}>
-                            + Nouvelle recette
+                            + Nouvelle fiche
                           </Link>
                         );
                       })()}
@@ -1285,7 +1285,7 @@ export function CatalogueContent() {
                               if (!href) return null;
                               return (
                                 <Link href={href} onClick={(e) => e.stopPropagation()}
-                                  title="Nouvelle recette dans cette sous-categorie"
+                                  title="Nouvelle fiche dans cette sous-catégorie"
                                   style={{
                                     marginLeft: "auto", width: 24, height: 24, borderRadius: 7,
                                     border: `1.5px solid ${sg.color}50`, background: "#fff", color: sg.color,

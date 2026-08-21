@@ -385,7 +385,7 @@ function PiccolaMiaContent() {
         {[
           { href: "/ventes", label: "Rapport de vente" },
           { href: "/ventes/marges", label: "Marges" },
-          { href: "/recettes", label: "Recettes" },
+          { href: "/recettes", label: "Fiches techniques" },
           { href: "/commandes", label: "Commandes" },
           { href: "/evenements", label: "Evenements" },
           { href: "/ingredients", label: "Produits" },
