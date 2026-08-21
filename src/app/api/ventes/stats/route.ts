@@ -331,6 +331,7 @@ function aggregate(rows: Row[]) {
 
   // Services (par jour + midi/soir) — with couverts
   const services: {
+    date: string; emp_tickets: number;
     jour: string; svc: string; ttc: number; ht: number; cov: number; tm_ttc: number; tm_ht: number;
     sp_ttc: number; sp_ht: number; emp_ttc: number; emp_ht: number;
     sp_cov: number; tm_sp_ttc: number; tm_sp_ht: number;
@@ -364,7 +365,10 @@ function aggregate(rows: Row[]) {
         z_ht[key] = svcRows.filter(m).reduce((s, r) => s + Number(r.ht), 0);
       }
 
+      // Commandes à emporter distinctes (tickets) sur ce service
+      const empTickets = new Set(empSvc.map(r => r.num_fiscal).filter(Boolean)).size;
       services.push({
+        date: d, emp_tickets: empTickets,
         jour: jourCap, svc, ttc, ht, cov,
         tm_ttc: cov > 0 ? ttc / cov : 0,
         tm_ht: cov > 0 ? ht / cov : 0,

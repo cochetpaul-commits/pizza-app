@@ -212,9 +212,14 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
+    // Jeton : si une recherche ou un rechargement démarre pendant ce fetch,
+    // on jette le résultat — sinon une page entière de produits venait
+    // s'ajouter par-dessus les résultats de recherche.
+    const fetchId = fetchIdRef.current;
     setLoadingMore(true);
     try {
       const bundle = await fetchPage(pageRef.current, etabRef.current, etabSlugRef.current);
+      if (fetchIdRef.current !== fetchId) return;
       setItems((prev) => {
         const seen = new Set(prev.map((i) => i.id));
         return [...prev, ...bundle.items.filter((i) => !seen.has(i.id))];
