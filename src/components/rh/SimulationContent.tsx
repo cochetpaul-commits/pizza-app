@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, type CSSProperties } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { loadEtabParam, saveEtabParamDebounced, deleteEtabParam } from "@/lib/etabParams";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
 /* ── Types ─────────────────────────────────────────────────────── */
@@ -164,11 +165,30 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
   const [salaryOverrides, setSalaryOverrides] = useState<Record<string, number>>({});
 
   /* ── Load ── */
+  const loadEmployes = async (etabId: string): Promise<Employe[]> => {
+    const empRes = await supabase
+      .from("employes").select("*")
+      .contains("etablissements_ids", [etabId]).eq("actif", true).order("nom");
+    const empIds = (empRes.data ?? []).map((e: Record<string, unknown>) => e.id as string);
+    const contratRes = empIds.length > 0
+      ? await supabase.from("contrats").select("*").eq("actif", true).in("employe_id", empIds)
+      : { data: [] };
+    const contrats = (contratRes.data ?? []) as Contrat[];
+    return (empRes.data ?? []).map((e: Record<string, unknown>) => ({
+      ...e,
+      contrats: contrats.filter((c) => c.employe_id === e.id),
+    })) as Employe[];
+  };
+
   useEffect(() => {
     if (!etab) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
+      // Salaires ajustés mémorisés (table etablissement_params — partagés entre appareils)
+      const savedOverrides = await loadEtabParam<Record<string, number>>(etab.id, "ms_salaires_simules");
+      if (cancelled) return;
+      setSalaryOverrides(savedOverrides && typeof savedOverrides === "object" ? savedOverrides : {});
       const empRes = await supabase
         .from("employes").select("*")
         .contains("etablissements_ids", [etab.id]).eq("actif", true).order("nom");
@@ -262,15 +282,42 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
   const baseTotalMS = useMemo(() => baseCosts.reduce((acc, c) => acc + c.coutEmployeur, 0), [baseCosts]);
   const hasOverrides = Object.keys(salaryOverrides).length > 0;
 
+  const persistOverrides = (next: Record<string, number>) => {
+    if (!etab) return;
+    if (Object.keys(next).length === 0) void deleteEtabParam(etab.id, "ms_salaires_simules");
+    else saveEtabParamDebounced(etab.id, "ms_salaires_simules", next);
+  };
   const setSalaryOverride = (empId: string, value: number) => {
-    setSalaryOverrides((prev) => ({ ...prev, [empId]: value }));
+    setSalaryOverrides((prev) => {
+      const next = { ...prev, [empId]: value };
+      persistOverrides(next);
+      return next;
+    });
   };
   const resetOverride = (empId: string) => {
     setSalaryOverrides((prev) => {
       const next = { ...prev };
       delete next[empId];
+      persistOverrides(next);
       return next;
     });
+  };
+  const resetAllOverrides = () => {
+    setSalaryOverrides({});
+    if (etab) void deleteEtabParam(etab.id, "ms_salaires_simules");
+  };
+  /** Écrit les salaires ajustés dans les contrats (devient le nouveau réel) */
+  const saveOverridesToContracts = async () => {
+    if (!etab) return;
+    for (const [empId, brut] of Object.entries(salaryOverrides)) {
+      const emp = employes.find(e => e.id === empId);
+      const contrat = emp?.contrats?.find(c => c.actif);
+      if (contrat) {
+        await supabase.from("contrats").update({ remuneration: brut }).eq("id", contrat.id);
+      }
+    }
+    resetAllOverrides();
+    setEmployes(await loadEmployes(etab.id));
   };
 
   // Auto-select first TNS (derive, no effect needed)
@@ -410,12 +457,20 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
                               {fmt(tnsNet)} {"\u20AC"}
                             </span>
                             {isOverridden && (
-                              <button type="button" onClick={() => resetOverride(sel.emp.id)} style={{
-                                fontSize: 11, color: "#999", background: "none", border: "1px solid #ddd6c8",
-                                borderRadius: 12, padding: "2px 10px", cursor: "pointer",
-                              }}>
-                                Reinitialiser ({fmt(baseNet)} {"\u20AC"})
-                              </button>
+                              <>
+                                <button type="button" onClick={() => resetOverride(sel.emp.id)} style={{
+                                  fontSize: 11, color: "#999", background: "none", border: "1px solid #ddd6c8",
+                                  borderRadius: 12, padding: "2px 10px", cursor: "pointer",
+                                }}>
+                                  Réinitialiser ({fmt(baseNet)} {"\u20AC"})
+                                </button>
+                                <button type="button" onClick={saveOverridesToContracts} style={{
+                                  fontSize: 11, color: "#fff", background: "#4a6741", border: "none",
+                                  borderRadius: 12, padding: "3px 12px", cursor: "pointer", fontWeight: 700,
+                                }}>
+                                  Sauvegarder dans le contrat
+                                </button>
+                              </>
                             )}
                           </div>
                           <input
@@ -426,6 +481,7 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
                           />
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#999", marginTop: 2 }}>
                             <span>1 000 {"\u20AC"}</span>
+                            <span>montant mémorisé automatiquement</span>
                             <span>15 000 {"\u20AC"}</span>
                           </div>
                         </div>
@@ -522,7 +578,7 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
                     Augmentations au cas par cas
                   </h3>
                   <div style={{ fontSize: 12, color: "#999", marginBottom: 12 }}>
-                    Ajustez les salaires pour simuler l&apos;impact d&apos;augmentations individuelles.
+                    Ajustez les salaires pour simuler l&apos;impact d&apos;augmentations individuelles. Les montants ajustés sont mémorisés d&apos;une visite à l&apos;autre : « Réinitialiser » revient aux contrats, « Sauvegarder » les inscrit dans les contrats.
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {costs.map((c, i) => {
@@ -587,27 +643,13 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
                         </strong>
                       </span>
                       <div style={{ display: "flex", gap: 8 }}>
-                        <button type="button" onClick={() => setSalaryOverrides({})} style={{
+                        <button type="button" onClick={resetAllOverrides} style={{
                           fontSize: 11, color: "#999", background: "none", border: "1px solid #ddd6c8",
                           borderRadius: 12, padding: "3px 12px", cursor: "pointer",
                         }}>
-                          Annuler
+                          Réinitialiser
                         </button>
-                        <button type="button" onClick={async () => {
-                          for (const [empId, brut] of Object.entries(salaryOverrides)) {
-                            const emp = employes.find(e => e.id === empId);
-                            const contrat = emp?.contrats?.find(c => c.actif);
-                            if (contrat) {
-                              await supabase.from("contrats").update({ remuneration: brut }).eq("id", contrat.id);
-                            }
-                          }
-                          setSalaryOverrides({});
-                          // Reload data
-                          const { data } = await supabase.from("employes")
-                            .select("id, prenom, nom, matricule, actif, contrats(id, employe_id, type, heures_semaine, salaire_brut:remuneration, remuneration, taux_horaire:remuneration, actif)")
-                            .eq("actif", true).eq("etablissement_id", etab!.id).eq("contrats.actif", true).order("nom");
-                          if (data) setEmployes(data as unknown as Employe[]);
-                        }} style={{
+                        <button type="button" onClick={saveOverridesToContracts} style={{
                           fontSize: 11, color: "#fff", background: "#4a6741", border: "none",
                           borderRadius: 12, padding: "3px 12px", cursor: "pointer", fontWeight: 700,
                         }}>

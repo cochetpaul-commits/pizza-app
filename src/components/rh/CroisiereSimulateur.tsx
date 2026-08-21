@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { loadEtabParam, saveEtabParamDebounced, deleteEtabParam } from "@/lib/etabParams";
 
 /**
  * Régime de croisière — remplace « Rentabilité MS ».
@@ -32,6 +33,9 @@ const eur2 = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2
 const n1 = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const fmtDate = (s: string) => new Date(s + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+
+/** Corrections du réel Pennylane (ex. virements gérants groupés sur un mois) — mémorisées en base */
+type Structure = { gerants?: number | null; ms?: number | null; fixes?: number | null; foodCost?: number | null };
 
 type Sim = {
   tmMidi: number; tmSoir: number; tmEmp: number;
@@ -67,6 +71,32 @@ function Col({ titre, couleur, lignes }: { titre: string; couleur: string; ligne
           <span style={{ fontFamily: OSWALD, fontSize: 17, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>{v}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function ColEdit({ titre, couleur, lignes }: { titre: string; couleur: string; lignes: { k: string; v: number; suffix: string; step: number; base: number; onChange: (v: number | null) => void }[] }) {
+  return (
+    <div style={{ flex: "1 1 170px", minWidth: 160, padding: "12px 14px", borderRadius: 12, background: "#faf7f2", borderTop: `3px solid ${couleur}` }}>
+      <div style={{ ...LAB, color: couleur, marginBottom: 6 }}>{titre}</div>
+      {lignes.map(l => {
+        const modif = Math.abs(l.v - l.base) >= (l.suffix === "%" ? 0.05 : 0.5);
+        return (
+          <div key={l.k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <span style={{ fontSize: 11, color: "#8a8378", flex: 1 }}>{l.k}</span>
+            {modif && (
+              <button type="button" onClick={() => l.onChange(null)} title={`Revenir à Pennylane (${l.suffix === "%" ? n1(l.base) + " %" : eur0(l.base)})`}
+                style={{ border: "none", background: "none", color: "#b45309", cursor: "pointer", fontSize: 13, lineHeight: 1, padding: "0 2px" }}>↺</button>
+            )}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+              <input type="number" value={Number.isFinite(l.v) ? l.v : ""} step={l.step} min={0}
+                onChange={e => l.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                style={{ width: 74, padding: "2px 4px", borderRadius: 6, border: `1px solid ${modif ? "#b45309" : "#ddd6c8"}`, fontFamily: OSWALD, fontSize: 16, fontWeight: 700, color: modif ? "#b45309" : "#1a1a1a", textAlign: "right", background: "#fff" }} />
+              <span style={{ fontSize: 10, color: "#999" }}>{l.suffix}</span>
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -162,6 +192,8 @@ export function CroisiereSimulateur({ etabId, etabColor }: { etabId: string; eta
   const [renta, setRenta] = useState<Renta | null>(null);
   const [loading, setLoading] = useState(true);
   const [sim, setSim] = useState<Sim | null>(null);
+  const [structure, setStructure] = useState<Structure | null>(null); // null = pas encore chargé
+  const [simSaved, setSimSaved] = useState<Partial<Sim> | null | undefined>(undefined); // undefined = pas encore chargé
 
   // ── Chargement réel (ventes) + charges (Pennylane, dernier mois complet) ──
   useEffect(() => {
@@ -172,13 +204,19 @@ export function CroisiereSimulateur({ etabId, etabColor }: { etabId: string; eta
       const from = new Date(to); from.setDate(from.getDate() - semaines * 7 + 1);
       const m0 = new Date(); m0.setDate(1); m0.setMonth(m0.getMonth() - 1);
       const m1 = new Date(); m1.setDate(0);
-      const [s, r] = await Promise.all([
+      const [s, r, st, sv] = await Promise.all([
         fetch(`/api/ventes/stats?etablissement_id=${etabId}&from=${iso(from)}&to=${iso(to)}`).then(x => x.json()).catch(() => null),
         fetch(`/api/rentabilite?etablissement_id=${etabId}&from=${iso(m0)}&to=${iso(m1)}`).then(x => x.json()).catch(() => null),
+        loadEtabParam<Structure>(etabId, "croisiere_structure"),
+        loadEtabParam<Partial<Sim>>(etabId, "croisiere_sim"),
       ]);
       if (cancelled) return;
       setStats(s?.stats ?? null);
       setRenta(r && !r.error ? r : null);
+      setStructure(st ?? {});
+      // Ancienne mémoire locale (avant la table etablissement_params) : reprise une fois
+      const legacy = sv == null ? localStorage.getItem(`croisiere:${etabId}`) : null;
+      setSimSaved(sv ?? (legacy ? JSON.parse(legacy) as Partial<Sim> : null));
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -219,13 +257,28 @@ export function CroisiereSimulateur({ etabId, etabColor }: { etabId: string; eta
     const gerants = renta.exploitationDetail.find(d => /gérant/i.test(d.libelle))?.montant ?? 0;
     const foodCost = renta.margeBrute?.foodCostPct ?? 28;
     const ratioHt = renta.ca.ttc > 0 ? renta.ca.ht / renta.ca.ttc : 1 / 1.1;
-    return { ms, fixesHorsMs: expl - gerants, gerants, foodCost, caHt: renta.ca.ht, ratioHt };
-  }, [renta]);
+    const base = { ms, fixesHorsMs: expl - gerants, gerants, foodCost };
+    const o = structure ?? {};
+    return {
+      ms: o.ms ?? base.ms, fixesHorsMs: o.fixes ?? base.fixesHorsMs, gerants: o.gerants ?? base.gerants, foodCost: o.foodCost ?? base.foodCost,
+      base, corrige: o.ms != null || o.fixes != null || o.gerants != null || o.foodCost != null,
+      caHt: renta.ca.ht, ratioHt,
+    };
+  }, [renta, structure]);
+  const setStruct = (patch: Structure) => {
+    const next: Structure = { ...(structure ?? {}) };
+    for (const [k, v] of Object.entries(patch) as [keyof Structure, number | null | undefined][]) {
+      if (v == null || !Number.isFinite(v)) delete next[k]; else next[k] = v;
+    }
+    setStructure(next);
+    if (Object.keys(next).length === 0) void deleteEtabParam(etabId, "croisiere_structure");
+    else saveEtabParamDebounced(etabId, "croisiere_structure", next);
+  };
 
   // ── Pré-remplissage du simulateur depuis le réel (1 fois, puis mémoire locale) ──
   useEffect(() => {
-    if (!reel || !charges || sim) return;
-    const saved = localStorage.getItem(`croisiere:${etabId}`);
+    if (!reel || !charges || sim || simSaved === undefined) return;
+    const saved = simSaved;
     const base: Sim = {
       tmMidi: +reel.midi.tm.toFixed(2), tmSoir: +reel.soir.tm.toFixed(2), tmEmp: +reel.emp.tm.toFixed(2),
       covMidi: Math.round(reel.midi.covJour), covSoir: Math.round(reel.soir.covJour), empJour: Math.round(reel.emp.parJour),
@@ -235,13 +288,14 @@ export function CroisiereSimulateur({ etabId, etabColor }: { etabId: string; eta
       caCible: 0,
     };
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSim(saved ? { ...base, ...JSON.parse(saved) } : base);
-  }, [reel, charges, sim, etabId, semaines]);
+    setSim(saved ? { ...base, ...saved } : base);
+  }, [reel, charges, sim, simSaved, etabId, semaines]);
   const up = (patch: Partial<Sim>) => setSim(s => {
     const n = { ...(s as Sim), ...patch };
-    localStorage.setItem(`croisiere:${etabId}`, JSON.stringify(n));
+    saveEtabParamDebounced(etabId, "croisiere_sim", n);
     return n;
   });
+  const resetSim = () => { void deleteEtabParam(etabId, "croisiere_sim"); localStorage.removeItem(`croisiere:${etabId}`); setSimSaved(null); setSim(null); };
 
   // ── Seuil de rentabilité réel ──
   const seuil = useMemo(() => {
@@ -331,8 +385,11 @@ export function CroisiereSimulateur({ etabId, etabColor }: { etabId: string; eta
         ) : (
           <>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Col titre="Structure mensuelle (réel)" couleur="#1a1a1a" lignes={[
-                ["Masse salariale", eur0(charges.ms)], ["Gérants", eur0(charges.gerants)], ["Autres charges", eur0(charges.fixesHorsMs)], ["Food cost", n1(charges.foodCost) + " %"],
+              <ColEdit titre={charges.corrige ? "Structure mensuelle (corrigée)" : "Structure mensuelle (réel)"} couleur={charges.corrige ? "#b45309" : "#1a1a1a"} lignes={[
+                { k: "Masse salariale", v: Math.round(charges.ms), base: Math.round(charges.base.ms), suffix: "€", step: 100, onChange: v => setStruct({ ms: v }) },
+                { k: "Gérants", v: Math.round(charges.gerants), base: Math.round(charges.base.gerants), suffix: "€", step: 100, onChange: v => setStruct({ gerants: v }) },
+                { k: "Autres charges", v: Math.round(charges.fixesHorsMs), base: Math.round(charges.base.fixesHorsMs), suffix: "€", step: 100, onChange: v => setStruct({ fixes: v }) },
+                { k: "Food cost", v: +charges.foodCost.toFixed(1), base: +charges.base.foodCost.toFixed(1), suffix: "%", step: 0.5, onChange: v => setStruct({ foodCost: v }) },
               ]} />
               <Col titre="CA nécessaire" couleur={etabColor} lignes={[
                 ["HT / mois", eur0(seuil.caHtMois)], ["TTC / jour", eur0(seuil.caTtcJour)], ["Ton réel / jour", eur0(seuil.caReelTtcJour)],
@@ -340,6 +397,11 @@ export function CroisiereSimulateur({ etabId, etabColor }: { etabId: string; eta
               <Col titre="Couverts / jour au seuil" couleur="#2D6A4F" lignes={[
                 ["Midi", n1(seuil.covMidi)], ["Soir", n1(seuil.covSoir)], ["Emporter", n1(seuil.emp)],
               ]} />
+            </div>
+            <div style={{ fontSize: 10.5, color: charges.corrige ? "#b45309" : "#999", marginTop: 8, lineHeight: 1.5 }}>
+              {charges.corrige
+                ? <>Structure corrigée à la main (↺ pour revenir au chiffre Pennylane). Utile quand un mois n&apos;est pas représentatif — ex. plusieurs virements gérants passés le même mois.</>
+                : <>Chiffres Pennylane du mois dernier — tu peux corriger chaque montant si le mois n&apos;est pas représentatif (ex. virements gérants groupés).</>}
             </div>
             <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, fontSize: 12.5, lineHeight: 1.5,
               background: seuil.caReelTtcJour >= seuil.caTtcJour ? "rgba(45,106,79,0.08)" : "rgba(220,38,38,0.07)",
@@ -458,8 +520,11 @@ export function CroisiereSimulateur({ etabId, etabColor }: { etabId: string; eta
             </div>
           </div>
 
-          <div style={{ fontSize: 10.5, color: "#999", padding: "0 18px 16px", lineHeight: 1.5 }}>
-            Pré-rempli avec ton réel des {semaines} dernières semaines et les charges Pennylane du mois dernier. Tes réglages sont mémorisés sur cet appareil.
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 10.5, color: "#999", padding: "0 18px 16px", lineHeight: 1.5 }}>
+            <span>Pré-rempli avec ton réel des {semaines} dernières semaines et les charges du mois dernier (corrigées si besoin ci-dessus). Tes réglages sont mémorisés pour tous tes appareils.</span>
+            <button type="button" onClick={resetSim} style={{ fontSize: 11, color: "#999", background: "none", border: "1px solid #ddd6c8", borderRadius: 12, padding: "3px 12px", cursor: "pointer", whiteSpace: "nowrap" }}>
+              ↺ Réinitialiser le simulateur
+            </button>
           </div>
         </div>
       )}

@@ -28,6 +28,7 @@ type ProductRow = {
   marge_pct: number | null;
   food_cost_pct: number | null;
   matched: boolean;
+  linked_no_cost?: string | null;
 };
 
 type CategoryRow = {
@@ -1394,7 +1395,7 @@ function MargesPage() {
                                   fontWeight: 400,
                                 }}
                               >
-                                non matche
+                                {p.linked_no_cost ? `relié · ${p.linked_no_cost}` : "non relié"}
                               </span>
                             )}
                           </td>

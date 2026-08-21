@@ -46,6 +46,8 @@ type ProductRow = {
   marge_pct: number | null;
   food_cost_pct: number | null;
   matched: boolean;
+  /** Relié (recette/ingrédient) mais sans coût calculable : fiche incomplète ou ingrédient sans prix */
+  linked_no_cost?: string | null;
 };
 
 /* ── GET /api/ventes/marges?etablissement_id=X&from=YYYY-MM-DD&to=YYYY-MM-DD ── */
@@ -85,16 +87,27 @@ export async function GET(req: NextRequest) {
     return all;
   }
 
+  // Convention kitchen_recipes.establishments : slugs bello_mio / piccola, NULL = visible partout.
+  const { data: etabRow } = await supabaseAdmin.from("etablissements").select("slug").eq("id", etabId).maybeSingle();
+  const etabSlug = (etabRow?.slug as string | undefined) ?? null;
+  const recipeFilter = [
+    `etablissement_id.eq.${etabId}`,
+    "establishments.is.null",
+    ...(etabSlug ? [`establishments.cs.{"${etabSlug}"}`] : []),
+  ].join(",");
+
   const [allVentes, { data: kitchenData }] = await Promise.all([
     fetchVentes(),
     supabaseAdmin
       .from("kitchen_recipes")
       .select("id,name,category,total_cost,cost_per_portion,cost_per_kg")
       .eq("is_draft", false)
-      .eq("etablissement_id", etabId),
+      .or(recipeFilter),
   ]);
 
   const recipeCosts = new Map<string, RecipeCost>();
+  // Produits reliés à une fiche/un ingrédient sans coût → signalés à part (pas « non relié »)
+  const linkedNoCost = new Map<string, string>();
 
   for (const r of kitchenData ?? []) {
     const isPizza = r.category === "pizza";
@@ -109,6 +122,8 @@ export async function GET(req: NextRequest) {
         type: isPizza ? "pizza" : isCocktail ? "cocktail" : "kitchen",
         recipeCategory: isPizza ? "Pizze" : isCocktail ? "Cocktails" : (r.category || "Cuisine"),
       });
+    } else {
+      linkedNoCost.set(normalize(r.name), `fiche « ${r.name} » sans coût`);
     }
   }
 
@@ -222,6 +237,8 @@ export async function GET(req: NextRequest) {
               type: isPizza ? "pizza" : "kitchen",
               recipeCategory: kr.category || "Cuisine",
             });
+          } else {
+            linkedNoCost.set(key, `fiche « ${kr.name} » sans coût`);
           }
         }
       } else if (pp.ingredient_id) {
@@ -244,8 +261,13 @@ export async function GET(req: NextRequest) {
               type: "ingredient",
               recipeCategory: "Ingredients",
             });
+          } else {
+            linkedNoCost.set(key, `ingrédient « ${ing.name} » sans prix`);
           }
         }
+      } else {
+        // Lien orphelin (recette/ingrédient supprimé puis recréé) : la cible a disparu
+        linkedNoCost.set(key, "lien Popina orphelin — à relier dans Catalogue Popina");
       }
     }
   }
@@ -332,6 +354,7 @@ export async function GET(req: NextRequest) {
         marge_pct: null,
         food_cost_pct: null,
         matched: false,
+        linked_no_cost: linkedNoCost.get(normalize(name)) ?? null,
       });
     }
   }
