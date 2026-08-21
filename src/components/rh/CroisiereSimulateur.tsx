@@ -27,7 +27,6 @@ const OSWALD = "var(--font-oswald), Oswald, sans-serif";
 const CARD: React.CSSProperties = { background: "#fff", borderRadius: 14, padding: "16px 18px", border: "1px solid #ddd6c8", marginBottom: 12 };
 const SEC: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 };
 const LAB: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.4 };
-const BIG: React.CSSProperties = { fontFamily: OSWALD, fontSize: 26, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.1 };
 const eur0 = (n: number) => Math.round(n).toLocaleString("fr-FR") + " €";
 const eur2 = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 const n1 = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
@@ -68,6 +67,91 @@ function Col({ titre, couleur, lignes }: { titre: string; couleur: string; ligne
           <span style={{ fontFamily: OSWALD, fontSize: 17, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>{v}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function SliderNum({ label, value, onChange, min, max, step, suffix, couleur }: { label: string; value: number; onChange: (v: number) => void; min: number; max: number; step: number; suffix?: string; couleur: string }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 2 }}>
+        <span style={LAB}>{label}</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+          <input type="number" value={Number.isFinite(value) ? value : ""} step={step} min={0}
+            onChange={e => onChange(Number(e.target.value))}
+            style={{ width: 74, padding: "4px 6px", borderRadius: 7, border: "1px solid #ddd6c8", fontSize: 15, fontWeight: 700, fontFamily: OSWALD, color: "#1a1a1a", textAlign: "right", background: "#fff" }} />
+          {suffix && <span style={{ fontSize: 11, color: "#999" }}>{suffix}</span>}
+        </span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={Math.min(max, Math.max(min, value))}
+        onChange={e => onChange(Number(e.target.value))}
+        style={{ width: "100%", accentColor: couleur }} />
+    </div>
+  );
+}
+
+function ServiceCard({ titre, couleur, tm, onTm, cov, onCov, cap, onCap, ca, libelleCov = "Couverts / service", libelleTm = "Ticket moyen TTC" }: {
+  titre: string; couleur: string; tm: number; onTm: (v: number) => void; cov: number; onCov: (v: number) => void;
+  cap?: number; onCap?: (v: number) => void; ca: number; libelleCov?: string; libelleTm?: string;
+}) {
+  const taux = cap && cap > 0 ? cov / cap : null;
+  const depasse = taux != null && taux > 1;
+  return (
+    <div style={{ borderRadius: 12, border: `1px solid ${depasse ? "#DC2626" : "#ddd6c8"}`, borderTop: `3px solid ${couleur}`, padding: "12px 14px", background: "#fff" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+        <span style={{ fontFamily: OSWALD, fontSize: 15, fontWeight: 700, color: couleur, textTransform: "uppercase", letterSpacing: 0.5 }}>{titre}</span>
+        <span style={{ fontFamily: OSWALD, fontSize: 17, fontWeight: 700, color: "#1a1a1a" }}>{eur0(ca)} <span style={{ fontSize: 10, color: "#999", fontFamily: "inherit", fontWeight: 600 }}>/ jour</span></span>
+      </div>
+      <SliderNum label={libelleTm} value={tm} onChange={onTm} min={10} max={80} step={0.5} suffix="€" couleur={couleur} />
+      <SliderNum label={libelleCov} value={cov} onChange={onCov} min={0} max={cap ? Math.max(cap * 1.3, 10) : 120} step={1} couleur={couleur} />
+      {cap != null && onCap && taux != null && (
+        <div>
+          <div style={{ height: 8, borderRadius: 4, background: "#f0ebe3", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.min(100, taux * 100)}%`, background: depasse ? "#DC2626" : taux > 0.9 ? "#b45309" : couleur, borderRadius: 4, transition: "width .15s" }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4, fontSize: 10.5, color: depasse ? "#DC2626" : "#999", fontWeight: depasse ? 700 : 500 }}>
+            <span>{depasse ? `Dépasse la capacité de ${cov - cap}` : `${Math.round(taux * 100)} % de la capacité`}</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>capacité
+              <input type="number" value={cap} min={1} onChange={e => onCap(Number(e.target.value))}
+                style={{ width: 48, padding: "2px 4px", borderRadius: 5, border: "1px solid #ddd6c8", fontSize: 11, fontWeight: 700, textAlign: "right", color: "#1a1a1a", background: "#fff" }} />
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stepper({ label, value, onChange, step = 1, suffix }: { label: string; value: number; onChange: (v: number) => void; step?: number; suffix?: string }) {
+  const btn: React.CSSProperties = { width: 28, height: 28, borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 700, color: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 };
+  const r = (v: number) => Math.round(v * 100) / 100;
+  return (
+    <div>
+      <div style={LAB}>{label}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+        <button type="button" onClick={() => onChange(Math.max(0, r(value - step)))} style={btn}>−</button>
+        <span style={{ fontFamily: OSWALD, fontSize: 18, fontWeight: 700, color: "#1a1a1a", minWidth: 36, textAlign: "center" }}>{value}{suffix ?? ""}</span>
+        <button type="button" onClick={() => onChange(r(value + step))} style={btn}>+</button>
+      </div>
+    </div>
+  );
+}
+
+function Pill({ label, value, ok, warn }: { label: string; value: string; ok?: boolean; warn?: boolean }) {
+  const bg = ok ? "rgba(165,214,167,0.28)" : warn ? "rgba(255,200,120,0.28)" : "rgba(255,255,255,0.16)";
+  return (
+    <div style={{ padding: "8px 12px", borderRadius: 10, background: bg, minWidth: 110 }}>
+      <div style={{ fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</div>
+      <div style={{ fontFamily: OSWALD, fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.15 }}>{value}</div>
+    </div>
+  );
+}
+
+function Objectif({ label, value, couleur, depasse }: { label: string; value: string; couleur: string; depasse?: boolean }) {
+  return (
+    <div style={{ padding: "8px 12px", borderRadius: 10, background: "#faf7f2", borderLeft: `3px solid ${depasse ? "#DC2626" : couleur}`, minWidth: 96 }}>
+      <div style={LAB}>{label}</div>
+      <div style={{ fontFamily: OSWALD, fontSize: 20, fontWeight: 700, color: depasse ? "#DC2626" : "#1a1a1a" }}>{value}</div>
     </div>
   );
 }
@@ -273,89 +357,109 @@ export function CroisiereSimulateur({ etabId, etabColor }: { etabId: string; eta
 
       {/* ═══ 3. LE SIMULATEUR ═══ */}
       {sim && res && (
-        <div style={CARD}>
-          <div style={SEC}>Le simulateur · mon régime de croisière</div>
-
-          <div style={{ ...LAB, marginBottom: 6 }}>Tickets moyens & couverts par jour</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 14 }}>
-            <Num label="TM midi" value={sim.tmMidi} onChange={v => up({ tmMidi: v })} step={0.5} suffix="€" />
-            <Num label="Couverts midi" value={sim.covMidi} onChange={v => up({ covMidi: v })} />
-            <Num label="TM soir" value={sim.tmSoir} onChange={v => up({ tmSoir: v })} step={0.5} suffix="€" />
-            <Num label="Couverts soir" value={sim.covSoir} onChange={v => up({ covSoir: v })} />
-            <Num label="Panier emporter" value={sim.tmEmp} onChange={v => up({ tmEmp: v })} step={0.5} suffix="€" />
-            <Num label="Cmd emporter / j" value={sim.empJour} onChange={v => up({ empJour: v })} />
+        <div style={{ ...CARD, padding: 0, overflow: "hidden" }}>
+          <div style={{ padding: "16px 18px 4px" }}>
+            <div style={SEC}>Le simulateur · mon régime de croisière</div>
           </div>
 
-          <div style={{ ...LAB, marginBottom: 6 }}>Capacité & calendrier</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 14 }}>
-            <Num label="Capacité midi" value={sim.capMidi} onChange={v => up({ capMidi: v })} suffix="cvts" />
-            <Num label="Capacité soir" value={sim.capSoir} onChange={v => up({ capSoir: v })} suffix="cvts" />
-            <Num label="Jours / mois" value={sim.joursMois} onChange={v => up({ joursMois: v })} />
-            <Num label="Couverts / serveur" value={sim.covParServeur} onChange={v => up({ covParServeur: v })} />
-          </div>
-
-          <div style={{ ...LAB, marginBottom: 6 }}>Équipe par service & coûts</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 14 }}>
-            <Num label="Salle midi" value={sim.salleMidi} onChange={v => up({ salleMidi: v })} suffix="pers." />
-            <Num label="Cuisine midi" value={sim.cuisineMidi} onChange={v => up({ cuisineMidi: v })} suffix="pers." />
-            <Num label="Salle soir" value={sim.salleSoir} onChange={v => up({ salleSoir: v })} suffix="pers." />
-            <Num label="Cuisine soir" value={sim.cuisineSoir} onChange={v => up({ cuisineSoir: v })} suffix="pers." />
-            <Num label="Heures midi" value={sim.hMidi} onChange={v => up({ hMidi: v })} step={0.5} suffix="h" />
-            <Num label="Heures soir" value={sim.hSoir} onChange={v => up({ hSoir: v })} step={0.5} suffix="h" />
-            <Num label="Coût horaire chargé" value={sim.coutHoraire} onChange={v => up({ coutHoraire: v })} step={0.5} suffix="€/h" />
-            <Num label="Food cost" value={sim.foodCost} onChange={v => up({ foodCost: v })} step={0.5} suffix="%" />
-            <Num label="Autres charges / mois" value={sim.chargesFixes} onChange={v => up({ chargesFixes: v })} step={100} suffix="€" />
-            <Num label="Gérants / mois" value={sim.gerants} onChange={v => up({ gerants: v })} step={100} suffix="€" />
+          {/* Services : 3 cartes avec curseurs + jauge de capacité */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12, padding: "6px 18px 16px" }}>
+            <ServiceCard titre="Midi" couleur="#D4775A"
+              tm={sim.tmMidi} onTm={v => up({ tmMidi: v })}
+              cov={sim.covMidi} onCov={v => up({ covMidi: v })} cap={sim.capMidi} onCap={v => up({ capMidi: v })}
+              ca={sim.covMidi * sim.tmMidi} />
+            <ServiceCard titre="Soir" couleur="#7c5c3a"
+              tm={sim.tmSoir} onTm={v => up({ tmSoir: v })}
+              cov={sim.covSoir} onCov={v => up({ covSoir: v })} cap={sim.capSoir} onCap={v => up({ capSoir: v })}
+              ca={sim.covSoir * sim.tmSoir} />
+            <ServiceCard titre="Emporter" couleur="#5e7a8a" libelleCov="Commandes / jour" libelleTm="Panier moyen"
+              tm={sim.tmEmp} onTm={v => up({ tmEmp: v })}
+              cov={sim.empJour} onCov={v => up({ empJour: v })}
+              ca={sim.empJour * sim.tmEmp} />
           </div>
 
           {/* Résultats */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 12 }}>
-            {[
-              ["CA TTC / jour", eur0(res.caJour), "#1a1a1a"],
-              ["CA HT / mois", eur0(res.caHtMois), "#1a1a1a"],
-              ["Masse salariale", eur0(res.ms), "#1a1a1a"],
-              ["Ratio MS / CA", n1(res.ratioMs) + " %", res.ratioMs <= 35 ? "#2D6A4F" : res.ratioMs <= 42 ? "#b45309" : "#b3261e"],
-              ["EBE / mois", eur0(res.ebe), res.ebe >= 0 ? "#2D6A4F" : "#b3261e"],
-              ["Serveurs midi / soir", `${res.serveursMidi} / ${res.serveursSoir}`, sim.salleMidi >= res.serveursMidi && sim.salleSoir >= res.serveursSoir ? "#2D6A4F" : "#b45309"],
-            ].map(([k, v, c]) => (
-              <div key={k} style={{ padding: "10px 12px", borderRadius: 10, background: "#faf7f2" }}>
-                <div style={LAB}>{k}</div>
-                <div style={{ ...BIG, fontSize: 22, color: c }}>{v}</div>
+          <div style={{ margin: "0 18px 16px", borderRadius: 14, padding: "18px 20px", color: "#fff",
+            background: `linear-gradient(135deg, ${etabColor} 0%, ${etabColor}cc 100%)` }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 18, alignItems: "flex-end", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ ...LAB, color: "rgba(255,255,255,0.75)" }}>CA TTC par jour</div>
+                <div style={{ fontFamily: OSWALD, fontSize: 40, fontWeight: 700, lineHeight: 1 }}>{eur0(res.caJour)}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 4 }}>{eur0(res.caMois)} TTC / mois · {eur0(res.caHtMois)} HT</div>
               </div>
-            ))}
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <Pill label="EBE / mois" value={eur0(res.ebe)} ok={res.ebe >= 0} />
+                <Pill label="MS / CA" value={n1(res.ratioMs) + " %"} ok={res.ratioMs <= 38} warn={res.ratioMs > 38 && res.ratioMs <= 45} />
+                <Pill label="Masse salariale" value={eur0(res.ms)} />
+                <Pill label="Serveurs midi · soir" value={`${res.serveursMidi} · ${res.serveursSoir}`}
+                  ok={sim.salleMidi >= res.serveursMidi && sim.salleSoir >= res.serveursSoir} warn={sim.salleMidi < res.serveursMidi || sim.salleSoir < res.serveursSoir} />
+              </div>
+            </div>
+            {(sim.salleMidi < res.serveursMidi || sim.salleSoir < res.serveursSoir) && (
+              <div style={{ marginTop: 12, fontSize: 12, color: "rgba(255,255,255,0.9)", background: "rgba(0,0,0,0.14)", borderRadius: 8, padding: "7px 10px" }}>
+                À {sim.covParServeur} couverts par serveur il faut <strong>{res.serveursMidi}</strong> en salle le midi et <strong>{res.serveursSoir}</strong> le soir.
+              </div>
+            )}
           </div>
 
-          {(sim.covMidi > sim.capMidi || sim.covSoir > sim.capSoir) && (
-            <div style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(220,38,38,0.07)", color: "#b3261e", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>
-              ⚠ Au-dessus de la capacité : {sim.covMidi > sim.capMidi && <>midi {sim.covMidi} &gt; {sim.capMidi}</>}{sim.covMidi > sim.capMidi && sim.covSoir > sim.capSoir && " · "}{sim.covSoir > sim.capSoir && <>soir {sim.covSoir} &gt; {sim.capSoir}</>}
+          {/* Équipe + coûts */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, padding: "0 18px 16px" }}>
+            <div style={{ background: "#faf7f2", borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ ...SEC, marginBottom: 12 }}>Mon équipe par service</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Stepper label="Salle midi" value={sim.salleMidi} onChange={v => up({ salleMidi: v })} />
+                <Stepper label="Salle soir" value={sim.salleSoir} onChange={v => up({ salleSoir: v })} />
+                <Stepper label="Cuisine midi" value={sim.cuisineMidi} onChange={v => up({ cuisineMidi: v })} />
+                <Stepper label="Cuisine soir" value={sim.cuisineSoir} onChange={v => up({ cuisineSoir: v })} />
+                <Stepper label="Heures midi" value={sim.hMidi} onChange={v => up({ hMidi: v })} step={0.5} suffix="h" />
+                <Stepper label="Heures soir" value={sim.hSoir} onChange={v => up({ hSoir: v })} step={0.5} suffix="h" />
+                <Stepper label="Couverts / serveur" value={sim.covParServeur} onChange={v => up({ covParServeur: v })} />
+                <Stepper label="Jours / mois" value={sim.joursMois} onChange={v => up({ joursMois: v })} />
+              </div>
             </div>
-          )}
-          {(sim.salleMidi < res.serveursMidi || sim.salleSoir < res.serveursSoir) && (
-            <div style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(180,83,9,0.08)", color: "#b45309", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>
-              À {sim.covParServeur} couverts par serveur il faut {res.serveursMidi} en salle le midi et {res.serveursSoir} le soir.
+            <div style={{ background: "#faf7f2", borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ ...SEC, marginBottom: 12 }}>Mes coûts</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Num label="Coût horaire chargé" value={sim.coutHoraire} onChange={v => up({ coutHoraire: v })} step={0.5} suffix="€/h" />
+                <Num label="Food cost" value={sim.foodCost} onChange={v => up({ foodCost: v })} step={0.5} suffix="%" />
+                <Num label="Autres charges / mois" value={sim.chargesFixes} onChange={v => up({ chargesFixes: v })} step={100} suffix="€" />
+                <Num label="Gérants / mois" value={sim.gerants} onChange={v => up({ gerants: v })} step={100} suffix="€" />
+              </div>
+              <div style={{ fontSize: 10.5, color: "#999", marginTop: 10, lineHeight: 1.5 }}>
+                Masse salariale = (salle + cuisine) × heures × coût horaire × jours + gérants. EBE = CA HT − matières − masse salariale − autres charges.
+              </div>
             </div>
-          )}
+          </div>
 
-          {/* Objectif CA */}
-          <div style={{ borderTop: "1px solid #f0ebe3", paddingTop: 12, marginTop: 4 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(140px, 200px) 1fr", gap: 14, alignItems: "end" }}>
-              <Num label="Je vise un CA TTC / mois" value={sim.caCible} onChange={v => up({ caCible: v })} step={1000} suffix="€" />
-              {res.cible ? (
-                <div style={{ fontSize: 13, color: "#1a1a1a", lineHeight: 1.6 }}>
-                  Soit <strong>{eur0(res.cibleJour)} TTC par jour</strong> → avec tes tickets moyens et ta répartition actuelle :{" "}
-                  <strong style={{ color: res.cible.covMidi > sim.capMidi ? "#b3261e" : "#2D6A4F" }}>{n1(res.cible.covMidi)} couverts le midi</strong>,{" "}
-                  <strong style={{ color: res.cible.covSoir > sim.capSoir ? "#b3261e" : "#2D6A4F" }}>{n1(res.cible.covSoir)} le soir</strong>,{" "}
-                  <strong>{n1(res.cible.emp)} commandes à emporter</strong>
-                  {" "}— et {Math.ceil(res.cible.covMidi / Math.max(1, sim.covParServeur))} / {Math.ceil(res.cible.covSoir / Math.max(1, sim.covParServeur))} serveurs.
-                  {(res.cible.covMidi > sim.capMidi || res.cible.covSoir > sim.capSoir) && <> <span style={{ color: "#b3261e" }}>Ça dépasse ta capacité : il faut monter le ticket moyen.</span></>}
+          {/* Objectif */}
+          <div style={{ margin: "0 18px 18px", borderRadius: 12, border: `2px solid ${etabColor}33`, padding: "14px 16px", background: "#fff" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(160px, 220px) 1fr", gap: 16, alignItems: "center" }}>
+              <div>
+                <div style={LAB}>Je vise un CA TTC / mois</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                  <input type="number" step={1000} min={0} value={sim.caCible || ""} placeholder="ex. 180 000"
+                    onChange={e => up({ caCible: Number(e.target.value) })}
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1.5px solid ${etabColor}66`, fontSize: 18, fontWeight: 700, fontFamily: OSWALD, color: "#1a1a1a", background: "#fff" }} />
+                  <span style={{ color: "#999", fontSize: 13 }}>€</span>
                 </div>
-              ) : <div style={{ fontSize: 12, color: "#999" }}>Saisis un objectif pour obtenir les couverts nécessaires à tes tickets moyens.</div>}
+              </div>
+              {res.cible ? (
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <Objectif label="Midi" value={n1(res.cible.covMidi) + " cvts"} couleur="#D4775A" depasse={res.cible.covMidi > sim.capMidi} />
+                  <Objectif label="Soir" value={n1(res.cible.covSoir) + " cvts"} couleur="#7c5c3a" depasse={res.cible.covSoir > sim.capSoir} />
+                  <Objectif label="Emporter" value={n1(res.cible.emp) + " cmd"} couleur="#5e7a8a" />
+                  <Objectif label="Serveurs" value={`${Math.ceil(res.cible.covMidi / Math.max(1, sim.covParServeur))} · ${Math.ceil(res.cible.covSoir / Math.max(1, sim.covParServeur))}`} couleur="#1a1a1a" />
+                  <div style={{ flexBasis: "100%", fontSize: 12, color: (res.cible.covMidi > sim.capMidi || res.cible.covSoir > sim.capSoir) ? "#b3261e" : "#2D6A4F", fontWeight: 600 }}>
+                    {eur0(res.cibleJour)} TTC par jour, à tes tickets moyens et ta répartition actuelle.
+                    {(res.cible.covMidi > sim.capMidi || res.cible.covSoir > sim.capSoir) ? " Ça dépasse ta capacité : monte le ticket moyen plutôt que les couverts." : " C'est dans ta capacité."}
+                  </div>
+                </div>
+              ) : <div style={{ fontSize: 12.5, color: "#999" }}>Saisis un objectif : tu obtiens les couverts midi / soir / emporter et l&apos;équipe nécessaires à tes tickets moyens.</div>}
             </div>
           </div>
 
-          <div style={{ fontSize: 10.5, color: "#999", marginTop: 12, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 10.5, color: "#999", padding: "0 18px 16px", lineHeight: 1.5 }}>
             Pré-rempli avec ton réel des {semaines} dernières semaines et les charges Pennylane du mois dernier. Tes réglages sont mémorisés sur cet appareil.
-            Masse salariale simulée = (salle + cuisine) × heures × coût horaire chargé × jours + gérants. EBE = CA HT − matières − masse salariale − autres charges.
           </div>
         </div>
       )}
