@@ -116,36 +116,80 @@ function normalizeLineHead(
   return { name: head, qty, unit: uMatch ? "pc" : null, notes: null, piece_volume_ml: null };
 }
 
+// Lignes d'en-tête / de page qui ne sont jamais une suite de désignation
+const NON_CONTINUATION = /^(Pensez|Facture\s*N|Date\b|Client\b|Page\b|SAS MAEL|\d{2}\/\d{2}\/\d{4}\b|\d+\s+rue|35400|Tél|N\.I\.I|S\.I\.R|R\.C\.S|N\.A\.F|IBAN|BIC|Mode de r|Prélèvement|Echéance|Réf\b|DLC\/DLUO|Bon de livraison|Commande|Reprise|Pénalités|Indemnité|Bases HT|Totaux?\b|H\.T\.|T\.V\.A\.|Net\s+[àa]\s+payer)/i;
+
+/** Codes TVA Mael → taux réels (2 = 5,5 %, 5 = 20 %) */
+function maelTaxRate(code: number | null): number | null {
+  if (code === 2) return 5.5;
+  if (code === 5) return 20;
+  return code;
+}
+
+/** Vide une suite de désignation de ses préfixes DLC ("1*18/11/26", "PIECES X 2") */
+function cleanContinuation(raw: string): string {
+  return toText(raw)
+    .replace(/\s+/g, " ")
+    .replace(/^(?:\d+\*\s*\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*)+/i, "")
+    .replace(/^PIECES?\s+X\s*\d+\s*/i, "")
+    .trim();
+}
+
 function parseLines(text: string): ParsedLine[] {
-  const tmp: ParsedLine[] = [];
+  const out: ParsedLine[] = [];
 
   const rows = text
     .split(/\r?\n/)
     .map((x) => x.trim())
     .filter(Boolean);
 
-  for (const r of rows) {
+  const TAIL = /([0-9][0-9\s.,]*)\s+([0-9][0-9\s.,]*)\s+([0-9]{1,2}(?:[.,][0-9]+)?)\s*%?\s*$/;
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
     const m = r.match(/\b(ART[0-9A-Z]{3,})\b\s+(.*)$/i);
     if (!m) continue;
 
     const sku = m[1].toUpperCase();
     const rest = m[2];
 
-    const tail = rest.match(/([0-9][0-9\s.,]*)\s+([0-9][0-9\s.,]*)\s+([0-9]{1,2}(?:[.,][0-9]+)?)\s*%?\s*$/);
+    const tail = rest.match(TAIL);
     if (!tail) continue;
 
     const unitPrice = parseFrenchNumber(tail[1]);
     const totalPrice = parseFrenchNumber(tail[2]);
-    const taxRate = parseFrenchNumber(tail[3]);
+    const taxRate = maelTaxRate(parseFrenchNumber(tail[3]));
 
     const headRaw = rest.slice(0, Math.max(0, rest.length - tail[0].length)).trim();
     const norm = normalizeLineHead(headRaw);
 
-    const volMl = norm.piece_volume_ml;
+    // Suite de désignation sur les 1-2 lignes suivantes (Mael coupe les
+    // libellés longs : "…IGP ~" / "1,5 kg", "(128 x" / "12,5 g) 1,6 kg",
+    // ou DLC multiples "2*04/11/26" / "1*18/11/26 Blanc d'oeuf liquide 1 kg").
+    const suite: string[] = [];
+    for (let k = 1; k <= 2 && i + k < rows.length; k++) {
+      const next = rows[i + k];
+      if (/\bART[0-9A-Z]{3,}\b/i.test(next)) break;
+      if (NON_CONTINUATION.test(next)) break;
+      if (TAIL.test(next) && /\d+,\d{2}\s+\d+,\d{2}/.test(next)) break; // une autre ligne chiffrée
+      suite.push(cleanContinuation(next));
+    }
 
-    tmp.push({
+    // Nom : la 1re ligne, sauf si elle ne contenait que des DLC ("2*04/11/26")
+    // → le nom est alors sur la suite. Les libellés coupés gardent leur
+    // 1re ligne comme nom (stabilité du rattachement aux produits existants),
+    // la suite ne sert qu'à lire le poids/volume du conditionnement.
+    let name = norm.name;
+    if (!name || /^[\d*\/\s]+$/.test(name)) {
+      name = suite.filter(Boolean).join(" ").trim();
+    }
+    const libelleComplet = [name, ...suite].filter(Boolean).join(" ");
+
+    const volMl = norm.piece_volume_ml ?? (norm.unit === "pc" ? extractVolumeFromName(libelleComplet) : null);
+
+    out.push({
       sku,
-      name: norm.name,
+      name,
       quantity: norm.qty,
       unit: norm.unit,
       unit_price: unitPrice,
@@ -153,35 +197,46 @@ function parseLines(text: string): ParsedLine[] {
       tax_rate: taxRate,
       notes: norm.notes,
       // piece_weight_g seulement si c'est une pièce sans volume connu
-      piece_weight_g: (norm.unit === "pc" && volMl == null) ? extractWeightGFromName(norm.name) : null,
+      piece_weight_g: (norm.unit === "pc" && volMl == null)
+        ? (extractWeightGFromName(name) ?? extractWeightGFromName(libelleComplet))
+        : null,
       piece_volume_ml: volMl,
     });
   }
 
-  const seen = new Set<string>();
-  const out: ParsedLine[] = [];
-  for (const l of tmp) {
-    const key = [
-      l.sku ?? "",
-      l.name,
-      l.quantity ?? "",
-      l.unit ?? "",
-      l.unit_price ?? "",
-      l.total_price ?? "",
-      l.tax_rate ?? "",
-      l.notes ?? "",
-    ].join("|");
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(l);
-  }
-
+  // PAS de déduplication : un même produit livré deux fois à l'identique
+  // (deux bons de livraison sur la même facture) est deux lignes réelles —
+  // l'ancienne dédup jetait ~270 € par facture (FB9599 du 21/08/2026).
   return out;
+}
+
+/**
+ * Remise globale en pied de facture ("Tx: 2,00" dans le bloc Bases HT) :
+ * les lignes sont facturées AVANT remise. On la répercute sur chaque ligne
+ * uniquement si le calcul retombe sur le total HT (sinon on ne touche à
+ * rien) — le food cost reflète ainsi le prix réellement payé.
+ */
+function applyGlobalDiscount(lines: ParsedLine[], text: string, totalHt: number | null): void {
+  if (totalHt == null || lines.length === 0) return;
+  const m = text.match(/Tx\s*:\s*([0-9]+(?:[.,][0-9]+)?)/i);
+  const rate = m ? parseFrenchNumber(m[1]) : null;
+  if (!rate || rate <= 0 || rate >= 50) return;
+  const factor = 1 - rate / 100;
+  const sum = lines.reduce((a, l) => a + (l.total_price ?? 0), 0);
+  if (Math.abs(sum * factor - totalHt) > 1) return; // remise non uniforme : on n'invente rien
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  for (const l of lines) {
+    if (l.unit_price != null) l.unit_price = r2(l.unit_price * factor);
+    if (l.total_price != null) l.total_price = r2(l.total_price * factor);
+    const note = `remise ${String(rate).replace(".", ",")} % déduite`;
+    l.notes = l.notes ? `${l.notes} · ${note}` : note;
+  }
 }
 
 export function parseMaelInvoiceText(text: string): ParsedInvoice {
   const meta = extractMeta(text);
   const lines = parseLines(text);
+  applyGlobalDiscount(lines, text, meta.total_ht);
 
   return {
     supplier: "MAEL",
