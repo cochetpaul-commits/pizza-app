@@ -33,6 +33,7 @@ const ETAB_KEYWORDS: Record<string, { name: string; keywords: string[] }> = {
 
 const SUPPLIER_KEYWORDS: Record<string, { name: string; keywords: string[] }> = {
   mael:     { name: "Maël",     keywords: ["MAEL", "MAËL", "MAEL SARL"] },
+  pomona:   { name: "Pomona TerreAzur", keywords: ["TERREAZUR", "TERRE AZUR", "TA BRETAGNE", "TA RENNES", "POMONA"] },
   metro:    { name: "Metro",    keywords: ["METRO", "MÉTRO", "METRO CASH", "METRO FRANCE"] },
   masse:    { name: "Masse",    keywords: ["MASSE"] },
   cozigou:  { name: "Cozigou",  keywords: ["COZIGOU"] },
@@ -99,6 +100,8 @@ export function supplierSlugToRoute(slug: string): string {
     sdpf: "sdpf",
     elien: "elien",
     hardy: "hardy",
+    snak: "snak",
+    pomona: "pomona",
   };
   return map[slug] ?? slug;
 }

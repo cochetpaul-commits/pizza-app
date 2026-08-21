@@ -24,6 +24,8 @@ export interface ParsedLine {
   notes: string | null;
   piece_weight_g: number | null;
   piece_volume_ml: number | null;
+  /** Catégorie imposée par le parser (ex. Pomona : famille F/M) — sinon détection par nom */
+  category?: Category | null;
 }
 
 export interface ParsedInvoice {
@@ -124,6 +126,7 @@ const SUPPLIER_CATEGORY: Record<string, string> = {
   sdpf: "produits_fins",
   progourmands: "produits_fins",
   lmdw: "spiritueux",
+  "pomona terreazur": "alimentaire_general",
 };
 
 function detectSupplierCategory(name: string): string | null {
@@ -388,7 +391,7 @@ export async function runImport(options: {
       }
       if (already) continue;
 
-      const cat = (detectCategoryFromName(nm) ?? fallbackCategory) as Category;
+      const cat = (l.category ?? detectCategoryFromName(nm) ?? fallbackCategory) as Category;
 
       // piece_volume_ml : valeur parsée, ou 750ml par défaut pour les boissons/alcools
       let pieceVolumeMl: number | null = l.piece_volume_ml ?? null;

@@ -57,6 +57,7 @@ const SUPPLIERS = [
   { slug: "sdpf", name: "SDPF" },
   { slug: "elien", name: "Eric Elien" },
   { slug: "hardy", name: "Maison Hardy" },
+  { slug: "pomona", name: "Pomona TerreAzur" },
 ];
 
 const ETABS = [
@@ -352,7 +353,7 @@ export default function InvoicesPage() {
         const etabId = getEtabId(etab);
 
         // Use dedicated parser if known, ai-parse if unknown
-        const endpoint = slug ? `/api/invoices/${slug}` : "/api/invoices/ai-parse";
+        const endpoint = slug ? `/api/invoices/${slug}` : "/api/invoices/scan";
 
         const res = await fetchApi(endpoint, {
           method: "POST",
