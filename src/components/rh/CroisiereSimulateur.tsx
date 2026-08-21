@@ -101,6 +101,155 @@ function ColEdit({ titre, couleur, lignes }: { titre: string; couleur: string; l
   );
 }
 
+/**
+ * Zone rentable d'un service : ticket moyen × couverts.
+ * La courbe est le seuil (TM × couverts = CA à réaliser sur ce service) ;
+ * tout ce qui est au-dessus est rentable. Un point plein = le réel,
+ * un point creux = le simulateur. Une seule teinte (celle du service),
+ * l'identité réel / simulé passe par la forme et l'étiquette.
+ */
+function ZoneRentable({ titre, couleur, caSeuil, cap, reelCov, reelTm, simCov, simTm }: {
+  titre: string; couleur: string; caSeuil: number; cap: number;
+  reelCov: number; reelTm: number; simCov: number; simTm: number;
+}) {
+  const [hover, setHover] = useState<number | null>(null); // couverts survolés
+  const W = 360, H = 220, ML = 40, MR = 14, MT = 16, MB = 30;
+  const pw = W - ML - MR, ph = H - MT - MB;
+  // Pas « ronds » (10 / 20 / 25 / 50…) pour ~4-5 graduations
+  const niceStep = (span: number, n: number) => {
+    const raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    return [1, 2, 2.5, 5, 10].map(m => m * mag).find(st => st >= raw) ?? 10 * mag;
+  };
+  const xStep = niceStep(Math.max(cap * 1.25, reelCov * 1.15, simCov * 1.15, 20), 5);
+  const xMax = Math.ceil(Math.max(cap * 1.25, reelCov * 1.15, simCov * 1.15, 20) / xStep) * xStep;
+  const yStep = niceStep(Math.max(reelTm, simTm, 20) * 1.5, 4);
+  const yMax = Math.ceil(Math.max(reelTm, simTm, 20) * 1.5 / yStep) * yStep;
+  const yMin = 0;
+  const X = (c: number) => ML + (c / xMax) * pw;
+  const Y = (t: number) => MT + ph - ((t - yMin) / (yMax - yMin)) * ph;
+  const tmSeuil = (c: number) => (c > 0 ? caSeuil / c : Infinity);
+
+  // Courbe du seuil (hyperbole), tronquée au cadre
+  const pts: [number, number][] = [];
+  for (let i = 0; i <= 120; i++) {
+    const c = (xMax * i) / 120;
+    const t = tmSeuil(c);
+    if (!Number.isFinite(t) || t > yMax) continue;
+    pts.push([X(c), Y(t)]);
+  }
+  const path = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  // Zone rentable = au-dessus de la courbe
+  const zone = pts.length
+    ? `${path} L${(ML + pw).toFixed(1)},${MT} L${pts[0][0].toFixed(1)},${MT} Z`
+    : "";
+
+  const xTicks = Array.from({ length: Math.round(xMax / xStep) + 1 }, (_, i) => i * xStep);
+  const yTicks = Array.from({ length: Math.round(yMax / yStep) + 1 }, (_, i) => i * yStep);
+  const rentable = (c: number, t: number) => c * t >= caSeuil;
+
+  const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const c = ((e.clientX - r.left) / r.width * W - ML) / pw * xMax;
+    setHover(c >= 0 && c <= xMax ? Math.round(c) : null);
+  };
+  const hv = hover != null && hover > 0 ? { c: hover, t: tmSeuil(hover) } : null;
+  const simAffiche = simCov > 0 && (Math.abs(simCov - reelCov) > 0.5 || Math.abs(simTm - reelTm) > 0.05);
+  const tipLeft = hv ? X(hv.c) > ML + pw * 0.6 : false;
+
+  const point = (c: number, t: number, plein: boolean, label: string, autreC: number | null) => {
+    const cx = X(Math.min(c, xMax)), cy = Y(Math.min(t, yMax));
+    const autreCx = autreC != null ? X(Math.min(autreC, xMax)) : null;
+    // côté de l'étiquette : à l'opposé de l'autre point s'il est proche, sinon vers l'intérieur du cadre
+    let right = autreCx != null && Math.abs(cx - autreCx) < 90 ? cx >= autreCx : cx < ML + pw * 0.65;
+    if (right && cx + 95 > ML + pw) right = false;
+    if (!right && cx - 85 < ML) right = true;
+    const tx = right ? cx + 9 : cx - 9;
+    // réel : étiquette sous le point · simulé : au-dessus → pas de collision quand ils se touchent
+    const y1 = plein ? cy + 13 : cy - 14, y2 = plein ? cy + 24 : cy - 3;
+    return (
+      <g key={label}>
+        <circle cx={cx} cy={cy} r={7} fill="#fff" />
+        <circle cx={cx} cy={cy} r={5} fill={plein ? couleur : "#fff"} stroke={couleur} strokeWidth={2} />
+        <text x={tx} y={y1} textAnchor={right ? "start" : "end"} fontSize={10} fontWeight={700} fill="#1a1a1a">{label}</text>
+        <text x={tx} y={y2} textAnchor={right ? "start" : "end"} fontSize={9.5} fill="#8a8378">{Math.round(c)} cvts × {n1(t)} €</text>
+      </g>
+    );
+  };
+
+  return (
+    <div style={{ flex: "1 1 300px", minWidth: 260 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 2 }}>
+        <span style={{ fontFamily: OSWALD, fontSize: 14, fontWeight: 700, color: couleur, textTransform: "uppercase", letterSpacing: 0.5 }}>{titre}</span>
+        <span style={{ fontSize: 10.5, color: "#8a8378" }}>seuil {eur0(caSeuil)} TTC / service</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", touchAction: "none" }}
+        onPointerMove={onMove} onPointerLeave={() => setHover(null)} role="img"
+        aria-label={`${titre} : ticket moyen minimum selon le nombre de couverts, seuil ${eur0(caSeuil)} par service`}>
+        {/* grille */}
+        {yTicks.map(t => (
+          <g key={t}>
+            <line x1={ML} x2={ML + pw} y1={Y(t)} y2={Y(t)} stroke="#ece6dc" strokeWidth={1} />
+            <text x={ML - 6} y={Y(t) + 3.5} textAnchor="end" fontSize={9.5} fill="#8a8378">{t} €</text>
+          </g>
+        ))}
+        {xTicks.map(c => (
+          <text key={c} x={X(c)} y={H - MB + 14} textAnchor="middle" fontSize={9.5} fill="#8a8378">{c}</text>
+        ))}
+        <text x={ML + pw} y={H - 4} textAnchor="end" fontSize={9} fill="#8a8378">couverts / service</text>
+        {/* zone rentable */}
+        {zone && <path d={zone} fill={couleur} opacity={0.1} />}
+        {zone && <text x={ML + pw - 6} y={MT + 14} textAnchor="end" fontSize={10} fontWeight={700} fill="#1a1a1a">zone rentable</text>}
+        {/* capacité */}
+        {cap > 0 && cap <= xMax && (
+          <g>
+            <line x1={X(cap)} x2={X(cap)} y1={MT} y2={MT + ph} stroke="#c9c1b3" strokeWidth={1} />
+            <text x={X(cap) + 4} y={MT + ph - 6} fontSize={9.5} fill="#8a8378">capacité {cap}</text>
+          </g>
+        )}
+        {/* seuil */}
+        {path && <path d={path} fill="none" stroke={couleur} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />}
+        {/* points */}
+        {reelCov > 0 && point(reelCov, reelTm, true, "Réel", simAffiche ? simCov : null)}
+        {simAffiche && point(simCov, simTm, false, "Simulé", reelCov > 0 ? reelCov : null)}
+        {/* survol */}
+        {hv && Number.isFinite(hv.t) && (
+          <g>
+            <line x1={X(hv.c)} x2={X(hv.c)} y1={MT} y2={MT + ph} stroke="#1a1a1a" strokeWidth={1} opacity={0.35} />
+            {hv.t <= yMax && <circle cx={X(hv.c)} cy={Y(hv.t)} r={4} fill="#fff" stroke={couleur} strokeWidth={2} />}
+            <g transform={`translate(${tipLeft ? X(hv.c) - 146 : X(hv.c) + 8}, ${MT + 24})`}>
+              <rect width={138} height={hv.t <= yMax ? 44 : 30} rx={6} fill="#1a1a1a" opacity={0.92} />
+              <text x={8} y={15} fontSize={10.5} fontWeight={700} fill="#fff">{hv.c} couverts</text>
+              {hv.t <= yMax
+                ? <>
+                    <text x={8} y={29} fontSize={10} fill="#e6e0d6">ticket mini {n1(hv.t)} €</text>
+                    <text x={8} y={40} fontSize={9.5} fill="#e6e0d6">{rentable(hv.c, reelTm) ? `rentable à ton ticket réel (${n1(reelTm)} €)` : `il manque ${n1(hv.t - reelTm)} € / couvert`}</text>
+                  </>
+                : <text x={8} y={25} fontSize={10} fill="#e6e0d6">ticket mini &gt; {yMax} € : trop peu de couverts</text>}
+            </g>
+          </g>
+        )}
+      </svg>
+      <div style={{ display: "flex", gap: 12, fontSize: 10, color: "#8a8378", marginTop: 2, flexWrap: "wrap" }}>
+        <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: couleur, verticalAlign: -1, marginRight: 4 }} />Réel</span>
+        <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, border: `2px solid ${couleur}`, boxSizing: "border-box", verticalAlign: -1, marginRight: 4 }} />Simulé</span>
+        <span><span style={{ display: "inline-block", width: 14, height: 2, background: couleur, verticalAlign: 3, marginRight: 4 }} />Seuil</span>
+        <span><span style={{ display: "inline-block", width: 9, height: 9, background: couleur, opacity: 0.15, verticalAlign: -1, marginRight: 4 }} />Zone rentable</span>
+      </div>
+      <details style={{ marginTop: 4 }}>
+        <summary style={{ fontSize: 10, color: "#8a8378", cursor: "pointer" }}>Voir les chiffres</summary>
+        <table style={{ fontSize: 10.5, borderCollapse: "collapse", marginTop: 4 }}>
+          <thead><tr><th style={{ textAlign: "left", color: "#8a8378", fontWeight: 600, paddingRight: 12 }}>Couverts</th><th style={{ textAlign: "right", color: "#8a8378", fontWeight: 600 }}>Ticket mini</th></tr></thead>
+          <tbody>
+            {[0.4, 0.6, 0.8, 1].map(f => Math.round(cap * f)).filter(c => c > 0).map(c => (
+              <tr key={c}><td style={{ paddingRight: 12, color: "#1a1a1a" }}>{c}{c === cap ? " (capacité)" : ""}</td><td style={{ textAlign: "right", fontWeight: 700, color: "#1a1a1a" }}>{n1(tmSeuil(c))} €</td></tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </div>
+  );
+}
+
 function SliderNum({ label, value, onChange, min, max, step, suffix, couleur }: { label: string; value: number; onChange: (v: number) => void; min: number; max: number; step: number; suffix?: string; couleur: string }) {
   return (
     <div style={{ marginBottom: 10 }}>
@@ -412,6 +561,20 @@ export function CroisiereSimulateur({ etabId, etabColor }: { etabId: string; eta
             </div>
             <div style={{ fontSize: 10.5, color: "#999", marginTop: 6 }}>
               Seuil = (masse salariale + gérants + autres charges) ÷ (1 − food cost), réparti midi / soir / emporter selon ta répartition réelle du CA, sur {seuil.joursMois} jours d&apos;ouverture par mois.
+            </div>
+
+            {/* Courbes ticket moyen × couverts */}
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid #f0ebe3" }}>
+              <div style={SEC}>Zone rentable · ticket moyen × couverts</div>
+              <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+                <ZoneRentable titre="Midi" couleur="#D4775A" caSeuil={seuil.caTtcJour * reel.partMidi} cap={sim?.capMidi ?? 85}
+                  reelCov={reel.midi.covJour} reelTm={reel.midi.tm} simCov={sim?.covMidi ?? 0} simTm={sim?.tmMidi ?? 0} />
+                <ZoneRentable titre="Soir" couleur="#7c5c3a" caSeuil={seuil.caTtcJour * reel.partSoir} cap={sim?.capSoir ?? 126}
+                  reelCov={reel.soir.covJour} reelTm={reel.soir.tm} simCov={sim?.covSoir ?? 0} simTm={sim?.tmSoir ?? 0} />
+              </div>
+              <div style={{ fontSize: 10.5, color: "#999", marginTop: 8, lineHeight: 1.5 }}>
+                La courbe est le seuil de ce service (à répartition midi / soir / emporter constante) : au-dessus tu gagnes, en dessous tu perds. Survole pour lire le ticket minimum à un nombre de couverts donné ; le point creux suit le simulateur ci-dessous.
+              </div>
             </div>
           </>
         )}
