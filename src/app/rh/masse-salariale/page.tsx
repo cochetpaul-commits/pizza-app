@@ -333,6 +333,14 @@ export default function MasseSalarialePage() {
   }], [handleImport]);
 
   const etabColor = etab?.couleur ?? ACCENT;
+  const [lastSyncLabel, setLastSyncLabel] = useState<string | null>(null);
+  useEffect(() => {
+    const ts = Number(localStorage.getItem("combo_last_sync") ?? 0);
+    if (!ts) return;
+    const h = Math.round((Date.now() - ts) / 3600000);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLastSyncLabel(h < 1 ? "il y a moins d'une heure" : `il y a ${h} h`);
+  }, [syncing]);
   const navRange = { from: selected?.from ?? "", to: selected?.to ?? "" };
 
   if (!etab) {
@@ -345,8 +353,16 @@ export default function MasseSalarialePage() {
       <div className={showMoney ? undefined : "no-money"} style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 100px" }}>
         {!showMoney && <style>{`.no-money [data-money] { filter: blur(8px); pointer-events: none; user-select: none; }`}</style>}
 
+        <style>{`
+          .ms-tabs { display: flex; gap: 4px; }
+          .ms-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+          @media (max-width: 640px) {
+            .ms-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+            .ms-kpis { grid-template-columns: 1fr 1fr; }
+          }
+        `}</style>
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 18, border: "1px solid #e8e0d0" }}>
+        <div className="ms-tabs" style={{ padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 18, border: "1px solid #e8e0d0" }}>
           {([
             { key: "reelle" as const, label: "Masse salariale" },
             { key: "tns" as const, label: "Statuts TNS" },
@@ -359,7 +375,6 @@ export default function MasseSalarialePage() {
               color: msTab === t.key ? "#1a1a1a" : "#777",
               fontSize: 12, fontWeight: 700, cursor: msTab === t.key ? "default" : "pointer",
               boxShadow: msTab === t.key ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-              whiteSpace: "nowrap",
             }}>
               {t.label}
             </button>
@@ -453,8 +468,14 @@ export default function MasseSalarialePage() {
           </div>
         </div>
 
+        {/* Nature des chiffres : estimation planning × contrats, pas la paie */}
+        <div style={{ fontSize: 11, color: "#8a8378", margin: "-6px 0 12px", lineHeight: 1.45 }}>
+          <strong style={{ color: "#6f6a61" }}>Estimation</strong> : heures du planning Combo (synchro chaque matin à 7h{lastSyncLabel ? `, dernière ${lastSyncLabel}` : ""}) × salaires des contrats × 42 % de charges.
+          La masse salariale réellement payée est dans <a href="/rentabilite" style={{ color: ACCENT, fontWeight: 600 }}>Rentabilité</a> (Pennylane).
+        </div>
+
         {/* ═══ KPIs compacts ═══ */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+        <div className="ms-kpis">
           <div style={CARD}>
             <div style={LABEL}>MS chargee</div>
             <div data-money style={KPI}>{fmt(totals.msChargee)}{"\u20AC"}</div>

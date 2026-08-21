@@ -431,7 +431,7 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
                         </div>
 
                         {/* 3 KPIs */}
-                        <div className="ventes-sim-tns-kpis" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
+                        <div className="ventes-sim-tns-kpis" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 20 }}>
                           <div style={{ ...kpiCard, borderColor: "#8B7EC820" }}>
                             <div style={{ fontSize: 22, fontWeight: 700, color: "#8B7EC8", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
                               {fmt(tnsNet * TAUX_CHARGES_TNS)} {"\u20AC"}
@@ -736,7 +736,7 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
                               </div>
                             </div>
 
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 6 }}>
                               {([
                                 { label: "CDI", val: fmt(s.coutCDI) + " \u20AC" },
                                 { label: "CDD", val: fmt(s.coutCDD) + " \u20AC" },
