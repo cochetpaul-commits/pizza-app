@@ -130,7 +130,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   /* ── Render nav item (level 3) ── */
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
-  const renderItem = (item: NavItemV2) => {
+  // `etabCtx` : resto de la section parente — un clic direct sur une page
+  // sous Bello Mio / Piccola Mia doit sélectionner ce resto, sinon la page
+  // s'ouvre en vue groupe et affiche « Sélectionnez un établissement ».
+  const renderItem = (item: NavItemV2, etabCtx?: { id: string } & Record<string, unknown>) => {
     if (!isRoleAllowed(item.roles, role)) return null;
     if (item.permission && !can(item.permission)) return null;
     const active = isActive(item.href);
@@ -141,7 +144,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <Link
         key={itemKey}
         href={item.href}
-        onClick={handleNav}
+        onClick={() => {
+          if (etabCtx && current?.id !== etabCtx.id) { setGroupView(false); setCurrent(etabCtx as typeof current); }
+          handleNav();
+        }}
         onMouseEnter={() => setHoveredItem(itemKey)}
         onMouseLeave={() => setHoveredItem(null)}
         style={{
@@ -510,7 +516,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                             </button>
                             {subOpen && (
                               <div style={{ marginBottom: 4 }}>
-                                {items.map(item => renderItem(item))}
+                                {items.map(item => renderItem(item, etab))}
                               </div>
                             )}
                           </div>
