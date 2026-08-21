@@ -172,10 +172,14 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setGroupView = useCallback((b: boolean) => {
+    // La vue groupe est réservée aux administrateurs : pour un manager elle
+    // vidait l'établissement courant → menus absents, « Sélectionnez un
+    // établissement » partout (vécu par Alberto sur Piccola le 21/08).
+    if (b && !isGroupAdmin) return;
     setGroupViewRaw(b);
     localStorage.setItem(LS_GROUP, b ? "true" : "false");
     if (b) setCurrentRaw(null);
-  }, []);
+  }, [isGroupAdmin]);
 
   // Valeur stable : evite de re-rendre tous les consommateurs a chaque render
   const value = useMemo(() => ({

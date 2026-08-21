@@ -108,14 +108,20 @@ export function SmartSelect(props: {
       .map((x) => x.o);
   }, [options, q, menuMax]);
 
+  // Liste TOUJOURS sous le champ (jamais au-dessus : sur mobile / iPad avec
+  // le clavier ouvert, la liste vers le haut recouvrait le formulaire et on
+  // ne voyait plus ce qu'on tapait). La hauteur disponible est mesurée avec
+  // le viewport visuel (hors clavier) ; s'il manque de place, on fait
+  // défiler la page pour remonter le champ.
   const measure = useCallback(() => {
     const el = inputRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - r.bottom - 12;
-    const spaceAbove = r.top - 12;
-    const maxHeight = Math.max(spaceBelow, spaceAbove, 200);
-    const top = spaceBelow >= 200 ? r.bottom + 6 : r.top - Math.min(maxHeight, 340) - 6;
+    const vv = window.visualViewport;
+    const viewBottom = (vv?.offsetTop ?? 0) + (vv?.height ?? window.innerHeight);
+    const spaceBelow = viewBottom - r.bottom - 12;
+    const maxHeight = Math.max(spaceBelow, 160);
+    const top = r.bottom + 6;
 
     // Sur mobile : pleine largeur
     if (isMobile()) {
@@ -128,6 +134,17 @@ export function SmartSelect(props: {
   useLayoutEffect(() => {
     if (!open) return;
     measure();
+    // Pas assez de place sous le champ → remonter le champ vers le haut de l'écran
+    const el = inputRef.current;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      const vv = window.visualViewport;
+      const viewTop = vv?.offsetTop ?? 0;
+      const viewBottom = viewTop + (vv?.height ?? window.innerHeight);
+      if (viewBottom - r.bottom < 240) {
+        window.scrollBy({ top: r.top - viewTop - 72, behavior: "smooth" });
+      }
+    }
   }, [open, measure]);
 
   useEffect(() => {

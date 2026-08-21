@@ -819,6 +819,29 @@ export function CatalogueContent() {
         }
       }
     }
+    // Sous-catégories déclarées en base mais encore vides (ex. « APERITIVI »
+    // sous Cocktail) : sans ça, une sous-catégorie n'apparaissait qu'une
+    // fois une recette rangée dedans — impossible de la voir juste créée.
+    for (const tg of result) {
+      const isCustom = tg.type.startsWith("custom:");
+      const slug = isCustom ? tg.type.slice(7) : tg.type;
+      const dbCat = dbCategories.find(c => c.slug === slug);
+      const declared = (dbCat?.sous_categories ?? []).filter(Boolean);
+      if (declared.length === 0) continue;
+      const first = tg.subGroups[0];
+      let base = (first?.key ?? (isCustom ? `cuisine:${slug}` : tg.type)).replace(/:_none$/, "");
+      for (const sc of declared) if (base.endsWith(`:${sc}`)) base = base.slice(0, -(sc.length + 1));
+      const labels = new Set(tg.subGroups.map(sg => sg.label));
+      for (const sc of declared) {
+        if (labels.has(sc)) continue;
+        // Un seul sous-groupe « sans sous-catégorie » → le marquer comme tel
+        if (tg.subGroups.length === 1 && first && first.key === base) {
+          tg.subGroups[0] = { ...first, key: `${base}:_none` };
+        }
+        tg.subGroups.push({ key: `${base}:${sc}`, label: sc, color: first?.color ?? tg.color, items: [] });
+      }
+    }
+
     result.sort((a, b) => {
       const ia = typeOrder.indexOf(a.type);
       const ib = typeOrder.indexOf(b.type);
@@ -849,7 +872,7 @@ export function CatalogueContent() {
     }
 
     return result;
-  }, [groups, catOrder, subCatOrders, groupLabel, groupColor]);
+  }, [groups, catOrder, subCatOrders, groupLabel, groupColor, dbCategories, dynamicCatColors]);
 
   // URL de création de recette pré-ciblée depuis une catégorie / sous-catégorie
   const newRecipeHref = useCallback((sgKey: string): string | null => {

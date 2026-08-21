@@ -391,8 +391,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 0" }}>
         {isAdmin ? (
           <>
-            {/* iFratelli Group */}
-            <Link
+            {/* iFratelli Group — administrateurs uniquement (vue groupe) */}
+            {role === "group_admin" && <Link
               href="/dashboard"
               onClick={() => { setGroupView(true); handleNav(); }}
               style={{
@@ -412,7 +412,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             >
               <IconBuilding size={18} color={C.ifratelli} />
               <span style={{ flex: 1, letterSpacing: 0.3 }}>iFratelli Group</span>
-            </Link>
+            </Link>}
 
             <div style={{ height: 1, background: C.divider, margin: "8px 16px" }} />
 
