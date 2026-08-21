@@ -400,7 +400,8 @@ export const IngredientRow = React.memo(function IngredientRow({
           )}
           {isEditing && <button onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>OK</button>}
           <a href={`/ingredients/${x.id}`} onClick={(e) => e.stopPropagation()} title="Fiche detail" style={{ ...BTN_ACTION, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", fontSize: 13, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>→</a>
-          {!isEditing && <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} title="Supprimer" style={{ ...BTN_ACTION, background: "rgba(220,38,38,0.10)", color: "#DC2626", flexShrink: 0 }}>✕</button>}
+          {/* Croix visible aussi fiche ouverte : c'est en la lisant qu'on decide de supprimer */}
+          <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} title="Supprimer le produit" style={{ ...BTN_ACTION, background: "rgba(220,38,38,0.10)", color: "#DC2626", flexShrink: 0 }}>✕</button>
         </div>
       </div>
 
