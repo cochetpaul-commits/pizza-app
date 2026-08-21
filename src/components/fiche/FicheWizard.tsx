@@ -38,7 +38,12 @@ type Props = {
 export default function FicheWizard({ recipeId, recipeType, initialCategorie, initialSousCategorie }: Props) {
   const router = useRouter();
   const { current: etab, etablissements } = useEtablissement();
-  const { canWrite } = useProfile();
+  const { can } = useProfile();
+  // Écriture = permission « Créer et modifier les recettes » (rôle + exceptions
+  // de la fiche employé), pas le rôle brut : un équipier autorisé doit pouvoir
+  // sauvegarder. L'étape prix/marge suit la permission « valeurs monétaires ».
+  const canWrite = can("operations.edit_recettes");
+  const canSeeMoney = can("performances.show_money");
   const resolvedEtab = etab ?? etablissements?.[0];
   const etabSlug = resolvedEtab?.slug?.includes("piccola") ? "piccola" : "bello_mio";
 
@@ -759,8 +764,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
         </div>
       )}
 
-      {/* ÉTAPE 4 : PRIX & MARGE (managers et admins uniquement) */}
-      {step === 3 && canWrite && (
+      {/* ÉTAPE 4 : PRIX & MARGE (permission valeurs monétaires) */}
+      {step === 3 && canSeeMoney && (
         <div style={{ background: COLORS.card, borderRadius: 18, padding: "22px 24px", marginBottom: 14, boxShadow: "0 4px 14px #0000000a" }}>
           <h2 style={{ fontSize: 13, letterSpacing: ".15em", textTransform: "uppercase", color: COLORS.bordeaux, marginBottom: 16, fontWeight: 800 }}>
             4. Prix et marge
@@ -1258,7 +1263,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
         <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
           <button disabled={step === 0} onClick={() => setStep(s => {
               let prev = s - 1;
-              if (prev === 3 && !canWrite) prev = 2;
+              if (prev === 3 && !canSeeMoney) prev = 2;
               return Math.max(0, prev);
             })}
             style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: step === 0 ? "default" : "pointer", background: "transparent", color: COLORS.muted, opacity: step === 0 ? 0.45 : 1, fontFamily: "inherit" }}>
@@ -1273,7 +1278,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           <button onClick={() => {
               if (step < 4) {
                 let next = step + 1;
-                if (next === 3 && !canWrite) next = 4;
+                if (next === 3 && !canSeeMoney) next = 4;
                 setStep(next);
               } else { handleSave(); router.push("/recettes"); }
             }}

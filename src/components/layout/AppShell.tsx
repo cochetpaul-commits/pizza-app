@@ -39,7 +39,7 @@ function AccessDenied() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, loading } = useProfile();
+  const { role, loading, can } = useProfile();
   const excluded = isExcluded(pathname);
 
   // Pas de session (jeton expiré, déconnexion) sur une page de l'app :
@@ -53,7 +53,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   // Global route guard — enforce RBAC on every page
-  const allowed = canAccess(role, pathname);
+  const allowed = canAccess(role, pathname, can);
 
   return (
     <BottomBarProvider>
