@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { T } from "@/lib/tokens";
 import { RequireRole } from "@/components/RequireRole";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
+import { usePilotageRange } from "@/lib/pilotageRange";
 
 const COLOR = "#e6c428";
 const COLOR_DARK = "#b5960f";
@@ -83,7 +84,7 @@ function PiccolaMiaContent() {
   const today = useMemo(() => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date()), []);
   const etab = useMemo(() => etablissements.find((e) => e.slug?.includes("piccola")), [etablissements]);
 
-  const [range, setRange] = useState<DateRange>(defaultRange);
+  const [range, setRange] = usePilotageRange(defaultRange);
 
   const [ca, setCa] = useState(0);
   const [caA1, setCaA1] = useState(0);

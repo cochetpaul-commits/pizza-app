@@ -38,20 +38,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
 
-  // ── 1. CA réel (Popina) ────────────────────────────────────────
-  const PAGE = 1000;
-  let caHt = 0, caTtc = 0, offset = 0, hasMore = true;
-  while (hasMore) {
-    const { data } = await supabaseAdmin
-      .from("ventes_lignes")
-      .select("ht, ttc")
-      .eq("etablissement_id", etabId)
-      .gte("date_service", from).lte("date_service", to)
-      .eq("type_ligne", "Produit").eq("annule", false)
-      .range(offset, offset + PAGE - 1);
-    for (const r of data ?? []) { caHt += Number(r.ht ?? 0); caTtc += Number(r.ttc ?? 0); }
-    hasMore = (data?.length ?? 0) === PAGE;
-    offset += PAGE;
+  // ── 1. CA réel (Popina) — agrégat SQL (ventes_ca_periode), plus de pagination ──
+  let caHt = 0, caTtc = 0;
+  {
+    const { data: agg, error: aggErr } = await supabaseAdmin.rpc("ventes_ca_periode", { p_etab: etabId, p_from: from, p_to: to });
+    if (aggErr) return NextResponse.json({ error: aggErr.message }, { status: 500 });
+    const row = Array.isArray(agg) ? agg[0] : agg;
+    caHt = Number(row?.ca_ht ?? 0);
+    caTtc = Number(row?.ca_ttc ?? 0);
   }
 
   // ── 2. Coût matière théorique (recettes × ventes) ──────────────

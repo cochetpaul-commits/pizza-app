@@ -7,6 +7,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { AiInsightCard } from "@/components/AiInsightCard";
 import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
+import { usePilotageRange } from "@/lib/pilotageRange";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 
@@ -196,7 +197,8 @@ function MargesPage() {
   const showMoney = can("performances.show_money");
   const accent = etab?.couleur ?? COLORS.accent;
 
-  const [internalRange, setInternalRange] = useState<DateRange>(() => {
+  const hasUrlRange = !!(searchParams.get("from") && searchParams.get("to"));
+  const [internalRange, setInternalRange] = usePilotageRange(() => {
     const qf = searchParams.get("from");
     const qt = searchParams.get("to");
     if (qf && qt && /^\d{4}-\d{2}-\d{2}$/.test(qf) && /^\d{4}-\d{2}-\d{2}$/.test(qt)) {
@@ -208,7 +210,7 @@ function MargesPage() {
     if (d.getDay() === 6) d.setDate(d.getDate() - 1);
     const iso = d.toISOString().slice(0, 10);
     return { from: iso, to: iso };
-  });
+  }, hasUrlRange);
   const range = internalRange;
   const setRange = setInternalRange;
   const isEmbedded = false;

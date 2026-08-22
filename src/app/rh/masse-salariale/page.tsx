@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { PilotageRangeBar } from "@/components/ui/PilotageRangeBar";
+import { usePilotageRange } from "@/lib/pilotageRange";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -41,7 +43,6 @@ type ContratInfo = {
 };
 
 type PeriodMode = "month" | "week";
-type PeriodOption = { value: string; label: string; from: string; to: string };
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -49,13 +50,6 @@ function toISO(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function getWeekKey(d: Date): string {
-  const t = new Date(d);
-  t.setDate(t.getDate() + 4 - (t.getDay() || 7));
-  const yearStart = new Date(t.getFullYear(), 0, 1);
-  const w = Math.ceil((((t.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return `${t.getFullYear()}-W${String(w).padStart(2, "0")}`;
-}
 
 function getWeekBounds(d: Date): { from: string; to: string; label: string } {
   const dow = d.getDay() || 7;
@@ -85,32 +79,7 @@ const fmtDec = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits:
 const CHARGES_RATE = 0.42;
 const TEAM_COLORS: Record<string, string> = { Cuisine: "#D97706", Salle: "#5e8278", Bar: "#8a6b3e", Autre: "#b0a894" };
 
-function getMonthOptions(): PeriodOption[] {
-  const opts: PeriodOption[] = [];
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const y = d.getFullYear(); const m = d.getMonth();
-    const from = `${y}-${String(m + 1).padStart(2, "0")}-01`;
-    const last = new Date(y, m + 1, 0);
-    const to = `${y}-${String(m + 1).padStart(2, "0")}-${String(last.getDate()).padStart(2, "0")}`;
-    const label = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" }).replace(/^\w/, c => c.toUpperCase());
-    opts.push({ value: `${y}-${String(m + 1).padStart(2, "0")}`, label, from, to });
-  }
-  return opts;
-}
 
-function getWeekOptions(): PeriodOption[] {
-  const opts: PeriodOption[] = [];
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now); d.setDate(now.getDate() - i * 7);
-    const { from, to, label } = getWeekBounds(d);
-    const value = getWeekKey(d);
-    if (!opts.find(o => o.value === value)) opts.push({ value, label, from, to });
-  }
-  return opts;
-}
 
 // ── Component ────────────────────────────────────────────────────────────
 
@@ -126,18 +95,25 @@ export default function MasseSalarialePage() {
   const [caHt, setCaHt] = useState<number | null>(null);
   const [couverts, setCouverts] = useState<number | null>(null);
 
-  const [periodMode, setPeriodMode] = useState<PeriodMode>("week");
-  const monthOptions = useMemo(() => getMonthOptions(), []);
-  const weekOptions = useMemo(() => getWeekOptions(), []);
-  const options = periodMode === "month" ? monthOptions : weekOptions;
-  const [selectedMonth, setSelectedMonth] = useState(monthOptions[0]?.value ?? "");
-  const [selectedWeek, setSelectedWeek] = useState(weekOptions[0]?.value ?? "");
-  const selectedValue = periodMode === "month" ? selectedMonth : selectedWeek;
-  const selected = options.find(o => o.value === selectedValue);
-  const currentIdx = options.findIndex(o => o.value === selectedValue);
+  // Période commune Pilotage (mémorisée d'une page à l'autre). Les heures
+  // Combo sont hebdomadaires : on cale la période choisie sur la semaine qui
+  // contient son début, ou sur le mois entier si elle couvre ≥ 25 jours.
+  const [shared, setShared] = usePilotageRange(() => { const w = getWeekBounds(new Date()); return { from: w.from, to: w.to }; });
+  const selected = useMemo(() => {
+    const d0 = new Date(shared.from + "T12:00:00"), d1 = new Date(shared.to + "T12:00:00");
+    const days = Math.round((d1.getTime() - d0.getTime()) / 86400000) + 1;
+    if (days >= 25) {
+      const y = d0.getFullYear(), m = d0.getMonth();
+      const last = new Date(y, m + 1, 0);
+      return { mode: "month" as PeriodMode, from: `${y}-${String(m + 1).padStart(2, "0")}-01`, to: toISO(last), label: d0.toLocaleDateString("fr-FR", { month: "long", year: "numeric" }) };
+    }
+    const w = getWeekBounds(d0);
+    return { mode: "week" as PeriodMode, from: w.from, to: w.to, label: w.label };
+  }, [shared.from, shared.to]);
+  const periodMode = selected.mode;
   const etabId = etab?.id;
-  const selectedFrom = selected?.from;
-  const selectedTo = selected?.to;
+  const selectedFrom = selected.from;
+  const selectedTo = selected.to;
 
   const loadingRef = useRef(false);
 
@@ -201,11 +177,6 @@ export default function MasseSalarialePage() {
     }).catch(() => {});
   }, [selectedFrom, selectedTo, etabId, loadAllData]);
 
-  const setSelectedValue = useCallback((v: string) => {
-    if (periodMode === "month") setSelectedMonth(v); else setSelectedWeek(v);
-  }, [periodMode]);
-  const goPrev = useCallback(() => { if (currentIdx < options.length - 1) setSelectedValue(options[currentIdx + 1].value); }, [currentIdx, options, setSelectedValue]);
-  const goNext = useCallback(() => { if (currentIdx > 0) setSelectedValue(options[currentIdx - 1].value); }, [currentIdx, options, setSelectedValue]);
 
   // ── Computed: merge presences + contrats ──
   const employees = useMemo(() => {
@@ -248,17 +219,23 @@ export default function MasseSalarialePage() {
       // Coût HS : taux horaire × 1.1 (majoration 10%) × heures sup
       const tauxH = hContrat > 0 && brut > 0 ? brut / (hContrat * 52 / 12) : 0;
       const coutHS = hs * tauxH * 1.1 * (1 + CHARGES_RATE);
-      const coutCharge = brut * (1 + CHARGES_RATE);
+      // Brut de la PÉRIODE (et non le brut mensuel du contrat, qui donnait
+      // 103 % de ratio sur une semaine) : heures planifiées × taux horaire ;
+      // TNS = mensualité fixe proratisée ; sans taux horaire → prorata simple.
+      const prorata = periodMode === "week" ? 12 / 52 : 1;
+      const heuresNormales = Math.max(0, pres.hTrav - hs);
+      const brutPeriode = type === "TNS" || tauxH <= 0 ? brut * prorata : heuresNormales * tauxH;
+      const coutCharge = brutPeriode * (1 + CHARGES_RATE);
 
       result.push({
         nom, equipe, type, emploi,
         hContrat, hTrav: pres.hTrav, ecart: pres.ecart, hs,
-        brut, coutCharge, coutHS,
+        brut: brutPeriode, coutCharge, coutHS,
         repas: pres.repas, jours: pres.jours,
       });
     }
     return result.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
-  }, [presences, contrats]);
+  }, [presences, contrats, periodMode]);
 
   // ── Totals ──
   const totals = useMemo(() => {
@@ -271,7 +248,7 @@ export default function MasseSalarialePage() {
     return t;
   }, [employees]);
 
-  const ratioCA = caHt && caHt > 0 ? (totals.msChargee / caHt) * 100 : null;
+  const ratioCA = caHt && caHt > 0 ? ((totals.msChargee + totals.coutHS) / caHt) * 100 : null;
   const productivite = totals.hTrav > 0 && caHt ? caHt / totals.hTrav : null;
   const coutCouvert = couverts && couverts > 0 ? totals.msChargee / couverts : null;
   const objRatioMS = 35; // target
@@ -386,42 +363,10 @@ export default function MasseSalarialePage() {
           <SimulationContent activeTab={msTab} />
         ) : (<>
 
-        {/* Period selector */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 10 }}>
-          <div style={{ display: "inline-flex", gap: 4, padding: 3, background: "#f0ebe2", borderRadius: 10, border: "1px solid #e8e0d0" }}>
-            {(["week", "month"] as const).map(m => (
-              <button key={m} type="button" onClick={() => setPeriodMode(m)} style={{
-                padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer",
-                background: periodMode === m ? "#fff" : "transparent",
-                color: periodMode === m ? ACCENT : "#777",
-                fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em",
-                boxShadow: periodMode === m ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-              }}>
-                {m === "month" ? "Mois" : "Semaine"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", maxWidth: 420 }}>
-            <button type="button" onClick={goPrev} disabled={currentIdx >= options.length - 1} style={{
-              width: 36, height: 36, borderRadius: 10, border: "none", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-              background: currentIdx >= options.length - 1 ? "#f0ebe3" : ACCENT + "15", color: currentIdx >= options.length - 1 ? "#ccc" : ACCENT,
-              fontSize: 14, fontWeight: 700, cursor: currentIdx >= options.length - 1 ? "not-allowed" : "pointer",
-            }}>{"\u2190"}</button>
-            <select value={selectedValue} onChange={e => setSelectedValue(e.target.value)} style={{
-              height: 36, borderRadius: 10, border: "1px solid #ddd6c8", padding: "0 14px",
-              fontSize: 13, fontWeight: 600, background: "#fff", color: "#1a1a1a", cursor: "pointer", flex: 1, textAlign: "center",
-            }}>
-              {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <button type="button" onClick={goNext} disabled={currentIdx <= 0} style={{
-              width: 36, height: 36, borderRadius: 10, border: "none", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-              background: currentIdx <= 0 ? "#f0ebe3" : ACCENT + "15", color: currentIdx <= 0 ? "#ccc" : ACCENT,
-              fontSize: 14, fontWeight: 700, cursor: currentIdx <= 0 ? "not-allowed" : "pointer",
-            }}>{"\u2192"}</button>
-          </div>
+        {/* Période commune Pilotage */}
+        <div style={{ marginBottom: 6 }}><PilotageRangeBar value={shared} onChange={setShared} accent={ACCENT} /></div>
+        <div style={{ textAlign: "center", fontSize: 11, color: "#999", marginBottom: 14 }}>
+          {periodMode === "month" ? "Mois" : "Semaine"} Combo : <strong style={{ color: "#6f6a61" }}>{selected.label}</strong> — les heures du planning sont hebdomadaires.
         </div>
 
         {/* Sync */}

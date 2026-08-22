@@ -587,7 +587,7 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
                       const isOvr = salaryOverrides[c.emp.id] !== undefined;
                       const diff = c.coutEmployeur - (base?.coutEmployeur ?? 0);
                       return (
-                        <div key={c.emp.id} style={{
+                        <div key={c.emp.id} className="ventes-sim-row" style={{
                           display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
                           borderRadius: 8, background: isOvr ? `${accent}06` : "#faf7f2",
                           border: isOvr ? `1px solid ${accent}30` : "1px solid #f0ebe3",
@@ -612,6 +612,7 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
                             max={c.isTNS ? 15000 : 5000}
                             step={50}
                             value={c.brut}
+                            className="ventes-sim-slider"
                             onChange={(e) => setSalaryOverride(c.emp.id, Number(e.target.value))}
                             style={{ flex: 1, accentColor: isOvr ? accent : "#ccc" }}
                           />

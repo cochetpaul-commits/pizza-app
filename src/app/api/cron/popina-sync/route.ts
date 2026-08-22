@@ -16,7 +16,7 @@ const supabase = createClient(
 );
 
 /**
- * Cron Vercel quotidien — synchronise J-1 depuis l'API Popina vers ventes_lignes.
+ * Cron Vercel horaire — synchronise J et J-1 depuis l'API Popina vers ventes_lignes.
  *
  * Param ?day=YYYY-MM-DD pour resynchroniser un jour précis (manuel).
  * Param ?days=N pour resynchroniser les N derniers jours (manuel, max 14).
@@ -40,9 +40,15 @@ export async function GET(req: NextRequest) {
   const nDays = Math.min(parseInt(url.searchParams.get("days") ?? "1", 10) || 1, 14);
   const triggeredBy = url.searchParams.get("manual") ? "manual" : "cron";
 
+  // Cron horaire : J (journée en cours, pour que Produits / Rentabilité /
+  // Mon tableau reflètent le jour même) + J-1 (clôture de la veille).
+  // ?days=N manuel → les N derniers jours à partir de J-1, comme avant.
+  const manualDays = url.searchParams.has("days");
   const targetDays = explicitDay
     ? [explicitDay]
-    : Array.from({ length: nDays }, (_, i) => getParisDate(-1 - i));
+    : manualDays
+      ? Array.from({ length: nDays }, (_, i) => getParisDate(-1 - i))
+      : [getParisDate(0), getParisDate(-1)];
 
   // Récupère les jours de fermeture de l'établissement
   const { data: etab } = await supabase

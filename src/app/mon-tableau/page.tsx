@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
+import { usePilotageRange } from "@/lib/pilotageRange";
 import { useTopBar } from "@/components/layout/TopBarContext";
 
 /* ── Types (réponse /api/mon-tableau) ─────────────────────── */
@@ -227,7 +228,7 @@ function semaineCourante(): DateRange {
 
 export default function MonTableauPage() {
   const router = useRouter();
-  const [period, setPeriod] = useState<DateRange>(() => semaineCourante());
+  const [period, setPeriod] = usePilotageRange(semaineCourante);
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");

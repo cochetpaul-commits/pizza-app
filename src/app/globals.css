@@ -1271,6 +1271,16 @@ button:active { transform: scale(0.98); }
   .ventes-sim-layout {
     grid-template-columns: 1fr !important;
   }
+  /* Augmentations au cas par cas : le curseur passe sur sa propre ligne,
+     le montant reste visible (il était coupé à droite sur iPhone). */
+  .ventes-sim-row {
+    flex-wrap: wrap !important;
+  }
+  .ventes-sim-row .ventes-sim-slider {
+    flex: 1 1 100% !important;
+    order: 10;
+    margin-top: 2px;
+  }
 
   /* ── Global font size reduction ── */
   .ventes-container,

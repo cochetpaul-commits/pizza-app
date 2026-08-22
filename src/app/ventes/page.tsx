@@ -7,6 +7,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import Chart from "chart.js/auto";
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
 import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
+import { usePilotageRange, readPilotageRange } from "@/lib/pilotageRange";
 import { useTopBar } from "@/components/layout/TopBarContext";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
@@ -188,15 +189,17 @@ function PerformancesPage() {
   const accent = etab?.couleur ?? "#D4775A";
 
   const hasUrlRange = !!(searchParams.get("from") && searchParams.get("to"));
-  const [range, setRange] = useState<DateRange>(() => {
+  // Période partagée avec toutes les pages Pilotage (mémorisée) ; l'URL prime
+  const [range, setRange] = usePilotageRange(() => {
     const qf = searchParams.get("from");
     const qt = searchParams.get("to");
     if (qf && qt && /^\d{4}-\d{2}-\d{2}$/.test(qf) && /^\d{4}-\d{2}-\d{2}$/.test(qt)) {
       return { from: qf, to: qt };
     }
     return defaultRange();
-  });
-  const initialLoadDone = useRef(hasUrlRange);
+  }, hasUrlRange);
+  // Saut au dernier jour importé : seulement sans URL ni période mémorisée
+  const initialLoadDone = useRef(hasUrlRange || readPilotageRange() != null);
   const [mode, setMode] = useState<"ttc" | "ht">(() => {
     const m = searchParams.get("mode");
     if (m === "ttc" || m === "ht") return m;

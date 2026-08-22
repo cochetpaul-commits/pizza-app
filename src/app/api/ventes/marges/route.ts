@@ -16,16 +16,7 @@ function normalize(name: string): string {
 }
 
 /* ── Types ── */
-type VenteLigne = {
-  date_service: string;
-  description: string;
-  categorie: string;
-  quantite: number;
-  ttc: number;
-  ht: number;
-  annule: boolean;
-  type_ligne: string;
-};
+type ProduitAgg = { description: string; categorie: string; qty: number; ca_ttc: number; ca_ht: number };
 
 type RecipeCost = {
   name: string;
@@ -64,27 +55,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  /* ── 1+2. Fetch ventes + recipe costs in parallel ── */
-  async function fetchVentes() {
-    const PAGE = 1000;
-    const all: VenteLigne[] = [];
-    let offset = 0;
-    let hasMore = true;
-    while (hasMore) {
-      const { data, error } = await supabaseAdmin
-        .from("ventes_lignes")
-        .select("date_service,description,categorie,quantite,ttc,ht,annule,type_ligne")
-        .eq("etablissement_id", etabId)
-        .gte("date_service", from)
-        .lte("date_service", to)
-        .order("date_service", { ascending: true })
-        .range(offset, offset + PAGE - 1);
-      if (error) throw new Error(error.message);
-      all.push(...((data ?? []) as VenteLigne[]));
-      hasMore = (data?.length ?? 0) === PAGE;
-      offset += PAGE;
-    }
-    return all;
+  /* ── 1+2. Ventes agrégées par produit (RPC SQL) + coûts recettes, en parallèle ── */
+  async function fetchVentes(): Promise<ProduitAgg[]> {
+    const { data, error } = await supabaseAdmin.rpc("ventes_par_produit", { p_etab: etabId, p_from: from, p_to: to });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as ProduitAgg[];
   }
 
   // Convention kitchen_recipes.establishments : slugs bello_mio / piccola, NULL = visible partout.
@@ -272,31 +247,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  /* ── 3. Filter valid product lines & aggregate by product ── */
-  const validRows = allVentes.filter(
-    (r) => r.type_ligne === "Produit" && !r.annule && Number(r.ttc) > 0 && (r.categorie ?? "").toUpperCase() !== "MESSAGES",
-  );
-
-  const prodMap = new Map<
-    string,
-    { qty: number; ca_ttc: number; ca_ht: number; categorie: string }
-  >();
-  for (const r of validRows) {
-    if (!r.description) continue;
-    const key = r.description;
-    const prev = prodMap.get(key);
-    if (prev) {
-      prev.qty += Number(r.quantite) || 1;
-      prev.ca_ttc += Number(r.ttc);
-      prev.ca_ht += Number(r.ht);
-    } else {
-      prodMap.set(key, {
-        qty: Number(r.quantite) || 1,
-        ca_ttc: Number(r.ttc),
-        ca_ht: Number(r.ht),
-        categorie: r.categorie || "Autre",
-      });
-    }
+  /* ── 3. Produits vendus (déjà agrégés côté base) ── */
+  const prodMap = new Map<string, { qty: number; ca_ttc: number; ca_ht: number; categorie: string }>();
+  for (const r of allVentes) {
+    prodMap.set(r.description, { qty: Number(r.qty) || 0, ca_ttc: Number(r.ca_ttc) || 0, ca_ht: Number(r.ca_ht) || 0, categorie: r.categorie || "Autre" });
   }
 
   /* ── 4. Match & compute margins ── */

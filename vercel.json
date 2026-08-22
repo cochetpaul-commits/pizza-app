@@ -17,7 +17,7 @@
     },
     {
       "path": "/api/cron/popina-sync",
-      "schedule": "0 5 * * *"
+      "schedule": "20 * * * *"
     },
     {
       "path": "/api/cron/combo-sync",

@@ -5,7 +5,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { RequireRole } from "@/components/RequireRole";
-import { PeriodSelector, currentPeriod, type PeriodValue, type PeriodMode } from "@/components/PeriodSelector";
+import { PilotageRangeBar } from "@/components/ui/PilotageRangeBar";
+import { usePilotageRange } from "@/lib/pilotageRange";
 
 /**
  * Rentabilité — la cascade CA → marge brute → EBE.
@@ -61,7 +62,12 @@ export default function RentabilitePage() {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
   const [reload, setReload] = useState(0);
-  const [period, setPeriod] = useState<PeriodValue>(() => currentPeriod("mois"));
+  // Période commune Pilotage (mémorisée) ; par défaut le mois en cours
+  const [period, setPeriod] = usePilotageRange(() => {
+    const d = new Date();
+    const from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    return { from, to: d.toISOString().slice(0, 10) };
+  });
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -88,7 +94,6 @@ export default function RentabilitePage() {
     return () => { cancelled = true; };
   }, [etab?.id, period.from, period.to, reload]);
 
-  const onModeChange = (m: PeriodMode) => setPeriod(currentPeriod(m));
 
   // Rapatrie les factures et charges Pennylane du mois affiché
   const syncPennylane = async () => {
@@ -115,7 +120,7 @@ export default function RentabilitePage() {
   return (
     <RequireRole permission="performances.pilotage">
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "20px 16px 80px" }}>
-        <PeriodSelector period={period} onPeriodChange={setPeriod} onModeChange={onModeChange} />
+        <div style={{ margin: "0 0 16px" }}><PilotageRangeBar value={period} onChange={setPeriod} accent={etab?.couleur ?? "#D4775A"} /></div>
 
         <h1 style={{
           fontFamily: "var(--font-oswald), Oswald, sans-serif",

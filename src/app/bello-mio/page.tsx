@@ -9,6 +9,7 @@ import { T } from "@/lib/tokens";
 import { RequireRole } from "@/components/RequireRole";
 import { useProfile } from "@/lib/ProfileContext";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
+import { usePilotageRange } from "@/lib/pilotageRange";
 
 const COLOR = "#e27f57";
 const OSWALD = "var(--font-oswald), Oswald, sans-serif";
@@ -93,7 +94,7 @@ function BelloMioContent() {
     [etablissements],
   );
 
-  const [range, setRange] = useState<DateRange>(defaultRange);
+  const [range, setRange] = usePilotageRange(defaultRange);
 
   // KPIs
   const [ca, setCa] = useState(0);
