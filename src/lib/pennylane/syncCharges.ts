@@ -176,6 +176,9 @@ export async function syncPennylaneMois(etabId: string, moisDebut: string): Prom
   const totaux = new Map<string, number>();
   let parFournisseur = 0, nonClassees = 0, horsEbe = 0;
   const add = (poste: string, montant: number) => totaux.set(poste, (totaux.get(poste) ?? 0) + montant);
+  // Détail facture / transaction × catégorie Pennylane (affiché dans Rentabilité)
+  type Detail = { date: string | null; poste: string; categorie: string; fournisseur: string | null; libelle: string | null; montant_ht: number; type: "facture" | "transaction"; ref_externe: string | null };
+  const details: Detail[] = [];
 
   for (const inv of invoices) {
     const ht = Number(inv.currency_amount_before_tax ?? 0);
@@ -185,11 +188,13 @@ export async function syncPennylaneMois(etabId: string, moisDebut: string): Prom
     if (c.length > 0) {
       // Ventilation par poids (Pennylane répartit avec `weight`)
       const totalPoids = c.reduce((s, x) => s + (Number(x.weight) || 1), 0);
+      const fourn = inv.supplier?.id ? plNameById.get(inv.supplier.id) ?? null : null;
       for (const cat of c) {
         const part = ht * ((Number(cat.weight) || 1) / totalPoids);
         const poste = cat.label in MAPPING ? MAPPING[cat.label] : "autres_charges";
         if (poste === null) { horsEbe += part; continue; }
         add(poste, part);
+        details.push({ date: inv.date ?? null, poste, categorie: cat.label, fournisseur: fourn, libelle: inv.label ?? null, montant_ht: part, type: "facture", ref_externe: String(inv.id) });
       }
       continue;
     }
@@ -200,6 +205,7 @@ export async function syncPennylaneMois(etabId: string, moisDebut: string): Prom
     const estMatiere = n.length > 3 && [...mercuriale].some(m => n.includes(m) || m.includes(n));
     if (estMatiere) { add("achats_matieres", ht); parFournisseur++; }
     else { add("a_categoriser", ht); nonClassees++; }
+    details.push({ date: inv.date ?? null, poste: estMatiere ? "achats_matieres" : "a_categoriser", categorie: estMatiere ? "Fournisseur mercuriale (sans catégorie)" : "En attente de catégorisation", fournisseur: nomFournisseur || null, libelle: inv.label ?? null, montant_ht: ht, type: "facture", ref_externe: String(inv.id) });
   }
 
   // ── Charges sans facture (salaires, URSSAF, prélèvements) ──
@@ -224,7 +230,9 @@ export async function syncPennylaneMois(etabId: string, moisDebut: string): Prom
         const label = c.label ?? "";
         const poste = label in MAPPING ? MAPPING[label] : null;
         if (poste === null || !ACCEPTES.includes(poste)) continue;
-        add(poste, ht * ((Number(c.weight) || 1) / totalPoids));
+        const part = ht * ((Number(c.weight) || 1) / totalPoids);
+        add(poste, part);
+        details.push({ date: t.date ?? null, poste, categorie: label, fournisseur: null, libelle: t.label ?? null, montant_ht: part, type: "transaction", ref_externe: String(t.id) });
         transactionsPrises++;
       }
     }
@@ -250,6 +258,16 @@ export async function syncPennylaneMois(etabId: string, moisDebut: string): Prom
   if (rows.length > 0) {
     const { error } = await supabaseAdmin.from("charges_mensuelles").insert(rows);
     if (error) throw new Error(`Écriture charges : ${error.message}`);
+  }
+
+  // Détail (remplacement du mois)
+  await supabaseAdmin.from("charges_detail").delete().eq("etablissement_id", etabId).eq("mois", moisDebut);
+  const detailRows = details
+    .filter(d => Math.abs(d.montant_ht) > 0.005)
+    .map(d => ({ ...d, etablissement_id: etabId, mois: moisDebut, montant_ht: Math.round(d.montant_ht * 100) / 100 }));
+  for (let i = 0; i < detailRows.length; i += 500) {
+    const { error } = await supabaseAdmin.from("charges_detail").insert(detailRows.slice(i, i + 500));
+    if (error) throw new Error(`Écriture détail : ${error.message}`);
   }
 
   return {

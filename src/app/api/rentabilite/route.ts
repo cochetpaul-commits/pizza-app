@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { pennylaneConfigured } from "@/lib/pennylane/api";
+import { LIBELLES } from "@/lib/pennylane/syncCharges";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -165,6 +166,36 @@ export async function GET(req: NextRequest) {
     : { poste: "Charges d'exploitation", montant: null, statut: "manquant", source: "Pennylane",
         detail: pennylaneConfigured() ? "Lancer la synchronisation Pennylane" : "Clé API Pennylane non configurée" };
 
+  // ── 6b. Détail Pennylane : poste → catégorie → factures / transactions ──
+  type DetailRow = { date: string | null; poste: string; categorie: string; fournisseur: string | null; libelle: string | null; montant_ht: number; type: string };
+  const { data: detailRows } = await supabaseAdmin
+    .from("charges_detail")
+    .select("date, poste, categorie, fournisseur, libelle, montant_ht, type")
+    .eq("etablissement_id", etabId)
+    .gte("mois", moisFrom).lte("mois", to)
+    .order("date", { ascending: false });
+  const postesMap = new Map<string, { poste: string; libelle: string; total: number; cats: Map<string, { categorie: string; total: number; lignes: { date: string | null; fournisseur: string | null; libelle: string | null; montant: number; type: string }[] }> }>();
+  for (const r of (detailRows ?? []) as DetailRow[]) {
+    let pEntry = postesMap.get(r.poste);
+    if (!pEntry) { pEntry = { poste: r.poste, libelle: LIBELLES[r.poste] ?? r.poste, total: 0, cats: new Map() }; postesMap.set(r.poste, pEntry); }
+    const m = Number(r.montant_ht ?? 0);
+    pEntry.total += m;
+    let cEntry = pEntry.cats.get(r.categorie);
+    if (!cEntry) { cEntry = { categorie: r.categorie, total: 0, lignes: [] }; pEntry.cats.set(r.categorie, cEntry); }
+    cEntry.total += m;
+    cEntry.lignes.push({ date: r.date, fournisseur: r.fournisseur, libelle: r.libelle, montant: m, type: r.type });
+  }
+  const ORDRE_POSTES = ["achats_matieres", "masse_salariale", "remuneration_gerants", "loyer", "energie", "commissions_cb", "entretien", "assurances", "honoraires", "locations", "autres_charges", "a_categoriser"];
+  const detailPennylane = [...postesMap.values()]
+    .sort((a, b) => ORDRE_POSTES.indexOf(a.poste) - ORDRE_POSTES.indexOf(b.poste))
+    .map(p => ({
+      poste: p.poste, libelle: p.libelle, total: Math.round(p.total * 100) / 100,
+      categories: [...p.cats.values()].sort((a, b) => b.total - a.total).map(c => ({
+        categorie: c.categorie, total: Math.round(c.total * 100) / 100, nb: c.lignes.length,
+        lignes: c.lignes.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "")),
+      })),
+    }));
+
   // ── 7. Cascade ─────────────────────────────────────────────────
   const coutMatiere = (achats.montant ?? 0) + (variationStock.montant ?? 0);
   const margeBrute = achats.montant != null ? caHt - coutMatiere : null;
@@ -185,6 +216,7 @@ export async function GET(req: NextRequest) {
     } : null,
     ebe: ebe != null ? { montant: ebe, pct: caHt > 0 ? (ebe / caHt) * 100 : 0 } : null,
     exploitationDetail: exploitationDetail.sort((a, b) => b.montant - a.montant).slice(0, 12),
+    detailPennylane,
     pennylane: pennylaneConfigured(),
   });
 }

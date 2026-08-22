@@ -29,8 +29,76 @@ type Data = {
   margeBrute: { montant: number; pct: number; foodCostPct: number; fiable: boolean } | null;
   ebe: { montant: number; pct: number } | null;
   exploitationDetail: { libelle: string; montant: number }[];
+  detailPennylane?: PosteDetail[];
   pennylane: boolean;
 };
+type LigneDetail = { date: string | null; fournisseur: string | null; libelle: string | null; montant: number; type: string };
+type CatDetail = { categorie: string; total: number; nb: number; lignes: LigneDetail[] };
+type PosteDetail = { poste: string; libelle: string; total: number; categories: CatDetail[] };
+
+const fmtDate = (s: string | null) => (s ? new Date(s + "T12:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "");
+/** « Facture SAS MAEL - FB9373 (label généré) » → « FB9373 » · « Avoir SAS MAEL - FB9282 » → « Avoir FB9282 » */
+function libelleCourt(libelle: string | null, fournisseur: string | null): string | null {
+  if (!libelle) return null;
+  let l = libelle.replace(/\s*\(label généré\)/i, "").trim();
+  const m = l.match(/^(Facture|Avoir)\s+(.+?)\s+-\s+(.+)$/i);
+  if (m) l = (m[1].toLowerCase() === "avoir" ? "Avoir " : "") + m[3].trim();
+  if (fournisseur && l.toLowerCase() === fournisseur.toLowerCase()) return null;
+  return l;
+}
+
+/** Charges par catégorie Pennylane : poste ▸ catégorie ▸ factures */
+function DetailPennylane({ postes }: { postes: PosteDetail[] }) {
+  const total = postes.reduce((a, p) => a + p.total, 0);
+  return (
+    <div style={{ ...CARD, padding: "6px 18px 10px" }}>
+      <style>{`.pl-det > summary::-webkit-details-marker{display:none} .pl-det > summary .chev{display:inline-block;transition:transform .15s} .pl-det[open] > summary .chev{transform:rotate(90deg)}`}</style>
+      <div style={{ ...SEC, paddingTop: 12, display: "flex", justifyContent: "space-between" }}>
+        <span>Charges par catégorie Pennylane</span>
+        <span style={{ color: "#1a1a1a" }}>{eur(total)}</span>
+      </div>
+      {postes.map(p => (
+        <details key={p.poste} className="pl-det" style={{ borderBottom: "1px solid #f0ebe3" }}>
+          <summary style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "9px 0", cursor: "pointer", listStyle: "none", fontSize: 13.5 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#1a1a1a", fontWeight: 600 }}>
+              <span className="chev" style={{ fontSize: 10, color: "#999" }}>▶</span>{p.libelle}
+              <span style={{ fontSize: 11, color: "#999", fontWeight: 500 }}>{p.categories.length} catégorie{p.categories.length > 1 ? "s" : ""}</span>
+            </span>
+            <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{eur(p.total)}</span>
+          </summary>
+          <div style={{ paddingLeft: 18, paddingBottom: 6 }}>
+            {p.categories.map(c => (
+              <details key={c.categorie} className="pl-det">
+                <summary style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "6px 0", cursor: "pointer", listStyle: "none", fontSize: 12.5 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 8, color: "#1a1a1a" }}>
+                    <span className="chev" style={{ fontSize: 9, color: "#bbb" }}>▶</span>{c.categorie}
+                    <span style={{ fontSize: 11, color: "#999" }}>{c.nb} ligne{c.nb > 1 ? "s" : ""}</span>
+                  </span>
+                  <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{eur(c.total)}</span>
+                </summary>
+                <div style={{ paddingLeft: 17, paddingBottom: 6 }}>
+                  {c.lignes.map((l, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0", fontSize: 12, color: "#6f6a61" }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <span style={{ color: "#999", marginRight: 6, fontVariantNumeric: "tabular-nums" }}>{fmtDate(l.date)}</span>
+                        {l.fournisseur ?? (l.type === "transaction" ? "Transaction bancaire" : "—")}
+                        {(() => { const lc = libelleCourt(l.libelle, l.fournisseur); return lc ? <span style={{ color: "#999" }}> · {lc}</span> : null; })()}
+                      </span>
+                      <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{l.montant.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
+        </details>
+      ))}
+      <div style={{ fontSize: 10.5, color: "#999", marginTop: 8 }}>
+        Catégories telles que définies dans Pennylane (HT, ventilées au prorata quand une facture a plusieurs catégories). Les lignes sans facture (paie, URSSAF, gérants) viennent des transactions bancaires.
+      </div>
+    </div>
+  );
+}
 
 const eur = (n: number) => Math.round(n).toLocaleString("fr-FR") + " €";
 const pct = (n: number) => n.toFixed(1).replace(".", ",") + " %";
@@ -267,8 +335,11 @@ export default function RentabilitePage() {
               )}
             </div>
 
-            {/* Détail exploitation */}
-            {data.exploitationDetail.length > 0 && (
+            {/* Catégories Pennylane, dépliables jusqu'aux factures */}
+            {data.detailPennylane && data.detailPennylane.length > 0 && <DetailPennylane postes={data.detailPennylane} />}
+
+            {/* Détail exploitation (résumé par poste) */}
+            {(!data.detailPennylane || data.detailPennylane.length === 0) && data.exploitationDetail.length > 0 && (
               <div style={{ ...CARD, padding: "6px 18px" }}>
                 <div style={{ ...SEC, paddingTop: 12 }}>Détail des charges</div>
                 {data.exploitationDetail.map((d, i) => (
