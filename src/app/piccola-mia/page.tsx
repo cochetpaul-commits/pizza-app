@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import Chart from "chart.js/auto";
+import dynamic from "next/dynamic";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { T } from "@/lib/tokens";
 import { RequireRole } from "@/components/RequireRole";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { usePilotageRange } from "@/lib/pilotageRange";
+
+const DailyCaBarChart = dynamic(() => import("@/components/charts/DailyCaBarChart"), { ssr: false });
 
 const COLOR = "#e6c428";
 const COLOR_DARK = "#b5960f";
@@ -101,9 +103,6 @@ function PiccolaMiaContent() {
   const [meteoForecast, setMeteoForecast] = useState<MeteoDay[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(() => today.slice(0, 7));
 
-  const chartRef = useRef<HTMLCanvasElement | null>(null);
-  const chartInstance = useRef<Chart | null>(null);
-
   useEffect(() => {
     if (etab) { setCurrent(etab); setGroupView(false); }
   }, [etab, setCurrent, setGroupView]);
@@ -167,28 +166,6 @@ function PiccolaMiaContent() {
       } catch { /* ignore */ }
     })();
   }, [etab, today]);
-
-  // Chart
-  useEffect(() => {
-    if (!chartRef.current || dailyCa.length === 0) return;
-    if (chartInstance.current) chartInstance.current.destroy();
-    chartInstance.current = new Chart(chartRef.current, {
-      type: "bar",
-      data: {
-        labels: dailyCa.map(d => new Date(d.date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })),
-        datasets: [{ label: "CA TTC", data: dailyCa.map(d => Math.round(d.ca)), backgroundColor: COLOR_DARK + "CC", borderRadius: 6 }],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${(ctx.parsed.y ?? 0).toLocaleString("fr-FR")} \u20AC` } } },
-        scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 10, family: DM_SANS } } },
-          y: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10, family: DM_SANS }, callback: v => `${Number(v).toLocaleString("fr-FR")}` } },
-        },
-      },
-    });
-    return () => { chartInstance.current?.destroy(); chartInstance.current = null; };
-  }, [dailyCa]);
 
   const ticketMoyen = couverts > 0 ? ca / couverts : 0;
   const ticketMoyenA1 = couvertsA1 > 0 ? caA1 / couvertsA1 : 0;
@@ -265,7 +242,7 @@ function PiccolaMiaContent() {
           {dailyCa.length > 0 && (
             <div style={{ ...CARD, padding: "20px 22px" }}>
               <SectionTitle>CA par jour</SectionTitle>
-              <div style={{ marginTop: 12 }}><canvas ref={chartRef} height={220} /></div>
+              <div style={{ marginTop: 12 }}><DailyCaBarChart dailyCa={dailyCa} color={COLOR_DARK} /></div>
             </div>
           )}
 

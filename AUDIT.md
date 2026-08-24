@@ -50,13 +50,19 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
      `FoodCostTrendChart.tsx` + `CategoryProfitChart.tsx`) et chargé via
      `next/dynamic({ ssr: false })` — `ingredients/[id]`,
      `achats` (StatsAchatsContent), `finances`.
-   - [ ] **Reste à faire** : les 7 pages `chart.js/auto` (`ventes/marges`,
-     `ventes`, `achats`, `tresorerie`, `piccola-mia`, `dashboard`,
-     `bello-mio`). Ce sont toutes des utilisations impératives (canvas +
-     `useRef`/`useEffect`, pas du JSX déclaratif) — l'extraction est un peu
-     plus délicate que pour recharts mais suit le même principe : sortir le
-     `<canvas>` + la logique `new Chart(...)` dans un composant `"use
-     client"` séparé, importé en `next/dynamic({ ssr: false })` depuis la
+   - [x] *(24/08/2026)* `bello-mio` et `piccola-mia` : le graphique « CA par
+     jour » (bar chart Chart.js identique sur les deux pages, seule la
+     couleur change) est extrait dans un composant partagé
+     `src/components/charts/DailyCaBarChart.tsx`, chargé via
+     `next/dynamic({ ssr: false })`. `import Chart from "chart.js/auto"` et
+     les `useRef`/`useEffect` associés ont disparu de ces deux pages.
+   - [ ] **Reste à faire** : les 5 pages `chart.js/auto` restantes
+     (`ventes/marges`, `ventes`, `achats`, `tresorerie`, `dashboard`).
+     Note : `tresorerie` ne semble en fait plus utiliser `chart.js/auto` —
+     à revérifier avant de la traiter. Même principe que ci-dessus : sortir
+     le `<canvas>` + la logique `new Chart(...)` dans un composant `"use
+     client"` séparé (regarder s'il est réutilisable comme
+     `DailyCaBarChart`), importé en `next/dynamic({ ssr: false })` depuis la
      page. À faire une poignée de pages à la fois pour rester dans le budget
      de lignes.
 2. **`v_latest_offers` téléchargée en entier** (toutes les offres de tous les
