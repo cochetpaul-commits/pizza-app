@@ -206,6 +206,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           prix_base: prixBase,
           unite_base: base,
           allergenes: allergens,
+          cpu,
         };
       });
       setMercuriale(mercs);
@@ -308,6 +309,10 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   }, [recipeId, recipeType, etabSlug]);
 
   // ── Derived ──
+  // Type de liaison Popina attendu par Pilotage › Produits (marges) :
+  // sans linked_type, la liaison est ignorée par le calcul des marges.
+  const popinaLinkedType = fiche.categorie_slug === "pizza" ? "pizza" : fiche.categorie_slug === "cocktail" ? "cocktail" : "kitchen";
+
   const cat = useMemo(() => categories.find(c => c.slug === fiche.categorie_slug), [categories, fiche.categorie_slug]);
   const fam = useMemo(() => familles.find(f => f.id === (cat?.famille_id ?? "autre")) ?? { id: "autre", label: "Autre", objectif_fc: 30, tva_defaut: 10, portions_label: "portion", portions_label_pluriel: "portions" } as Famille, [familles, cat]);
   const isPizza = fam.id === "pizza";
@@ -449,7 +454,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
     if (savedId && linkedPopina) {
       const pp = popinaProducts.find(p => p.id === linkedPopina);
       if (pp && pp.kitchen_recipe_id !== savedId) {
-        await supabase.from("popina_products").update({ kitchen_recipe_id: savedId }).eq("id", linkedPopina);
+        await supabase.from("popina_products").update({ kitchen_recipe_id: savedId, ingredient_id: null, linked_type: popinaLinkedType }).eq("id", linkedPopina);
       }
     }
 
@@ -690,7 +695,16 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const ingList = mercuriale.map(m => ({ id: m.id, name: m.nom_produit || m.nom_court, category: "" as any, allergens: m.allergenes })) as any[];
             const priceMap: Record<string, CpuByUnit> = {};
-            for (const m of mercuriale) { if (m.prix_base > 0) priceMap[m.id] = { g: m.prix_base }; }
+            for (const m of mercuriale) {
+              // Prix complets (€/g, €/ml, €/pièce) quand on les a — l'ancien
+              // raccourci { g: prix_base } perdait le €/L : plus d'estimation
+              // possible sur une ligne en cl, et le poids total comptait
+              // les centilitres comme des grammes.
+              if (m.cpu && (m.cpu.g || m.cpu.ml || m.cpu.pcs)) priceMap[m.id] = m.cpu;
+              else if (m.prix_base > 0) {
+                priceMap[m.id] = m.unite_base === "cl" ? { ml: m.prix_base / 10 } : m.unite_base === "pc" ? { pcs: m.prix_base } : { g: m.prix_base };
+              }
+            }
             const units = ["g", "kg", "cl", "ml", "L", "pcs"];
             const currentUrl = typeof window !== "undefined" ? window.location.pathname + window.location.search : "";
 
@@ -1070,7 +1084,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
                   <span style={{ fontSize: 12, color: COLORS.muted }}>{pp?.category} : {pp?.price_ttc?.toFixed(2)} {"\u20AC"}</span>
                   <button onClick={async () => {
                     if (linkedPopina) {
-                      await supabase.from("popina_products").update({ kitchen_recipe_id: null }).eq("id", linkedPopina);
+                      await supabase.from("popina_products").update({ kitchen_recipe_id: null, linked_type: null }).eq("id", linkedPopina);
                     }
                     setLinkedPopina(null);
                     showToast("Lien Popina retire");
@@ -1098,10 +1112,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
                           e.preventDefault();
                           if (fiche.id) {
                             // Detach from previous recipe if already linked
-                            if (p.kitchen_recipe_id) {
-                              await supabase.from("popina_products").update({ kitchen_recipe_id: null }).eq("id", p.id);
-                            }
-                            await supabase.from("popina_products").update({ kitchen_recipe_id: fiche.id }).eq("id", p.id);
+                            await supabase.from("popina_products").update({ kitchen_recipe_id: fiche.id, ingredient_id: null, linked_type: popinaLinkedType }).eq("id", p.id);
                           }
                           setLinkedPopina(p.id);
                           setPopinaSearch("");

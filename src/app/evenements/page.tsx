@@ -181,9 +181,14 @@ function detectOverlaps(events: Event[]): Set<string> {
   return overlapping;
 }
 
+type AbsenceCal = { id: string; date_debut: string; date_fin: string; type: string | null; statut: string; etablissement_id: string | null; nom: string };
+
 export default function EventsPage() {
-  const { current: etab } = useEtablissement();
+  const { current: etab, etablissements } = useEtablissement();
   const [events, setEvents] = useState<Event[]>([]);
+  // Congés des employés affichés sur le calendrier — Bello Mio, Piccola Mia ou les deux
+  const [congesEtabId, setCongesEtabId] = useState<string | null | "off">(null); // null = les deux
+  const [absencesCal, setAbsencesCal] = useState<AbsenceCal[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"upcoming" | "all" | "past">("upcoming");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -224,6 +229,59 @@ export default function EventsPage() {
       setLoading(false);
     })();
   }, [etabKey]);
+
+  // Congés (validés + en attente) chevauchant le mois affiché
+  useEffect(() => {
+    if (congesEtabId === "off") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAbsencesCal([]);
+      return;
+    }
+    const from = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-01`;
+    const last = new Date(calYear, calMonth + 1, 0).getDate();
+    const to = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
+    let q = supabase
+      .from("absences")
+      .select("id, date_debut, date_fin, type, statut, etablissement_id, employes(prenom, nom)")
+      .in("statut", ["valide", "en_attente"])
+      .lte("date_debut", to)
+      .gte("date_fin", from);
+    if (congesEtabId) q = q.eq("etablissement_id", congesEtabId);
+    q.then(({ data }) => {
+      setAbsencesCal(((data ?? []) as Record<string, unknown>[]).map(a => {
+        const emp = a.employes as { prenom?: string; nom?: string } | { prenom?: string; nom?: string }[] | null;
+        const e0 = Array.isArray(emp) ? emp[0] : emp;
+        return {
+          id: a.id as string, date_debut: a.date_debut as string, date_fin: a.date_fin as string,
+          type: (a.type as string) ?? null, statut: a.statut as string,
+          etablissement_id: (a.etablissement_id as string) ?? null,
+          nom: [e0?.prenom, e0?.nom].filter(Boolean).join(" ") || "Employé",
+        };
+      }));
+    });
+  }, [calYear, calMonth, congesEtabId]);
+
+  const absencesByDate = useMemo(() => {
+    const map = new Map<string, AbsenceCal[]>();
+    for (const a of absencesCal) {
+      const d0 = new Date(a.date_debut + "T12:00:00");
+      const d1 = new Date(a.date_fin + "T12:00:00");
+      for (let d = new Date(d0); d <= d1; d.setDate(d.getDate() + 1)) {
+        if (d.getFullYear() !== calYear || d.getMonth() !== calMonth) continue;
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const arr = map.get(key) ?? [];
+        arr.push(a);
+        map.set(key, arr);
+      }
+    }
+    return map;
+  }, [absencesCal, calYear, calMonth]);
+
+  const etabCourt = (id: string | null) => {
+    const e = etablissements.find(x => x.id === id);
+    return e?.nom?.includes("Piccola") ? "PM" : e?.nom?.includes("Bello") ? "BM" : "";
+  };
+  const etabCouleur = (id: string | null) => etablissements.find(x => x.id === id)?.couleur ?? "#2D6A4F";
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -454,12 +512,13 @@ export default function EventsPage() {
 
                     const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                     const dayEvents = eventsByDate.get(dateStr) ?? [];
-                    const hasEvents = dayEvents.length > 0;
+                    const dayAbs = absencesByDate.get(dateStr) ?? [];
+                    const hasEvents = dayEvents.length > 0 || dayAbs.length > 0;
                     const isToday = dateStr === todayStr;
                     const isSelected = dateStr === selectedDate;
                     const isPast = dateStr < todayStr;
                     // Color the cell background with the first event's type color
-                    const eventTypeColor = hasEvents ? (TYPE_COLORS[dayEvents[0].type] ?? "#6B7280") : "";
+                    const eventTypeColor = dayEvents.length > 0 ? (TYPE_COLORS[dayEvents[0].type] ?? "#6B7280") : "#2D6A4F";
 
                     return (
                       <button
@@ -498,7 +557,15 @@ export default function EventsPage() {
                         }}>
                           {day}
                         </span>
-                        {hasEvents && (
+                        {dayAbs.length > 0 && (
+                          <span style={{
+                            position: "absolute", top: 1, right: 2, fontSize: 8.5, fontWeight: 800,
+                            color: isSelected ? "#fff" : "#2D6A4F", lineHeight: 1,
+                          }}>
+                            {dayAbs.length}🏖
+                          </span>
+                        )}
+                        {dayEvents.length > 0 && (
                           <div style={{ display: "flex", gap: 2, position: "absolute", bottom: 2 }}>
                             {dayEvents.slice(0, 3).map((ev) => (
                               <span key={ev.id} style={{
@@ -555,6 +622,46 @@ export default function EventsPage() {
             >
               Voir tout
             </button>
+          </div>
+        )}
+
+        {/* ═══ CONGÉS : affichage ═══ */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 }}>🏖 Congés</span>
+          <div style={{ display: "inline-flex", gap: 4, padding: 3, background: "#f0ebe2", borderRadius: 10, border: "1px solid #e8e0d0" }}>
+            {[...etablissements.map(e => ({ key: e.id as string | null | "off", label: e.nom, color: e.couleur ?? "#D4775A" })),
+              { key: null as string | null | "off", label: "Les deux", color: "#1a1a1a" },
+              { key: "off" as const, label: "Masqués", color: "#999" }].map(opt => (
+              <button key={String(opt.key)} type="button" onClick={() => setCongesEtabId(opt.key)} style={{
+                padding: "5px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+                background: congesEtabId === opt.key ? "#fff" : "transparent",
+                color: congesEtabId === opt.key ? opt.color : "#777",
+                fontSize: 11, fontWeight: 700,
+                boxShadow: congesEtabId === opt.key ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+              }}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ═══ CONGÉS du jour sélectionné ═══ */}
+        {selectedDate && (absencesByDate.get(selectedDate) ?? []).length > 0 && (
+          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e2d8", padding: "12px 16px", marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#2D6A4F", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+              🏖 En congé ce jour
+            </div>
+            {(absencesByDate.get(selectedDate) ?? []).map(a => (
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 13 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: etabCouleur(a.etablissement_id), flexShrink: 0 }} />
+                <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{a.nom}</span>
+                {congesEtabId === null && <span style={{ fontSize: 10, fontWeight: 700, color: etabCouleur(a.etablissement_id) }}>{etabCourt(a.etablissement_id)}</span>}
+                <span style={{ fontSize: 11, color: "#999" }}>
+                  {a.type ?? "CP"} · du {new Date(a.date_debut + "T12:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })} au {new Date(a.date_fin + "T12:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                  {a.statut === "en_attente" ? " · en attente" : ""}
+                </span>
+              </div>
+            ))}
           </div>
         )}
 

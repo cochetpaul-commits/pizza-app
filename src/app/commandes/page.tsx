@@ -591,6 +591,49 @@ function CommandesPage() {
   }[]>([]);
 
   // Pending receptions (validated orders awaiting reception)
+  // Dépliage des commandes (historique & réceptions en attente) : lignes chargées au clic
+  type SessionLigne = { id: string; name: string; quantite: number; unite: string; prix_unitaire_ht: number | null; total_ligne_ht: number | null; qty_received: number | null; checked: boolean | null };
+  const [openSessionId, setOpenSessionId] = useState<string | null>(null);
+  const [sessionLignes, setSessionLignes] = useState<Record<string, SessionLigne[] | "loading">>({});
+  const toggleSession = useCallback(async (id: string) => {
+    setOpenSessionId(prev => (prev === id ? null : id));
+    setSessionLignes(prev => {
+      if (prev[id]) return prev;
+      (async () => {
+        try {
+          const res = await fetchApi(`/api/commandes/session-lignes?session_id=${id}`);
+          const data = await res.json();
+          setSessionLignes(p2 => ({ ...p2, [id]: (data.lignes ?? []) as SessionLigne[] }));
+        } catch {
+          setSessionLignes(p2 => ({ ...p2, [id]: [] }));
+        }
+      })();
+      return { ...prev, [id]: "loading" };
+    });
+  }, []);
+
+  const renderSessionLignes = (id: string) => {
+    const lignes = sessionLignes[id];
+    if (openSessionId !== id) return null;
+    if (!lignes || lignes === "loading") return <div style={{ fontSize: 12, color: "#999", padding: "8px 0 2px" }}>Chargement…</div>;
+    if (lignes.length === 0) return <div style={{ fontSize: 12, color: "#999", padding: "8px 0 2px" }}>Aucune ligne.</div>;
+    return (
+      <div style={{ marginTop: 8, borderTop: "1px dashed #ece4d4", paddingTop: 8 }}>
+        {lignes.map(l => (
+          <div key={l.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0", fontSize: 12.5 }}>
+            <span style={{ color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {l.name}
+              <span style={{ color: "#999", marginLeft: 6 }}>{l.quantite} {l.unite}</span>
+            </span>
+            <span style={{ color: "#6f6a61", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+              {l.total_ligne_ht != null ? `${l.total_ligne_ht.toFixed(2)} €` : "—"}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const [pendingReceptions, setPendingReceptions] = useState<{
     id: string; supplier_id: string; supplier_name: string;
     created_at: string; nb_articles: number; total_ht: number;
@@ -2316,9 +2359,9 @@ function CommandesPage() {
               Receptions en attente
             </div>
             {pendingReceptions.map((r) => (
-              <div key={r.id} style={{
+              <div key={r.id} onClick={() => toggleSession(r.id)} style={{
                 background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce",
-                borderLeft: "4px solid #4a6741", padding: "14px 16px", marginBottom: 8,
+                borderLeft: "4px solid #4a6741", padding: "14px 16px", marginBottom: 8, cursor: "pointer",
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -2337,8 +2380,9 @@ function CommandesPage() {
                     )}
                   </div>
                 </div>
+                {renderSessionLignes(r.id)}
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                  <button type="button" onClick={() => downloadPdfById(r.id, r.supplier_name)}
+                  <button type="button" onClick={(e) => { e.stopPropagation(); downloadPdfById(r.id, r.supplier_name); }}
                     style={{
                       fontSize: 11, fontWeight: 600, color: "#4a6741", background: "#fff",
                       border: "1px solid #ddd6c8", borderRadius: 6, cursor: "pointer", padding: "5px 12px",
@@ -2346,7 +2390,7 @@ function CommandesPage() {
                     }}>
                     PDF
                   </button>
-                  <button type="button" onClick={() => setReceptionSessionId(r.id)} disabled={saving}
+                  <button type="button" onClick={(e) => { e.stopPropagation(); setReceptionSessionId(r.id); }} disabled={saving}
                     style={{
                       fontSize: 11, fontWeight: 700, color: "#fff", background: "#16a34a",
                       border: "none", borderRadius: 6, cursor: "pointer", padding: "5px 14px",
@@ -2452,30 +2496,33 @@ function CommandesPage() {
             </div>
             <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #ece4d4", overflow: "hidden" }}>
               {recentOrders.map((r, idx) => (
-                <div key={r.id} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "11px 16px",
+                <div key={r.id} onClick={() => toggleSession(r.id)} style={{
+                  padding: "11px 16px", cursor: "pointer",
                   borderBottom: idx < recentOrders.length - 1 ? "1px solid #f0ebe2" : "none",
                 }}>
-                  <span style={{
-                    width: 8, height: 8, borderRadius: "50%",
-                    background: supplierColor(r.supplier_name), flexShrink: 0,
-                  }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
-                      {r.supplier_name}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: supplierColor(r.supplier_name), flexShrink: 0,
+                    }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
+                        {r.supplier_name}
+                      </span>
+                      <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>
+                        {new Date(r.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                      </span>
+                    </div>
+                    <span style={{
+                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+                      fontWeight: 700, fontSize: 14, color: "#1a1a1a",
+                      fontVariantNumeric: "tabular-nums",
+                    }}>
+                      {r.total_ht > 0 ? `${r.total_ht.toFixed(2)} €` : "—"}
                     </span>
-                    <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>
-                      {new Date(r.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-                    </span>
+                    <span style={{ fontSize: 10, color: "#b0a894", transform: openSessionId === r.id ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▶</span>
                   </div>
-                  <span style={{
-                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                    fontWeight: 700, fontSize: 14, color: "#1a1a1a",
-                    fontVariantNumeric: "tabular-nums",
-                  }}>
-                    {r.total_ht > 0 ? `${r.total_ht.toFixed(2)} €` : "—"}
-                  </span>
+                  {renderSessionLignes(r.id)}
                 </div>
               ))}
             </div>

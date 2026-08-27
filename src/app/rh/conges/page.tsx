@@ -301,9 +301,20 @@ function computeMonthsWorkedInPeriod(
 /* ── Component ─────────────────────────────────────────────────── */
 
 export default function CongesPage() {
-  const { current: etab, etablissements } = useEtablissement();
+  const { current: ctxEtab, etablissements } = useEtablissement();
   const { isGroupAdmin, role } = useProfile();
   const isEquipier = role === "equipier";
+
+  // Filtre d'affichage : un établissement précis ou « Les deux » (null).
+  // Initialisé sur l'établissement courant, modifiable en haut de page.
+  const [filtreEtabId, setFiltreEtabId] = useState<string | null>(ctxEtab?.id ?? null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFiltreEtabId(ctxEtab?.id ?? null);
+  }, [ctxEtab?.id]);
+  const etab = isEquipier
+    ? ctxEtab
+    : (filtreEtabId ? (etablissements.find(e => e.id === filtreEtabId) ?? null) : null);
 
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [employes, setEmployes] = useState<Employe[]>([]);
@@ -831,6 +842,25 @@ export default function CongesPage() {
             }}>
               {comboSyncing ? "Synchronisation…" : "⟳ Synchroniser les congés Combo"}
             </button>
+          </div>
+        )}
+
+        {/* ── Choix de l'établissement affiché ─────────────────── */}
+        {!isEquipier && etablissements.length > 1 && (
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+            <div style={{ display: "inline-flex", gap: 4, padding: 3, background: "#f0ebe2", borderRadius: 10, border: "1px solid #e8e0d0" }}>
+              {[...etablissements.map(e => ({ id: e.id as string | null, label: e.nom, color: e.couleur ?? "#D4775A" })), { id: null, label: "Les deux", color: "#1a1a1a" }].map(opt => (
+                <button key={opt.id ?? "tous"} type="button" onClick={() => setFiltreEtabId(opt.id)} style={{
+                  padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer",
+                  background: filtreEtabId === opt.id ? "#fff" : "transparent",
+                  color: filtreEtabId === opt.id ? opt.color : "#777",
+                  fontSize: 12, fontWeight: 700,
+                  boxShadow: filtreEtabId === opt.id ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

@@ -80,6 +80,11 @@ function computeCost(line: IngredientLine, cpu: CpuByUnit | undefined, ing?: Ing
   if (eff.pcs == null && eff.g != null && pwg && pwg > 0) eff.pcs = eff.g * pwg;
   if (eff.pcs == null && eff.ml != null && pvm && pvm > 0) eff.pcs = eff.ml * pvm;
 
+  // Dernier recours : densité 1 g/ml (l'avertissement « Densité manquante —
+  // prix estimé avec 1g/ml » est déjà affiché sur la ligne dans ce cas).
+  if (eff.g == null && eff.ml != null) eff.g = eff.ml;
+  if (eff.ml == null && eff.g != null) eff.ml = eff.g;
+
   if ((unit === "g" || unit === "kg") && eff.g) {
     return eff.g * (unit === "kg" ? qty * 1000 : qty);
   }

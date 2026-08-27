@@ -37,6 +37,8 @@ export type IngredientRef = {
   prix_base: number;
   unite_base: "g" | "cl" | "pc";
   allergenes: string[];
+  /** Prix par unité complets (€/g, €/ml, €/pièce) — pour convertir g ⇄ cl sans perdre d'info */
+  cpu?: { g?: number; ml?: number; pcs?: number };
 };
 
 export type LigneIngredient = {

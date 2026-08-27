@@ -48,26 +48,32 @@ function parisHour(iso: string | null | undefined): number | null {
   return isNaN(h) ? null : h;
 }
 
-/** Fetch paginé de ventes_lignes sur une période. */
+/** Fetch paginé de ventes_lignes sur une période — pages en PARALLÈLE
+ *  (le chargement séquentiel de 1000 en 1000 faisait ramer la page Ventes). */
 async function fetchRange(etabId: string, from: string, to: string): Promise<Row[]> {
-  const out: Row[] = [];
   const PAGE = 1000;
-  let offset = 0;
-  let hasMore = true;
-  while (hasMore) {
-    const { data } = await supabase
-      .from("ventes_lignes")
-      .select(SELECT_COLS)
-      .eq("etablissement_id", etabId)
-      .gte("date_service", from)
-      .lte("date_service", to)
-      .order("ouvert_a", { ascending: true })
-      .range(offset, offset + PAGE - 1);
-    out.push(...((data ?? []) as Row[]));
-    hasMore = (data?.length ?? 0) === PAGE;
-    offset += PAGE;
-  }
-  return out;
+  const base = () => supabase
+    .from("ventes_lignes")
+    .select(SELECT_COLS)
+    .eq("etablissement_id", etabId)
+    .gte("date_service", from)
+    .lte("date_service", to)
+    .order("ouvert_a", { ascending: true });
+
+  const { count } = await supabase
+    .from("ventes_lignes")
+    .select("id", { count: "exact", head: true })
+    .eq("etablissement_id", etabId)
+    .gte("date_service", from)
+    .lte("date_service", to);
+  const total = count ?? 0;
+  if (total === 0) return [];
+
+  const nPages = Math.ceil(total / PAGE);
+  const pages = await Promise.all(
+    Array.from({ length: nPages }, (_, i) => base().range(i * PAGE, i * PAGE + PAGE - 1)),
+  );
+  return pages.flatMap(p => (p.data ?? []) as Row[]);
 }
 
 export async function GET(req: NextRequest) {
@@ -80,14 +86,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
 
-  // Load popina sub-categories + current period data in parallel
-  const [{ data: popinaProds }, rows] = await Promise.all([
+  // Sous-catégories Popina + les TROIS périodes (courante, A-1, S-1) en parallèle
+  const fromA1 = (parseInt(from.slice(0, 4)) - 1) + from.slice(4);
+  const toA1 = (parseInt(to.slice(0, 4)) - 1) + to.slice(4);
+  const fromS1 = shiftDays(from, -7);
+  const toS1 = shiftDays(to, -7);
+  const [{ data: popinaProds }, rows, prevData, prevWeekData] = await Promise.all([
     supabase
       .from("popina_products")
       .select("name, sub_category")
       .eq("active", true)
       .not("sub_category", "is", null),
     fetchRange(etabId, from, to),
+    fetchRange(etabId, fromA1, toA1),
+    fetchRange(etabId, fromS1, toS1),
   ]);
   subCatByName = new Map();
   for (const p of popinaProds ?? []) {
@@ -106,17 +118,6 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json({ empty: true, stats: null, prev: null, prevWeek: null });
   }
-
-  // ── Comparatifs : A-1 (année -1) et S-1 (-7 jours), fetch en parallèle ─
-  const fromA1 = (parseInt(from.slice(0, 4)) - 1) + from.slice(4);
-  const toA1 = (parseInt(to.slice(0, 4)) - 1) + to.slice(4);
-  const fromS1 = shiftDays(from, -7);
-  const toS1 = shiftDays(to, -7);
-
-  const [prevData, prevWeekData] = await Promise.all([
-    fetchRange(etabId, fromA1, toA1),
-    fetchRange(etabId, fromS1, toS1),
-  ]);
 
   const stats = aggregate(rows);
   const prev = prevData.length > 0 ? aggregate(prevData) : null;
