@@ -58,6 +58,7 @@ const SUPPLIERS = [
   { slug: "elien", name: "Eric Elien" },
   { slug: "hardy", name: "Maison Hardy" },
   { slug: "pomona", name: "Pomona TerreAzur" },
+  { slug: "billard", name: "Le Père Billard" },
 ];
 
 const ETABS = [
