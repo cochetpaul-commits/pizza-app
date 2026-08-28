@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef, Suspense } from "react";
+import { RecoverProductsModal } from "@/components/RecoverProductsModal";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -338,6 +339,7 @@ function IngredientsPageInner() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterDropdown, setFilterDropdown] = useState<"supplier" | "category" | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showRecover, setShowRecover] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [showSearchSheet, setShowSearchSheet] = useState(false);
 
@@ -1276,6 +1278,12 @@ function IngredientsPageInner() {
                 {compactMode ? "⊞" : "☰"}
               </button>
               {userCanWrite && (
+                <button onClick={() => setShowRecover(true)} title="Récupérer un produit supprimé"
+                  style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
+                  🛟
+                </button>
+              )}
+              {userCanWrite && (
                 <button onClick={() => setShowCreateForm(true)} aria-label="Ajouter un produit"
                   style={{ padding: "9px 12px", borderRadius: 10, border: "none", background: accentColor, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center" }}>
                   <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
@@ -1314,6 +1322,9 @@ function IngredientsPageInner() {
         {!isVariations && (
           <>
             {/* ── Create form (drawer) ── */}
+            <>{showRecover && (
+              <RecoverProductsModal etabId={etab?.id} onClose={() => setShowRecover(false)} onDone={() => { void mutate(); }} />
+            )}</>
             <BottomSheet open={showCreateForm} onClose={() => setShowCreateForm(false)} title="Créer un ingrédient">
               <div style={{ padding: "0 4px 16px" }}>
                 <form onSubmit={addIngredient} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
