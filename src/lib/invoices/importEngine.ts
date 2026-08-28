@@ -632,10 +632,18 @@ export async function runImport(options: {
       }
     }
 
-    // 10. Ensure all matched ingredients have both establishments set
+    // 10. Ensure all matched ingredients are active and have both establishments
+    // Un produit supprimé « en douceur » (désactivé) puis refacturé doit
+    // réapparaître : sans ça l'import le voyait « déjà présent » et le
+    // laissait invisible (vécu sur une facture Carniato le 25/08/2026).
     {
       const allIngIds = Array.from(offerByIngredient.keys());
       if (allIngIds.length) {
+        await supabase
+          .from("ingredients")
+          .update({ is_active: true })
+          .in("id", allIngIds)
+          .eq("is_active", false);
         const { data: estabRows } = await supabase
           .from("ingredients")
           .select("id,establishments")
