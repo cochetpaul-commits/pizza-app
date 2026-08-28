@@ -655,28 +655,34 @@ function CommandesPage() {
 
   useEffect(() => {
     async function init() {
-      // Load suppliers filtered by current establishment
-      let supQuery = supabase
+      // Fournisseurs de TOUS les établissements : un même nom (ex. Carniato
+      // chez Bello Mio ET Piccola Mia) est regroupé sous une seule entrée,
+      // sinon les produits rattachés à la fiche de l'autre resto restaient
+      // invisibles au moment de commander. La fiche du resto courant sert de
+      // référence (franco, jours de livraison) ; on n'affiche que les
+      // fournisseurs présents dans le resto courant.
+      const { data } = await supabase
         .from("suppliers")
-        .select("id, name, franco_minimum, delivery_schedule, color, website, portal_login, portal_password")
+        .select("id, name, etablissement_id, franco_minimum, delivery_schedule, color, website, portal_login, portal_password")
         .eq("is_active", true)
         .order("name");
-      if (etab?.id) supQuery = supQuery.eq("etablissement_id", etab.id);
-      const { data } = await supQuery;
-      // Deduplicate by name (accent+case insensitive) with alias tracking
-      const seen = new Map<string, Supplier>();
-      const aliases = new Map<string, Set<string>>();
-      for (const s of (data ?? []) as Supplier[]) {
+      type SupRow = Supplier & { etablissement_id?: string | null };
+      const byName = new Map<string, SupRow[]>();
+      for (const s of (data ?? []) as SupRow[]) {
         const key = s.name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-        if (!seen.has(key)) {
-          seen.set(key, s);
-          aliases.set(s.id, new Set([s.id]));
-        } else {
-          const canonical = seen.get(key)!;
-          aliases.get(canonical.id)!.add(s.id);
-        }
+        const arr = byName.get(key) ?? [];
+        arr.push(s);
+        byName.set(key, arr);
       }
-      const list = Array.from(seen.values());
+      const aliases = new Map<string, Set<string>>();
+      const list: Supplier[] = [];
+      for (const rows of byName.values()) {
+        if (etab?.id && !rows.some(r => r.etablissement_id === etab.id)) continue;
+        const canonical = (etab?.id ? rows.find(r => r.etablissement_id === etab.id) : null) ?? rows[0];
+        aliases.set(canonical.id, new Set(rows.map(r => r.id)));
+        list.push(canonical);
+      }
+      list.sort((a, b) => a.name.localeCompare(b.name, "fr"));
 
       // Load draft sessions with at least 1 ligne to show pastilles
       if (etab?.id) {

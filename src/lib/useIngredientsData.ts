@@ -126,28 +126,34 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
 
   // Suppliers + alerts: load once, filtered by establishment
   useEffect(() => {
-    const supQuery = supabase
+    // Tous les établissements : un même nom de fournisseur (ex. Carniato chez
+    // Bello Mio ET Piccola Mia) = une seule entrée dont les alias couvrent les
+    // deux fiches — sinon les produits rattachés à la fiche de l'autre resto
+    // n'apparaissaient pas dans le filtre fournisseur.
+    supabase
       .from("suppliers")
-      .select("id,name,is_active")
-      .order("name", { ascending: true });
-    if (etablissementId) supQuery.eq("etablissement_id", etablissementId);
-    supQuery.then(({ data, error: err }) => {
+      .select("id,name,is_active,etablissement_id")
+      .order("name", { ascending: true })
+      .then(({ data, error: err }) => {
         if (!err) {
-          // Deduplicate suppliers by name (case+accent insensitive) — keep the first entry as canonical
-          const seen = new Map<string, Supplier>();
-          const aliases = new Map<string, Set<string>>();
-          for (const s of (data ?? []) as Supplier[]) {
+          type SupRow = Supplier & { etablissement_id?: string | null };
+          const byName = new Map<string, SupRow[]>();
+          for (const s of (data ?? []) as SupRow[]) {
             const key = s.name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-            if (!seen.has(key)) {
-              seen.set(key, s);
-              aliases.set(s.id, new Set([s.id]));
-            } else {
-              // Add this duplicate's ID to the canonical entry's alias set
-              const canonical = seen.get(key)!;
-              aliases.get(canonical.id)!.add(s.id);
-            }
+            const arr = byName.get(key) ?? [];
+            arr.push(s);
+            byName.set(key, arr);
           }
-          setSuppliers(Array.from(seen.values()));
+          const list: Supplier[] = [];
+          const aliases = new Map<string, Set<string>>();
+          for (const rows of byName.values()) {
+            if (etablissementId && !rows.some(r => r.etablissement_id === etablissementId)) continue;
+            const canonical = (etablissementId ? rows.find(r => r.etablissement_id === etablissementId) : null) ?? rows[0];
+            aliases.set(canonical.id, new Set(rows.map(r => r.id)));
+            list.push(canonical);
+          }
+          list.sort((a, b) => a.name.localeCompare(b.name, "fr"));
+          setSuppliers(list);
           setSupplierAliases(aliases);
         }
       });
