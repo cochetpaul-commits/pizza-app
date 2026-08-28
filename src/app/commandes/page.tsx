@@ -40,6 +40,8 @@ type Session = {
   notes: string | null;
   total_ht: number;
   created_at: string;
+  email_sent_at?: string | null;
+  email_sent_to?: string | null;
   lignes: Ligne[];
 };
 
@@ -636,7 +638,7 @@ function CommandesPage() {
 
   const [pendingReceptions, setPendingReceptions] = useState<{
     id: string; supplier_id: string; supplier_name: string;
-    created_at: string; nb_articles: number; total_ht: number;
+    created_at: string; nb_articles: number; total_ht: number; email_sent_at?: string | null;
   }[]>([]);
 
   // Active sessions across all suppliers (brouillon + en_attente)
@@ -716,7 +718,7 @@ function CommandesPage() {
         // Load pending receptions (validated orders)
         const { data: validees } = await supabase
           .from("commande_sessions")
-          .select("id, supplier_id, created_at, total_ht, commande_lignes(count)")
+          .select("id, supplier_id, created_at, total_ht, email_sent_at, commande_lignes(count)")
           .eq("etablissement_id", etab.id)
           .eq("status", "validee")
           .order("created_at", { ascending: false });
@@ -727,9 +729,10 @@ function CommandesPage() {
           if (name) for (const aid of aliasSet) supplierMap.set(aid, name);
         }
         setPendingReceptions(
-          (validees ?? []).map((v: { id: string; supplier_id: string; created_at: string; total_ht: number; commande_lignes: { count: number }[] }) => ({
+          (validees ?? []).map((v: { id: string; supplier_id: string; created_at: string; total_ht: number; email_sent_at?: string | null; commande_lignes: { count: number }[] }) => ({
             id: v.id,
             supplier_id: v.supplier_id,
+            email_sent_at: v.email_sent_at ?? null,
             supplier_name: supplierMap.get(v.supplier_id) ?? "Fournisseur",
             created_at: v.created_at,
             nb_articles: v.commande_lignes?.[0]?.count ?? 0,
@@ -1239,8 +1242,12 @@ function CommandesPage() {
       });
       const data = await res.json();
       if (data.ok) {
-        setConfirmation(`Mail envoye a ${data.recipients?.join(", ")}`);
-        await reloadSession();
+        // Retour à l'accueil des commandes : le bandeau vert confirme l'envoi
+        // et les autres brouillons sont accessibles tout de suite.
+        setConfirmation(`✓ Commande envoyée à ${data.recipients?.join(", ") || "au fournisseur"}`);
+        setSession(null);
+        setSelectedSupplierId(null);
+        setQuantities({});
       } else {
         alert(data.error ?? "Erreur envoi mail");
       }
@@ -1747,7 +1754,9 @@ function CommandesPage() {
           padding: "12px 16px", borderRadius: 10,
           fontSize: 14, fontWeight: 600, marginBottom: 16, textAlign: "center",
         }}>
-          {session.status === "validee" && "Commande validee"}
+          {session.status === "validee" && (session.email_sent_at
+            ? `Commande envoyée le ${new Date(session.email_sent_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })} à ${new Date(session.email_sent_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}${session.email_sent_to ? ` (${session.email_sent_to})` : ""}`
+            : "Commande validee — pas encore envoyée")}
           {session.status === "recue" && "Commande recue"}
           {session.status === "en_attente" && "En attente (legacy)"}
 
@@ -1759,7 +1768,7 @@ function CommandesPage() {
               </button>
               <button onClick={() => sendEmailOnly(session.id)} disabled={sendingEmail}
                 style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#2563EB", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: sendingEmail ? 0.6 : 1 }}>
-                {sendingEmail ? "Envoi..." : "Envoyer par mail"}
+                {sendingEmail ? "Envoi..." : session.email_sent_at ? "Renvoyer le mail" : "Envoyer par mail"}
               </button>
               {currentSupplier?.website && (
                 <button type="button" onClick={openPortal}
@@ -2373,6 +2382,9 @@ function CommandesPage() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{r.supplier_name}</span>
                     <span style={{ fontSize: 11, color: "#999" }}>{fmtDate(r.created_at)}</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: r.email_sent_at ? "#2D6A4F" : "#b45309" }}>
+                      {r.email_sent_at ? "✓ envoyée par mail" : "à envoyer"}
+                    </span>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                     <span style={{ fontSize: 12, color: "#666" }}>{r.nb_articles} article{r.nb_articles > 1 ? "s" : ""}</span>
