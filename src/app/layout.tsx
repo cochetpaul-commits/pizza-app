@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { FreshnessGuard } from "@/components/FreshnessGuard";
 import { Geist, Geist_Mono, DM_Sans, Oswald, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
@@ -104,6 +105,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         `}} />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${dmSans.variable} ${oswald.variable} ${cormorantGaramond.variable} antialiased`}>
+        <FreshnessGuard />
         <Providers>{children}</Providers>
         <script dangerouslySetInnerHTML={{ __html: `
           if ("serviceWorker" in navigator) {

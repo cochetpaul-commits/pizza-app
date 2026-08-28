@@ -826,6 +826,9 @@ export function BottomTabBar() {
                 gap: 8,
                 padding: "0 14px 14px",
               }}>
+                {sections.length === 0 && (
+                  <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "#999", fontSize: 13, padding: "18px 0" }}>Chargement du menu…</div>
+                )}
                 {sections.map(section => (
                   <Tile
                     key={section.label}
