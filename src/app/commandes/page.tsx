@@ -1944,7 +1944,9 @@ function CommandesPage() {
               </button>
 
               <div style={{
-                maxHeight: isOpen ? 5000 : 0, overflow: "hidden",
+                // Plafond proportionnel au nombre de produits : à 5000 px fixes,
+                // les grosses catégories (cave à vin Vinoflo) étaient coupées.
+                maxHeight: isOpen ? Math.max(5000, allItems.length * 900 + 600) : 0, overflow: "hidden",
                 transition: "max-height 0.3s ease",
                 ...(isOpen ? {
                   borderLeft: `3px solid ${color}`,
