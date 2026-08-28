@@ -49,15 +49,18 @@ function extractMeta(text: string): Pick<ParsedInvoice, "invoice_number" | "invo
 
   // Total HT (last occurrence before TTC, with value > 100 typically)
   // "251,98 Total HT" or "Total HT 251,98"
-  const htMatches = [...text.matchAll(/(\d[\d\s.,]+)\s+Total\s+HT|Total\s+HT\s+(\d[\d\s.,]+)/gi)];
+  // Nombre strict (« 1 234,56 » / « -161,40 ») et même ligne que le libellé :
+  // l'ancien motif avalait des montants d'une autre ligne à travers le \n.
+  const htMatches = [...text.matchAll(/(-?\d{1,3}(?:[ .]\d{3})*,\d{2})[^\S\n]+Total\s+HT|Total\s+HT[^\S\n]+(-?\d{1,3}(?:[ .]\d{3})*,\d{2})/gi)];
   let totalHt: number | null = null;
   for (const m of htMatches) {
     const v = parseFrenchNumber(m[1] ?? m[2] ?? "");
-    if (v != null && v > (totalHt ?? 0)) totalHt = v;
+    // Montants négatifs sur les avoirs : on garde la plus grande valeur absolue
+    if (v != null && Math.abs(v) > Math.abs(totalHt ?? 0)) totalHt = v;
   }
 
-  // TOTAL TTC en EURO 265,84
-  const ttcMatch = text.match(/TOTAL\s+TTC\s+(?:en\s+EURO\s+)?(\d[\d\s.,]*)/i);
+  // TOTAL TTC en EURO 265,84 (négatif sur un avoir)
+  const ttcMatch = text.match(/TOTAL\s+TTC\s+(?:en\s+EURO\s+)?(-?\d[\d\s.,]*)/i);
 
   let invoice_date: string | null = null;
   if (dateMatch) invoice_date = `${dateMatch[1]}/${dateMatch[2]}/${dateMatch[3]}`;
@@ -106,6 +109,38 @@ function parseLines(text: string): ParsedLine[] {
       piece_weight_g: unit === "pc" ? extractWeightGFromName(name) : null,
       piece_volume_ml: unit === "pc" ? extractVolumeFromName(name) : null,
     });
+  }
+
+  // ── Nouveau gabarit Masse (2026, factures ET avoirs) ──────────────────
+  // "EPIF214 MOZZARELLA BUFFLONNE BBC 1.5KG 12 PCE 26,90 26,90 322,80 5,50"
+  //  SKU NOM QTÉ UNITÉ PRIX_BRUT PRIX_NET TOTAL_HT TAXE — sur un avoir le
+  // total est négatif et la quantité est rendue négative (stats d'achats).
+  if (tmp.length === 0) {
+    const estAvoir = /\bAVOIR\b/i.test(text);
+    const motif = text.match(/Motif d'avoir\s*:\s*([^\n]+)/i)?.[1]?.trim() ?? null;
+    const surFacture = text.match(/AVOIR SUR\s+([A-Z]{3,5}\d{6,})/i)?.[1] ?? null;
+    const note = estAvoir ? ["avoir", surFacture ? `sur ${surFacture}` : null, motif].filter(Boolean).join(" · ") : "";
+    const avoirRe = /^([A-Z]{2,6}\d{2,6})\s+(.+?)\s+(\d+(?:[.,]\d+)?)\s+(KGM?|PCE?|PCS|UNI|LIT?|L)\s+(-?\d+[.,]\d+)\s+(-?\d+[.,]\d+)\s+(-?\d+[.,]\d+)\s+(\d+[.,]\d+)\s*$/gim;
+    let a: RegExpExecArray | null;
+    while ((a = avoirRe.exec(text)) !== null) {
+      const qty = parseFrenchNumber(a[3]);
+      const rawUnit = a[4].toUpperCase();
+      const total = parseFrenchNumber(a[7]);
+      const unit: "pc" | "kg" | "l" = rawUnit.startsWith("KG") ? "kg" : rawUnit.startsWith("LIT") || rawUnit === "L" ? "l" : "pc";
+      const name = a[2].trim();
+      tmp.push({
+        sku: a[1],
+        name,
+        quantity: qty != null && total != null && total < 0 ? -qty : qty,
+        unit,
+        unit_price: parseFrenchNumber(a[6]),
+        total_price: total,
+        tax_rate: parseFrenchNumber(a[8]),
+        notes: note || null,
+        piece_weight_g: unit === "pc" ? extractWeightGFromName(name) : null,
+        piece_volume_ml: unit === "pc" ? extractVolumeFromName(name) : null,
+      });
+    }
   }
 
   // Deduplicate
