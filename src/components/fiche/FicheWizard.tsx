@@ -100,19 +100,21 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
         .from("kitchen_recipes")
         .select("category, sous_categorie")
         .not("sous_categorie", "is", null);
-      const scMap: Record<string, Set<string>> = {};
+      // Fusion insensible à la casse/accents (« Sirop » = « SIROP ») :
+      // la graphie déclarée sur la catégorie fait référence.
+      const foldSc = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+      const scMap: Record<string, Map<string, string>> = {};
+      for (const c of (cRes.data ?? []) as Categorie[]) {
+        if (!scMap[c.slug]) scMap[c.slug] = new Map();
+        for (const sc of c.sous_categories ?? []) if (sc) scMap[c.slug].set(foldSc(sc), sc);
+      }
       for (const r of (scData ?? []) as { category: string; sous_categorie: string }[]) {
         if (!r.sous_categorie) continue;
-        if (!scMap[r.category]) scMap[r.category] = new Set();
-        scMap[r.category].add(r.sous_categorie);
-      }
-      // Merge with categories.sous_categories from DB
-      for (const c of (cRes.data ?? []) as Categorie[]) {
-        if (!scMap[c.slug]) scMap[c.slug] = new Set();
-        for (const sc of c.sous_categories ?? []) scMap[c.slug].add(sc);
+        if (!scMap[r.category]) scMap[r.category] = new Map();
+        if (!scMap[r.category].has(foldSc(r.sous_categorie))) scMap[r.category].set(foldSc(r.sous_categorie), r.sous_categorie);
       }
       const scResult: Record<string, string[]> = {};
-      for (const [k, v] of Object.entries(scMap)) scResult[k] = [...v].sort();
+      for (const [k, v] of Object.entries(scMap)) scResult[k] = [...v.values()].sort((a, b) => a.localeCompare(b, "fr"));
       setExistingSubCats(scResult);
 
       // Build CPU map from supplier offers

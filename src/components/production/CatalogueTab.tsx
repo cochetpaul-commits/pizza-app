@@ -761,14 +761,23 @@ export function CatalogueContent() {
       const subs = typeMap.get(type) ?? [];
       const subColor = type === "cuisine" && cat ? (dynamicCatColors[cat] ?? CUISINE_CAT_COLORS[cat] ?? "#4a6741") : groupColor(key);
 
-      // Split items by sous_categorie within each category
+      // Split items by sous_categorie within each category.
+      // Rapprochement insensible à la casse et aux accents : « Sirop » (fiche)
+      // et « SIROP » (sous-catégorie déclarée) sont le MÊME groupe — sinon
+      // deux groupes jumeaux apparaissaient (vécu sur Mocktail le 29/08).
+      const foldSc = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+      const declaredSc = (dbCategories.find(c => c.slug === (cat || type))?.sous_categories ?? []).filter(Boolean);
+      const canonicalSc = new Map<string, string>();
+      for (const d of declaredSc) canonicalSc.set(foldSc(d), d);
       const subCatMap = new Map<string, Recipe[]>();
       const noSubCat: Recipe[] = [];
       for (const r of items) {
         if (r.sous_categorie) {
-          const arr = subCatMap.get(r.sous_categorie) ?? [];
+          const canon = canonicalSc.get(foldSc(r.sous_categorie)) ?? r.sous_categorie;
+          if (!canonicalSc.has(foldSc(canon))) canonicalSc.set(foldSc(canon), canon);
+          const arr = subCatMap.get(canon) ?? [];
           arr.push(r);
-          subCatMap.set(r.sous_categorie, arr);
+          subCatMap.set(canon, arr);
         } else {
           noSubCat.push(r);
         }
@@ -831,14 +840,25 @@ export function CatalogueContent() {
       const first = tg.subGroups[0];
       let base = (first?.key ?? (isCustom ? `cuisine:${slug}` : tg.type)).replace(/:_none$/, "");
       for (const sc of declared) if (base.endsWith(`:${sc}`)) base = base.slice(0, -(sc.length + 1));
-      const labels = new Set(tg.subGroups.map(sg => sg.label));
+      const foldSc2 = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+      const labels = new Set(tg.subGroups.map(sg => foldSc2(sg.label)));
       for (const sc of declared) {
-        if (labels.has(sc)) continue;
+        if (labels.has(foldSc2(sc))) continue;
         // Un seul sous-groupe « sans sous-catégorie » → le marquer comme tel
         if (tg.subGroups.length === 1 && first && first.key === base) {
           tg.subGroups[0] = { ...first, key: `${base}:_none` };
         }
         tg.subGroups.push({ key: `${base}:${sc}`, label: sc, color: first?.color ?? tg.color, items: [] });
+      }
+    }
+
+    // Quand une catégorie a des sous-catégories, le groupe des fiches non
+    // rangées portait une étiquette vide (« • 3 » sans nom) : on le nomme.
+    for (const tg of result) {
+      if (tg.subGroups.length > 1) {
+        for (let gi = 0; gi < tg.subGroups.length; gi++) {
+          if (!tg.subGroups[gi].label) tg.subGroups[gi] = { ...tg.subGroups[gi], label: "Sans sous-catégorie" };
+        }
       }
     }
 
