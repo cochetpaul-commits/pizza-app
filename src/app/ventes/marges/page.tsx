@@ -8,6 +8,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { AiInsightCard } from "@/components/AiInsightCard";
 import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
 import { usePilotageRange } from "@/lib/pilotageRange";
+import { usePilotageTopBar } from "@/components/ui/PilotageRangeBar";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 
@@ -213,6 +214,8 @@ function MargesPage() {
   }, hasUrlRange);
   const range = internalRange;
   const setRange = setInternalRange;
+  // Sur mobile : sélecteur dans le bandeau du haut, comme la page Ventes
+  usePilotageTopBar(range, setRange, accent);
   const isEmbedded = false;
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(false);

@@ -328,7 +328,8 @@ body {
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 @media (max-width: 767px) {
-  .period-sticky { top: calc(52px + env(safe-area-inset-top, 0px)); }
+  /* Sur mobile le sélecteur vit dans le bandeau du haut (useTopBar) */
+  .period-sticky { display: none !important; }
 }
 
 /* ── Sidebar repliable (desktop + tablette) ───────── */

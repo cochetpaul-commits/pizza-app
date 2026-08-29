@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { PilotageRangeBar } from "@/components/ui/PilotageRangeBar";
+import { PilotageRangeBar, usePilotageTopBar } from "@/components/ui/PilotageRangeBar";
 import { usePilotageRange } from "@/lib/pilotageRange";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -114,13 +114,23 @@ export default function MasseSalarialePage() {
   const etabId = etab?.id;
   const selectedFrom = selected.from;
   const selectedTo = selected.to;
+  // Sur mobile : sélecteur dans le bandeau du haut, comme la page Ventes
+  usePilotageTopBar(shared, setShared, ACCENT);
 
   const loadingRef = useRef(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const pendingArgsRef = useRef<[string, string, string] | null>(null);
   const loadAllData = useCallback(async (eId: string, from: string, to: string) => {
-    if (loadingRef.current) return;
+    if (loadingRef.current) {
+      // Un chargement est déjà en cours : on rejoue celui-ci juste après
+      // (avant, l'appel était perdu → page figée sur des zéros).
+      pendingArgsRef.current = [eId, from, to];
+      return;
+    }
     loadingRef.current = true;
     setLoading(true);
+    setLoadError(null);
     try {
       const [presData, contratData] = await Promise.all([
         supabase.from("combo_presences")
@@ -136,6 +146,9 @@ export default function MasseSalarialePage() {
             setCouverts(s?.couverts ?? null);
           }).catch(() => { setCaHt(null); setCouverts(null); }),
       ]);
+      if (presData.error || contratData.error) {
+        setLoadError(presData.error?.message ?? contratData.error?.message ?? "Erreur de chargement");
+      }
       setPresences((presData.data ?? []) as ComboPresence[]);
       const ct: ContratInfo[] = [];
       for (const c of (contratData.data ?? []) as Record<string, unknown>[]) {
@@ -149,9 +162,14 @@ export default function MasseSalarialePage() {
         });
       }
       setContrats(ct);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
       loadingRef.current = false;
+      const pending = pendingArgsRef.current;
+      pendingArgsRef.current = null;
+      if (pending) void loadAllData(...pending);
     }
   }, []);
 
@@ -363,8 +381,18 @@ export default function MasseSalarialePage() {
           <SimulationContent activeTab={msTab} />
         ) : (<>
 
-        {/* Période commune Pilotage */}
-        <div style={{ marginBottom: 6 }}><PilotageRangeBar value={shared} onChange={setShared} accent={ACCENT} /></div>
+        {loadError && (
+          <div style={{ background: "#FDECEA", color: "#B3261E", borderRadius: 10, padding: "10px 14px", fontSize: 13, fontWeight: 600, margin: "0 0 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <span>Les données n&apos;ont pas pu être chargées ({loadError}).</span>
+            <button type="button" onClick={() => { if (etabId && selectedFrom && selectedTo) loadAllData(etabId, selectedFrom, selectedTo); }}
+              style={{ border: "1px solid #B3261E", background: "#fff", color: "#B3261E", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+              Réessayer
+            </button>
+          </div>
+        )}
+
+        {/* Période commune Pilotage (ordinateur — sur mobile elle est dans le bandeau du haut) */}
+        <div className="period-sticky" style={{ marginBottom: 6, padding: "10px 16px" }}><PilotageRangeBar value={shared} onChange={setShared} accent={ACCENT} /></div>
         <div style={{ textAlign: "center", fontSize: 11, color: "#999", marginBottom: 14 }}>
           {periodMode === "month" ? "Mois" : "Semaine"} Combo : <strong style={{ color: "#6f6a61" }}>{selected.label}</strong> — les heures du planning sont hebdomadaires.
         </div>

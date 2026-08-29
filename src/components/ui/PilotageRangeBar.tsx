@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
+import { useTopBar } from "@/components/layout/TopBarContext";
 
 /**
  * Barre de période commune à toutes les pages Pilotage :
@@ -28,4 +30,18 @@ export function PilotageRangeBar({ value, onChange, accent = "#D4775A", center =
       </button>
     </div>
   );
+}
+
+/**
+ * Place la barre de période dans le bandeau du haut sur mobile (même
+ * emplacement que la page Ventes). La barre de page reste pour l'ordinateur
+ * (à masquer sous 768 px via une classe display:none).
+ */
+export function usePilotageTopBar(value: DateRange, onChange: (r: DateRange) => void, accent = "#D4775A") {
+  const topBar = useTopBar();
+  useEffect(() => {
+    topBar.set({ actions: <PilotageRangeBar value={value} onChange={onChange} accent={accent} center={false} /> });
+    return () => topBar.clear();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value.from, value.to, accent]);
 }

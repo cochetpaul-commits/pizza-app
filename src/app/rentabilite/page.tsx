@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { RequireRole } from "@/components/RequireRole";
-import { PilotageRangeBar } from "@/components/ui/PilotageRangeBar";
+import { PilotageRangeBar, usePilotageTopBar } from "@/components/ui/PilotageRangeBar";
 import { usePilotageRange } from "@/lib/pilotageRange";
 
 /**
@@ -140,6 +140,9 @@ export default function RentabilitePage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
+  // Sur mobile : sélecteur dans le bandeau du haut, comme la page Ventes
+  usePilotageTopBar(period, setPeriod, etab?.couleur ?? "#D4775A");
+
   // Chargement : dépendances scalaires uniquement (pas de useCallback —
   // le compilateur React refuse la mémoïsation manuelle ici).
   useEffect(() => {
@@ -188,7 +191,7 @@ export default function RentabilitePage() {
   return (
     <RequireRole permission="performances.pilotage">
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "20px 16px 80px" }}>
-        <div style={{ margin: "0 0 16px" }}><PilotageRangeBar value={period} onChange={setPeriod} accent={etab?.couleur ?? "#D4775A"} /></div>
+        <div className="period-sticky" style={{ margin: "-24px -16px 16px", padding: "10px 16px" }}><PilotageRangeBar value={period} onChange={setPeriod} accent={etab?.couleur ?? "#D4775A"} /></div>
 
         <h1 style={{
           fontFamily: "var(--font-oswald), Oswald, sans-serif",
