@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import Chart from "chart.js/auto";
+import dynamic from "next/dynamic";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { T } from "@/lib/tokens";
 import { RequireRole } from "@/components/RequireRole";
-import { AiInsightCard } from "@/components/AiInsightCard";
+
+const DashboardCaBarChart = dynamic(() => import("@/components/charts/DashboardCaBarChart"), { ssr: false });
 
 const GROUP_COLOR = "#b45f57";
 const OSWALD = "var(--font-oswald), Oswald, sans-serif";
@@ -195,8 +196,6 @@ function GroupContent() {
   const [achatsMonth, setAchatsMonth] = useState(0);
   const [topFournisseurs, setTopFournisseurs] = useState<SupplierTotal[]>([]);
   const [loading, setLoading] = useState(true);
-  const chartRef = useRef<HTMLCanvasElement | null>(null);
-  const chartInstance = useRef<Chart | null>(null);
 
   useEffect(() => { setGroupView(true); }, [setGroupView]);
 
@@ -297,45 +296,6 @@ function GroupContent() {
   }, [etablissements, range, prevRange, a1Range, fiscalStart, today]);
 
   useEffect(() => { fetchData(); }, [fetchData]); // eslint-disable-line react-hooks/set-state-in-effect
-
-  // Draw chart
-  useEffect(() => {
-    if (!chartRef.current || dailyCa.length === 0) return;
-    if (chartInstance.current) chartInstance.current.destroy();
-
-    const etabIds = etablissements.map(e => e.id);
-    const etabColors: Record<string, string> = {};
-    for (const e of etablissements) etabColors[e.id] = e.slug?.includes("bello") ? T.belloMio : T.piccolaMia;
-
-    const labels = dailyCa.map(d => {
-      const dt = new Date(d.date + "T12:00:00");
-      return dt.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" });
-    });
-
-    const datasets = etabIds.map(id => ({
-      label: etablissements.find(e => e.id === id)?.nom ?? "",
-      data: dailyCa.map(d => Math.round(d.byEtab[id] ?? 0)),
-      backgroundColor: etabColors[id] + "CC",
-      borderRadius: 6,
-    }));
-
-    chartInstance.current = new Chart(chartRef.current, {
-      type: "bar",
-      data: { labels, datasets },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: etabIds.length > 1, position: "top", labels: { boxWidth: 10, font: { size: 11, family: DM_SANS } } },
-          tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${(ctx.parsed.y ?? 0).toLocaleString("fr-FR")} \u20AC` } },
-        },
-        scales: {
-          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10, family: DM_SANS } } },
-          y: { stacked: true, grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10, family: DM_SANS }, callback: (v) => `${Number(v).toLocaleString("fr-FR")}` } },
-        },
-      },
-    });
-    return () => { chartInstance.current?.destroy(); chartInstance.current = null; };
-  }, [dailyCa, etablissements]);
 
   // Derived totals
   const totalCa = Object.values(etabData).reduce((s, d) => s + d.ca, 0);
@@ -479,7 +439,7 @@ function GroupContent() {
             <div style={{ ...CARD, padding: "20px 22px" }}>
               <SectionTitle>CA par jour</SectionTitle>
               <div style={{ marginTop: 12 }}>
-                <canvas ref={chartRef} height={220} />
+                <DashboardCaBarChart dailyCa={dailyCa} etablissements={etablissements} />
               </div>
             </div>
           )}

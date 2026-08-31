@@ -56,15 +56,19 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
      `src/components/charts/DailyCaBarChart.tsx`, chargé via
      `next/dynamic({ ssr: false })`. `import Chart from "chart.js/auto"` et
      les `useRef`/`useEffect` associés ont disparu de ces deux pages.
-   - [ ] **Reste à faire** : les 5 pages `chart.js/auto` restantes
-     (`ventes/marges`, `ventes`, `achats`, `tresorerie`, `dashboard`).
-     Note : `tresorerie` ne semble en fait plus utiliser `chart.js/auto` —
-     à revérifier avant de la traiter. Même principe que ci-dessus : sortir
-     le `<canvas>` + la logique `new Chart(...)` dans un composant `"use
-     client"` séparé (regarder s'il est réutilisable comme
-     `DailyCaBarChart`), importé en `next/dynamic({ ssr: false })` depuis la
-     page. À faire une poignée de pages à la fois pour rester dans le budget
-     de lignes.
+   - [x] *(31/08/2026)* `dashboard` : le graphique « CA par jour » (multi-
+     établissements, barres empilées) extrait dans
+     `src/components/charts/DashboardCaBarChart.tsx`, chargé via
+     `next/dynamic({ ssr: false })`. `import Chart from "chart.js/auto"` et
+     le `useRef`/`useEffect` de dessin ont disparu de la page (au passage,
+     l'import mort `AiInsightCard` a été retiré, -1 warning ESLint).
+   - [ ] **Reste à faire** : `tresorerie` n'utilise déjà plus `chart.js/auto`
+     (vérifié — rien à faire dessus). Restent 3 pages : `ventes/marges`,
+     `ventes`, `achats`. Même principe que ci-dessus : sortir le `<canvas>`
+     + la logique `new Chart(...)` dans un composant `"use client"` séparé,
+     importé en `next/dynamic({ ssr: false })` depuis la page. Ces 3 pages
+     sont plus grosses (1250 à 2700 lignes) — probablement une page par
+     exécution pour rester dans le budget de lignes.
 2. **`v_latest_offers` téléchargée en entier** (toutes les offres de tous les
    fournisseurs) à chaque ouverture d'un formulaire de recette — 6 composants
    concernés. Filtrer par les ingrédients affichés, comme le fait déjà
