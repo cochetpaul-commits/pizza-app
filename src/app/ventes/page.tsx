@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, Suspense, type CSSProperties } from "react";
+import { useEtabAuto } from "@/lib/useEtabAuto";
 import { useSearchParams } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -641,6 +642,9 @@ function PerformancesPage() {
   // Date-ranker dans le bandeau du haut sur mobile (demande Paul 15/08) :
   // le header mobile rend ce contenu au centre, la barre sticky de page
   // est masquee en-dessous de 768px.
+  // Jamais « choisis un établissement » ici : auto-sélection du dernier resto
+  useEtabAuto();
+
   const topBar = useTopBar();
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);

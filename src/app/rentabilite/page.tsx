@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useEtabAuto } from "@/lib/useEtabAuto";
 import { supabase } from "@/lib/supabaseClient";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -140,6 +141,8 @@ export default function RentabilitePage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
+  // Jamais « choisis un établissement » ici : auto-sélection du dernier resto
+  useEtabAuto();
   // Sur mobile : sélecteur dans le bandeau du haut, comme la page Ventes
   usePilotageTopBar(period, setPeriod, etab?.couleur ?? "#D4775A");
 

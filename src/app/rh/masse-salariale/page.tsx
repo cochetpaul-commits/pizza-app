@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useEtabAuto } from "@/lib/useEtabAuto";
 import { PilotageRangeBar, usePilotageTopBar } from "@/components/ui/PilotageRangeBar";
 import { usePilotageRange } from "@/lib/pilotageRange";
 import { RequireRole } from "@/components/RequireRole";
@@ -114,6 +115,8 @@ export default function MasseSalarialePage() {
   const etabId = etab?.id;
   const selectedFrom = selected.from;
   const selectedTo = selected.to;
+  // Jamais « choisis un établissement » ici : auto-sélection du dernier resto
+  useEtabAuto();
   // Sur mobile : sélecteur dans le bandeau du haut, comme la page Ventes
   usePilotageTopBar(shared, setShared, ACCENT);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo, Suspense, type CSSProperties } from "react";
+import { useEtabAuto } from "@/lib/useEtabAuto";
 import { useSearchParams } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -214,6 +215,8 @@ function MargesPage() {
   }, hasUrlRange);
   const range = internalRange;
   const setRange = setInternalRange;
+  // Jamais « choisis un établissement » ici : auto-sélection du dernier resto
+  useEtabAuto();
   // Sur mobile : sélecteur dans le bandeau du haut, comme la page Ventes
   usePilotageTopBar(range, setRange, accent);
   const isEmbedded = false;
