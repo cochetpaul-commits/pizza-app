@@ -8,10 +8,6 @@
   },
   "crons": [
     {
-      "path": "/api/cron/renew-gmail-watch",
-      "schedule": "0 0 */6 * *"
-    },
-    {
       "path": "/api/meteo?action=fetch",
       "schedule": "0 7 * * *"
     },
@@ -30,6 +26,10 @@
     {
       "path": "/api/pennylane/sync",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/factures-auto",
+      "schedule": "40 6 * * *"
     }
   ]
 }

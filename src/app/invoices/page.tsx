@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { RequireRole } from "@/components/RequireRole";
 import { fetchApi } from "@/lib/fetchApi";
+import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { takePendingInvoiceFile } from "@/lib/pendingInvoiceFile";
 
@@ -77,6 +78,77 @@ type BatchItem = {
   result?: { ingredients_created?: number; offers_inserted?: number; already_imported?: boolean };
   error?: string;
 };
+
+
+/** Journal de la récupération automatique des factures Pennylane (Bello Mio) */
+function AutoImportJournal() {
+  type Row = { pennylane_id: number; fournisseur: string | null; invoice_number: string | null; invoice_date: string | null; montant_ttc: number | null; statut: string; detail: string | null; processed_at: string };
+  const [rows, setRows] = useState<Row[]>([]);
+  const [ouvert, setOuvert] = useState(false);
+  const [lancement, setLancement] = useState(false);
+
+  const charger = useCallback(async () => {
+    const { data } = await supabase
+      .from("auto_import_factures")
+      .select("pennylane_id, fournisseur, invoice_number, invoice_date, montant_ttc, statut, detail, processed_at")
+      .neq("statut", "hors_mercuriale")
+      .order("processed_at", { ascending: false })
+      .limit(12);
+    setRows((data ?? []) as Row[]);
+  }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void charger();
+  }, [charger]);
+
+  const lancer = async () => {
+    setLancement(true);
+    try {
+      const res = await fetch("/api/cron/factures-auto?days=10");
+      const d = await res.json();
+      alert(d.ok ? `Terminé : ${d.importees} importée(s), ${d.dejaConnues} déjà connue(s), ${d.aVerifier} à vérifier, ${d.erreurs} erreur(s).` : `Erreur : ${d.error}`);
+      await charger();
+    } catch { alert("Erreur réseau"); }
+    setLancement(false);
+  };
+
+  const COULEURS: Record<string, string> = { importee: "#2D6A4F", deja_connue: "#8a8378", a_verifier: "#b45309", erreur: "#DC2626" };
+  const LIBELLES: Record<string, string> = { importee: "importée", deja_connue: "déjà connue", a_verifier: "à vérifier", erreur: "erreur" };
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>⚙️ Récupération automatique (Bello Mio)</div>
+          <div style={{ fontSize: 11.5, color: "#8a8378", marginTop: 2 }}>
+            Chaque matin, les factures déposées dans Pennylane (Drive, mail, photo) sont importées toutes seules : produits et prix pour les fournisseurs nourriture, montant + catégorie pour le reste. Piccola Mia reste en import manuel.
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" onClick={() => setOuvert(o => !o)} style={{ border: "1px solid #ddd6c8", background: "#fff", borderRadius: 9, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", color: "#1a1a1a" }}>
+            {ouvert ? "Masquer" : `Journal (${rows.length})`}
+          </button>
+          <button type="button" onClick={lancer} disabled={lancement} style={{ border: "none", background: "#2D6A4F", color: "#fff", borderRadius: 9, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: lancement ? 0.6 : 1 }}>
+            {lancement ? "Récupération…" : "Récupérer maintenant"}
+          </button>
+        </div>
+      </div>
+      {ouvert && (
+        <div style={{ marginTop: 10, borderTop: "1px solid #f0ebe3" }}>
+          {rows.length === 0 && <div style={{ fontSize: 12, color: "#999", padding: "10px 0" }}>Aucune facture traitée pour l&apos;instant — « Récupérer maintenant » pour un premier passage.</div>}
+          {rows.map(r => (
+            <div key={r.pennylane_id} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "7px 0", borderBottom: "1px solid #f7f3ec", fontSize: 12.5 }}>
+              <span style={{ fontWeight: 700, color: COULEURS[r.statut] ?? "#1a1a1a", minWidth: 86 }}>{LIBELLES[r.statut] ?? r.statut}</span>
+              <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{r.fournisseur ?? "?"}</span>
+              <span style={{ color: "#999" }}>{r.invoice_number ?? ""}{r.invoice_date ? ` · ${new Date(r.invoice_date + "T12:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}` : ""}{r.montant_ttc != null ? ` · ${Number(r.montant_ttc).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €` : ""}</span>
+              <span style={{ color: "#8a8378", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{r.detail ?? ""}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function InvoicesPage() {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -399,6 +471,8 @@ export default function InvoicesPage() {
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={pageStyle}>
         <h1 style={h1Style}>Import factures</h1>
+
+        <AutoImportJournal />
 
         {error && <div style={errorBox}>{error}</div>}
 

@@ -49,6 +49,10 @@ export type PlSupplierInvoice = {
   id: number;
   date: string;
   label: string | null;
+  invoice_number?: string | null;
+  filename?: string | null;
+  /** Fichier d'origine (PDF ou photo) — sert à la récupération automatique */
+  public_file_url?: string | null;
   currency_amount_before_tax: string;
   currency_amount: string;
   archived_at: string | null;
