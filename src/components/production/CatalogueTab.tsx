@@ -809,10 +809,35 @@ export function CatalogueContent() {
     const customColors = ["#8B6914", "#7C3AED", "#0284C7", "#C026D3", "#EA580C", "#16A34A", "#D97706"];
     let ci = 0;
     for (const [cat, items] of customTopLevel) {
-      const color = customColors[ci % customColors.length];
+      const color = dynamicCatColors[cat] ?? customColors[ci % customColors.length];
       ci++;
-      const label = cat.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
-      result.push({ type: `custom:${cat}`, label, color, count: items.length, subGroups: [{ key: `cuisine:${cat}`, label: "", color, items }], isCustom: true });
+      const label = dbCategories.find(c => c.slug === cat)?.nom ?? cat.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
+      // Les catégories personnalisées (Mocktail, …) respectent AUSSI les
+      // sous-catégories : sans ce découpage, une fiche glissée dans « Sirop »
+      // restait affichée dans le paquet unique (vécu le 29/08/2026).
+      const foldSc = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+      const canonicalSc = new Map<string, string>();
+      for (const d of (dbCategories.find(c => c.slug === cat)?.sous_categories ?? []).filter(Boolean)) canonicalSc.set(foldSc(d), d);
+      const subCatMap = new Map<string, Recipe[]>();
+      const noSubCat: Recipe[] = [];
+      for (const r of items) {
+        if (r.sous_categorie) {
+          const canon = canonicalSc.get(foldSc(r.sous_categorie)) ?? r.sous_categorie;
+          if (!canonicalSc.has(foldSc(canon))) canonicalSc.set(foldSc(canon), canon);
+          const arr = subCatMap.get(canon) ?? [];
+          arr.push(r);
+          subCatMap.set(canon, arr);
+        } else {
+          noSubCat.push(r);
+        }
+      }
+      const subGroups: SubGroup[] = subCatMap.size > 0
+        ? [
+            ...(noSubCat.length > 0 ? [{ key: `cuisine:${cat}:_none`, label: "", color, items: noSubCat }] : []),
+            ...[...subCatMap.entries()].map(([sc, scItems]) => ({ key: `cuisine:${cat}:${sc}`, label: sc, color, items: scItems })),
+          ]
+        : [{ key: `cuisine:${cat}`, label: "", color, items }];
+      result.push({ type: `custom:${cat}`, label, color, count: items.length, subGroups, isCustom: true });
     }
 
     // Add empty categories from DB that don't have recipes yet
