@@ -133,25 +133,21 @@ function periodDisplayLabel(period: Period, ref: string): string {
   return `Oct ${fyY} — Sep ${fyY + 1}`;
 }
 
-async function fetchAllVentesRows(
-  etabId: string, from: string, to: string, cols = "ttc, num_fiscal",
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let all: any[] = [];
-  let offset = 0;
-  while (true) {
-    const { data } = await supabase
-      .from("ventes_lignes").select(cols)
-      .eq("etablissement_id", etabId).gte("date_service", from)
-      .lte("date_service", to).eq("type_ligne", "Produit")
-      .range(offset, offset + 999);
-    if (!data || data.length === 0) break;
-    all = all.concat(data);
-    if (data.length < 1000) break;
-    offset += 1000;
-  }
-  return all;
+/**
+ * CA + tickets d'une période via agrégat SQL (RPC ventes_ca_tickets).
+ * Remplace l'ancienne pagination client de ventes_lignes : des centaines de
+ * requêtes qui saturaient les 6 connexions Safari et bloquaient les autres
+ * pages (Commandes restait « chargement » derrière la file d'attente).
+ */
+async function fetchCaTickets(etabId: string, from: string, to: string): Promise<{ ca: number; couverts: number }> {
+  const { data } = await supabase.rpc("ventes_ca_tickets", { p_etab: etabId, p_from: from, p_to: to });
+  const row = Array.isArray(data) ? data[0] : data;
+  return { ca: Number(row?.ca_ttc) || 0, couverts: Number(row?.tickets) || 0 };
+}
+
+async function fetchJourCategorie(etabId: string, from: string, to: string): Promise<{ jour: string; categorie: string; ca_ttc: number }[]> {
+  const { data } = await supabase.rpc("ventes_par_jour_categorie", { p_etab: etabId, p_from: from, p_to: to });
+  return (data ?? []) as { jour: string; categorie: string; ca_ttc: number }[];
 }
 
 function GroupContent() {
@@ -206,23 +202,17 @@ function GroupContent() {
     const etabIds = etablissements.map((e) => e.id);
 
     const caPromises = etablissements.map(async (etab) => {
-      const rows = await fetchAllVentesRows(etab.id, range.start, range.end);
-      const ca = rows.reduce((s, r) => s + (Number(r.ttc) || 0), 0);
-      const couverts = new Set(rows.map((r) => r.num_fiscal).filter(Boolean)).size;
+      const { ca, couverts } = await fetchCaTickets(etab.id, range.start, range.end);
       return { id: etab.id, ca, couverts };
     });
 
     const caPrevPromises = etablissements.map(async (etab) => {
-      const rows = await fetchAllVentesRows(etab.id, prevRange.start, prevRange.end);
-      const ca = rows.reduce((s, r) => s + (Number(r.ttc) || 0), 0);
-      const couverts = new Set(rows.map((r) => r.num_fiscal).filter(Boolean)).size;
+      const { ca, couverts } = await fetchCaTickets(etab.id, prevRange.start, prevRange.end);
       return { id: etab.id, ca, couverts };
     });
 
     const caA1Promises = etablissements.map(async (etab) => {
-      const rows = await fetchAllVentesRows(etab.id, a1Range.start, a1Range.end);
-      const ca = rows.reduce((s, r) => s + (Number(r.ttc) || 0), 0);
-      const couverts = new Set(rows.map((r) => r.num_fiscal).filter(Boolean)).size;
+      const { ca, couverts } = await fetchCaTickets(etab.id, a1Range.start, a1Range.end);
       return { id: etab.id, ca, couverts };
     });
 
@@ -230,13 +220,13 @@ function GroupContent() {
       const byDate: Record<string, Record<string, number>> = {};
       const cats: Record<string, number> = {};
       for (const etab of etablissements) {
-        const rows = await fetchAllVentesRows(etab.id, range.start, range.end, "ttc, date_service, categorie");
+        const rows = await fetchJourCategorie(etab.id, range.start, range.end);
         for (const r of rows) {
-          const d = String(r.date_service);
+          const d = String(r.jour).slice(0, 10);
           if (!byDate[d]) byDate[d] = {};
-          byDate[d][etab.id] = (byDate[d][etab.id] ?? 0) + (Number(r.ttc) || 0);
+          byDate[d][etab.id] = (byDate[d][etab.id] ?? 0) + (Number(r.ca_ttc) || 0);
           const cat = String(r.categorie || "Autre");
-          cats[cat] = (cats[cat] ?? 0) + (Number(r.ttc) || 0);
+          cats[cat] = (cats[cat] ?? 0) + (Number(r.ca_ttc) || 0);
         }
       }
       const daily = Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b))
@@ -248,8 +238,8 @@ function GroupContent() {
     const fyPromise = (async () => {
       let total = 0;
       for (const etab of etablissements) {
-        const rows = await fetchAllVentesRows(etab.id, fiscalStart, today, "ttc");
-        total += rows.reduce((s, r) => s + (Number(r.ttc) || 0), 0);
+        const { ca } = await fetchCaTickets(etab.id, fiscalStart, today);
+        total += ca;
       }
       return total;
     })();

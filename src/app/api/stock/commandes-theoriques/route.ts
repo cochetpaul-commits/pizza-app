@@ -13,6 +13,15 @@ import { getEtablissement, EtabError } from "@/lib/getEtablissement";
  *
  * Returns grouped by supplier with order lines.
  */
+// Une liste in.(...) de plusieurs centaines d'UUID dépasse la longueur d'URL
+// acceptée par PostgREST (erreur 400 silencieuse) — on requête par paquets.
+const CHUNK = 150;
+function chunks<T>(arr: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += CHUNK) out.push(arr.slice(i, i + CHUNK));
+  return out;
+}
+
 export async function GET(req: NextRequest) {
   let etabId: string;
   try {
@@ -88,19 +97,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ suppliers: [], generated_at: new Date().toISOString() });
   }
 
-  const { data: ingredients } = await supabaseAdmin
-    .from("ingredients")
-    .select("id, name, category, stock_min, stock_objectif, purchase_unit_label, default_unit")
-    .in("id", [...allIngIds]);
+  const ingredients = (await Promise.all(chunks([...allIngIds]).map(async (ids) => {
+    const { data } = await supabaseAdmin
+      .from("ingredients")
+      .select("id, name, category, stock_min, stock_objectif, purchase_unit_label, default_unit")
+      .in("id", ids);
+    return data ?? [];
+  }))).flat();
 
   const ingMap = new Map((ingredients ?? []).map(i => [i.id, i]));
 
   // Get supplier offers to know which supplier sells what
-  const { data: offers } = await supabaseAdmin
-    .from("supplier_offers")
-    .select("ingredient_id, supplier_id, pack_count, pack_each_qty, pack_each_unit, pack_price, unit_price, label")
-    .eq("is_active", true)
-    .in("ingredient_id", [...allIngIds]);
+  const offers = (await Promise.all(chunks([...allIngIds]).map(async (ids) => {
+    const { data } = await supabaseAdmin
+      .from("supplier_offers")
+      .select("ingredient_id, supplier_id, pack_count, pack_each_qty, pack_each_unit, pack_price, unit_price, label")
+      .eq("is_active", true)
+      .in("ingredient_id", ids);
+    return data ?? [];
+  }))).flat();
 
   // Get supplier info
   const supplierIds = [...new Set((offers ?? []).map(o => o.supplier_id))];

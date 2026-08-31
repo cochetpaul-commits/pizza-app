@@ -124,10 +124,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ inventory_date: lastInv?.date ?? null, items: [] });
   }
 
-  const { data: ingredients } = await supabaseAdmin
-    .from("ingredients")
-    .select("id, name, category, stock_min, stock_objectif, purchase_unit_label, default_unit")
-    .in("id", ids);
+  // Paquets de 150 : une liste in.(...) trop longue fait échouer la requête (400)
+  const ingredients = (await Promise.all(
+    Array.from({ length: Math.ceil(ids.length / 150) }, (_, i) => ids.slice(i * 150, i * 150 + 150))
+      .map(async (batch) => {
+        const { data } = await supabaseAdmin
+          .from("ingredients")
+          .select("id, name, category, stock_min, stock_objectif, purchase_unit_label, default_unit")
+          .in("id", batch);
+        return data ?? [];
+      }),
+  )).flat();
 
   const ingMap = new Map((ingredients ?? []).map((i) => [i.id, i]));
 

@@ -649,6 +649,8 @@ function CommandesPage() {
 
   // Loading
   const [loading, setLoading] = useState(true);
+  const [initError, setInitError] = useState(false);
+  const [initRetry, setInitRetry] = useState(0);
   const [loadingSupplier, setLoadingSupplier] = useState(false);
   const [saving, setSaving] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
@@ -657,17 +659,27 @@ function CommandesPage() {
 
   useEffect(() => {
     async function init() {
+      setInitError(false);
+      setLoading(true);
       // Fournisseurs de TOUS les établissements : un même nom (ex. Carniato
       // chez Bello Mio ET Piccola Mia) est regroupé sous une seule entrée,
       // sinon les produits rattachés à la fiche de l'autre resto restaient
       // invisibles au moment de commander. La fiche du resto courant sert de
       // référence (franco, jours de livraison) ; on n'affiche que les
       // fournisseurs présents dans le resto courant.
-      const { data } = await supabase
-        .from("suppliers")
-        .select("id, name, etablissement_id, franco_minimum, delivery_schedule, color, website, portal_login, portal_password")
-        .eq("is_active", true)
-        .order("name");
+      // Garde-fou 20 s : si la requête reste coincée (file d'attente réseau,
+      // session à rafraîchir…), on affiche une erreur + Réessayer au lieu
+      // d'un chargement sans fin.
+      const timeout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 20000));
+      const { data, error } = await Promise.race([
+        supabase
+          .from("suppliers")
+          .select("id, name, etablissement_id, franco_minimum, delivery_schedule, color, website, portal_login, portal_password")
+          .eq("is_active", true)
+          .order("name"),
+        timeout,
+      ]);
+      if (error) throw error;
       type SupRow = Supplier & { etablissement_id?: string | null };
       const byName = new Map<string, SupRow[]>();
       for (const s of (data ?? []) as SupRow[]) {
@@ -790,8 +802,11 @@ function CommandesPage() {
       }
       setLoading(false);
     }
-    init();
-  }, [etab?.id, searchParams]);
+    init().catch(() => {
+      setInitError(true);
+      setLoading(false);
+    });
+  }, [etab?.id, searchParams, initRetry]);
 
   // ── Load session + catalog when supplier changes ──────────────────────
 
@@ -2028,6 +2043,28 @@ function CommandesPage() {
             fontSize: 14, fontWeight: 600, marginBottom: 16, textAlign: "center",
           }}>
             {confirmation}
+          </div>
+        )}
+
+        {initError && (
+          <div style={{
+            background: "#fdf0ee", border: "1px solid #eecfc8", color: "#a4442e",
+            padding: "14px 16px", borderRadius: 12, marginBottom: 16,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+          }}>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>
+              Les fournisseurs n&apos;ont pas pu être chargés (connexion lente ou coupée).
+            </span>
+            <button
+              type="button"
+              onClick={() => setInitRetry((n) => n + 1)}
+              style={{
+                padding: "8px 18px", borderRadius: 10, border: "none",
+                background: "#a4442e", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              Réessayer
+            </button>
           </div>
         )}
 
