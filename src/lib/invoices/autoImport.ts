@@ -55,15 +55,18 @@ export async function autoImportFactures(etabId: string, days = 5, dossier: PlDo
     .map((s) => norm(s.name as string))
     .filter((n) => n.length > 3);
 
-  // Factures déjà passées par ce pipeline
+  // Factures déjà passées par ce pipeline — sauf celles en erreur,
+  // qu'on retente au passage suivant (fichier momentanément illisible…)
   const ids = invoices.map((i) => i.id);
   const dejaTraitees = new Set<number>();
   for (let i = 0; i < ids.length; i += 100) {
     const { data } = await supabaseAdmin
       .from("auto_import_factures")
-      .select("pennylane_id")
+      .select("pennylane_id, statut")
       .in("pennylane_id", ids.slice(i, i + 100));
-    for (const r of data ?? []) dejaTraitees.add(Number(r.pennylane_id));
+    for (const r of data ?? []) {
+      if (r.statut !== "erreur") dejaTraitees.add(Number(r.pennylane_id));
+    }
   }
 
   const res: AutoImportResult = {
@@ -128,6 +131,10 @@ export async function autoImportFactures(etabId: string, days = 5, dossier: PlDo
         continue;
       }
       const bytes = new Uint8Array(await rep.arrayBuffer());
+      if (bytes.length === 0) {
+        await log(inv, fournisseur, "a_verifier", "fichier d'origine vide dans Pennylane — à importer à la main");
+        continue;
+      }
       const contentType = rep.headers.get("content-type") ?? "";
       const estPdf = contentType.includes("pdf") || (inv.filename ?? "").toLowerCase().endsWith(".pdf") || (bytes[0] === 0x25 && bytes[1] === 0x50);
 
