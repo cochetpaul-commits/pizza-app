@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getSupplierInvoices, getInvoiceCategories, getSuppliers, getTransactions } from "@/lib/pennylane/api";
+import { getSupplierInvoices, getInvoiceCategories, getSuppliers, getTransactions, type PlDossier } from "@/lib/pennylane/api";
 
 /**
  * Rapatrie les factures fournisseurs Pennylane dans charges_mensuelles,
@@ -146,15 +146,15 @@ export type SyncResult = {
 };
 
 /** Synchronise un mois (YYYY-MM-01 → fin de mois). Idempotent. */
-export async function syncPennylaneMois(etabId: string, moisDebut: string): Promise<SyncResult> {
+export async function syncPennylaneMois(etabId: string, moisDebut: string, dossier: PlDossier = "bello"): Promise<SyncResult> {
   const d = new Date(moisDebut + "T12:00:00Z");
   const fin = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0));
   const from = moisDebut;
   const to = fin.toISOString().slice(0, 10);
 
   const [invoices, plSuppliers, { data: appSuppliers }] = await Promise.all([
-    getSupplierInvoices(from, to),
-    getSuppliers(),
+    getSupplierInvoices(from, to, dossier),
+    getSuppliers(dossier),
     // Les fournisseurs de la mercuriale : s'ils facturent, c'est de la matière
     supabaseAdmin.from("suppliers").select("name").eq("is_active", true),
   ]);
@@ -168,7 +168,7 @@ export async function syncPennylaneMois(etabId: string, moisDebut: string): Prom
   const BATCH = 4;
   for (let i = 0; i < invoices.length; i += BATCH) {
     const lot = invoices.slice(i, i + BATCH);
-    const res = await Promise.all(lot.map(inv => getInvoiceCategories(inv.id)));
+    const res = await Promise.all(lot.map(inv => getInvoiceCategories(inv.id, dossier)));
     lot.forEach((inv, k) => cats.set(inv.id, res[k] as { label: string; weight?: number }[]));
     if (i + BATCH < invoices.length) await new Promise(r => setTimeout(r, 250));
   }
@@ -218,7 +218,7 @@ export async function syncPennylaneMois(etabId: string, moisDebut: string): Prom
   // qui n'ont jamais de facture fournisseur (virements de paie, URSSAF).
   const ACCEPTES = ["masse_salariale", "remuneration_gerants"];
   try {
-    const txs = await getTransactions(from, to);
+    const txs = await getTransactions(from, to, dossier);
     for (const t of txs) {
       const montant = Number(t.amount ?? 0);
       if (!(montant < 0)) continue;

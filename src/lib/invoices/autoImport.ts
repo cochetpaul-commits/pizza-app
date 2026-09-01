@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getSupplierInvoices, getSuppliers, type PlSupplierInvoice } from "@/lib/pennylane/api";
+import { getSupplierInvoices, getSuppliers, type PlSupplierInvoice, type PlDossier } from "@/lib/pennylane/api";
 import { pdfToText } from "@/lib/pdfToText";
 import { detectInvoice } from "@/lib/invoices/invoiceDetector";
 import { PARSERS } from "@/lib/invoices/registry";
@@ -40,14 +40,14 @@ function isoDaysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export async function autoImportFactures(etabId: string, days = 5): Promise<AutoImportResult> {
+export async function autoImportFactures(etabId: string, days = 5, dossier: PlDossier = "bello"): Promise<AutoImportResult> {
   const from = isoDaysAgo(days);
   const to = new Date().toISOString().slice(0, 10);
   const userId = process.env.AUTO_IMPORT_USER_ID ?? "bd335e2e-6a50-4311-89b4-8f735cf6bc0b";
 
   const [invoices, plSuppliers, { data: appSuppliers }] = await Promise.all([
-    getSupplierInvoices(from, to),
-    getSuppliers(),
+    getSupplierInvoices(from, to, dossier),
+    getSuppliers(dossier),
     supabaseAdmin.from("suppliers").select("name").eq("is_active", true),
   ]);
   const plNameById = new Map(plSuppliers.map((s) => [s.id, s.name]));
@@ -173,7 +173,7 @@ export async function autoImportFactures(etabId: string, days = 5): Promise<Auto
         supabase: supabaseAdmin, userId, supplierName, payload,
         sourceFileName: inv.filename ?? `pennylane_${inv.id}`,
         rawText: rawText || `pennylane_${inv.id}`, mode: "commit",
-        establishment: "bellomio", defaultUnit, etabId,
+        establishment: dossier === "piccola" ? "piccola" : "bellomio", defaultUnit, etabId,
       });
 
       await log(

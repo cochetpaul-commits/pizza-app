@@ -7,14 +7,26 @@
  * portent le HT, alors que les factures scannées dans l'app ne couvrent
  * que les fournisseurs de la mercuriale.
  *
- * Nécessite PENNYLANE_API_KEY (Pennylane → Paramètres → API).
- * Un seul dossier est connecté aujourd'hui : SARL SASHA (Bello Mio).
+ * Deux dossiers :
+ *  - bello   → PENNYLANE_API_KEY          (SARL SASHA / Bello Mio)
+ *  - piccola → PENNYLANE_API_KEY_PICCOLA  (SARL I FRATELLI / Piccola Mia)
+ *              — ou PENYLANE_API_KEY, nom sous lequel la clé a été déposée
+ *                dans Vercel (orthographe conservée pour ne pas la casser).
  */
 
 const BASE_URL = "https://app.pennylane.com/api/external/v2/";
 
-export function pennylaneConfigured(): boolean {
-  return !!process.env.PENNYLANE_API_KEY;
+export type PlDossier = "bello" | "piccola";
+
+function keyFor(dossier: PlDossier): string | undefined {
+  if (dossier === "piccola") {
+    return process.env.PENNYLANE_API_KEY_PICCOLA ?? process.env.PENYLANE_API_KEY;
+  }
+  return process.env.PENNYLANE_API_KEY;
+}
+
+export function pennylaneConfigured(dossier: PlDossier = "bello"): boolean {
+  return !!keyFor(dossier);
 }
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -24,9 +36,9 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
  * d'attendre quelques secondes — sans ce retry, une synchro d'un mois
  * complet échoue au milieu.
  */
-async function plGet<T = unknown>(path: string, tentative = 0): Promise<T> {
-  const key = process.env.PENNYLANE_API_KEY;
-  if (!key) throw new Error("PENNYLANE_API_KEY manquante");
+async function plGet<T = unknown>(path: string, dossier: PlDossier = "bello", tentative = 0): Promise<T> {
+  const key = keyFor(dossier);
+  if (!key) throw new Error(`Clé Pennylane manquante pour le dossier ${dossier}`);
   const res = await fetch(BASE_URL + path, {
     headers: { Authorization: `Bearer ${key.trim()}`, Accept: "application/json" },
     cache: "no-store",
@@ -36,7 +48,7 @@ async function plGet<T = unknown>(path: string, tentative = 0): Promise<T> {
     const m = /retry in (\d+)/i.exec(txt);
     const attente = (m ? Number(m[1]) : 2) * 1000 + tentative * 500;
     await sleep(attente);
-    return plGet<T>(path, tentative + 1);
+    return plGet<T>(path, dossier, tentative + 1);
   }
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
@@ -64,7 +76,7 @@ export type PlCategory = { id: number; label: string; direction: string };
 type Paged<T> = { items: T[]; has_more: boolean; next_cursor: string | null };
 
 /** Toutes les factures fournisseurs d'une période (pagination suivie). */
-export async function getSupplierInvoices(from: string, to: string): Promise<PlSupplierInvoice[]> {
+export async function getSupplierInvoices(from: string, to: string, dossier: PlDossier = "bello"): Promise<PlSupplierInvoice[]> {
   const filter = encodeURIComponent(JSON.stringify([
     { field: "date", operator: "gteq", value: from },
     { field: "date", operator: "lteq", value: to },
@@ -73,7 +85,7 @@ export async function getSupplierInvoices(from: string, to: string): Promise<PlS
   let cursor: string | null = null;
   for (let page = 0; page < 30; page++) {
     const q = `supplier_invoices?filter=${filter}&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
-    const data: Paged<PlSupplierInvoice> = await plGet(q);
+    const data: Paged<PlSupplierInvoice> = await plGet(q, dossier);
     out.push(...(data.items ?? []));
     if (!data.has_more || !data.next_cursor) break;
     cursor = data.next_cursor;
@@ -83,10 +95,10 @@ export async function getSupplierInvoices(from: string, to: string): Promise<PlS
 }
 
 /** Catégories analytiques d'une facture (une facture peut en avoir plusieurs). */
-export async function getInvoiceCategories(invoiceId: number): Promise<{ label: string; weight: number }[]> {
+export async function getInvoiceCategories(invoiceId: number, dossier: PlDossier = "bello"): Promise<{ label: string; weight: number }[]> {
   try {
     const data = await plGet<Paged<{ label?: string; category?: { label?: string }; weight?: string }>>(
-      `supplier_invoices/${invoiceId}/categories`,
+      `supplier_invoices/${invoiceId}/categories`, dossier,
     );
     return (data.items ?? []).map(c => ({
       label: c.label ?? c.category?.label ?? "En attente de catégorisation",
@@ -112,7 +124,7 @@ export type PlTransaction = {
  * loyer prélevé…). Les transactions déjà rapprochées à une facture sont
  * exclues à l'usage pour ne pas compter deux fois.
  */
-export async function getTransactions(from: string, to: string): Promise<PlTransaction[]> {
+export async function getTransactions(from: string, to: string, dossier: PlDossier = "bello"): Promise<PlTransaction[]> {
   const filter = encodeURIComponent(JSON.stringify([
     { field: "date", operator: "gteq", value: from },
     { field: "date", operator: "lteq", value: to },
@@ -121,7 +133,7 @@ export async function getTransactions(from: string, to: string): Promise<PlTrans
   let cursor: string | null = null;
   for (let page = 0; page < 30; page++) {
     const q = `transactions?filter=${filter}&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
-    const data: Paged<PlTransaction> = await plGet(q);
+    const data: Paged<PlTransaction> = await plGet(q, dossier);
     out.push(...(data.items ?? []));
     if (!data.has_more || !data.next_cursor) break;
     cursor = data.next_cursor;
@@ -129,12 +141,12 @@ export async function getTransactions(from: string, to: string): Promise<PlTrans
   return out;
 }
 
-export async function getSuppliers(): Promise<{ id: number; name: string }[]> {
+export async function getSuppliers(dossier: PlDossier = "bello"): Promise<{ id: number; name: string }[]> {
   const out: { id: number; name: string }[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < 20; page++) {
     const q = `suppliers?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
-    const data: Paged<{ id: number; name: string }> = await plGet(q);
+    const data: Paged<{ id: number; name: string }> = await plGet(q, dossier);
     out.push(...(data.items ?? []));
     if (!data.has_more || !data.next_cursor) break;
     cursor = data.next_cursor;

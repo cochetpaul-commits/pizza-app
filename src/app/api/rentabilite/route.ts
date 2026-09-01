@@ -39,6 +39,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
 
+  // Dossier Pennylane de cet établissement (bello → SARL SASHA, piccola → SARL I FRATELLI)
+  const { data: etabRow } = await supabaseAdmin
+    .from("etablissements").select("slug").eq("id", etabId).maybeSingle();
+  const dossier = ((etabRow?.slug as string | null) ?? "").includes("bello") ? "bello" as const : "piccola" as const;
+
   // ── 1. CA réel (Popina) — agrégat SQL (ventes_ca_periode), plus de pagination ──
   let caHt = 0, caTtc = 0;
   {
@@ -164,7 +169,7 @@ export async function GET(req: NextRequest) {
   const exploitation: Ligne = exploitationTotal > 0
     ? { poste: "Charges d'exploitation", montant: exploitationTotal, statut: "ok", source: "Pennylane" }
     : { poste: "Charges d'exploitation", montant: null, statut: "manquant", source: "Pennylane",
-        detail: pennylaneConfigured() ? "Lancer la synchronisation Pennylane" : "Clé API Pennylane non configurée" };
+        detail: pennylaneConfigured(dossier) ? "Lancer la synchronisation Pennylane" : "Clé API Pennylane non configurée" };
 
   // ── 6b. Détail Pennylane : poste → catégorie → factures / transactions ──
   type DetailRow = { date: string | null; poste: string; categorie: string; fournisseur: string | null; libelle: string | null; montant_ht: number; type: string };
@@ -217,6 +222,6 @@ export async function GET(req: NextRequest) {
     ebe: ebe != null ? { montant: ebe, pct: caHt > 0 ? (ebe / caHt) * 100 : 0 } : null,
     exploitationDetail: exploitationDetail.sort((a, b) => b.montant - a.montant).slice(0, 12),
     detailPennylane,
-    pennylane: pennylaneConfigured(),
+    pennylane: pennylaneConfigured(dossier),
   });
 }
