@@ -269,6 +269,42 @@ function UserAvatar() {
   );
 }
 
+/* ── Sub: Sélecteur d'entreprise (Bello Mio / Piccola Mia / Groupe) ── */
+
+function EtabPill() {
+  const { current, etablissements, isGroupView, isGroupAdmin } = useEtablissement();
+  const canSwitch = isGroupAdmin || etablissements.length > 1;
+  const label = isGroupView ? "iFratelli Group" : (current?.nom ?? "Entreprise");
+  const color = isGroupView ? "#b45f57" : (current?.couleur ?? "#b45f57");
+  // Le tiroir de choix vit dans BottomTabBar (événement déjà écouté là-bas)
+  const open = () => { if (canSwitch) window.dispatchEvent(new Event("open-etab-drawer")); };
+  return (
+    <button
+      type="button"
+      onClick={open}
+      aria-label="Changer d'entreprise"
+      disabled={!canSwitch}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        maxWidth: 170, height: 34, padding: "0 10px 0 12px",
+        borderRadius: 17, border: `1px solid ${color}33`,
+        background: `${color}12`, color,
+        cursor: canSwitch ? "pointer" : "default",
+        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+        fontSize: 13, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase",
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      {canSwitch && (
+        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 /* ── Main component ──────────────────────────────── */
 
 export function MobileHeader() {
@@ -290,6 +326,8 @@ export function MobileHeader() {
         display: "flex", alignItems: "center",
         height: 52, padding: "0 12px", gap: 10,
       }}>
+        {/* Gauche : entreprise courante (Bello Mio / Piccola Mia / Groupe) */}
+        <EtabPill />
         {/* Centre : contenu injecte par la page (date-ranker...) */}
         <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
           {state.actions ?? null}

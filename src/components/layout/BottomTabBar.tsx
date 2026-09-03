@@ -692,7 +692,6 @@ export function BottomTabBar() {
   });
   const activeSection = getActiveSection(pathname, sections);
   const etabColor = current?.couleur ?? "#b45f57";
-  const canSwitchEtab = isGroupAdmin || etablissements.length > 1;
 
   const closeMenu = () => setMenuState(null);
 
@@ -764,59 +763,7 @@ export function BottomTabBar() {
               </button>
             </div>
 
-            {/* Etab switcher */}
-            {canSwitchEtab && (
-              <div style={{ padding: "0 14px 10px" }}>
-                <div style={{
-                  display: "flex", gap: 8, overflowX: "auto",
-                  paddingBottom: 2,
-                }}>
-                  {isGroupAdmin && (
-                    <button type="button" onClick={() => {
-                      setGroupView(true); setCurrent(null); closeMenu();
-                      router.push("/groupe");
-                    }} style={{
-                      display: "flex", alignItems: "center", gap: 8,
-                      padding: "8px 14px", borderRadius: 12,
-                      border: "none", cursor: "pointer",
-                      background: isGroupView ? "rgba(180,95,87,0.12)" : "rgba(255,255,255,0.6)",
-                      boxShadow: isGroupView ? "0 0 0 1.5px rgba(180,95,87,0.3)" : "0 0 0 1px rgba(0,0,0,0.05)",
-                      flexShrink: 0, whiteSpace: "nowrap",
-                    }}>
-                      <IconBuilding />
-                      <span style={{
-                        fontSize: 12, fontWeight: isGroupView ? 700 : 600,
-                        color: isGroupView ? "#b45f57" : "#666",
-                      }}>Groupe</span>
-                    </button>
-                  )}
-                  {etablissements.map(e => {
-                    const isSelected = !isGroupView && current?.id === e.id;
-                    const clr = e.couleur ?? "#b45f57";
-                    return (
-                      <button key={e.id} type="button" onClick={() => {
-                        setGroupView(false); setCurrent(e); closeMenu();
-                        const slug = e.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio";
-                        router.push(slug);
-                      }} style={{
-                        display: "flex", alignItems: "center", gap: 8,
-                        padding: "8px 14px", borderRadius: 12,
-                        border: "none", cursor: "pointer",
-                        background: isSelected ? `${clr}15` : "rgba(255,255,255,0.6)",
-                        boxShadow: isSelected ? `0 0 0 1.5px ${clr}40` : "0 0 0 1px rgba(0,0,0,0.05)",
-                        flexShrink: 0, whiteSpace: "nowrap",
-                      }}>
-                        <div style={{ color: clr }}><IconStore /></div>
-                        <span style={{
-                          fontSize: 12, fontWeight: isSelected ? 700 : 600,
-                          color: isSelected ? clr : "#666",
-                        }}>{e.nom}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Le choix de l'entreprise se fait depuis le bandeau du haut (EtabPill) */}
 
             {/* Section tiles grid */}
             {showNavPill && (
@@ -918,14 +865,14 @@ export function BottomTabBar() {
         ) : null}
       </Sheet>
 
-      {/* ── Etab drawer (legacy event) ── */}
+      {/* ── Tiroir entreprise (ouvert par le sélecteur du bandeau du haut) ── */}
       <Sheet open={etabDrawerOpen} onClose={() => setEtabDrawerOpen(false)}>
         <div style={{ padding: "6px 18px 4px" }}>
           <span style={{
             fontSize: 15, fontWeight: 700,
             fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
             textTransform: "uppercase", letterSpacing: 1, color: "#2c2c2c",
-          }}>Etablissement</span>
+          }}>Entreprise</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "8px 14px 14px" }}>
           {isGroupAdmin && (
