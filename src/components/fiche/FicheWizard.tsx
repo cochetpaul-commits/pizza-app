@@ -394,6 +394,18 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   useEffect(() => {
     if (loading || draftReady.current) return;
     try {
+      // Retour depuis la fiche produit (?draft=…) : on reprend ce brouillon précis
+      const wanted = new URLSearchParams(window.location.search).get("draft");
+      const entry = wanted ? readArchive(etabSlug).find(d => d.id === wanted) : undefined;
+      if (entry?.fiche) {
+        draftIdRef.current = entry.id;
+        setFiche(entry.fiche);
+        if (typeof entry.step === "number") setStep(entry.step);
+        setLinkedPopina(entry.linkedPopina ?? null);
+        showToast("Fiche en cours restaurée");
+        draftReady.current = true;
+        return;
+      }
       const raw = localStorage.getItem(draftKey);
       if (raw) {
         const d = JSON.parse(raw) as { ts?: number; step?: number; fiche?: FicheState; linkedPopina?: string | null };
@@ -817,7 +829,15 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
               }
             }
             const units = ["g", "kg", "cl", "ml", "L", "pcs"];
-            const currentUrl = typeof window !== "undefined" ? window.location.pathname + window.location.search : "";
+            // URL de retour depuis /ingredients : on y glisse l'identifiant du
+            // brouillon pour retrouver exactement cette fiche, quel que soit le
+            // chemin d'entrée (nouvelle fiche, catégorie, sous-catégorie).
+            const currentUrl = (() => {
+              if (typeof window === "undefined") return "";
+              const u = new URL(window.location.href);
+              u.searchParams.set("draft", draftIdRef.current);
+              return u.pathname + u.search;
+            })();
 
             return (
               <>

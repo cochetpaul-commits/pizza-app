@@ -270,7 +270,8 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     const newAllOffers = await fetchAllActiveOffers([ingredientId]);
     const newOffers = pickLatestOffers(newAllOffers);
 
-    setItems((prev) => prev.map((i) => (i.id === ingredientId ? updated : i)));
+    // Absent de la page chargée (arrivée par ?edit=… depuis une recette) : on l'ajoute en tête
+    setItems((prev) => prev.some((i) => i.id === ingredientId) ? prev.map((i) => (i.id === ingredientId ? updated : i)) : [updated, ...prev]);
     setOffers((prev) => {
       const without = prev.filter((o) => o.ingredient_id !== ingredientId);
       return newOffers.length > 0 ? [...without, ...newOffers] : without;
