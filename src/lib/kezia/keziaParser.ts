@@ -135,7 +135,9 @@ function findPayment(lines: string[], label: RegExp): number {
 export function parseKeziaSynthese(textBrut: string): KeziaDaily {
   // Le PDF Kezia sort ses milliers avec un « † » (U+2020) ou une espace
   // insécable : « 1†056,62 » — sans ce nettoyage, 1 056,62 devenait 56,62.
-  const text = textBrut.replace(/(\d)[\u2020\u00a0\u202f ](?=\d{3}(?:[,.]|\b))/g, "$1");
+  // Le chiffre avant le s\u00e9parateur ne doit pas appartenir \u00e0 une d\u00e9cimale :
+  // \u00ab 105,797 823,34 \u00bb (quantit\u00e9 \u00e0 3 d\u00e9cimales puis montant) reste en deux nombres.
+  const text = textBrut.replace(/(?<![,.]\d*)(\d)[\u2020\u00a0\u202f ](?=\d{3}(?:[,.]|\b))/g, "$1");
   const lines = text.split("\n").map((l) => l.trim());
 
   // ---- Date ----
