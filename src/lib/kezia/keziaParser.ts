@@ -130,7 +130,10 @@ function findPayment(lines: string[], label: RegExp): number {
 // Main parser
 // ---------------------------------------------------------------------------
 
-export function parseKeziaSynthese(text: string): KeziaDaily {
+export function parseKeziaSynthese(textBrut: string): KeziaDaily {
+  // Le PDF Kezia sort ses milliers avec un « † » (U+2020) ou une espace
+  // insécable : « 1†056,62 » — sans ce nettoyage, 1 056,62 devenait 56,62.
+  const text = textBrut.replace(/(\d)[\u2020\u00a0\u202f ](?=\d{3}(?:[,.]|\b))/g, "$1");
   const lines = text.split("\n").map((l) => l.trim());
 
   // ---- Date ----
@@ -237,7 +240,7 @@ export function parseKeziaSynthese(text: string): KeziaDaily {
     // A rayon line looks like: "RESTO 245 1 234,56 1 456,78 345,67 29,89 % 85,23 %"
     // Or "CAVE & SPIRITUEUX 12 ..."
     // The name is the leading text before the first number
-    const nameMatch = line.match(/^([A-ZÀ-Ü\s&]+?)\s+(-?[\d\s ]*\d+[,.]?\d*)/i);
+    const nameMatch = line.match(/^([A-Za-zÀ-ÿ\s&.'’\/-]+?)\s+(-?\d[\d\s ]*[,.]?\d*)/);
     if (!nameMatch) {
       // Could be a "Total" line
       if (/^Total\b/i.test(line)) {
