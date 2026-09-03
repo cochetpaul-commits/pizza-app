@@ -991,14 +991,19 @@ async function buildFromDailySales(etabId: string, from: string, to: string) {
     if (!r.rayons || typeof r.rayons !== "object") continue;
     // Deux formes : tableau [{ name, ca_ttc }] (journal de synthèse PDF)
     // ou objet { categories: { nom: montant } } (exports XLSX)
+    // Trois formes : tableau [{ name, ca_ttc }] (parser), objet { rayons: [{ nom, ca_ttc }] }
+    // (déclencheur daily_sales_normaliser) ou { categories: { nom: montant } } (exports XLSX)
     let cats: Record<string, number> | undefined;
-    if (Array.isArray(r.rayons)) {
+    const obj = r.rayons as Record<string, unknown>;
+    const liste = Array.isArray(r.rayons) ? r.rayons : Array.isArray(obj.rayons) ? obj.rayons : null;
+    if (liste) {
       cats = {};
-      for (const ry of r.rayons as { name?: string; ca_ttc?: number }[]) {
-        if (ry?.name) cats[ry.name] = (cats[ry.name] ?? 0) + (Number(ry.ca_ttc) || 0);
+      for (const ry of liste as { name?: string; nom?: string; ca_ttc?: number }[]) {
+        const nom = ry?.nom ?? ry?.name;
+        if (nom) cats[nom] = (cats[nom] ?? 0) + (Number(ry.ca_ttc) || 0);
       }
     } else {
-      cats = (r.rayons as Record<string, unknown>).categories as Record<string, number> | undefined;
+      cats = obj.categories as Record<string, unknown> as Record<string, number> | undefined;
     }
     if (!cats || Object.keys(cats).length === 0) continue;
     for (const [cat, val] of Object.entries(cats)) {

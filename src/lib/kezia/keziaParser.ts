@@ -73,11 +73,11 @@ function findValueAfterLabel(
     if (labelRe.test(lines[i])) {
       // Try to grab number from the same line, after the label match
       const after = lines[i].replace(labelRe, "");
-      const numMatch = after.match(/-?[\d\s ]+,\d{2}/);
+      const numMatch = after.match(/-?\d{1,3}(?:[ \u00a0\u202f]\d{3})*,\d{2,3}(?![\d])/);
       if (numMatch) return parseFr(numMatch[0]);
       // Fallback: look at next line
       if (!opts?.sameLineOnly && i + 1 < lines.length) {
-        const nextMatch = lines[i + 1].match(/-?[\d\s ]+,\d{2}/);
+        const nextMatch = lines[i + 1].match(/-?\d{1,3}(?:[ \u00a0\u202f]\d{3})*,\d{2,3}(?![\d])/);
         if (nextMatch) return parseFr(nextMatch[0]);
       }
     }
@@ -107,7 +107,9 @@ function findIntAfterLabel(lines: string[], labelRe: RegExp): number {
  * Matches patterns like "1 234,56" or "-12,34" or "0,00".
  */
 function extractNumbers(s: string): number[] {
-  const matches = s.match(/-?[\d\s ]*\d+,\d{2}/g);
+  // Un nombre = milliers optionnels (espace) + virgule + 2 ou 3 décimales, pris d'un bloc :
+  // les quantités Kezia ont 3 décimales (« 105,797 ») et coupaient le montant suivant.
+  const matches = s.match(/-?\d{1,3}(?:[ \u00a0\u202f]\d{3})*,\d{2,3}(?![\d])/g);
   if (!matches) return [];
   return matches.map(parseFr);
 }
