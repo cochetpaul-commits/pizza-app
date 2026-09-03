@@ -557,9 +557,6 @@ function Sheet({
     >
       <div
         ref={sheetRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         style={{
           position: "fixed", bottom: 0, left: 8, right: 8,
           maxHeight: "82dvh",
@@ -576,8 +573,15 @@ function Sheet({
           animation: "bottomSheetSlideUp 0.25s ease",
         }}
       >
-        {/* Handle bar */}
-        <div style={{ display: "flex", justifyContent: "center", padding: "8px 0 2px" }}>
+        {/* Poignée = seule zone du « glisser pour fermer » : posé sur tout le
+            tiroir, le geste capturait le défilement du menu et le fermait. */}
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          style={{ display: "flex", justifyContent: "center", padding: "10px 0 6px", touchAction: "none", position: "sticky", top: 0, zIndex: 1 }}
+        >
           <div style={{ width: 36, height: 5, borderRadius: 3, background: "rgba(0,0,0,0.12)" }} />
         </div>
         {children}

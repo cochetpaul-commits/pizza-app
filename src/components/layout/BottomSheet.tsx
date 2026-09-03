@@ -77,9 +77,6 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     >
       <div
         ref={sheetRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         style={{
           position: "fixed",
           bottom: 0,
@@ -99,6 +96,16 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
           animation: "bottomSheetSlideUp 0.25s ease",
         }}
       >
+        {/* Zone de prise : le « glisser pour fermer » ne s'attrape QUE sur la
+            poignée et le titre. Posé sur tout le panneau, il capturait le
+            défilement des listes (fournisseurs, catégories) et fermait tout. */}
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          style={{ touchAction: "none", position: "sticky", top: 0, zIndex: 1, background: "rgba(255,255,255,0.6)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderRadius: "20px 20px 0 0" }}
+        >
         {/* Handle bar */}
         <div style={{ display: "flex", justifyContent: "center", padding: "8px 0 2px" }}>
           <div style={{
@@ -141,6 +148,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
             </button>
           </div>
         )}
+        </div>
 
         <div style={{ padding: "0 14px 14px" }}>
           {children}
