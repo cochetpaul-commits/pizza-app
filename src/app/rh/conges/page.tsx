@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
+import { fetchApi } from "@/lib/fetchApi";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -723,7 +724,7 @@ export default function CongesPage() {
   // (code "regle") — on demande confirmation puis on force.
   const decide = async (id: string, action: "valide" | "refuse", motif?: string, force = false): Promise<boolean> => {
     const { data: sess } = await supabase.auth.getSession();
-    const res = await fetch("/api/conges/decision", {
+    const res = await fetchApi("/api/conges/decision", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
       body: JSON.stringify({ id, action, motif, force }),
@@ -759,7 +760,7 @@ export default function CongesPage() {
   const syncCombo = async () => {
     setComboSyncing(true);
     const { data: sess } = await supabase.auth.getSession();
-    const res = await fetch("/api/combo/sync-rests", {
+    const res = await fetchApi("/api/combo/sync-rests", {
       method: "POST",
       headers: { Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
     });

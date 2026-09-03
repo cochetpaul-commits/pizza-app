@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { pennylaneConfigured, type PlDossier } from "@/lib/pennylane/api";
+import { cronOrAdminUnauthorized } from "@/lib/cronAuth";
 import { autoImportFactures } from "@/lib/invoices/autoImport";
 
 export const runtime = "nodejs";
@@ -14,13 +15,9 @@ export const maxDuration = 60;
  * ?days=N pour élargir la fenêtre (défaut 5, max 60) — utile au premier passage.
  */
 export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}` && !req.headers.get("x-vercel-cron")) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
-  }
+  // Cron (secret) ou administrateur depuis le bouton « Récupérer maintenant »
+  const denied = await cronOrAdminUnauthorized(req);
+  if (denied) return denied;
 
   const days = Math.min(Math.max(parseInt(req.nextUrl.searchParams.get("days") ?? "5", 10) || 5, 1), 60);
 

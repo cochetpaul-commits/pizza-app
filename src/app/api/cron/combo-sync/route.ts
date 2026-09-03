@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronUnauthorized } from "@/lib/cronAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getContracts, getPlannings, getLocations, COMBO_LOCATIONS } from "@/lib/combo/api";
 import { syncRestsFromCombo } from "@/lib/combo/syncRests";
@@ -137,11 +138,8 @@ async function syncPeriod(from: string, to: string) {
  * Cron job: sync current week + previous week from Combo API
  */
 export async function GET(req: NextRequest) {
-  // Verify cron secret (Vercel sends this header)
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && !req.headers.get("x-vercel-cron")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = cronUnauthorized(req);
+  if (denied) return denied;
 
   try {
     const now = new Date();

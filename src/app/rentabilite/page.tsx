@@ -8,6 +8,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { RequireRole } from "@/components/RequireRole";
 import { PilotageRangeBar, usePilotageTopBar } from "@/components/ui/PilotageRangeBar";
 import { usePilotageRange } from "@/lib/pilotageRange";
+import { fetchApi } from "@/lib/fetchApi";
 
 /**
  * Rentabilité — la cascade CA → marge brute → EBE.
@@ -156,7 +157,7 @@ export default function RentabilitePage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setErr("");
-    fetch(`/api/rentabilite?etablissement_id=${etabId}&from=${period.from}&to=${period.to}`)
+    fetchApi(`/api/rentabilite?etablissement_id=${etabId}&from=${period.from}&to=${period.to}`)
       .then(async (res) => {
         const json = await res.json();
         if (cancelled) return;
@@ -175,7 +176,7 @@ export default function RentabilitePage() {
     setSyncing(true); setSyncMsg("");
     const { data: sess } = await supabase.auth.getSession();
     try {
-      const res = await fetch("/api/pennylane/sync", {
+      const res = await fetchApi("/api/pennylane/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
         body: JSON.stringify({ etablissement_id: etab.id, mois: period.from.slice(0, 8) + "01" }),

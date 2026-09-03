@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { fetchApi } from "@/lib/fetchApi";
 
 type InsightResult = { title: string; points: string[] };
 
@@ -47,7 +48,7 @@ export function AiInsightCard({ type, label, icon, color, from, to }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
+      const res = await fetchApi(
         `/api/claude/insights?etablissement_id=${etab.id}&from=${dateFrom}&to=${dateTo}&type=${type}`,
       );
       if (!res.ok) {

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { loadEtabParam, saveEtabParamDebounced, deleteEtabParam } from "@/lib/etabParams";
+import { fetchApi } from "@/lib/fetchApi";
 
 /**
  * Régime de croisière — remplace « Rentabilité MS ».
@@ -354,8 +355,8 @@ export function CroisiereSimulateur({ etabId, etabColor }: { etabId: string; eta
       const m0 = new Date(); m0.setDate(1); m0.setMonth(m0.getMonth() - 1);
       const m1 = new Date(); m1.setDate(0);
       const [s, r, st, sv] = await Promise.all([
-        fetch(`/api/ventes/stats?etablissement_id=${etabId}&from=${iso(from)}&to=${iso(to)}`).then(x => x.json()).catch(() => null),
-        fetch(`/api/rentabilite?etablissement_id=${etabId}&from=${iso(m0)}&to=${iso(m1)}`).then(x => x.json()).catch(() => null),
+        fetchApi(`/api/ventes/stats?etablissement_id=${etabId}&from=${iso(from)}&to=${iso(to)}`).then(x => x.json()).catch(() => null),
+        fetchApi(`/api/rentabilite?etablissement_id=${etabId}&from=${iso(m0)}&to=${iso(m1)}`).then(x => x.json()).catch(() => null),
         loadEtabParam<Structure>(etabId, "croisiere_structure"),
         loadEtabParam<Partial<Sim>>(etabId, "croisiere_sim"),
       ]);

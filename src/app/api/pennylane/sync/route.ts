@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { pennylaneConfigured, type PlDossier } from "@/lib/pennylane/api";
+import { cronUnauthorized } from "@/lib/cronAuth";
 import { syncPennylaneMois } from "@/lib/pennylane/syncCharges";
 
 export const runtime = "nodejs";
@@ -70,10 +71,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && !req.headers.get("x-vercel-cron")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = cronUnauthorized(req);
+  if (denied) return denied;
   const { data: etabs } = await supabaseAdmin
     .from("etablissements").select("id, slug, nom").eq("actif", true);
 

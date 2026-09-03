@@ -3,6 +3,7 @@
 import { useState, useCallback, type CSSProperties } from "react";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { fetchApi } from "@/lib/fetchApi";
 
 /* ── Types ── */
 type InsightResult = { title: string; points: string[] };
@@ -76,7 +77,7 @@ export default function InsightsPage() {
 
     try {
       const typeParam = type ? `&type=${type}` : "";
-      const res = await fetch(
+      const res = await fetchApi(
         `/api/claude/insights?etablissement_id=${etab.id}&from=${from}&to=${to}${typeParam}`,
       );
       if (!res.ok) {

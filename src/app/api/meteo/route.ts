@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronUnauthorized } from "@/lib/cronAuth";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -36,7 +37,11 @@ export async function GET(req: NextRequest) {
   const action = searchParams.get("action");
 
   // Cron trigger: GET ?action=fetch → same as POST (fetch forecast & store)
-  if (action === "fetch") return fetchAndStore();
+  if (action === "fetch") {
+    const denied = cronUnauthorized(req);
+    if (denied) return denied;
+    return fetchAndStore();
+  }
 
   if (!from || !to) return NextResponse.json({ error: "from, to requis" }, { status: 400 });
 

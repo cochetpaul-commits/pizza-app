@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { etabAccessDenied } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
@@ -54,6 +55,9 @@ export async function GET(req: NextRequest) {
       { status: 400 },
     );
   }
+  const denied = await etabAccessDenied(req, etabId);
+  if (denied) return denied;
+
 
   /* ── 1+2. Ventes agrégées par produit (RPC SQL) + coûts recettes, en parallèle ── */
   async function fetchVentes(): Promise<ProduitAgg[]> {

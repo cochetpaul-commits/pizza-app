@@ -9,6 +9,7 @@ import { useProfile } from "@/lib/ProfileContext";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import Image from "next/image";
 import { PERM_SECTIONS, DEFAULT_PERMS, ROLE_INFO, mapToPermRole, type PermRole } from "@/lib/permissions";
+import { fetchApi, openApiFile } from "@/lib/fetchApi";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -812,13 +813,13 @@ export default function EmployeDetailPage() {
             <Field label="Matricule (paie)" value={matricule} onChange={setMatricule} disabled={!canWrite} />
           </div>
           <div style={{ marginTop: 8 }}>
-            <a
-              href={`/api/rh/rup?etab=${(emp as Record<string, unknown>).etablissement_id ?? ""}`}
-              target="_blank" rel="noreferrer"
+            <button
+              type="button"
+              onClick={() => openApiFile(`/api/rh/rup?etab=${(emp as Record<string, unknown>).etablissement_id ?? ""}`)}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, color: "#1a1a1a", textDecoration: "none" }}
             >
               Exporter le Registre Unique du Personnel
-            </a>
+            </button>
             <div style={{ fontSize: 10, color: "#999", marginTop: 4 }}>
               Obligation legale (art. L1221-13) — genere a la demande a partir des fiches.
             </div>
@@ -1730,7 +1731,7 @@ function CompteAcces({ emp, setEmp, isGroupAdmin, etabIds, prenom, nom, email }:
     if (!isGroupAdmin || busy) return;
     setBusy(true); setMsg("");
     const { data: sess } = await supabase.auth.getSession();
-    const res = await fetch("/api/admin/set-role", {
+    const res = await fetchApi("/api/admin/set-role", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
       body: JSON.stringify({ employeId: emp.id, role: appRole }),
@@ -1750,7 +1751,7 @@ function CompteAcces({ emp, setEmp, isGroupAdmin, etabIds, prenom, nom, email }:
     if (!confirm(`Envoyer l'invitation a ${email} ?`)) return;
     setBusy(true); setMsg("");
     const { data: sess } = await supabase.auth.getSession();
-    const res = await fetch("/api/admin/invite", {
+    const res = await fetchApi("/api/admin/invite", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
       body: JSON.stringify({ email, role, displayName: `${prenom} ${nom}`.trim(), etablissementsAccess: etabIds }),

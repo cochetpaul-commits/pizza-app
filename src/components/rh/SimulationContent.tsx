@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { loadEtabParam, saveEtabParamDebounced, deleteEtabParam } from "@/lib/etabParams";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { fetchApi } from "@/lib/fetchApi";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -215,7 +216,7 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
         const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
         const to = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${lastDay}`;
         try {
-          const caRes = await fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${from}&to=${to}`);
+          const caRes = await fetchApi(`/api/ventes/stats?etablissement_id=${etab.id}&from=${from}&to=${to}`);
           const caJson = await caRes.json();
           const ca = caJson?.stats?.ca_ttc ?? caJson?.stats?.total_ttc ?? null;
           if (ca && ca > 0 && !cancelled) {

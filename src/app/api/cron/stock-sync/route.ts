@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronUnauthorized } from "@/lib/cronAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
@@ -9,9 +10,12 @@ export const runtime = "nodejs";
  * Syncs yesterday's sales → stock movements for all establishments.
  *
  * Replicates the logic of POST /api/stock/sync-ventes but called
- * server-side with supabaseAdmin (no auth needed).
+ * server-side with supabaseAdmin, protégé par CRON_SECRET.
  */
-export async function GET() {
+export async function GET(req: Request) {
+  const denied = cronUnauthorized(req);
+  if (denied) return denied;
+
   try {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);

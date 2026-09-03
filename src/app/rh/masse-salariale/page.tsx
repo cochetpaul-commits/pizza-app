@@ -142,7 +142,7 @@ export default function MasseSalarialePage() {
         supabase.from("contrats")
           .select("employe_id, type, heures_semaine, remuneration, emploi, employes!inner(prenom, nom, equipes_access, actif, etablissement_id)")
           .eq("actif", true).eq("employes.actif", true).eq("employes.etablissement_id", eId),
-        fetch(`/api/ventes/stats?etablissement_id=${eId}&from=${from}&to=${to}`)
+        fetchApi(`/api/ventes/stats?etablissement_id=${eId}&from=${from}&to=${to}`)
           .then(r => r.json()).then(json => {
             const s = json.stats;
             setCaHt(s?.ca_ht ?? null);
@@ -187,7 +187,7 @@ export default function MasseSalarialePage() {
     autoSyncDone.current = true;
     const lastSync = localStorage.getItem("combo_last_sync");
     if (lastSync && Number(lastSync) > Date.now() - 6 * 3600 * 1000) return;
-    fetch("/api/rh/combo-presences-sync", {
+    fetchApi("/api/rh/combo-presences-sync", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ from: selectedFrom, to: selectedTo }),
     }).then(r => r.json()).then(d => {
@@ -312,7 +312,7 @@ export default function MasseSalarialePage() {
     if (!selected || !etabId) return;
     setSyncing(true);
     try {
-      const res = await fetch("/api/rh/combo-presences-sync", {
+      const res = await fetchApi("/api/rh/combo-presences-sync", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ from: selected.from, to: selected.to }),
       });

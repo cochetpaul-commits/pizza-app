@@ -128,7 +128,7 @@ function StockContent() {
 
   async function loadDoseSuggestions() {
     setDoseLoading(true);
-    const res = await fetch("/api/stock/auto-doses");
+    const res = await fetchApi("/api/stock/auto-doses");
     if (res.ok) setDoseSuggestions(await res.json());
     setDoseLoading(false);
   }
@@ -142,7 +142,7 @@ function StockContent() {
       dose: s.suggested_dose,
       dose_unit: s.suggested_unit,
     }));
-    await fetch("/api/stock/auto-doses", {
+    await fetchApi("/api/stock/auto-doses", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ entries }),

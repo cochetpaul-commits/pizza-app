@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronUnauthorized } from "@/lib/cronAuth";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAllOrdersForDay, getParisDate } from "@/lib/popinaClient";
 import { ordersToVentesLignes } from "@/lib/popina/mapper";
@@ -27,13 +28,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "POPINA_API_KEY manquant" }, { status: 500 });
   }
 
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
-  }
+  const denied = cronUnauthorized(req);
+  if (denied) return denied;
 
   const url = new URL(req.url);
   const explicitDay = url.searchParams.get("day");

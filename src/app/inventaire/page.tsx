@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { CATEGORIES, CAT_LABELS, CAT_COLORS, type Category, type Ingredient } from "@/types/ingredients";
+import { openApiFile } from "@/lib/fetchApi";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -824,7 +825,7 @@ export default function InventairePage() {
                     <span style={{ fontSize: 15, fontWeight: 700, color: "#D4775A" }}>
                       {inv.total_valeur != null ? fmtMoney(inv.total_valeur) : "-"}
                     </span>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); window.open(`/api/inventaire/pdf?id=${inv.id}`, "_blank"); }}
+                    <button type="button" onClick={(e) => { e.stopPropagation(); openApiFile(`/api/inventaire/pdf?id=${inv.id}`); }}
                       style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", color: "#666" }}>
                       PDF
                     </button>
@@ -895,7 +896,7 @@ export default function InventairePage() {
             {/* PDF export */}
             {(isActive || isViewing) && currentInv && (
               <button
-                onClick={() => window.open(`/api/inventaire/pdf?id=${currentInv.id}`, "_blank")}
+                onClick={() => openApiFile(`/api/inventaire/pdf?id=${currentInv.id}`)}
                 style={{
                   padding: "8px 14px", borderRadius: 20, border: "1.5px solid #ddd6c8",
                   background: "#fff", color: "#666", fontSize: 12, fontWeight: 600,

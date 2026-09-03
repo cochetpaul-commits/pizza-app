@@ -35,6 +35,7 @@ type Employe = {
 
 // Libelles/couleurs identiques a la fiche employe (Compte & acces)
 import { mapToPermRole, ROLE_INFO } from "@/lib/permissions";
+import { fetchApi } from "@/lib/fetchApi";
 
 function getInitials(prenom: string, nom: string): string {
   return ((prenom?.[0] ?? "") + (nom?.[0] ?? "")).toUpperCase();
@@ -103,7 +104,7 @@ export default function EquipePage() {
           <button type="button" disabled={syncing} onClick={async () => {
             setSyncing(true); setSyncResult("");
             try {
-              const res = await fetch("/api/combo/sync", { method: "POST" });
+              const res = await fetchApi("/api/combo/sync", { method: "POST" });
               const data = await res.json();
               if (data.ok) {
                 const summary = (data.results as { location: string; created: number; updated: number }[])
@@ -231,7 +232,7 @@ export default function EquipePage() {
                                     setInviteStatus(prev => ({ ...prev, [emp.id]: "err:Session expiree, reconnectez-vous" }));
                                     return;
                                   }
-                                  const res = await fetch("/api/admin/invite", {
+                                  const res = await fetchApi("/api/admin/invite", {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
                                     body: JSON.stringify({ email: emp.email, displayName: `${emp.prenom} ${emp.nom}`, role: emp.role ?? "equipier", etablissementsAccess: emp.etablissement_id ? [emp.etablissement_id] : [] }),

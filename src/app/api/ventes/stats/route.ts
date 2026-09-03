@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { etabAccessDenied } from "@/lib/getEtablissement";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -85,6 +86,9 @@ export async function GET(req: NextRequest) {
   if (!etabId || !from || !to) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
+  const denied = await etabAccessDenied(req, etabId);
+  if (denied) return denied;
+
 
   // Sous-catégories Popina + les TROIS périodes (courante, A-1, S-1) en parallèle
   const fromA1 = (parseInt(from.slice(0, 4)) - 1) + from.slice(4);

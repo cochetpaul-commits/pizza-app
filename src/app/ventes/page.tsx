@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { getCached, setCache } from "@/lib/apiCache";
+import { fetchApi } from "@/lib/fetchApi";
 
 /* ── Types ── */
 type WeekData = {
@@ -227,7 +228,7 @@ function PerformancesPage() {
   // Fetch objectifs on mount
   useEffect(() => {
     if (!etab) return;
-    fetch(`/api/pilotage/objectifs?etablissement_id=${etab.id}`)
+    fetchApi(`/api/pilotage/objectifs?etablissement_id=${etab.id}`)
       .then(r => r.json())
       .then(d => { if (d.objectifs) setObjectifs(d.objectifs); })
       .catch(() => {});
@@ -307,8 +308,8 @@ function PerformancesPage() {
     setLoading(true);
     try {
       const [statsRes, meteoRes] = await Promise.all([
-        fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${from}&to=${to}`),
-        fetch(`/api/meteo?from=${from}&to=${to}`).catch(() => null),
+        fetchApi(`/api/ventes/stats?etablissement_id=${etab.id}&from=${from}&to=${to}`),
+        fetchApi(`/api/meteo?from=${from}&to=${to}`).catch(() => null),
       ]);
       const json = await statsRes.json();
       if (json.empty || !json.stats) {
@@ -343,7 +344,7 @@ function PerformancesPage() {
   useEffect(() => {
     if (!etab || !catTrendFilterCat) { setTrendCatProducts([]); return; }
     let cancelled = false;
-    fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${catTrendFrom}&to=${catTrendTo}`)
+    fetchApi(`/api/ventes/stats?etablissement_id=${etab.id}&from=${catTrendFrom}&to=${catTrendTo}`)
       .then(r => r.json())
       .then(json => {
         if (cancelled || !json.stats?.cat_products) return;
@@ -361,7 +362,7 @@ function PerformancesPage() {
     setCatTrendLoading(true);
     try {
       // Always fetch all-categories data (for the dropdown + default chart)
-      const res = await fetch(
+      const res = await fetchApi(
         `/api/ventes/marges/trend?etablissement_id=${etab.id}&from=${catTrendFrom}&to=${catTrendTo}&group_by=category`,
       );
       const json = await res.json();
@@ -369,7 +370,7 @@ function PerformancesPage() {
 
       // If a specific product is selected, fetch product-level daily data
       if (catTrendFilterProd) {
-        const pRes = await fetch(
+        const pRes = await fetchApi(
           `/api/ventes/marges/trend?etablissement_id=${etab.id}&from=${catTrendFrom}&to=${catTrendTo}&product=${encodeURIComponent(catTrendFilterProd)}`,
         );
         const pJson = await pRes.json();
@@ -567,7 +568,7 @@ function PerformancesPage() {
     fd.append("file", file);
     fd.append("etablissement_id", etab.id);
     try {
-      const res = await fetch("/api/ventes/import", { method: "POST", body: fd });
+      const res = await fetchApi("/api/ventes/import", { method: "POST", body: fd });
       const json = await res.json();
       if (json.ok) {
         setImportMsg(`${json.inserted} lignes importees (${json.range})`);
@@ -588,7 +589,7 @@ function PerformancesPage() {
     setBriefingLoading(true);
     try {
       const { from, to } = getRange();
-      const res = await fetch(`/api/claude/insights?etablissement_id=${etab.id}&from=${from}&to=${to}&type=briefing`);
+      const res = await fetchApi(`/api/claude/insights?etablissement_id=${etab.id}&from=${from}&to=${to}&type=briefing`);
       const json = await res.json();
       if (json.briefing?.points) setBriefing(json.briefing.points);
     } catch { /* ignore */ }
@@ -616,7 +617,7 @@ function PerformancesPage() {
         exportType,
         objectifs,
       };
-      const res = await fetch(`/api/ventes/pdf?type=${exportType}`, {
+      const res = await fetchApi(`/api/ventes/pdf?type=${exportType}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bodyPayload),

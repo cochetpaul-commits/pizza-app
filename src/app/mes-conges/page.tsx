@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { fetchApi } from "@/lib/fetchApi";
 
 /**
  * Mes congés — l'espace congés de chaque employé :
@@ -146,7 +147,7 @@ export default function MesCongesPage() {
     const { data: sess } = await supabase.auth.getSession();
     const token = sess?.session?.access_token;
     if (!token) { setErr("Non connecté"); setLoading(false); return; }
-    const res = await fetch("/api/conges", { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetchApi("/api/conges", { headers: { Authorization: `Bearer ${token}` } });
     const json = await res.json();
     if (!res.ok) setErr(json.error ?? "Erreur");
     else {
@@ -253,7 +254,7 @@ export default function MesCongesPage() {
     if (!range) { setMsg("Choisis tes dates sur le calendrier"); return; }
     setSending(true); setMsg("");
     const { data: sess } = await supabase.auth.getSession();
-    const res = await fetch("/api/conges", {
+    const res = await fetchApi("/api/conges", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
       body: JSON.stringify({ type: fType, date_debut: range.lo, date_fin: range.hi, note: fNote }),
@@ -272,7 +273,7 @@ export default function MesCongesPage() {
   const cancel = async (id: string) => {
     if (!confirm("Annuler cette demande ?")) return;
     const { data: sess } = await supabase.auth.getSession();
-    await fetch("/api/conges", {
+    await fetchApi("/api/conges", {
       method: "DELETE",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
       body: JSON.stringify({ id }),

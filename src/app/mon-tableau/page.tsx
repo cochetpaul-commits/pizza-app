@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
 import { usePilotageRange } from "@/lib/pilotageRange";
 import { useTopBar } from "@/components/layout/TopBarContext";
+import { fetchApi } from "@/lib/fetchApi";
 
 /* ── Types (réponse /api/mon-tableau) ─────────────────────── */
 
@@ -274,7 +275,7 @@ export default function MonTableauPage() {
       const token = sess?.session?.access_token;
       if (!token) { setErr("Non connecté"); setLoading(false); return; }
       try {
-        const res = await fetch(`/api/mon-tableau?from=${period.from}&to=${period.to}`, {
+        const res = await fetchApi(`/api/mon-tableau?from=${period.from}&to=${period.to}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const json = await res.json();

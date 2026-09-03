@@ -311,7 +311,7 @@ function ReceptionModal({ sessionId, onClose, onDone }: {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/commandes/reception?session_id=${sessionId}`)
+    fetchApi(`/api/commandes/reception?session_id=${sessionId}`)
       .then((r) => r.json())
       .then((data) => {
         setLines(data.lines ?? []);
@@ -344,7 +344,7 @@ function ReceptionModal({ sessionId, onClose, onDone }: {
 
   async function save(finalize: boolean) {
     setSaving(true);
-    await fetch("/api/commandes/reception", {
+    await fetchApi("/api/commandes/reception", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -577,6 +577,7 @@ function CommandesPage() {
   // Email sending state
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showCredentials, setShowCredentials] = useState(false);
+  const [portalCreds, setPortalCreds] = useState<{ login: string; password: string } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [supplierListOpen, setSupplierListOpen] = useState(false);
@@ -674,7 +675,7 @@ function CommandesPage() {
       const { data, error } = await Promise.race([
         supabase
           .from("suppliers")
-          .select("id, name, etablissement_id, franco_minimum, delivery_schedule, color, website, portal_login, portal_password")
+          .select("id, name, etablissement_id, franco_minimum, delivery_schedule, color, website")
           .eq("is_active", true)
           .order("name"),
         timeout,
@@ -1212,9 +1213,13 @@ function CommandesPage() {
     if (!currentSupplier?.website) return;
     const url = currentSupplier.website.startsWith("http") ? currentSupplier.website : `https://${currentSupplier.website}`;
     window.open(url, "_blank");
-    if (currentSupplier.portal_login || currentSupplier.portal_password) {
-      setShowCredentials(true);
-    }
+    // Identifiants servis par l'API (admins/managers) — jamais chargés avec la liste
+    fetchApi(`/api/fournisseurs/portal?supplier_id=${currentSupplier.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((c) => {
+        if (c && (c.login || c.password)) { setPortalCreds({ login: c.login ?? "", password: c.password ?? "" }); setShowCredentials(true); }
+      })
+      .catch(() => {});
   }
 
   async function copyToClipboard(text: string, field: string) {
@@ -2819,7 +2824,7 @@ function CommandesPage() {
       </div>
 
       {/* Panneau trousseau — identifiants portail fournisseur */}
-      {showCredentials && currentSupplier && (currentSupplier.portal_login || currentSupplier.portal_password) && (
+      {showCredentials && currentSupplier && portalCreds && (
         <>
           <div onClick={() => setShowCredentials(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 9998 }} />
           <div style={{
@@ -2837,7 +2842,7 @@ function CommandesPage() {
               </button>
             </div>
 
-            {currentSupplier.portal_login && (
+            {portalCreds.login && (
               <div style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: 11, color: "#999", marginBottom: 4 }}>Identifiant</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -2846,9 +2851,9 @@ function CommandesPage() {
                     fontSize: 13, fontWeight: 600, color: "#1a1a1a", fontFamily: "monospace",
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
-                    {currentSupplier.portal_login}
+                    {portalCreds.login}
                   </div>
-                  <button type="button" onClick={() => copyToClipboard(currentSupplier.portal_login!, "login")}
+                  <button type="button" onClick={() => copyToClipboard(portalCreds.login, "login")}
                     style={{
                       padding: "8px 14px", borderRadius: 8, border: "none", fontFamily: "inherit",
                       background: copiedField === "login" ? "#16a34a" : "#D4775A",
@@ -2861,7 +2866,7 @@ function CommandesPage() {
               </div>
             )}
 
-            {currentSupplier.portal_password && (
+            {portalCreds.password && (
               <div>
                 <div style={{ fontSize: 11, color: "#999", marginBottom: 4 }}>Mot de passe</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -2872,7 +2877,7 @@ function CommandesPage() {
                   }}>
                     {"••••••••"}
                   </div>
-                  <button type="button" onClick={() => copyToClipboard(currentSupplier.portal_password!, "password")}
+                  <button type="button" onClick={() => copyToClipboard(portalCreds.password, "password")}
                     style={{
                       padding: "8px 14px", borderRadius: 8, border: "none", fontFamily: "inherit",
                       background: copiedField === "password" ? "#16a34a" : "#D4775A",

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { etabAccessDenied, roleDenied } from "@/lib/getEtablissement";
 import { createClient } from "@supabase/supabase-js";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import React from "react";
@@ -45,6 +46,13 @@ type Etab = {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const etabId = searchParams.get("etab");
+
+  // Registre du personnel : administrateurs (tout le groupe) ou managers
+  // de l'établissement demandé — jamais sans identification.
+  const denied = etabId
+    ? await etabAccessDenied(req, etabId, ["group_admin", "manager"])
+    : await roleDenied(req, ["group_admin"]);
+  if (denied) return denied;
 
   // Load data
   const etabQuery = etabId

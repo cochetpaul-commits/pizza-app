@@ -15,6 +15,7 @@ import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 
 import Chart from "chart.js/auto";
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
+import { fetchApi } from "@/lib/fetchApi";
 
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
@@ -306,7 +307,7 @@ function MargesPage() {
     setLoading(true);
     const { from, to } = getRange();
     try {
-      const res = await fetch(
+      const res = await fetchApi(
         `/api/ventes/marges?etablissement_id=${etab.id}&from=${from}&to=${to}`,
       );
       const json = await res.json();
@@ -334,7 +335,7 @@ function MargesPage() {
     fd.append("file", file);
     fd.append("etablissement_id", etab.id);
     try {
-      const res = await fetch("/api/ventes/import", { method: "POST", body: fd });
+      const res = await fetchApi("/api/ventes/import", { method: "POST", body: fd });
       const json = await res.json();
       if (json.ok) {
         setImportMsg(`${json.inserted} lignes importees (${json.range})`);
@@ -356,14 +357,14 @@ function MargesPage() {
     setExportingPdf(true);
     try {
       const { from, to } = getRange();
-      const sRes = await fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${from}&to=${to}`);
+      const sRes = await fetchApi(`/api/ventes/stats?etablissement_id=${etab.id}&from=${from}&to=${to}`);
       const sJson = await sRes.json();
       if (!sJson.stats) { setExportingPdf(false); return; }
       const isSingle = from === to;
       const label = isSingle
         ? new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
         : `Du ${new Date(from + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })} au ${new Date(to + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`;
-      const res = await fetch("/api/ventes/pdf", {
+      const res = await fetchApi("/api/ventes/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stats: sJson.stats, prev: sJson.prev ?? null, mode, viewTab: isSingle ? "jour" : "perso", rangeLabel: label, etabName: etab.nom ?? "Etablissement", briefing: null }),
@@ -621,7 +622,7 @@ function MargesPage() {
       params.set("group_by", "category");
     }
 
-    fetch(`/api/ventes/marges/trend?${params.toString()}`)
+    fetchApi(`/api/ventes/marges/trend?${params.toString()}`)
       .then((r) => r.json())
       .then((j) => {
         if (cancelled) return;
@@ -2032,14 +2033,14 @@ function MargesPage() {
             setExportingPdf(true);
             try {
               const { from: f, to: t } = getRange();
-              const sRes = await fetch(`/api/ventes/stats?etablissement_id=${etab.id}&from=${f}&to=${t}`);
+              const sRes = await fetchApi(`/api/ventes/stats?etablissement_id=${etab.id}&from=${f}&to=${t}`);
               const sJson = await sRes.json();
               if (!sJson.stats) { setExportingPdf(false); return; }
               const isSingle = f === t;
               const label = isSingle
                 ? new Date(f + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
                 : `Du ${new Date(f + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })} au ${new Date(t + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`;
-              const res = await fetch("/api/ventes/pdf", {
+              const res = await fetchApi("/api/ventes/pdf", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ stats: sJson.stats, prev: sJson.prev ?? null, mode, viewTab: "complet", rangeLabel: label, etabName: etab.nom ?? "Etablissement", briefing: null }),

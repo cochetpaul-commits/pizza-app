@@ -10,6 +10,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useProfile } from "@/lib/ProfileContext";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { usePilotageRange } from "@/lib/pilotageRange";
+import { fetchApi } from "@/lib/fetchApi";
 
 const DailyCaBarChart = dynamic(() => import("@/components/charts/DailyCaBarChart"), { ssr: false });
 
@@ -188,7 +189,7 @@ function BelloMioContent() {
       })));
       // Meteo
       try {
-        const meteoRes = await fetch(`/api/meteo?from=${today}&to=${(() => { const d = new Date(today + "T12:00:00"); d.setDate(d.getDate() + 10); return d.toISOString().slice(0, 10); })()}`);
+        const meteoRes = await fetchApi(`/api/meteo?from=${today}&to=${(() => { const d = new Date(today + "T12:00:00"); d.setDate(d.getDate() + 10); return d.toISOString().slice(0, 10); })()}`);
         const meteoData = await meteoRes.json();
         if (meteoData.meteo) setMeteoForecast(meteoData.meteo.map((m: { date_service: string; emoji: string; description: string; temp: number; service: string }) => ({ date: m.date_service, emoji: m.emoji, desc: m.description, temp: m.temp, service: m.service })));
       } catch { /* ignore */ }

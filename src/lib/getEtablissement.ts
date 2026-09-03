@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { createClient } from "@supabase/supabase-js";
 
@@ -131,4 +131,49 @@ export class EtabError extends Error {
     super(message);
     this.status = status;
   }
+}
+
+// ── Contrôles d'accès pour les routes qui reçoivent un etablissement_id ──
+
+async function callerProfile(req: NextRequest | Request): Promise<{ userId: string; role: string | null; accessIds: string[] } | null> {
+  const authHeader = req.headers.get("authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token) return null;
+  const { data: auth } = await supabaseAdmin.auth.getUser(token);
+  if (!auth?.user?.id) return null;
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("role, etablissements_access")
+    .eq("id", auth.user.id)
+    .single();
+  return { userId: auth.user.id, role: profile?.role ?? null, accessIds: profile?.etablissements_access ?? [] };
+}
+
+/**
+ * Refuse (401/403) si l'appelant n'a pas accès à l'établissement demandé
+ * en paramètre — les group_admin voient tout. Renvoie null si OK.
+ * `roles` restreint en plus aux rôles listés (ex. données RH).
+ */
+export async function etabAccessDenied(
+  req: NextRequest | Request,
+  etabId: string,
+  roles?: string[],
+): Promise<NextResponse | null> {
+  const p = await callerProfile(req);
+  if (!p) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  if (roles && !roles.includes(p.role ?? "")) {
+    return NextResponse.json({ error: "Accès réservé" }, { status: 403 });
+  }
+  if (p.role !== "group_admin" && !p.accessIds.includes(etabId)) {
+    return NextResponse.json({ error: "Accès refusé à cet établissement" }, { status: 403 });
+  }
+  return null;
+}
+
+/** Refuse (401/403) si l'appelant n'a pas l'un des rôles listés. */
+export async function roleDenied(req: NextRequest | Request, roles: string[]): Promise<NextResponse | null> {
+  const p = await callerProfile(req);
+  if (!p) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  if (!roles.includes(p.role ?? "")) return NextResponse.json({ error: "Accès réservé" }, { status: 403 });
+  return null;
 }

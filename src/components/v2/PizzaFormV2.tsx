@@ -15,7 +15,7 @@ import type { LatestOffer } from "@/types/ingredients";
 import { compressImage } from "@/lib/compressImage";
 
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
-import { fetchApi } from "@/lib/fetchApi";
+import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { EtabsSelector, estabsFromRow, estabsToPayload, ETABS_RECETTES } from "./EtabsSelector";
@@ -599,7 +599,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
     if (!pizzaId) return;
     setPdfLoading(true);
     try {
-      const res = await fetch(`/api/recettes/pdf?id=${pizzaId}&portions=${nbParts}`, {
+      const res = await fetchApi(`/api/recettes/pdf?id=${pizzaId}&portions=${nbParts}`, {
       });
       if (!res.ok) { const e = await res.json().catch(() => ({ message: "Erreur inconnue" })); alert(`Erreur PDF: ${e.message}`); return; }
       const blob = await res.blob();
@@ -643,7 +643,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
               const n = prompt("Nombre de portions / personnes ?", "10");
               if (!n) return;
               const portions = parseInt(n);
-              if (portions > 0) window.open(`/api/recettes/pdf?id=${pizzaId}&portions=${portions}`, "_blank");
+              if (portions > 0) openApiFile(`/api/recettes/pdf?id=${pizzaId}&portions=${portions}`);
             }} disabled={!isEdit}>PDF Prod.</HeroBtn>
             {isEdit ? <PublishCatalogueButton recipeType="pizza" recipeId={pizzaId!} /> : <HeroBtn disabled title="Enregistrer la recette pour publier au catalogue">Catalogue</HeroBtn>}
             {userCanWrite && <HeroBtn onClick={handleSave} disabled={saving} primary>{saving ? "Sauvegarde…" : "Enregistrer"}</HeroBtn>}

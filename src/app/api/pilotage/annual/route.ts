@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { etabAccessDenied } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
@@ -10,6 +11,9 @@ export async function GET(req: NextRequest) {
   const etabId = req.nextUrl.searchParams.get("etablissement_id");
   const year = parseInt(req.nextUrl.searchParams.get("year") ?? String(new Date().getFullYear()));
   if (!etabId) return NextResponse.json({ error: "etablissement_id required" }, { status: 400 });
+  const denied = await etabAccessDenied(req, etabId);
+  if (denied) return denied;
+
 
   const supabase = supabaseAdmin;
   const from = `${year}-01-01`;

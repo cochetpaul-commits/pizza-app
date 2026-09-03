@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { RequireRole } from "@/components/RequireRole";
 import { NavBar } from "@/components/NavBar";
+import { fetchApi } from "@/lib/fetchApi";
 
 /* ── Types ─────────────────────────────────────────────── */
 
@@ -130,19 +131,19 @@ function CataloguePage() {
   /* ── Data loading ──────────────────────────────────────── */
 
   const loadProducts = useCallback(async () => {
-    const res = await fetch("/api/popina-catalogue");
+    const res = await fetchApi("/api/popina-catalogue");
     const data = await res.json();
     setProducts(Array.isArray(data) ? data : []);
   }, []);
 
   const loadRecipes = useCallback(async () => {
-    const res = await fetch("/api/popina-catalogue/recipes");
+    const res = await fetchApi("/api/popina-catalogue/recipes");
     const data = await res.json();
     setRecipes(Array.isArray(data) ? data : []);
   }, []);
 
   const loadDoses = useCallback(async () => {
-    const res = await fetch("/api/popina-catalogue/doses");
+    const res = await fetchApi("/api/popina-catalogue/doses");
     const data = await res.json();
     setDoses(Array.isArray(data) ? data : []);
   }, []);
@@ -164,7 +165,7 @@ function CataloguePage() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch("/api/popina-catalogue/sync", { method: "POST" });
+      const res = await fetchApi("/api/popina-catalogue/sync", { method: "POST" });
       const data = await res.json();
       if (data.ok) {
         setSyncResult(`${data.upserted} produits synchronisés, ${data.deactivated} désactivés`);
@@ -184,7 +185,7 @@ function CataloguePage() {
   async function doSearch() {
     if (!searchQ.trim()) return;
     setSearching(true);
-    const res = await fetch("/api/popina-catalogue", {
+    const res = await fetchApi("/api/popina-catalogue", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: linkType, q: searchQ.trim() }),
@@ -203,7 +204,7 @@ function CataloguePage() {
     if (linkType === "ingredient") {
       const actualDose = doseValue || 1;
       const actualUnit = doseValue ? doseUnit : "pcs";
-      await fetch("/api/popina-catalogue/doses", {
+      await fetchApi("/api/popina-catalogue/doses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -214,13 +215,13 @@ function CataloguePage() {
         }),
       });
       // Also set the simple link for display
-      await fetch("/api/popina-catalogue", {
+      await fetchApi("/api/popina-catalogue", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ popina_product_id: editingId, linked_type: "ingredient", linked_id: linkedId }),
       });
     } else {
-      await fetch("/api/popina-catalogue", {
+      await fetchApi("/api/popina-catalogue", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ popina_product_id: editingId, linked_type: linkType, linked_id: linkedId }),
@@ -272,7 +273,7 @@ function CataloguePage() {
     const recipeId = editingRecipe.id;
     const recipeType = editingRecipe.type;
     setSaving(true);
-    await fetch("/api/popina-catalogue", {
+    await fetchApi("/api/popina-catalogue", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -301,7 +302,7 @@ function CataloguePage() {
   async function unlinkProduct(popinaProductId: string) {
     // Find the recipe/ingredient that was linked before clearing
     const product = products.find((p) => p.id === popinaProductId);
-    await fetch("/api/popina-catalogue", {
+    await fetchApi("/api/popina-catalogue", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ popina_product_id: popinaProductId }),

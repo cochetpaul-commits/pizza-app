@@ -7,6 +7,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useCategories } from "@/lib/useCategories";
+import { fetchApi } from "@/lib/fetchApi";
 
 type PairingItem = { id: string; name: string; category: string };
 
@@ -75,7 +76,7 @@ function PairingPicker({ fiche, onAdd, onRemove }: {
     if (!q.trim()) { setResults([]); return; }
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
-      const res = await fetch(`/api/catalogue/fiches/pairings?q=${encodeURIComponent(q)}`);
+      const res = await fetchApi(`/api/catalogue/fiches/pairings?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       setResults(Array.isArray(data) ? data : []);
       setSearching(false);
@@ -148,27 +149,27 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
 
   async function save() {
     setSaving(true);
-    await fetch("/api/catalogue/fiches/update", { method: "PATCH", headers: { "Content-Type": "application/json" },
+    await fetchApi("/api/catalogue/fiches/update", { method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: fiche.id, type: fiche.type, description_courte: desc.trim() }) });
     onUpdate(fiche.id, fiche.type, { description_courte: desc.trim() || null });
     setSaving(false); setEditing(false);
   }
 
   async function addPairing(item: PairingItem) {
-    await fetch("/api/catalogue/fiches/pairings", { method: "POST", headers: { "Content-Type": "application/json" },
+    await fetchApi("/api/catalogue/fiches/pairings", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ recipe_id: fiche.id, recipe_type: fiche.type, ingredient_id: item.id }) });
     onUpdate(fiche.id, fiche.type, { pairings: [...fiche.pairings, item] });
   }
 
   async function removePairing(ingredientId: string) {
-    await fetch("/api/catalogue/fiches/pairings", { method: "DELETE", headers: { "Content-Type": "application/json" },
+    await fetchApi("/api/catalogue/fiches/pairings", { method: "DELETE", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ recipe_id: fiche.id, recipe_type: fiche.type, ingredient_id: ingredientId }) });
     onUpdate(fiche.id, fiche.type, { pairings: fiche.pairings.filter((p) => p.id !== ingredientId) });
   }
 
   async function toggleCatalogue() {
     const newVal = !fiche.in_catalogue;
-    await fetch("/api/catalogue/fiches/update", { method: "PATCH", headers: { "Content-Type": "application/json" },
+    await fetchApi("/api/catalogue/fiches/update", { method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: fiche.id, type: fiche.type, in_catalogue: newVal }) });
     onUpdate(fiche.id, fiche.type, { in_catalogue: newVal });
   }
@@ -314,7 +315,7 @@ export function CatalogueSalleContent() {
   const load = useCallback(async () => {
     setLoading(true);
     const etabParam = etab?.slug ? `?etab=${etab.slug}` : "";
-    const res = await fetch(`/api/catalogue/fiches${etabParam}`);
+    const res = await fetchApi(`/api/catalogue/fiches${etabParam}`);
     const data = await res.json();
     setFiches(Array.isArray(data) ? data : []);
     setLoading(false);
@@ -329,7 +330,7 @@ export function CatalogueSalleContent() {
   async function handleExportPdf() {
     setExporting(true);
     try {
-      const res = await fetch("/api/catalogue/fiches/pdf");
+      const res = await fetchApi("/api/catalogue/fiches/pdf");
       if (!res.ok) { alert("Erreur export PDF"); return; }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

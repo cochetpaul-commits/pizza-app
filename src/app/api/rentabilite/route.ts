@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { etabAccessDenied } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { pennylaneConfigured } from "@/lib/pennylane/api";
 import { LIBELLES } from "@/lib/pennylane/syncCharges";
@@ -38,6 +39,9 @@ export async function GET(req: NextRequest) {
   if (!etabId || !from || !to) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
+  const denied = await etabAccessDenied(req, etabId);
+  if (denied) return denied;
+
 
   // Dossier Pennylane de cet établissement (bello → SARL SASHA, piccola → SARL I FRATELLI)
   const { data: etabRow } = await supabaseAdmin
@@ -60,7 +64,7 @@ export async function GET(req: NextRequest) {
     const origin = new URL(req.url).origin;
     const res = await fetch(
       `${origin}/api/ventes/marges?etablissement_id=${etabId}&from=${from}&to=${to}`,
-      { cache: "no-store" },
+      { cache: "no-store", headers: { authorization: req.headers.get("authorization") ?? "" } },
     );
     if (res.ok) {
       const m = await res.json();

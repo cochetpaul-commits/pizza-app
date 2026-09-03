@@ -104,7 +104,7 @@ function AutoImportJournal() {
   const lancer = async () => {
     setLancement(true);
     try {
-      const res = await fetch("/api/cron/factures-auto?days=10");
+      const res = await fetchApi("/api/cron/factures-auto?days=10");
       const d = await res.json();
       alert(d.ok ? `Terminé : ${d.importees} importée(s), ${d.dejaConnues} déjà connue(s), ${d.aVerifier} à vérifier, ${d.erreurs} erreur(s).` : `Erreur : ${d.error}`);
       await charger();

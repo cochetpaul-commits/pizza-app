@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { etabAccessDenied } from "@/lib/getEtablissement";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -12,6 +13,9 @@ const supabase = createClient(
 export async function GET(req: NextRequest) {
   const etabId = req.nextUrl.searchParams.get("etablissement_id");
   if (!etabId) return NextResponse.json({ error: "etablissement_id requis" }, { status: 400 });
+  const denied = await etabAccessDenied(req, etabId);
+  if (denied) return denied;
+
 
   const { data, error } = await supabase
     .from("objectifs")

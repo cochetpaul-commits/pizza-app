@@ -1262,7 +1262,7 @@ function SalleTab({
   // Load existing pairings
   useEffect(() => {
     if (!recipeId) return;
-    fetch("/api/catalogue/fiches")
+    fetchApi("/api/catalogue/fiches")
       .then(async (fichesRes) => {
         const fiches = await fichesRes.json();
         const fiche = Array.isArray(fiches) ? fiches.find((f: { id: string }) => f.id === recipeId) : null;
@@ -1276,7 +1276,7 @@ function SalleTab({
     if (!q.trim()) { setPairingResults([]); return; }
     debounceRef.current = setTimeout(async () => {
       setPairingSearching(true);
-      const res = await fetch(`/api/catalogue/fiches/pairings?q=${encodeURIComponent(q)}`);
+      const res = await fetchApi(`/api/catalogue/fiches/pairings?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       setPairingResults(Array.isArray(data) ? data : []);
       setPairingSearching(false);
@@ -1285,7 +1285,7 @@ function SalleTab({
 
   async function addPairing(item: PairingItem) {
     if (!recipeId) return;
-    await fetch("/api/catalogue/fiches/pairings", {
+    await fetchApi("/api/catalogue/fiches/pairings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ recipe_id: recipeId, recipe_type: "cuisine", ingredient_id: item.id }),
@@ -1297,7 +1297,7 @@ function SalleTab({
 
   async function removePairing(ingredientId: string) {
     if (!recipeId) return;
-    await fetch("/api/catalogue/fiches/pairings", {
+    await fetchApi("/api/catalogue/fiches/pairings", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ recipe_id: recipeId, recipe_type: "cuisine", ingredient_id: ingredientId }),

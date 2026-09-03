@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { fetchApi } from "@/lib/fetchApi";
 
 /* ── Types ── */
 type Article = {
@@ -267,7 +268,7 @@ export function ArticlesContent() {
     if (!etab?.id) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/ventes/articles?etablissement_id=${etab.id}`);
+      const res = await fetchApi(`/api/ventes/articles?etablissement_id=${etab.id}`);
       const json = await res.json();
       if (json.error) {
         console.error(json.error);
@@ -321,7 +322,7 @@ export function ArticlesContent() {
         body.nb_portions = linkNbPortions ? Number(linkNbPortions) : 1;
       }
 
-      const res = await fetch("/api/ventes/articles", {
+      const res = await fetchApi("/api/ventes/articles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -360,7 +361,7 @@ export function ArticlesContent() {
   /* ── Delete article ── */
   const deleteArticle = async (id: string) => {
     if (!confirm("Supprimer cet article ?")) return;
-    await fetch(`/api/ventes/articles?id=${id}`, { method: "DELETE" });
+    await fetchApi(`/api/ventes/articles?id=${id}`, { method: "DELETE" });
     await fetchData();
   };
 

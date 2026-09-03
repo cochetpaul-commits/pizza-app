@@ -18,6 +18,7 @@ import {
 } from "./ficheTypes";
 import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
+import { openApiFile } from "@/lib/fetchApi";
 
 // ── Styles ──
 const COLORS = {
@@ -1321,7 +1322,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           )}
           {fiche.id && (
             <>
-              <button onClick={() => window.open(`/api/recettes/pdf?id=${fiche.id}`, "_blank")}
+              <button onClick={() => openApiFile(`/api/recettes/pdf?id=${fiche.id}`)}
                 style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", background: "#fff", color: COLORS.muted, fontFamily: "inherit" }}>
                 PDF
               </button>
@@ -1329,7 +1330,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
                 const n = prompt("Nombre de portions / personnes ?", String(fiche.portions > 1 ? fiche.portions : 10));
                 if (!n) return;
                 const p = parseInt(n);
-                if (p > 0) window.open(`/api/recettes/pdf?id=${fiche.id}&portions=${p}`, "_blank");
+                if (p > 0) openApiFile(`/api/recettes/pdf?id=${fiche.id}&portions=${p}`);
               }}
                 style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", background: "#fff", color: COLORS.muted, fontFamily: "inherit" }}>
                 PDF Prod.

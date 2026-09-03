@@ -9,6 +9,7 @@ import { ColorPicker } from "@/components/ColorPicker";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
+import { fetchApi } from "@/lib/fetchApi";
 
 type SupplierRow = {
   id: string;
@@ -140,7 +141,7 @@ const readonlyBadge: React.CSSProperties = {
   padding: "2px 8px", borderRadius: 6, display: "inline-block",
 };
 
-const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code,color,portal_login,portal_password";
+const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code,color";
 
 // Accordion header pour la fiche fournisseur
 function AccordionHeader({ label, isOpen, onToggle }: { label: string; isOpen: boolean; onToggle: () => void }) {
@@ -342,9 +343,14 @@ export default function FournisseursPage() {
       etablissement_id: s.etablissement_id,
       client_code: s.client_code ?? "",
       color: s.color ?? "",
-      portal_login: s.portal_login ?? "",
-      portal_password: s.portal_password ?? "",
+      portal_login: "",
+      portal_password: "",
     });
+    // Identifiants du portail : servis par l'API aux admins/managers seulement
+    fetchApi(`/api/fournisseurs/portal?supplier_id=${s.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((c) => { if (c) setForm((f) => ({ ...f, portal_login: c.login ?? "", portal_password: c.password ?? "" })); })
+      .catch(() => {});
     setSchedule(Array.isArray(s.delivery_schedule) ? s.delivery_schedule : []);
     setDeletedContactIds([]);
 
@@ -431,9 +437,11 @@ export default function FournisseursPage() {
       etablissement_id: form.etablissement_id,
       client_code: form.client_code.trim() || null,
       color: form.color || null,
-      portal_login: form.portal_login.trim() || null,
-      portal_password: form.portal_password.trim() || null,
     };
+    const savePortal = (supplierId: string) => fetchApi("/api/fournisseurs/portal", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ supplier_id: supplierId, login: form.portal_login, password: form.portal_password }),
+    }).catch(() => {});
 
     if (modalMode === "create") {
       // INSERT
@@ -446,6 +454,7 @@ export default function FournisseursPage() {
       if (error) { setSaving(false); alert(error.message); return; }
 
       const created = newRow as SupplierRow;
+      await savePortal(created.id);
 
       // Save contacts for new supplier
       const validContacts = contacts.filter((c) => c.name.trim());
@@ -472,6 +481,7 @@ export default function FournisseursPage() {
 
       const { error } = await supabase.from("suppliers").update(fields).eq("id", modalSupplier.id);
       if (error) { setSaving(false); alert(error.message); return; }
+      await savePortal(modalSupplier.id);
 
       // Delete removed contacts
       if (deletedContactIds.length > 0) {

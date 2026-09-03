@@ -20,6 +20,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { ColorPicker } from "@/components/ColorPicker";
+import { fetchApi } from "@/lib/fetchApi";
 
 /**
  * SQL to add new columns:
@@ -179,9 +180,14 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
           address: s.address ?? "", city: s.city ?? "", postal_code: s.postal_code ?? "",
           siret: s.siret ?? "", category: s.category ?? "", payment_terms: s.payment_terms ?? "",
           delivery_days: (s.delivery_days ?? []).join(", "), website: s.website ?? "", tva_intra: s.tva_intra ?? "",
-          color: s.color ?? "", portal_login: s.portal_login ?? "", portal_password: s.portal_password ?? "",
+          color: s.color ?? "", portal_login: "", portal_password: "",
         });
         setSchedule(Array.isArray(s.delivery_schedule) ? s.delivery_schedule : []);
+        // Identifiants du portail : servis par l'API aux admins/managers seulement
+        fetchApi(`/api/fournisseurs/portal?supplier_id=${id}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((c) => { if (c) setForm((f) => ({ ...f, portal_login: c.login ?? "", portal_password: c.password ?? "" })); })
+          .catch(() => {});
 
         // Load contacts
         const dbContacts = (contactsRes.data ?? []).map((c: Record<string, unknown>) => ({
@@ -250,11 +256,13 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
       website: form.website.trim() || null,
       tva_intra: form.tva_intra.trim() || null,
       color: form.color || null,
-      portal_login: form.portal_login.trim() || null,
-      portal_password: form.portal_password.trim() || null,
     }).eq("id", id);
 
     if (error) { setSaving(false); alert(error.message); return; }
+    await fetchApi("/api/fournisseurs/portal", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ supplier_id: id, login: form.portal_login, password: form.portal_password }),
+    }).catch(() => {});
 
     // 2) Delete removed contacts
     if (deletedContactIds.length > 0) {
