@@ -169,6 +169,7 @@ export async function geminiVisionParse(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY manquante dans .env.local");
 
+  if (fileBytes.byteLength === 0) throw new Error("Fichier vide transmis au scan IA (tampon détaché après lecture PDF ?)");
   const base64Data = Buffer.from(fileBytes).toString("base64");
   const userPrompt = supplierNameHint
     ? `Voici une facture du fournisseur "${supplierNameHint}". Extrais les données.`

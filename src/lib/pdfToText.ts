@@ -1,3 +1,5 @@
+// NB : pdf.js transfère le tampon qu'on lui passe (il devient vide pour l'appelant).
+// On lui donne toujours une COPIE — sinon un second usage des octets (scan IA…) échoue.
 // unpdf : wrapper de pdfjs-dist conçu pour Node serverless (Vercel, Cloudflare
 // Workers). Le worker pdfjs est inline, pas de path à résoudre — élimine les
 // problèmes de bundling rencontrés avec pdfjs-dist + Vercel.
@@ -6,7 +8,7 @@ import { getDocumentProxy } from "unpdf";
 type TextItem = { str?: string; transform?: number[]; width?: number };
 
 export async function pdfToText(pdfBytes: Uint8Array): Promise<string> {
-  const pdf = await getDocumentProxy(pdfBytes);
+  const pdf = await getDocumentProxy(new Uint8Array(pdfBytes).slice());
   const pages: string[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {

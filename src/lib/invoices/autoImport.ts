@@ -154,7 +154,9 @@ export async function autoImportFactures(etabId: string, days = 5, dossier: PlDo
       let diag = "";
 
       if (estPdf) {
-        try { rawText = await pdfToText(bytes); } catch (e) { diag = `pdfToText : ${e instanceof Error ? e.message : "échec"}`; }
+        // COPIE obligatoire : pdf.js transfère (et vide) le tampon qu'on lui donne —
+        // le scan IA recevait ensuite 0 octet (« The document has no pages »).
+        try { rawText = await pdfToText(bytes.slice()); } catch (e) { diag = `pdfToText : ${e instanceof Error ? e.message : "échec"}`; }
         const det = detectInvoice(rawText);
         const entry = det.supplier ? PARSERS[det.supplier.slug] : undefined;
         if (entry) {
