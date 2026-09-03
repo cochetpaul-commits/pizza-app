@@ -200,11 +200,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <button
           type="button"
           onClick={() => {
+            const target = sub.href === "/mon-tableau" && role === "group_admin" && current
+              ? (current.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio")
+              : sub.href;
             if (items.length > 0) {
               toggleHub(hubKey);
-              if (sub.href) router.push(sub.href);
-            } else if (sub.href) {
-              router.push(sub.href);
+              if (target) router.push(target);
+            } else if (target) {
+              router.push(target);
               onNavigate?.();
             }
           }}
@@ -493,7 +496,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                                 setGroupView(false);
                                 setCurrent(etab);
                                 setOpenHub(prev => prev === subKey ? `etab:${etab.id}` : subKey);
-                                if (sub.href) router.push(sub.href);
+                                // « Pilotage » d'un admin : l'accueil de l'établissement, pas
+                                // /mon-tableau (réservé aux équipes, renvoyait vers la vue groupe)
+                                const target = sub.href === "/mon-tableau" && role === "group_admin" ? (isPiccolaEtab ? "/piccola-mia" : "/bello-mio") : sub.href;
+                                if (target) router.push(target);
                               }}
                               style={{
                                 display: "flex", alignItems: "center", gap: 8,

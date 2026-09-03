@@ -7,6 +7,7 @@ import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/Dat
 import { usePilotageRange } from "@/lib/pilotageRange";
 import { useTopBar } from "@/components/layout/TopBarContext";
 import { fetchApi } from "@/lib/fetchApi";
+import { useEtablissement } from "@/lib/EtablissementContext";
 
 /* ── Types (réponse /api/mon-tableau) ─────────────────────── */
 
@@ -229,6 +230,7 @@ function semaineCourante(): DateRange {
 
 export default function MonTableauPage() {
   const router = useRouter();
+  const { current: etabCourant } = useEtablissement();
   const [period, setPeriod] = usePilotageRange(semaineCourante);
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -282,8 +284,11 @@ export default function MonTableauPage() {
         if (cancelled) return;
         if (!res.ok) { setErr(json.error ?? "Erreur"); setData(null); }
         else if ((json as ApiData).admin) {
-          // Admins : vision globale — redirection vers l'accueil groupe
-          router.replace("/dashboard");
+          // Admins : pas de tableau personnel. On reste dans l'établissement
+          // choisi (sa page d'accueil) ; vue groupe seulement si aucun n'est choisi.
+          // Avant, ce renvoi vers /dashboard forçait la vue groupe dès qu'on
+          // cliquait « Pilotage » sous Piccola Mia ou Bello Mio.
+          router.replace(etabCourant ? (etabCourant.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio") : "/dashboard");
           return;
         }
         else setData(json as ApiData);
