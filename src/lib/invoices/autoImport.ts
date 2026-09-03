@@ -136,16 +136,23 @@ export async function autoImportFactures(etabId: string, days = 5, dossier: PlDo
         continue;
       }
       const contentType = rep.headers.get("content-type") ?? "";
-      const estPdf = contentType.includes("pdf") || (inv.filename ?? "").toLowerCase().endsWith(".pdf") || (bytes[0] === 0x25 && bytes[1] === 0x50);
+      // Le vrai type se lit dans les premiers octets : %PDF, JPEG (FF D8), PNG (89 50)
+      const magicPdf = bytes[0] === 0x25 && bytes[1] === 0x50;
+      const magicJpeg = bytes[0] === 0xff && bytes[1] === 0xd8;
+      const magicPng = bytes[0] === 0x89 && bytes[1] === 0x50;
+      const estPdf = magicPdf || (!magicJpeg && !magicPng && (contentType.includes("pdf") || (inv.filename ?? "").toLowerCase().endsWith(".pdf")));
+      // Trace technique jointe aux statuts d'échec (type annoncé, taille, signature)
+      const trace = `[${contentType || "type ?"} · ${bytes.length} o · ${Array.from(bytes.slice(0, 4)).map((b) => b.toString(16).padStart(2, "0")).join(" ")}]`;
 
       let payload: ParsedInvoice | null = null;
       let rawText = "";
       let parserUtilise = "";
       let supplierName = fournisseur.toUpperCase();
       let defaultUnit: "g" | "pc" | "kg" | "l" = "g";
+      let diag = "";
 
       if (estPdf) {
-        rawText = await pdfToText(bytes);
+        try { rawText = await pdfToText(bytes); } catch (e) { diag = `pdfToText : ${e instanceof Error ? e.message : "échec"}`; }
         const det = detectInvoice(rawText);
         const entry = det.supplier ? PARSERS[det.supplier.slug] : undefined;
         if (entry) {
@@ -157,22 +164,34 @@ export async function autoImportFactures(etabId: string, days = 5, dossier: PlDo
             parserUtilise = det.supplier!.slug;
             supplierName = entry.supplierName;
             defaultUnit = entry.defaultUnit;
+          } else {
+            diag = `parser ${det.supplier!.slug} : ${parsed.lines.length} ligne(s), somme ${somme.toFixed(2)} vs total ${parsed.total_ht ?? "?"}`;
           }
+        } else if (rawText.length < 50) {
+          diag = diag || `texte PDF vide (${rawText.length} car.) — scan sans couche texte ?`;
+        } else {
+          diag = `fournisseur non reconnu dans le texte (${rawText.length} car.)`;
         }
       }
 
       // Photo, fournisseur sans parser, ou parse incohérent → scan IA
       if (!payload && process.env.GEMINI_API_KEY) {
-        const mime = estPdf ? "application/pdf" : contentType.startsWith("image/") ? contentType : "image/jpeg";
-        const scan = await geminiVisionParse(bytes, mime, fournisseur);
-        payload = scan.invoice as unknown as ParsedInvoice;
-        parserUtilise = "scan-ia";
-        supplierName = (scan.supplierName || fournisseur).toUpperCase();
-        defaultUnit = "pc";
+        const mime = magicPdf ? "application/pdf" : magicPng ? "image/png" : magicJpeg ? "image/jpeg" : estPdf ? "application/pdf" : (contentType.startsWith("image/") ? contentType : "image/jpeg");
+        try {
+          const scan = await geminiVisionParse(bytes, mime, fournisseur);
+          payload = scan.invoice as unknown as ParsedInvoice;
+          parserUtilise = "scan-ia";
+          supplierName = (scan.supplierName || fournisseur).toUpperCase();
+          defaultUnit = "pc";
+        } catch (e) {
+          const msg = e instanceof Error ? e.message.split("\n")[0] : "scan IA impossible";
+          await log(inv, fournisseur, "erreur", `${diag ? diag + " · " : ""}scan IA : ${msg} ${trace}`);
+          continue;
+        }
       }
 
       if (!payload || payload.lines.length === 0) {
-        await log(inv, fournisseur, "a_verifier", "aucun parser n'a lu cette facture — à importer à la main");
+        await log(inv, fournisseur, "a_verifier", `aucun parser n'a lu cette facture — à importer à la main${diag ? " · " + diag : ""} ${trace}`);
         continue;
       }
 
