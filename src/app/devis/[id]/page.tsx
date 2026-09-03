@@ -142,8 +142,6 @@ export default function DevisDetailPage() {
       })
       .eq("id", id);
 
-    // Delete old lignes and re-insert
-    await supabase.from("devis_lignes").delete().eq("devis_id", id);
     const payload = editLignes
       .filter((l) => l.description.trim())
       .map((l, i) => ({
@@ -155,9 +153,12 @@ export default function DevisDetailPage() {
         total_ht: l.total_ht,
         position: i,
       }));
-    if (payload.length > 0) {
-      await supabase.from("devis_lignes").insert(payload);
-    }
+    // Une seule transaction côté base : plus de devis vidé si l'insertion échoue
+    const { error: lignesErr } = await supabase.rpc("devis_replace_lignes", {
+      p_devis_id: id,
+      p_lignes: payload.map(({ devis_id: _d, ...l }) => l),
+    });
+    if (lignesErr) { alert(`Lignes non enregistrées : ${lignesErr.message}`); setSaving(false); return; }
 
     setLignes(editLignes);
     if (devis) {

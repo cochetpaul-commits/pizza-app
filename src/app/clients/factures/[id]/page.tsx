@@ -139,7 +139,6 @@ export default function FactureDetailPage() {
       })
       .eq("id", id);
 
-    await supabase.from("facture_lignes").delete().eq("facture_id", id);
     const payload = editLignes
       .filter((l) => l.description.trim())
       .map((l, i) => ({
@@ -151,9 +150,12 @@ export default function FactureDetailPage() {
         total_ht: l.total_ht,
         position: i,
       }));
-    if (payload.length > 0) {
-      await supabase.from("facture_lignes").insert(payload);
-    }
+    // Une seule transaction côté base : plus de facture vidée si l'insertion échoue
+    const { error: lignesErr } = await supabase.rpc("facture_replace_lignes", {
+      p_facture_id: id,
+      p_lignes: payload.map(({ facture_id: _f, ...l }) => l),
+    });
+    if (lignesErr) { alert(`Lignes non enregistrées : ${lignesErr.message}`); setSaving(false); return; }
 
     setLignes(editLignes);
     if (facture) {

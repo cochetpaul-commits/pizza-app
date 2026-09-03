@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
 import { offerRowToCpu } from "@/lib/offerPricing";
+import { inChunks } from "@/lib/supabaseChunks";
 
 type Ingredient = {
   id: string;
@@ -108,10 +109,10 @@ export default function EpiceriePage() {
       const ingIds = (ings ?? []).map((i: { id: string }) => i.id);
       let offs: Record<string, unknown>[] = [];
       if (ingIds.length > 0) {
-        const { data } = await supabase.from("v_latest_offers")
+        const { data } = await inChunks<Record<string, unknown>>(ingIds, (batch) => supabase.from("v_latest_offers")
           .select("ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g")
-          .in("ingredient_id", ingIds);
-        offs = (data ?? []) as Record<string, unknown>[];
+          .in("ingredient_id", batch));
+        offs = data;
       }
       setIngredients((ings ?? []) as Ingredient[]);
       // Deduplicate suppliers by normalized name

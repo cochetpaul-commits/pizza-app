@@ -30,7 +30,13 @@ async function getPendingBadgeCount(): Promise<number> {
  * Adds badgeCount (pending commandes) if not provided.
  */
 export async function notifyGroupAdmins(payload: PushPayload): Promise<void> {
-  ensureVapid();
+  try {
+    ensureVapid();
+  } catch (e) {
+    // Clé VAPID invalide (ex. « = » de padding) : on journalise, on n'échoue pas
+    console.error("[push] configuration VAPID invalide :", e instanceof Error ? e.message : e);
+    return;
+  }
   if (!vapidReady) return;
   const { data: admins } = await supabaseAdmin
     .from("profiles")

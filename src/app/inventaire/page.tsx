@@ -487,10 +487,13 @@ export default function InventairePage() {
       }));
 
     if (movements.length > 0) {
-      // Delete previous inventory movements for this session (idempotent)
-      await supabase.from("stock_movements").delete()
-        .eq("reference_type", `inventaire_${session.id}`);
-      await supabase.from("stock_movements").insert(movements);
+      // Remplacement atomique (idempotent) : l'ancien effacer-puis-insérer
+      // pouvait perdre les mouvements si la seconde requête échouait.
+      const { error: mvErr } = await supabase.rpc("inventaire_replace_movements", {
+        p_reference: `inventaire_${session.id}`,
+        p_movements: movements.map(({ reference_type: _r, ...m }) => m),
+      });
+      if (mvErr) alert(`Inventaire clôturé, mais mouvements de stock non enregistrés : ${mvErr.message}`);
     }
 
     await reload();

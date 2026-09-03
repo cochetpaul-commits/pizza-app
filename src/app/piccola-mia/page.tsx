@@ -35,23 +35,23 @@ function fmtPct(n: number) {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function fetchAllRows(etabId: string, from: string, to: string, cols = "ttc, num_fiscal"): Promise<any[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let all: any[] = [];
-  let offset = 0;
-  while (true) {
-    const { data } = await supabase
-      .from("ventes_lignes").select(cols)
-      .eq("etablissement_id", etabId).gte("date_service", from)
-      .lte("date_service", to).eq("type_ligne", "Produit")
-      .range(offset, offset + 999);
-    if (!data || data.length === 0) break;
-    all = all.concat(data);
-    if (data.length < 1000) break;
-    offset += 1000;
-  }
-  return all;
+type ProduitAgg = { description: string; categorie: string; qty: number; ca_ttc: number };
+
+// Agrégats SQL (mêmes RPC que le tableau de bord groupe) : une requête par
+// indicateur, au lieu d'une pagination de ventes_lignes dans le navigateur qui
+// saturait les 6 connexions Safari et bloquait les autres pages.
+async function fetchCaTickets(etabId: string, from: string, to: string): Promise<{ ca: number; couverts: number }> {
+  const { data } = await supabase.rpc("ventes_ca_tickets", { p_etab: etabId, p_from: from, p_to: to });
+  const row = Array.isArray(data) ? data[0] : data;
+  return { ca: Number(row?.ca_ttc) || 0, couverts: Number(row?.tickets) || 0 };
+}
+async function fetchJours(etabId: string, from: string, to: string): Promise<{ jour: string; ca_ttc: number }[]> {
+  const { data } = await supabase.rpc("ventes_par_jour_categorie", { p_etab: etabId, p_from: from, p_to: to });
+  return (data ?? []) as { jour: string; ca_ttc: number }[];
+}
+async function fetchProduits(etabId: string, from: string, to: string): Promise<ProduitAgg[]> {
+  const { data } = await supabase.rpc("ventes_par_produit", { p_etab: etabId, p_from: from, p_to: to });
+  return (data ?? []) as ProduitAgg[];
 }
 
 function getA1Range(from: string, to: string) {
@@ -113,37 +113,36 @@ function PiccolaMiaContent() {
     setLoading(true);
     const a1 = getA1Range(range.from, range.to);
 
-    const [rows, rowsA1, dailyRows, topRows, achatsRes] = await Promise.all([
-      fetchAllRows(etab.id, range.from, range.to),
-      fetchAllRows(etab.id, a1.from, a1.to),
-      fetchAllRows(etab.id, range.from, range.to, "ttc, date_service"),
-      fetchAllRows(etab.id, range.from, range.to, "ttc, description, categorie"),
+    const [cur, prev, jours, produits, achatsRes] = await Promise.all([
+      fetchCaTickets(etab.id, range.from, range.to),
+      fetchCaTickets(etab.id, a1.from, a1.to),
+      fetchJours(etab.id, range.from, range.to),
+      fetchProduits(etab.id, range.from, range.to),
       supabase.from("supplier_invoices").select("total_ht")
         .eq("etablissement_id", etab.id)
         .gte("invoice_date", range.from).lte("invoice_date", range.to),
     ]);
 
-    setCa(rows.reduce((s: number, r: { ttc: number }) => s + (Number(r.ttc) || 0), 0));
-    setCouverts(new Set(rows.map((r: { num_fiscal: string }) => r.num_fiscal).filter(Boolean)).size);
-    setCaA1(rowsA1.reduce((s: number, r: { ttc: number }) => s + (Number(r.ttc) || 0), 0));
-    setCouvertsA1(new Set(rowsA1.map((r: { num_fiscal: string }) => r.num_fiscal).filter(Boolean)).size);
+    setCa(cur.ca);
+    setCouverts(cur.couverts);
+    setCaA1(prev.ca);
+    setCouvertsA1(prev.couverts);
 
+    // CA par jour
     const byDate: Record<string, number> = {};
-    for (const r of dailyRows) { const d = String(r.date_service); byDate[d] = (byDate[d] ?? 0) + (Number(r.ttc) || 0); }
+    for (const r of jours) { const d = String(r.jour).slice(0, 10); byDate[d] = (byDate[d] ?? 0) + (Number(r.ca_ttc) || 0); }
     setDailyCa(Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)).map(([date, ca]) => ({ date, ca })));
 
-    const prodMap: Record<string, { ca: number; qty: number }> = {};
+    // Top produits + mix catégories
     const catMap: Record<string, number> = {};
-    for (const r of topRows) {
-      const name = String(r.description || "Autre");
-      if (!prodMap[name]) prodMap[name] = { ca: 0, qty: 0 };
-      prodMap[name].ca += Number(r.ttc) || 0;
-      prodMap[name].qty += 1;
+    for (const r of produits) {
       const cat = String(r.categorie || "Autre");
-      if (cat !== "MESSAGES") catMap[cat] = (catMap[cat] ?? 0) + (Number(r.ttc) || 0);
+      if (cat !== "MESSAGES") catMap[cat] = (catMap[cat] ?? 0) + (Number(r.ca_ttc) || 0);
     }
-    setTopProducts(Object.entries(prodMap).sort(([, a], [, b]) => b.ca - a.ca).slice(0, 8).map(([name, d]) => ({ name, ...d })));
+    setTopProducts([...produits].sort((a, b) => b.ca_ttc - a.ca_ttc).slice(0, 8)
+      .map((p) => ({ name: p.description, ca: Number(p.ca_ttc) || 0, qty: Number(p.qty) || 0 })));
     setMixCats(Object.entries(catMap).sort(([, a], [, b]) => b - a).map(([cat, ca]) => ({ cat, ca })));
+
     setAchatsHt((achatsRes.data ?? []).reduce((s, r: { total_ht: number | null }) => s + (r.total_ht ?? 0), 0));
     setLoading(false);
   }, [etab, range]);

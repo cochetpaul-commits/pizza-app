@@ -13,7 +13,9 @@ import { usePilotageTopBar } from "@/components/ui/PilotageRangeBar";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 
-import Chart from "chart.js/auto";
+import type { Chart } from "chart.js";
+// Chart.js chargé à la demande : ~65 Ko gzip en moins au premier rendu
+const loadChart = () => import("chart.js/auto").then((m) => m.default);
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
 import { fetchApi } from "@/lib/fetchApi";
 
@@ -385,6 +387,7 @@ function MargesPage() {
   // Charts
   useEffect(() => {
     if (!data) return;
+    loadChart().then((ChartJS) => {
 
     // Bar chart: Top 10 by marge_brute
     if (barRef.current) {
@@ -396,7 +399,7 @@ function MargesPage() {
         .sort((a, b) => (b.marge_brute ?? 0) - (a.marge_brute ?? 0))
         .slice(0, 10);
 
-      charts["margeBar"] = new Chart(barRef.current, {
+      charts["margeBar"] = new ChartJS(barRef.current, {
         type: "bar",
         data: {
           labels: top10.map((p) =>
@@ -444,7 +447,7 @@ function MargesPage() {
       destroyChart("margePie");
       const cats = data.categories.filter((c) => c.cogs > 0);
 
-      charts["margePie"] = new Chart(pieRef.current, {
+      charts["margePie"] = new ChartJS(pieRef.current, {
         type: "doughnut",
         data: {
           labels: cats.map((c) => c.cat),
@@ -478,6 +481,8 @@ function MargesPage() {
         },
       });
     }
+
+    });
 
     return () => {
       destroyChart("margeBar");
@@ -704,6 +709,9 @@ function MargesPage() {
   useEffect(() => {
     if (!trendChartRef.current) return;
     destroyChart("trendBar");
+    loadChart().then((ChartJS) => {
+    if (!trendChartRef.current) return;
+    destroyChart("trendBar");
 
     let labels: string[];
     let values: number[];
@@ -722,7 +730,7 @@ function MargesPage() {
     }
 
     if (labels.length === 0) return;
-    charts["trendBar"] = new Chart(trendChartRef.current, {
+    charts["trendBar"] = new ChartJS(trendChartRef.current, {
       type: "bar",
       data: {
         labels,
@@ -742,6 +750,7 @@ function MargesPage() {
           y: { beginAtZero: true, grid: { color: COLORS.border }, ticks: { font: { size: 10 }, callback: (v) => trendMetric === "qty" ? v : fmt(v as number) } },
         },
       },
+    });
     });
     return () => destroyChart("trendBar");
   // eslint-disable-next-line react-hooks/exhaustive-deps

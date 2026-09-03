@@ -6,7 +6,9 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
-import Chart from "chart.js/auto";
+import type { Chart } from "chart.js";
+// Chart.js chargé à la demande : ~65 Ko gzip en moins au premier rendu
+const loadChart = () => import("chart.js/auto").then((m) => m.default);
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { setPendingInvoiceFile } from "@/lib/pendingInvoiceFile";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
@@ -522,8 +524,10 @@ function AchatsContent() {
 
   useEffect(() => {
     if (!evoChartRef.current || loading || curFYMonths.length === 0) return;
+    loadChart().then((ChartJS) => {
+    if (!evoChartRef.current) return;
     if (evoChartInstance.current) evoChartInstance.current.destroy();
-    evoChartInstance.current = new Chart(evoChartRef.current, {
+    evoChartInstance.current = new ChartJS(evoChartRef.current, {
       type: "bar",
       data: evoChartData,
       options: {
@@ -558,6 +562,7 @@ function AchatsContent() {
         },
       },
     });
+    });
     return () => { evoChartInstance.current?.destroy(); evoChartInstance.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evoChartData, loading]);
@@ -568,8 +573,10 @@ function AchatsContent() {
 
   useEffect(() => {
     if (!supplierBarRef.current || loading || supplierTotalsRange.length === 0) return;
+    loadChart().then((ChartJS) => {
+    if (!supplierBarRef.current) return;
     if (supplierBarInstance.current) supplierBarInstance.current.destroy();
-    supplierBarInstance.current = new Chart(supplierBarRef.current, {
+    supplierBarInstance.current = new ChartJS(supplierBarRef.current, {
       type: "bar",
       data: {
         labels: supplierTotalsRange.map((s) => s.name),
@@ -610,6 +617,7 @@ function AchatsContent() {
           },
         },
       },
+    });
     });
     return () => { supplierBarInstance.current?.destroy(); supplierBarInstance.current = null; };
   }, [supplierTotalsRange, loading]);

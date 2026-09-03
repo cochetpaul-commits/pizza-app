@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts, type PriceAlert } from "@/lib/priceAlerts";
 import type { Ingredient, LatestOffer, Supplier } from "@/types/ingredients";
+import { inChunks } from "@/lib/supabaseChunks";
 
 const PAGE_SIZE = 1000;
 
@@ -21,22 +22,16 @@ const OFFER_COLS =
 async function fetchAllActiveOffers(ids: string[]): Promise<LatestOffer[]> {
   if (ids.length === 0) return [];
 
-  // Batch IDs to avoid URL length limits (Supabase rejects >100 IDs in .in())
-  const BATCH = 80;
-  const allData: Record<string, unknown>[] = [];
-  for (let i = 0; i < ids.length; i += BATCH) {
-    const batch = ids.slice(i, i + BATCH);
-    const { data, error } = await supabase
-      .from("supplier_offers")
-      .select(OFFER_COLS)
-      .eq("is_active", true)
-      .in("ingredient_id", batch)
-      .order("updated_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    allData.push(...(data ?? []));
-  }
-
-  return allData.map(r => r as LatestOffer);
+  // Paquets (limite d'URL PostgREST) lancés en parallèle : 13 requêtes en
+  // série par page de 1000 ingrédients devenaient une seule salve.
+  const { data, error } = await inChunks<Record<string, unknown>>(ids, (batch) => supabase
+    .from("supplier_offers")
+    .select(OFFER_COLS)
+    .eq("is_active", true)
+    .in("ingredient_id", batch)
+    .order("updated_at", { ascending: false }));
+  if (error) throw new Error(error);
+  return data.map(r => r as LatestOffer);
 }
 
 /** Keep only the latest active offer per ingredient_id */

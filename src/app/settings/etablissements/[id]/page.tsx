@@ -268,10 +268,12 @@ export default function EtablissementDetailPage() {
     if (!id || !pNom.trim()) return;
     const payload = { nom: pNom.trim(), equipe: pEquipe, couleur: pCouleur, emoji: pEmoji, etablissement_id: id };
     if (editPosteId) {
-      const { data } = await supabase.from("postes").update(payload).eq("id", editPosteId).select().single();
+      const { data, error } = await supabase.from("postes").update(payload).eq("id", editPosteId).select().single();
+      if (error) { alert(`Enregistrement impossible : ${error.message}`); return; }
       if (data) setPostes(prev => prev.map(p => p.id === editPosteId ? { ...p, ...data } as Poste : p));
     } else {
-      const { data } = await supabase.from("postes").insert(payload).select().single();
+      const { data, error } = await supabase.from("postes").insert(payload).select().single();
+      if (error) { alert(`Enregistrement impossible : ${error.message}`); return; }
       if (data) setPostes(prev => [...prev, data as Poste]);
     }
     setShowPosteModal(false);
@@ -300,10 +302,12 @@ export default function EtablissementDetailPage() {
   const savePrime = async () => {
     if (!id || !primeLibelle.trim()) return;
     if (editPrimeId) {
-      const { data } = await supabase.from("primes").update({ libelle: primeLibelle.trim(), code: primeCode.trim() }).eq("id", editPrimeId).select().single();
+      const { data, error } = await supabase.from("primes").update({ libelle: primeLibelle.trim(), code: primeCode.trim() }).eq("id", editPrimeId).select().single();
+      if (error) { alert(`Enregistrement impossible : ${error.message}`); return; }
       if (data) setPrimes(prev => prev.map(p => p.id === editPrimeId ? { ...p, ...data } as Prime : p));
     } else {
-      const { data } = await supabase.from("primes").insert({ etablissement_id: id, libelle: primeLibelle.trim(), code: primeCode.trim() }).select().single();
+      const { data, error } = await supabase.from("primes").insert({ etablissement_id: id, libelle: primeLibelle.trim(), code: primeCode.trim() }).select().single();
+      if (error) { alert(`Enregistrement impossible : ${error.message}`); return; }
       if (data) setPrimes(prev => [...prev, data as Prime]);
     }
     setShowPrimeModal(false);
@@ -314,7 +318,8 @@ export default function EtablissementDetailPage() {
     const { data: srcPrimes } = await supabase.from("primes").select("libelle, code, type, montant, recurrence").eq("etablissement_id", primeDupEtabId).eq("actif", true);
     if (!srcPrimes || srcPrimes.length === 0) { alert("Aucune prime a dupliquer."); return; }
     const toInsert = srcPrimes.map(p => ({ ...p, etablissement_id: id }));
-    const { data } = await supabase.from("primes").insert(toInsert).select();
+    const { data, error } = await supabase.from("primes").insert(toInsert).select();
+    if (error) { alert(`Enregistrement impossible : ${error.message}`); return; }
     if (data) setPrimes(prev => [...prev, ...(data as Prime[])]);
     setShowPrimeModal(false);
   };
@@ -563,7 +568,8 @@ export default function EtablissementDetailPage() {
     if (!src || src.length === 0) { alert("Aucune etiquette a importer depuis cet etablissement."); return; }
     // Insert them under the current equipe of this establishment
     const toInsert = src.map(p => ({ nom: p.nom, couleur: p.couleur, equipe: importEquipe, etablissement_id: id, actif: true, emoji: null }));
-    const { data } = await supabase.from("postes").insert(toInsert).select();
+    const { data, error } = await supabase.from("postes").insert(toInsert).select();
+    if (error) { alert(`Enregistrement impossible : ${error.message}`); return; }
     if (data) setPostes(prev => [...prev, ...(data as Poste[])]);
     setShowImportModal(false);
   };
@@ -796,7 +802,8 @@ export default function EtablissementDetailPage() {
       temps_partiel_actif: modPartielActif,
       equipe_ids: modEquipeIds,
     };
-    const { data } = await supabase.from("periodes_modulation").insert(payload).select().single();
+    const { data, error } = await supabase.from("periodes_modulation").insert(payload).select().single();
+    if (error) { alert(`Enregistrement impossible : ${error.message}`); return; }
     if (data) setPeriodes(prev => [data as PeriodeMod, ...prev]);
     setShowCreatePeriode(false);
   };

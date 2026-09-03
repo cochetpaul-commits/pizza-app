@@ -5,7 +5,9 @@ import { useEtabAuto } from "@/lib/useEtabAuto";
 import { useSearchParams } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
-import Chart from "chart.js/auto";
+import type { Chart } from "chart.js";
+// Chart.js chargé à la demande : ~65 Ko gzip en moins au premier rendu
+const loadChart = () => import("chart.js/auto").then((m) => m.default);
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
 import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
 import { usePilotageRange, readPilotageRange } from "@/lib/pilotageRange";
@@ -523,7 +525,10 @@ function PerformancesPage() {
       });
     }
 
-    charts[id] = new Chart(catTrendChartRef.current, {
+    loadChart().then((ChartJS) => {
+    if (!catTrendChartRef.current) return;
+    destroyChart(id);
+    charts[id] = new ChartJS(catTrendChartRef.current, {
       type: "bar" as const,
       data: { labels, datasets },
       options: {
@@ -555,6 +560,7 @@ function PerformancesPage() {
           },
         },
       },
+    });
     });
     }
   }, [catTrendData, catTrendMetric, catTrendFrom, catTrendTo, catTrendFilterCat, catTrendFilterProd, prodTrendData]);
@@ -2572,11 +2578,14 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
   useEffect(() => {
     if (!canvasRef.current) return;
     destroyChart(id);
+    loadChart().then((ChartJS) => {
+    if (!canvasRef.current) return;
+    destroyChart(id);
 
     if (type === "mix") {
       const vals = mode === "ttc" ? data.mix_ttc : data.mix_ht;
       const total = vals.reduce((a, b) => a + b, 0);
-      charts[id] = new Chart(canvasRef.current, {
+      charts[id] = new ChartJS(canvasRef.current, {
         type: "bar",
         data: { labels: data.mix_labels, datasets: [{
           data: vals,
@@ -2628,7 +2637,7 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
         const t = n > 1 ? i / (n - 1) : 0;
         return `rgb(${Math.round(gradStart[0] + (gradEnd[0] - gradStart[0]) * t)},${Math.round(gradStart[1] + (gradEnd[1] - gradStart[1]) * t)},${Math.round(gradStart[2] + (gradEnd[2] - gradStart[2]) * t)})`;
       });
-      charts[id] = new Chart(canvasRef.current, {
+      charts[id] = new ChartJS(canvasRef.current, {
         type: "bar",
         data: { labels: data.top10_names, datasets: [{ data: mode === "ttc" ? data.top10_ca_ttc : data.top10_ca_ht, backgroundColor: colors, borderRadius: 4 }] },
         options: {
@@ -2649,7 +2658,7 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
         const t = n > 1 ? i / (n - 1) : 0;
         return `rgb(${Math.round(gradStart[0] + (gradEnd[0] - gradStart[0]) * t)},${Math.round(gradStart[1] + (gradEnd[1] - gradStart[1]) * t)},${Math.round(gradStart[2] + (gradEnd[2] - gradStart[2]) * t)})`;
       });
-      charts[id] = new Chart(canvasRef.current, {
+      charts[id] = new ChartJS(canvasRef.current, {
         type: "bar",
         data: { labels: data.serveurs, datasets: [{ data: mode === "ttc" ? data.serv_ca_ttc : data.serv_ca_ht, backgroundColor: colors, borderRadius: 4 }] },
         options: {
@@ -2672,7 +2681,7 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
 
     if (type === "pay" && data.pay && data.pay.length > 0) {
       const payColors = ["#c8960a", "#e0b020", "#f0c840", "#f5d96a", "#f9e9a0"];
-      charts[id] = new Chart(canvasRef.current, {
+      charts[id] = new ChartJS(canvasRef.current, {
         type: "doughnut",
         data: {
           labels: data.pay.map(p => p.l),
@@ -2686,6 +2695,7 @@ function ChartCanvas({ id, height, data, mode, type, onBarClick }: {
       });
     }
 
+    });
     return () => { destroyChart(id); };
   }, [id, data, mode, type, onBarClick]);
 

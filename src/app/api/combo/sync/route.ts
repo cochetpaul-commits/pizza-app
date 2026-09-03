@@ -82,7 +82,7 @@ export async function POST() {
             role: contract.role === "main_owner" || contract.role === "owner" ? "group_admin" : "equipier",
           }).select("id").single();
           employeId = inserted?.id ?? "";
-          created++;
+          if (employeId) created++;
         }
 
         // Upsert active contract

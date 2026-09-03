@@ -147,7 +147,8 @@ function NouvelleFacturePage() {
       }));
 
     if (lignesPayload.length > 0) {
-      await supabase.from("facture_lignes").insert(lignesPayload);
+      const { error: lErr } = await supabase.from("facture_lignes").insert(lignesPayload);
+      if (lErr) { alert(`Facture créée mais lignes non enregistrées : ${lErr.message}`); }
     }
 
     setSaving(false);

@@ -572,7 +572,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
                     onKeyDown={async e => {
                       if (e.key === "Enter" && newCatName.trim()) {
                         const slug = newCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
-                        const { data } = await supabase.from("categories").insert({ nom: newCatName.trim(), slug, couleur: "#999999", famille_id: "autre", sous_categories: [], sort_order: 99 }).select().single();
+                        const { data, error } = await supabase.from("categories").insert({ nom: newCatName.trim(), slug, couleur: "#999999", famille_id: "autre", sous_categories: [], sort_order: 99 }).select().single();
+                        if (error) { alert(`Catégorie non créée : ${error.message}`); return; }
                         if (data) {
                           setCategories(prev => [...prev, data as Categorie]);
                           update({ categorie_slug: slug, sous_categorie: "" });

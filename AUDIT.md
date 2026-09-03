@@ -107,3 +107,40 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
 3. Toute nouvelle page doit être ajoutée à `ROUTE_ACCESS` (src/lib/rbac.ts) —
    deny par défaut pour les non-admins.
 4. Ne pas retirer les gardes anti-`SIGNED_IN` des contextes.
+
+## Vagues 1 et 2 — 3 septembre 2026 (déployées)
+
+### Vague 1 — sécurité
+- [x] `src/middleware.ts` : toute route `/api/*` refuse (401) sans jeton Supabase valide.
+  Liste blanche : `/api/version`, `/api/client-error`, `/api/cron/*`, `GET /api/pennylane/sync`,
+  `GET /api/meteo?action=fetch` (gardes cron propres). Cache 60 s des jetons validés.
+- [x] `src/lib/cronAuth.ts` : gardes cron **fermées par défaut** (`CRON_SECRET` obligatoire, sinon 503).
+  `cronOrAdminUnauthorized` pour les tâches lançables à la main par un admin (factures-auto).
+  Job pg_cron `popina-sync-horaire` envoie le secret. **À faire par Paul : créer `CRON_SECRET`
+  dans Vercel (même valeur que `.env.local`) puis redéployer — sinon les crons restent en 503.**
+- [x] `etabAccessDenied` / `roleDenied` (lib/getEtablissement.ts) sur Rentabilité, Marges, Stats,
+  Pilotage annuel/objectifs, Tendances, Registre du personnel (admins ou managers de l'étab).
+- [x] Identifiants de portail fournisseur : table `supplier_portal_credentials` (RLS sans policy =
+  service role seulement) + `/api/fournisseurs/portal` (admins/managers). Colonnes `suppliers.portal_*`
+  vidées et plus jamais sélectionnées côté client.
+- [x] RLS activée sur `charges_mensuelles` ; routes `admin/sync-role`, `admin/setup-ventes`,
+  `admin/clean-names`, `pennylane/diagnostic` supprimées.
+- [x] 68 `fetch("/api…")` → `fetchApi` (jeton + établissement automatiques) ; PDF ouverts via
+  `openApiFile` (lib/fetchApi.ts) au lieu de liens sans jeton. **Règle : tout nouvel appel API côté
+  client passe par `fetchApi`/`openApiFile`, sinon 401.**
+
+### Vague 2 — fiabilité et vitesse
+- [x] `bello-mio` / `piccola-mia` : agrégats SQL (`ventes_ca_tickets`, `ventes_par_jour_categorie`,
+  `ventes_par_produit`) — fin de la pagination navigateur qui saturait Safari.
+- [x] Transactions : `facture_replace_lignes`, `devis_replace_lignes`, `inventaire_replace_movements`.
+- [x] Erreurs d'écriture visibles : paramètres établissement (7), duplication de fiche, création de
+  catégorie, lignes de facture/devis à la création, compteur combo-sync.
+- [x] `src/lib/supabaseChunks.ts` (`inChunks`, paquets de 150 en parallèle) appliqué à epicerie,
+  commandes (+ N+1 par alias supprimés), catalogue (lignes pizzas), stock/sync-ventes, cron/stock-sync,
+  useIngredientsData. **Règle : jamais de `.in()` sur une liste non bornée sans `inChunks`.**
+- [x] Catalogue : `ventes_articles_distincts` (RPC) au lieu de relire toutes les ventes.
+- [x] Chart.js en import dynamique sur Ventes (256→186 Ko), Achats (251→181), Marges (245→176).
+- [x] Push : clé VAPID invalide journalisée au lieu de lever une erreur serveur.
+- [ ] Non fait, volontairement : filtrer `v_latest_offers` dans les 6 formulaires de recette — la vue
+  ne fait que 1 249 lignes et les formulaires ont besoin des prix de tous les candidats à l'ajout ;
+  à revoir seulement si la vue grossit (>5 000 lignes).

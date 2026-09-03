@@ -142,7 +142,8 @@ function NouveauDevisPage() {
       }));
 
     if (lignesPayload.length > 0) {
-      await supabase.from("devis_lignes").insert(lignesPayload);
+      const { error: lErr } = await supabase.from("devis_lignes").insert(lignesPayload);
+      if (lErr) { alert(`Devis créé mais lignes non enregistrées : ${lErr.message}`); }
     }
 
     setSaving(false);

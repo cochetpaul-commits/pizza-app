@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
+import { inChunks } from "@/lib/supabaseChunks";
 
 /**
  * POST /api/stock/sync-ventes
@@ -98,24 +99,22 @@ export async function POST(req: NextRequest) {
   for (const p of products ?? []) if (p.ingredient_id) allIngIds.add(p.ingredient_id);
   for (const lines of linesByRecipe.values()) for (const l of lines) allIngIds.add(l.ingredient_id);
 
-  const { data: ingredients } = allIngIds.size > 0
-    ? await supabaseAdmin
-        .from("ingredients")
-        .select("id, name, default_unit, piece_volume_ml, purchase_unit_label")
-        .in("id", [...allIngIds])
-    : { data: [] };
+  const { data: ingredients } = await inChunks<{ id: string; name: string; default_unit: string | null; piece_volume_ml: number | null; purchase_unit_label: string | null }>(
+    [...allIngIds], (batch) => supabaseAdmin
+      .from("ingredients")
+      .select("id, name, default_unit, piece_volume_ml, purchase_unit_label")
+      .in("id", batch));
 
   const ingMap = new Map((ingredients ?? []).map(i => [i.id, i]));
 
   // Also load supplier_offers for pack info (for g → pcs conversion)
-  const { data: offers } = allIngIds.size > 0
-    ? await supabaseAdmin
-        .from("supplier_offers")
-        .select("ingredient_id, pack_count, pack_each_qty, pack_each_unit")
-        .eq("is_active", true)
-        .in("ingredient_id", [...allIngIds])
-        .not("pack_count", "is", null)
-    : { data: [] };
+  const { data: offers } = await inChunks<{ ingredient_id: string; pack_count: number | null; pack_each_qty: number | null; pack_each_unit: string | null }>(
+    [...allIngIds], (batch) => supabaseAdmin
+      .from("supplier_offers")
+      .select("ingredient_id, pack_count, pack_each_qty, pack_each_unit")
+      .eq("is_active", true)
+      .in("ingredient_id", batch)
+      .not("pack_count", "is", null));
 
   // ingredient_id → { pack_count, pack_each_qty (g or ml per piece), pack_each_unit }
   const packMap = new Map<string, { pack_count: number; pack_each_qty: number; pack_each_unit: string }>();

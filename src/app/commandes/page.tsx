@@ -16,6 +16,7 @@ import type { FloatingAction } from "@/components/layout/FloatingActions";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
+import { inChunks } from "@/lib/supabaseChunks";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -842,11 +843,12 @@ function CommandesPage() {
     // Fetch offers for ALL alias IDs of this supplier
     const offerMap = new Map<string, { ingredient_id: string; price_kind: string | null; unit: string | null; unit_price: number | null; pack_price: number | null; pack_unit: string | null; pack_count: number | null; pack_each_qty: number | null; pack_each_unit: string | null; pack_total_qty: number | null; establishment: string | null }>();
     const offerIngIds: string[] = [];
-    for (const sid of supplierIds) {
+    {
+      // Une seule requête pour tous les alias (avant : une par alias, en série)
       const { data: offerData, error: offerErr } = await supabase
         .from("supplier_offers")
         .select("ingredient_id, price_kind, unit, unit_price, pack_price, pack_unit, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, establishment")
-        .eq("supplier_id", sid)
+        .in("supplier_id", supplierIds)
         .eq("is_active", true);
       if (offerErr) console.error("[commandes] offers query error:", offerErr.message);
       for (const o of offerData ?? []) {
@@ -859,11 +861,11 @@ function CommandesPage() {
 
     // Fetch ingredients directly linked to any alias supplier_id
     const directIds: string[] = [];
-    for (const sid of supplierIds) {
+    {
       let directIngQ = supabase
         .from("ingredients")
         .select("id")
-        .eq("supplier_id", sid);
+        .in("supplier_id", supplierIds);
       if (etabKey) directIngQ = directIngQ.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
       const { data: directIngs, error: directErr } = await directIngQ;
       if (directErr) console.error("[commandes] direct ingredients query error:", directErr.message);
@@ -874,31 +876,16 @@ function CommandesPage() {
 
     let items: CatalogItem[] = [];
     if (allIds.length > 0) {
-      // Try with favori_commande, fallback without if column doesn't exist
       const selectCols = "id, name, category, sub_category, default_unit, favori_commande, order_unit_label, order_quantity, stock_objectif, stock_min, storage_zone";
-      let ingDataQ = supabase
-        .from("ingredients")
-        .select(selectCols)
-        .in("id", allIds)
-        .order("category")
-        .order("name");
-      if (etabKey) ingDataQ = ingDataQ.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
-      let { data: ingData, error: ingErr } = await ingDataQ;
-
-      // Fallback: retry without favori_commande if the column doesn't exist yet
-      if (ingErr) {
-        console.warn("[commandes] ingredient query error, retrying without favori_commande:", ingErr.message);
-        let fallbackQ = supabase
-          .from("ingredients")
-          .select("id, name, category, sub_category, default_unit, order_unit_label, order_quantity, stock_objectif, stock_min, storage_zone")
-          .in("id", allIds)
-          .order("category")
-          .order("name");
-        if (etabKey) fallbackQ = fallbackQ.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
-        const fallback = await fallbackQ;
-        ingData = (fallback.data ?? []).map((r) => ({ ...r, favori_commande: false })) as typeof ingData;
-        ingErr = fallback.error;
-      }
+      // Par paquets : au-delà de ~200 identifiants l'URL dépasse la limite PostgREST (400 silencieux)
+      const { data: ingRows, error: ingErrMsg } = await inChunks<Record<string, unknown>>(allIds, (batch) => {
+        let q = supabase.from("ingredients").select(selectCols).in("id", batch);
+        if (etabKey) q = q.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
+        return q;
+      });
+      const ingData = ingRows.sort((a, b) =>
+        String(a.category ?? "").localeCompare(String(b.category ?? ""), "fr") || String(a.name ?? "").localeCompare(String(b.name ?? ""), "fr"));
+      const ingErr = ingErrMsg ? { message: ingErrMsg } : null;
 
       if (ingErr) console.error("[commandes] ingredient query error:", ingErr.message);
 

@@ -10,6 +10,7 @@ import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult }
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { useCategories, filterCategoriesForEtab } from "@/lib/useCategories";
+import { inChunks } from "@/lib/supabaseChunks";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -279,11 +280,11 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     .eq("category", "pizza")
     .order("name");
   const pizzaIds = (pizzas ?? []).map(p => p.id);
-  const { data: pizzaIngs } = pizzaIds.length ? await supabase
+  const { data: pizzaIngs } = await inChunks<Record<string, unknown>>(pizzaIds, (batch) => supabase
     .from("kitchen_recipe_lines")
     .select("recipe_id, ingredient_id, qty, unit, sort_order, ingredients(name, allergens)")
-    .in("recipe_id", pizzaIds)
-    .order("sort_order") : { data: [] };
+    .in("recipe_id", batch)
+    .order("sort_order"));
 
   for (const p of (pizzas ?? [])) {
     if (!matchEstab(p.establishments)) continue;
@@ -543,17 +544,14 @@ export function CatalogueContent() {
         for (const r of data ?? []) if (r.recette_id) m.set(r.recette_id, r.nom_vente);
         setArticleLinks(m);
       });
-    // Load unique product names from ventes_lignes
+    // Noms d'articles vendus sur 12 mois — DISTINCT côté base (avant : toutes
+    // les lignes de vente rapatriées dans le navigateur, liste tronquée à 1000)
+    const depuis = new Date(); depuis.setFullYear(depuis.getFullYear() - 1);
     supabase
-      .from("ventes_lignes")
-      .select("description")
-      .eq("etablissement_id", etab.id)
-      .eq("type_ligne", "Produit")
-      .eq("annule", false)
+      .rpc("ventes_articles_distincts", { p_etab: etab.id, p_from: depuis.toISOString().slice(0, 10) })
       .then(({ data }) => {
-        const names = new Set<string>();
-        for (const r of data ?? []) if (r.description) names.add(r.description);
-        setAvailableArticles(Array.from(names).sort((a, b) => a.localeCompare(b, "fr")));
+        const names = (data ?? []).map((r: { description: string }) => r.description).filter(Boolean) as string[];
+        setAvailableArticles(names.sort((a, b) => a.localeCompare(b, "fr")));
       });
   }, [etab]);
 
@@ -1073,11 +1071,13 @@ export function CatalogueContent() {
       rest.sous_categorie = dupSubCat || null;
       rest.statut = "brouillon";
       rest.in_catalogue = false;
-      const { data: newRec } = await supabase.from("kitchen_recipes").insert(rest).select("id").single();
+      const { data: newRec, error: recErr } = await supabase.from("kitchen_recipes").insert(rest).select("id").single();
+      if (recErr) throw new Error(recErr.message);
       if (newRec) {
         const { data: lines } = await supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", dupTarget.id);
         if (lines?.length) {
-          await supabase.from("kitchen_recipe_lines").insert(lines.map(({ id: _i, recipe_id: _r, created_at: _c, updated_at: _u, ...l }: Record<string, unknown>) => ({ ...l, recipe_id: newRec.id })));
+          const { error: linesErr } = await supabase.from("kitchen_recipe_lines").insert(lines.map(({ id: _i, recipe_id: _r, created_at: _c, updated_at: _u, ...l }: Record<string, unknown>) => ({ ...l, recipe_id: newRec.id })));
+          if (linesErr) throw new Error(`fiche copiée mais ingrédients non copiés : ${linesErr.message}`);
         }
       }
       setDupTarget(null);

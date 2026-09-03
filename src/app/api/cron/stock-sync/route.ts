@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cronUnauthorized } from "@/lib/cronAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { inChunks } from "@/lib/supabaseChunks";
 
 export const runtime = "nodejs";
 
@@ -111,9 +112,8 @@ async function syncVentesForEtab(etabId: string, dateFrom: string, dateTo: strin
   for (const p of products ?? []) if (p.ingredient_id) allIngIds.add(p.ingredient_id);
   for (const lines of linesByRecipe.values()) for (const l of lines) allIngIds.add(l.ingredient_id);
 
-  const { data: ingredients } = allIngIds.size > 0
-    ? await supabaseAdmin.from("ingredients").select("id, piece_volume_ml, purchase_unit_label, default_unit").in("id", [...allIngIds])
-    : { data: [] };
+  const { data: ingredients } = await inChunks<{ id: string; piece_volume_ml: number | null; purchase_unit_label: string | null; default_unit: string | null }>(
+    [...allIngIds], (batch) => supabaseAdmin.from("ingredients").select("id, piece_volume_ml, purchase_unit_label, default_unit").in("id", batch));
 
   const ingMap = new Map((ingredients ?? []).map(i => [i.id, i]));
 
