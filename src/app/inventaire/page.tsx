@@ -222,8 +222,12 @@ export default function InventairePage() {
         .select("*")
         .eq("is_active", true)
         .order("name");
-      if (etabId) {
-        q = q.eq("etablissement_id", etabId);
+      // Visibilité par établissement (establishments), PAS établissement de
+      // création : 379 produits créés côté Piccola mais ouverts à Bello Mio
+      // (ex. Molecola Carniato) manquaient à l'inventaire de Bello.
+      const etabKey = etab?.slug?.includes("piccola") ? "piccola" : etab?.slug?.includes("bello") ? "bellomio" : null;
+      if (etabKey) {
+        q = q.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
       }
       let zq = supabase.from("storage_zones").select("*").order("display_order").order("name");
       if (etabId) zq = zq.eq("etablissement_id", etabId);
@@ -263,7 +267,8 @@ export default function InventairePage() {
       setIngSupplier(isMap);
       setSuppliers((supData ?? []) as { id: string; name: string }[]);
     })();
-  }, [etabId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etabId, etab?.slug]);
 
   // ── Load inventaires ──────────────────────────────────────
 
