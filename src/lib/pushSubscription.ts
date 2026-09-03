@@ -17,15 +17,25 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
 export async function subscribeToPush(reg: ServiceWorkerRegistration): Promise<PushSubscription | null> {
   if (!("PushManager" in window)) return null;
 
-  const existing = await reg.pushManager.getSubscription();
-  if (existing) return existing;
-
   const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   if (!vapidKey) return null;
+  const keyBytes = urlBase64ToUint8Array(vapidKey);
+
+  const existing = await reg.pushManager.getSubscription();
+  if (existing) {
+    // Abonnement créé avec une ANCIENNE clé serveur (clé VAPID régénérée le
+    // 03/09/2026) : il faut le refaire, sinon les envois échouent en silence.
+    const current = existing.options?.applicationServerKey
+      ? new Uint8Array(existing.options.applicationServerKey as ArrayBuffer)
+      : null;
+    const sameKey = !!current && current.length === keyBytes.length && current.every((b, i) => b === keyBytes[i]);
+    if (sameKey) return existing;
+    try { await existing.unsubscribe(); } catch { /* on retente l'abonnement quand même */ }
+  }
 
   return reg.pushManager.subscribe({
     userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
+    applicationServerKey: keyBytes.buffer as ArrayBuffer,
   });
 }
 
