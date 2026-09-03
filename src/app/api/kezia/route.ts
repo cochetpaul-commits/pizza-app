@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { pdfToText } from "@/lib/pdfToText";
 import { parseKeziaSynthese } from "@/lib/kezia/keziaParser";
+import { keziaDailyRow, estRecapMensuel } from "@/lib/kezia/row";
 import { resolveEtabId, EtabError } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
@@ -46,9 +47,17 @@ export async function POST(req: Request) {
       throw e;
     }
 
+    if (estRecapMensuel(parsed, file.name)) {
+      return NextResponse.json({ ok: false, error: `Ce PDF est un récapitulatif mensuel (DEBUT ${parsed.date_debut || "?"} ≠ FIN ${parsed.date_fin || "?"}) : il ne peut pas être enregistré comme une journée.` }, { status: 422 });
+    }
+    if (!parsed.date) {
+      return NextResponse.json({ ok: false, error: "Date DEBUT introuvable dans le journal." }, { status: 422 });
+    }
+
     if (mode === "preview") {
       return NextResponse.json({ ok: true, mode: "preview", parsed });
     }
+    const row = { ...keziaDailyRow(parsed, text), user_id: userId };
 
     // Check if already imported for this date
     const { data: existing } = await supabase
@@ -65,24 +74,7 @@ export async function POST(req: Request) {
       // Update existing record
       const { error: upErr } = await supabase
         .from("daily_sales")
-        .update({
-          ca_ttc: parsed.ca_ttc,
-          ca_ht: parsed.ca_ht,
-          tva_total: parsed.tva_total,
-          tickets: parsed.tickets,
-          couverts: parsed.couverts,
-          panier_moyen: parsed.panier_moyen,
-          especes: parsed.especes,
-          cartes: parsed.cartes,
-          cheques: parsed.cheques,
-          virements: parsed.virements,
-          marge_total: parsed.marge_total,
-          taux_marque: parsed.taux_marque,
-          rayons: parsed.rayons,
-          tva_details: parsed.tva_details,
-          raw_text: text,
-          user_id: userId,
-        })
+        .update(row)
         .eq("id", existing[0].id);
 
       if (upErr) throw new Error(upErr.message);
@@ -93,27 +85,7 @@ export async function POST(req: Request) {
     // Insert new record
     const { error: insErr } = await supabase
       .from("daily_sales")
-      .insert({
-        etablissement_id: etabId,
-        date: parsed.date,
-        source: "kezia_pdf",
-        ca_ttc: parsed.ca_ttc,
-        ca_ht: parsed.ca_ht,
-        tva_total: parsed.tva_total,
-        tickets: parsed.tickets,
-        couverts: parsed.couverts,
-        panier_moyen: parsed.panier_moyen,
-        especes: parsed.especes,
-        cartes: parsed.cartes,
-        cheques: parsed.cheques,
-        virements: parsed.virements,
-        marge_total: parsed.marge_total,
-        taux_marque: parsed.taux_marque,
-        rayons: parsed.rayons,
-        tva_details: parsed.tva_details,
-        raw_text: text,
-        user_id: userId,
-      });
+      .insert({ etablissement_id: etabId, date: parsed.date, source: "kezia_pdf", ...row });
 
     if (insErr) throw new Error(insErr.message);
 

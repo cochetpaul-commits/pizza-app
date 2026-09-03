@@ -1,15 +1,17 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { pdfToText } from "@/lib/pdfToText";
 import { parseKeziaSynthese } from "@/lib/kezia/keziaParser";
+import { keziaDailyRow, estRecapMensuel } from "@/lib/kezia/row";
 
 /**
  * Ingestion serveur d'un « JOURNAL de SYNTHESE » Kezia (caisse Piccola Mia)
  * dans daily_sales — même écriture que le bouton d'import manuel (/api/kezia),
  * mais sans utilisateur : sert au dépôt quotidien automatique (Apps Script
  * qui relaie le mail Kezia, ou lecture du dossier Drive).
- * Idempotent : une ligne par date, mise à jour si elle existe déjà.
+ * Idempotent : une ligne par (établissement, date DEBUT, source), mise à jour
+ * si elle existe déjà. Le récapitulatif mensuel (DEBUT ≠ FIN) est refusé.
  */
-export type IngestResult = { date: string | null; statut: "insere" | "mis_a_jour" | "ignore" | "erreur"; detail?: string };
+export type IngestResult = { date: string | null; statut: "insere" | "mis_a_jour" | "rejete" | "erreur"; detail?: string };
 
 let piccolaId: string | null = null;
 async function etabPiccola(): Promise<string> {
@@ -21,21 +23,16 @@ async function etabPiccola(): Promise<string> {
 }
 
 export async function ingestKeziaPdf(bytes: Uint8Array, filename = ""): Promise<IngestResult> {
-  // Le journal MENSUEL récapitule le mois : ce n'est pas une journée
-  if (/MENSUEL/i.test(filename)) return { date: null, statut: "ignore", detail: "journal mensuel" };
   try {
     const text = await pdfToText(bytes);
     const parsed = parseKeziaSynthese(text);
-    if (!parsed.date) return { date: null, statut: "erreur", detail: `date introuvable dans ${filename || "le PDF"}` };
+    if (estRecapMensuel(parsed, filename)) {
+      return { date: null, statut: "rejete", detail: `récapitulatif mensuel (DEBUT ${parsed.date_debut || "?"} ≠ FIN ${parsed.date_fin || "?"}) — jamais écrit comme une journée` };
+    }
+    if (!parsed.date) return { date: null, statut: "erreur", detail: `date DEBUT introuvable dans ${filename || "le PDF"}` };
+    if (!(parsed.ca_ttc > 0) && parsed.tickets === 0) return { date: parsed.date, statut: "erreur", detail: "journal vide (CA 0, 0 ticket) — lecture du PDF douteuse" };
     const etabId = await etabPiccola();
-
-    const row = {
-      ca_ttc: parsed.ca_ttc, ca_ht: parsed.ca_ht, tva_total: parsed.tva_total,
-      tickets: parsed.tickets, couverts: parsed.couverts, panier_moyen: parsed.panier_moyen,
-      especes: parsed.especes, cartes: parsed.cartes, cheques: parsed.cheques, virements: parsed.virements,
-      marge_total: parsed.marge_total, taux_marque: parsed.taux_marque,
-      rayons: parsed.rayons, tva_details: parsed.tva_details, raw_text: text,
-    };
+    const row = keziaDailyRow(parsed, text);
 
     const { data: existing } = await supabaseAdmin
       .from("daily_sales").select("id")

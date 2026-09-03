@@ -3,9 +3,16 @@
  * Expects text extracted via pdfToText (line breaks by Y-coordinate).
  */
 
+/** Un mode de règlement du bloc « Encaissements Nets / Dont Remboursement / Qté » */
+export type KeziaReglement = { montant: number; qte: number; remboursement?: number };
+
 export type KeziaDaily = {
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD — la date DEBUT du journal (jamais la date du mail)
   date_raw: string; // DD/MM/YYYY as found in PDF
+  date_debut: string; // YYYY-MM-DD ("" si absente)
+  date_fin: string; // YYYY-MM-DD — différente de date_debut ⇒ récapitulatif mensuel
+  /** Modes non nuls seulement : ESPECES, CHEQUES, CARTES, VIREMENT, CONECS, CREDIT, REGUL, BON ACHAT */
+  reglements: Record<string, KeziaReglement>;
   ca_ttc: number;
   ca_ht: number;
   tva_total: number;
@@ -28,7 +35,7 @@ export type KeziaDaily = {
     repart_pct: number;
   }>;
   tva_details: Array<{
-    rate: number; // e.g. 5.5, 10, 20
+    taux: number; // e.g. 5.5, 10, 20
     montant: number;
     base_ht: number;
     base_ttc: number;
@@ -70,9 +77,11 @@ function findValueAfterLabel(
   opts?: { sameLineOnly?: boolean }
 ): number {
   for (let i = 0; i < lines.length; i++) {
-    if (labelRe.test(lines[i])) {
-      // Try to grab number from the same line, after the label match
-      const after = lines[i].replace(labelRe, "");
+    const lm = lines[i].match(labelRe);
+    if (lm && lm.index != null) {
+      // Le nombre cherché est APRÈS le libellé : sur « 5,50 % 20,71 Eur … Panier Moyen 20,95 Eur »
+      // (deux colonnes du PDF sur une même ligne), supprimer le libellé rendait 5,50.
+      const after = lines[i].slice(lm.index + lm[0].length);
       const numMatch = after.match(/(?<![\d,])-?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+),\d{2,3}(?![\d])/);
       if (numMatch) return parseFr(numMatch[0]);
       // Fallback: look at next line
@@ -91,8 +100,9 @@ function findValueAfterLabel(
  */
 function findIntAfterLabel(lines: string[], labelRe: RegExp): number {
   for (const line of lines) {
-    if (!labelRe.test(line)) continue;
-    const after = line.replace(labelRe, "");
+    const lm = line.match(labelRe);
+    if (!lm || lm.index == null) continue;
+    const after = line.slice(lm.index + lm[0].length);
     const m = after.match(/-?\d[\d\s ]*/);
     if (m) {
       const n = parseInt(m[0].replace(/[\s ]/g, ""), 10);
@@ -141,23 +151,43 @@ export function parseKeziaSynthese(textBrut: string): KeziaDaily {
   const lines = text.split("\n").map((l) => l.trim());
 
   // ---- Date ----
-  let dateRaw = "";
+  // « DEBUT = JJ/MM/AAAA » et « FIN = JJ/MM/AAAA » : la journée est la date
+  // DEBUT. Si FIN diffère, c'est le récapitulatif mensuel (à refuser en amont).
+  let debutRaw = "", finRaw = "";
   for (const line of lines) {
-    // Look for "DEBUT = DD/MM/YYYY" or "FIN = DD/MM/YYYY"
-    const dm = line.match(/(?:DEBUT|FIN)\s*=\s*(\d{2}\/\d{2}\/\d{4})/i);
-    if (dm) {
-      dateRaw = dm[1];
-      // Prefer FIN date if both present; keep scanning
-      if (/FIN/i.test(line)) break;
-    }
+    const d = line.match(/DEBUT\s*=\s*(\d{2}\/\d{2}\/\d{4})/i);
+    if (d && !debutRaw) debutRaw = d[1];
+    const f = line.match(/FIN\s*=\s*(\d{2}\/\d{2}\/\d{4})/i);
+    if (f && !finRaw) finRaw = f[1];
+    if (debutRaw && finRaw) break;
   }
+  const dateRaw = debutRaw || finRaw;
   const dateIso = frDateToIso(dateRaw);
+  const dateDebut = debutRaw ? frDateToIso(debutRaw) : "";
+  const dateFin = finRaw ? frDateToIso(finRaw) : "";
 
   // ---- Payments ----
-  const especes = findPayment(lines, /ESP[EÈ]CES/i);
-  const cartes = findPayment(lines, /CARTES?/i);
-  const cheques = findPayment(lines, /CH[EÈ]QUES?/i);
-  const virements = findPayment(lines, /VIREMENTS?/i);
+  // Lignes « ESPECES 110,70 Eur 0,00 Eur 7 » : montant net, dont remboursement, quantité
+  const reglements: Record<string, KeziaReglement> = {};
+  const modeRe = /^(ESP[EÈ]CES|CH[EÈ]QUES?|CARTES?|VIREMENTS?|CONECS|CREDIT|REGUL|BON\s+ACHAT)\b(.*)$/i;
+  for (const line of lines) {
+    const m = line.match(modeRe);
+    if (!m) continue;
+    const nums = extractNumbers(m[2]);
+    if (nums.length === 0) continue; // « VIREMENT Réguls et BA » : titre de colonne, pas de valeur
+    const qteM = m[2].match(/(-?\d+)\s*$/);
+    const qte = qteM ? parseInt(qteM[1], 10) : 0;
+    const montant = nums[0];
+    const remboursement = nums.length >= 2 ? nums[1] : 0;
+    if (montant === 0 && qte === 0 && remboursement === 0) continue;
+    const mode = m[1].toUpperCase().replace(/È/g, "E").replace(/\s+/g, " ")
+      .replace(/^CHEQUE$/, "CHEQUES").replace(/^CARTE$/, "CARTES").replace(/^VIREMENTS$/, "VIREMENT");
+    reglements[mode] = { montant, qte, ...(remboursement !== 0 ? { remboursement } : {}) };
+  }
+  const especes = reglements.ESPECES?.montant ?? findPayment(lines, /ESP[EÈ]CES/i);
+  const cartes = reglements.CARTES?.montant ?? findPayment(lines, /CARTES?/i);
+  const cheques = reglements.CHEQUES?.montant ?? findPayment(lines, /CH[EÈ]QUES?/i);
+  const virements = reglements.VIREMENT?.montant ?? findPayment(lines, /VIREMENTS?/i);
 
   // ---- Key figures ----
   const caTtc = findValueAfterLabel(lines, /Total\s+Global\s+R[eé]glements/i);
@@ -186,7 +216,7 @@ export function parseKeziaSynthese(textBrut: string): KeziaDaily {
       const nums = extractNumbers(line.replace(tvaMatch[0], ""));
       if (nums.length >= 3) {
         tvaDetails.push({
-          rate,
+          taux: rate,
           montant: nums[0],
           base_ht: nums[1],
           base_ttc: nums[2],
@@ -276,7 +306,7 @@ export function parseKeziaSynthese(textBrut: string): KeziaDaily {
 
     rayons.push({
       name,
-      qty: Math.round(nums[0]),
+      qty: Math.round(nums[0] * 1000) / 1000, // Kezia imprime 3 décimales (« 59,194 » : poids traiteur)
       ca_ht: nums[1],
       ca_ttc: nums[2],
       marge: nums[3],
@@ -298,6 +328,9 @@ export function parseKeziaSynthese(textBrut: string): KeziaDaily {
   return {
     date: dateIso,
     date_raw: dateRaw,
+    date_debut: dateDebut,
+    date_fin: dateFin,
+    reglements,
     ca_ttc: caTtc,
     ca_ht: caHt,
     tva_total: tvaTotal,

@@ -11,6 +11,7 @@ import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { useCategories, filterCategoriesForEtab } from "@/lib/useCategories";
 import { inChunks } from "@/lib/supabaseChunks";
+import { fetchApi } from "@/lib/fetchApi";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,9 @@ type Recipe = {
   allergens: string[];
   metadata?: Record<string, unknown>;
   emp_data?: EmpData;
+  /** Fiches kitchen_recipes seulement : publiée au catalogue salle ? (null = pas concernée) */
+  in_catalogue?: boolean | null;
+  statut?: string | null;
 };
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -276,7 +280,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
   // ── Pizza ──
   const { data: pizzas } = await supabase
     .from("kitchen_recipes")
-    .select("id, name, photo_url, notes, pivot_ingredient_id, ball_weight_g, establishments, sous_categorie")
+    .select("id, name, photo_url, notes, pivot_ingredient_id, ball_weight_g, establishments, sous_categorie, in_catalogue, statut")
     .eq("category", "pizza")
     .order("name");
   const pizzaIds = (pizzas ?? []).map(p => p.id);
@@ -297,6 +301,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     });
     recipes.push({
       id: p.id, type: "pizza", name: p.name, category: null, sous_categorie: p.sous_categorie ?? null, fiche_type: "recette",
+      in_catalogue: p.in_catalogue !== false, statut: p.statut ?? null,
       photo_url: p.photo_url, lines, steps: parseJsonSteps(p.notes),
       pivot_ingredient_id: p.pivot_ingredient_id,
       yield_info: p.ball_weight_g ? `Pâton ${p.ball_weight_g} g` : null,
@@ -308,7 +313,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
   // ── Cuisine ──
   const { data: kitchens } = await supabase
     .from("kitchen_recipes")
-    .select("id, name, category, sous_categorie, fiche_type, metadata, photo_url, procedure, pivot_ingredient_id, yield_grams, portions_count, establishments")
+    .select("id, name, category, sous_categorie, fiche_type, metadata, photo_url, procedure, pivot_ingredient_id, yield_grams, portions_count, establishments, in_catalogue, statut")
     .eq("is_active", true)
     .order("name");
   const kitchenIds = (kitchens ?? []).map(k => k.id);
@@ -343,6 +348,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
     recipes.push({
       id: k.id, type: isProduit ? "produit" : isCocktail ? "cocktail" : "cuisine", name: k.name, category: k.category, sous_categorie: k.sous_categorie ?? null,
       fiche_type: k.fiche_type ?? (isCocktail ? "cocktail" : "recette"),
+      in_catalogue: k.in_catalogue !== false, statut: k.statut ?? null,
       metadata: (k.metadata as Record<string, unknown>) ?? {},
       photo_url: k.photo_url, lines, steps: parseJsonSteps(k.procedure),
       pivot_ingredient_id: k.pivot_ingredient_id, yield_info: yieldInfo,
@@ -524,6 +530,31 @@ export function CatalogueContent() {
 
   // Pivot modal (any recipe with pivot or emp_data)
   const [modalRecipe, setModalRecipe] = useState<Recipe | null>(null);
+
+  // Étiquette « Catalogue » : publier / retirer une fiche du catalogue salle
+  // sans ouvrir la fiche (même API que l'onglet Catalogue salle).
+  const [togglingCatalogue, setTogglingCatalogue] = useState<string | null>(null);
+  const toggleCatalogue = useCallback(async (recipe: Recipe) => {
+    if (!canWrite) return;
+    const next = !recipe.in_catalogue;
+    if (next && recipe.statut === "brouillon" && !confirm(`« ${recipe.name} » est encore un brouillon. La publier quand même au catalogue salle ?`)) return;
+    setTogglingCatalogue(recipe.id);
+    try {
+      const apiType = recipe.type === "pizza" || recipe.type === "cocktail" ? recipe.type : "cuisine";
+      const res = await fetchApi("/api/catalogue/fiches/update", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: recipe.id, type: apiType, in_catalogue: next }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({} as { error?: string }));
+        alert(`Impossible de modifier le catalogue : ${j.error ?? res.status}`);
+        return;
+      }
+      setRecipes(prev => prev.map(r => r.id === recipe.id && r.in_catalogue != null ? { ...r, in_catalogue: next, statut: next ? "publiee" : "validee" } : r));
+    } finally {
+      setTogglingCatalogue(null);
+    }
+  }, [canWrite]);
 
   // Article de vente linking
   const [articleLinks, setArticleLinks] = useState<Map<string, string>>(new Map()); // recipeId → nom_vente
@@ -1439,6 +1470,18 @@ export function CatalogueContent() {
                           Fiche
                         </a>
                         {canProduce && <button type="button" onClick={(e) => { e.stopPropagation(); setModalRecipe(recipe); }} style={{ padding: "2px 8px", borderRadius: 12, border: "none", background: "rgba(45,106,79,0.1)", color: "#2D6A4F", fontSize: 10, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>Prod.</button>}
+                        {recipe.in_catalogue != null && (
+                          <button type="button"
+                            title={recipe.in_catalogue ? "Publiée au catalogue salle — cliquer pour retirer" : "Hors catalogue salle — cliquer pour publier"}
+                            disabled={!canWrite || togglingCatalogue === recipe.id}
+                            onClick={(e) => { e.stopPropagation(); void toggleCatalogue(recipe); }}
+                            style={{ padding: "2px 8px", borderRadius: 12, fontSize: 10, fontWeight: 700, cursor: canWrite ? "pointer" : "default", flexShrink: 0, opacity: togglingCatalogue === recipe.id ? 0.5 : 1,
+                              border: `1px solid ${recipe.in_catalogue ? "#A5D6A7" : "#e0d6c6"}`,
+                              background: recipe.in_catalogue ? "#E8F5E9" : "#f6f1e8",
+                              color: recipe.in_catalogue ? "#2D6A4F" : "#9a8b74" }}>
+                            {recipe.in_catalogue ? "● Catalogue" : "○ Catalogue"}
+                          </button>
+                        )}
                         {recipe.allergens.length > 0 && (
                           <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
                             {recipe.allergens.slice(0, 3).map(a => (<span key={a} style={{ fontSize: 7, fontWeight: 800, padding: "1px 4px", borderRadius: 3, background: "rgba(220,38,38,0.08)", color: "#DC2626" }}>{a.slice(0, 3).toUpperCase()}</span>))}

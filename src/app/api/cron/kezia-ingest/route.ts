@@ -38,5 +38,8 @@ export async function POST(req: NextRequest) {
   if (resultats.length === 0) {
     return NextResponse.json({ ok: false, error: "Aucun fichier reçu (champ `file` ou JSON { files: [{ name, base64 }] })" }, { status: 400 });
   }
-  return NextResponse.json({ ok: true, resultats });
+  // 422 si rien n'a été écrit (récapitulatif mensuel refusé, PDF illisible) :
+  // l'automate voit l'échec ; avec plusieurs fichiers, le détail est par fichier.
+  const ecrits = resultats.filter((r) => r.statut === "insere" || r.statut === "mis_a_jour").length;
+  return NextResponse.json({ ok: ecrits > 0, ecrits, resultats }, { status: ecrits > 0 ? 200 : 422 });
 }
