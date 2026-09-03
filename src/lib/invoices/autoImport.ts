@@ -186,7 +186,8 @@ export async function autoImportFactures(etabId: string, days = 5, dossier: PlDo
           supplierName = (scan.supplierName || fournisseur).toUpperCase();
           defaultUnit = "pc";
         } catch (e) {
-          const msg = e instanceof Error ? e.message.split("\n")[0] : "scan IA impossible";
+          // Message complet (un item par modèle essayé) pour comprendre un refus en prod
+          const msg = e instanceof Error ? e.message.replace(/\s*\n+\s*/g, " | ").slice(0, 700) : "scan IA impossible";
           await log(inv, fournisseur, "erreur", `${diag ? diag + " · " : ""}scan IA : ${msg} ${trace}`, undefined, undefined, rawText);
           continue;
         }
