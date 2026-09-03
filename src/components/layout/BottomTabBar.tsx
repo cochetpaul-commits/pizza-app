@@ -945,7 +945,8 @@ export function BottomTabBar() {
         padding: "0 12px",
       }}>
         <div style={{ display: "flex", alignItems: "stretch", justifyContent: "center", gap: 8 }}>
-          {/* Menu pill */}
+          {/* Menu pill — pas en vue groupe : sans entreprise choisie, rien à parcourir */}
+          {showNavPill && (
           <div style={{
             display: "flex", alignItems: "center", gap: 2,
             padding: "4px 6px",
@@ -1000,6 +1001,7 @@ export function BottomTabBar() {
               </button>
             )}
           </div>
+          )}
 
           {/* Context FAB */}
           {hasActions && (
