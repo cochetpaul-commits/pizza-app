@@ -42,14 +42,12 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/commandes":       "achats.edit",
   "/fournisseurs":    "achats.edit",
   "/achats":          "achats.view",
-  "/stats-achats":    "achats.view",
   "/variations-prix": "achats.view",
   "/mercuriale":      "achats.view",
   // Pilotage
   "/ventes":          "performances.view",
   "/ventes/marges":   "performances.pilotage",
   "/rentabilite":     "performances.pilotage",
-  "/finances":        "performances.pilotage",
   // Personnel
   "/rh/equipe":       "profil.view_team",
   "/rh/employe":      "profil.view_team",
@@ -74,7 +72,6 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/dashboard":    ALL,
   "/mon-tableau":  ALL,
   "/mes-conges":   ALL,
-  "/messagerie":   ALL,
   "/haccp":        MANAGERS,
   "/fournisseurs": ALL,
   "/rh/conges":    MANAGERS,
@@ -83,10 +80,8 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   // Manager + Admin: pilotage, ventes, RH, événements
   "/pilotage":        ALL, // redirection (page supprimee le 15/08)
   "/ventes":          MANAGERS,
-  "/finances":        MANAGERS,
   "/variations-prix": MANAGERS,
   "/achats":          MANAGERS,
-  "/stats-achats":    MANAGERS,
   "/rentabilite":     MANAGERS,
   "/mercuriale":      MANAGERS,
   "/evenements":      MANAGERS,

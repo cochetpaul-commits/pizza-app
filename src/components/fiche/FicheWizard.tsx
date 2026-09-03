@@ -20,6 +20,45 @@ import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/o
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { openApiFile } from "@/lib/fetchApi";
 
+// ── Brouillons non enregistrés ──────────────────────────────────────
+// Le 03/09/2026, des fiches saisies sur un appareil dont la session était
+// figée n'ont jamais atteint la base : un seul brouillon par point d'entrée
+// survivait, 6 h. Désormais chaque fiche en cours a son entrée (72 h, 20 max)
+// et l'assistant propose de les reprendre.
+type DraftEntry = {
+  id: string; ts: number; nom: string; categorie_slug: string; sous_categorie: string;
+  step: number; fiche: FicheState; linkedPopina: string | null;
+};
+const ARCHIVE_TTL_MS = 72 * 60 * 60 * 1000;
+const archiveKey = (etabSlug: string) => `fiche-drafts:${etabSlug}`;
+function readArchive(etabSlug: string): DraftEntry[] {
+  try {
+    const raw = localStorage.getItem(archiveKey(etabSlug));
+    const arr = raw ? (JSON.parse(raw) as DraftEntry[]) : [];
+    const now = Date.now();
+    return arr.filter(d => d && d.fiche && now - (d.ts ?? 0) < ARCHIVE_TTL_MS);
+  } catch { return []; }
+}
+function writeArchive(etabSlug: string, entries: DraftEntry[]) {
+  try { localStorage.setItem(archiveKey(etabSlug), JSON.stringify(entries.slice(0, 20))); } catch { /* quota / stockage bloqué */ }
+}
+function ageLabel(ts: number): string {
+  const min = Math.round((Date.now() - ts) / 60000);
+  if (min < 1) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.round(min / 60);
+  return h < 48 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`;
+}
+// Un enregistrement ne doit jamais « tourner dans le vide » : au-delà de 15 s
+// on prévient (le brouillon reste sur l'appareil).
+const SAVE_TIMEOUT_MS = 15000;
+function withTimeout<T>(p: PromiseLike<T>, ms = SAVE_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    Promise.resolve(p),
+    new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), ms)),
+  ]);
+}
+
 // ── Styles ──
 const COLORS = {
   bg: "#f6efe2", card: "#ffffff", ink: "#2b2620", muted: "#8d8577",
@@ -342,9 +381,15 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   // Corriger un ingrédient depuis la recette navigue vers /ingredients puis
   // revient : sans cache, la recette en cours était perdue. On persiste le
   // brouillon en localStorage (6 h) et on le restaure au retour.
-  const DRAFT_TTL_MS = 6 * 60 * 60 * 1000;
+  const DRAFT_TTL_MS = 72 * 60 * 60 * 1000;
   const draftKey = `fiche-draft:${etabSlug}:${recipeId ?? `new:${initialCategorie ?? ""}:${initialSousCategorie ?? ""}`}`;
   const draftReady = useRef(false);
+  const draftIdRef = useRef<string>(recipeId ?? `new-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
+  const [drafts, setDrafts] = useState<DraftEntry[]>([]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDrafts(readArchive(etabSlug));
+  }, [etabSlug]);
 
   useEffect(() => {
     if (loading || draftReady.current) return;
@@ -372,11 +417,42 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
     try {
       localStorage.setItem(draftKey, JSON.stringify({ ts: Date.now(), step, fiche, linkedPopina }));
     } catch { /* quota plein ou stockage bloqué : non bloquant */ }
-  }, [fiche, step, linkedPopina, draftKey]);
+    if (!fiche.nom.trim() && fiche.lignes.length === 0) return;
+    const t = setTimeout(() => {
+      const others = readArchive(etabSlug).filter(d => d.id !== draftIdRef.current);
+      const next: DraftEntry[] = [{
+        id: draftIdRef.current, ts: Date.now(), nom: fiche.nom, categorie_slug: fiche.categorie_slug,
+        sous_categorie: fiche.sous_categorie, step, fiche, linkedPopina,
+      }, ...others];
+      writeArchive(etabSlug, next);
+      setDrafts(next);
+    }, 800);
+    return () => clearTimeout(t);
+  }, [fiche, step, linkedPopina, draftKey, etabSlug]);
 
   const clearDraft = useCallback(() => {
     try { localStorage.removeItem(draftKey); } catch { /* */ }
-  }, [draftKey]);
+    const rest = readArchive(etabSlug).filter(d => d.id !== draftIdRef.current);
+    writeArchive(etabSlug, rest);
+    setDrafts(rest);
+  }, [draftKey, etabSlug]);
+
+  const otherDrafts = drafts.filter(d => d.id !== draftIdRef.current);
+  const restoreDraft = (d: DraftEntry) => {
+    const enCours = fiche.nom.trim() || fiche.lignes.length > 0;
+    if (enCours && !confirm(`Remplacer la fiche en cours par le brouillon « ${d.nom?.trim() || "sans nom"} » ?`)) return;
+    draftIdRef.current = d.id;
+    setFiche(d.fiche);
+    setStep(typeof d.step === "number" ? d.step : 0);
+    setLinkedPopina(d.linkedPopina ?? null);
+    showToast("Brouillon restauré — pense à enregistrer");
+  };
+  const forgetDraft = (d: DraftEntry) => {
+    if (!confirm(`Oublier le brouillon « ${d.nom?.trim() || "sans nom"} » ?`)) return;
+    const rest = readArchive(etabSlug).filter(x => x.id !== d.id);
+    writeArchive(etabSlug, rest);
+    setDrafts(rest);
+  };
 
   // ── Save to DB ──
   async function handleSave() {
@@ -426,18 +502,20 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
 
     let savedId = fiche.id;
 
+    try {
     if (isEdit && savedId) {
-      const { error } = await supabase.from("kitchen_recipes").update(recData).eq("id", savedId);
+      const { error } = await withTimeout(supabase.from("kitchen_recipes").update(recData).eq("id", savedId));
       if (error) { showToast("Erreur : " + error.message); setSaving(false); return; }
     } else {
-      const { data, error } = await supabase.from("kitchen_recipes").insert(recData).select("id").single();
+      const { data, error } = await withTimeout(supabase.from("kitchen_recipes").insert(recData).select("id").single());
       if (error) { showToast("Erreur : " + error.message); setSaving(false); return; }
       savedId = data?.id;
       update({ id: savedId });
     }
 
     if (savedId) {
-      await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", savedId);
+      const { error: delErr } = await withTimeout(supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", savedId));
+      if (delErr) { showToast("Erreur ingrédients : " + delErr.message); setSaving(false); return; }
       const linesToInsert = fiche.lignes
         .filter(l => l.ingredient_id)
         .map((l, i) => ({
@@ -449,7 +527,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           sort_order: i,
         }));
       if (linesToInsert.length > 0) {
-        await supabase.from("kitchen_recipe_lines").insert(linesToInsert);
+        const { error: insErr } = await withTimeout(supabase.from("kitchen_recipe_lines").insert(linesToInsert));
+        if (insErr) { showToast("Fiche enregistrée mais ingrédients refusés : " + insErr.message); setSaving(false); return; }
       }
     }
 
@@ -457,13 +536,21 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
     if (savedId && linkedPopina) {
       const pp = popinaProducts.find(p => p.id === linkedPopina);
       if (pp && pp.kitchen_recipe_id !== savedId) {
-        await supabase.from("popina_products").update({ kitchen_recipe_id: savedId, ingredient_id: null, linked_type: popinaLinkedType }).eq("id", linkedPopina);
+        await withTimeout(supabase.from("popina_products").update({ kitchen_recipe_id: savedId, ingredient_id: null, linked_type: popinaLinkedType }).eq("id", linkedPopina));
       }
+    }
+    } catch (e) {
+      const bloque = e instanceof Error && e.message === "timeout";
+      showToast(bloque
+        ? "Enregistrement bloqué (15 s) : le brouillon est conservé sur cet appareil — vérifie la connexion ou recharge l'app, puis réessaie."
+        : `Erreur : ${e instanceof Error ? e.message : "enregistrement impossible"}`);
+      setSaving(false);
+      return;
     }
 
     setSaving(false);
     clearDraft();
-    showToast("Fiche sauvegardee");
+    showToast("Fiche enregistrée");
   }
 
   // ── Steps ──
@@ -505,6 +592,26 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           {fiche.sous_categorie && <span style={{ background: "#ffffff22", borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600 }}>{fiche.sous_categorie}</span>}
         </div>
       </div>
+
+      {/* BROUILLONS NON ENREGISTRÉS (cet appareil) */}
+      {otherDrafts.length > 0 && (
+        <div style={{ background: "#fff8ec", border: "1px solid #ecd9b8", borderRadius: 14, padding: "10px 14px", marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.amber, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>
+            Brouillons non enregistrés sur cet appareil
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {otherDrafts.map(d => (
+              <span key={d.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#fff", border: `1px solid ${COLORS.line}`, borderRadius: 999, padding: "4px 6px 4px 12px", fontSize: 13 }}>
+                <button type="button" onClick={() => restoreDraft(d)} style={{ border: "none", background: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13, color: COLORS.ink, padding: 0 }}>
+                  <strong>{d.nom?.trim() || "Sans nom"}</strong>
+                  <span style={{ color: COLORS.muted }}> · {d.sous_categorie || d.categorie_slug || "—"} · {ageLabel(d.ts)}</span>
+                </button>
+                <button type="button" aria-label="Oublier ce brouillon" onClick={() => forgetDraft(d)} style={{ border: "none", background: "none", cursor: "pointer", color: COLORS.muted, fontSize: 15, lineHeight: 1, padding: "0 4px" }}>×</button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* PIPELINE */}
       <div style={{

@@ -292,7 +292,7 @@ const SECTION_PILOTAGE: TabSection = {
 const SECTION_ACHATS: TabSection = {
   label: "Achats",
   href: "/commandes",
-  match: ["/achats", "/commandes", "/ingredients", "/invoices", "/fournisseurs", "/stats-achats", "/variations-prix", "/admin/popina-catalogue", "/stock"],
+  match: ["/achats", "/commandes", "/ingredients", "/invoices", "/fournisseurs", "/variations-prix", "/admin/popina-catalogue", "/stock"],
   icon: () => <IconShoppingBag />,
   roles: ["group_admin", "manager", "equipier"],
   tabs: [
