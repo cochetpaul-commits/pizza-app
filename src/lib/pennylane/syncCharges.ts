@@ -25,6 +25,11 @@ const MAPPING: Record<string, string | null> = {
   "Packaging & consommables": "achats_matieres",
   "Consignes": "achats_matieres",
 
+  // ── Achats matières — libellés du dossier SARL I FRATELLI (Piccola) ──
+  "fournisseur cuisine": "achats_matieres",
+  "Alimentaire": "achats_matieres",
+  "Boissons": "achats_matieres",
+
   // ── Personnel ──
   "Masse salariale": "masse_salariale",
   "URSSAF & charges sociales": "masse_salariale",
@@ -34,6 +39,7 @@ const MAPPING: Record<string, string | null> = {
   "Taxe apprentissage & formation": "masse_salariale",
   "Formation professionnelle": "masse_salariale",
   "Repas du personnel": "masse_salariale",
+  "ticket restaurant swile": "masse_salariale",
   "Tenues de travail": "masse_salariale",
   "Rémunération des gérants": "remuneration_gerants",
 
@@ -93,6 +99,7 @@ const MAPPING: Record<string, string | null> = {
   "Vaisselle & petit équipement": "autres_charges",
   "Réceptions": "autres_charges",
   "Cotisations professionnelles": "autres_charges",
+  "Sécurité": "autres_charges",
   "CFE & taxes locales": "autres_charges",
   "Gros équipements & travaux": "autres_charges",
   "En attente de catégorisation": "autres_charges",
@@ -133,6 +140,14 @@ export const LIBELLES: Record<string, string> = {
 
 const norm = (s: string) =>
   s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+
+// Les libellés Pennylane arrivent parfois avec un espace final ou une casse
+// différente d'un dossier à l'autre : on compare en forme normalisée.
+const MAPPING_NORM = new Map<string, string | null>(Object.entries(MAPPING).map(([k, v]) => [norm(k), v]));
+/** Poste EBE d'un libellé de catégorie ; `undefined` = libellé inconnu. */
+function posteDe(label: string): string | null | undefined {
+  return MAPPING_NORM.has(norm(label)) ? MAPPING_NORM.get(norm(label)) : undefined;
+}
 
 export type SyncResult = {
   mois: string;
@@ -191,7 +206,8 @@ export async function syncPennylaneMois(etabId: string, moisDebut: string, dossi
       const fourn = inv.supplier?.id ? plNameById.get(inv.supplier.id) ?? null : null;
       for (const cat of c) {
         const part = ht * ((Number(cat.weight) || 1) / totalPoids);
-        const poste = cat.label in MAPPING ? MAPPING[cat.label] : "autres_charges";
+        const p = posteDe(cat.label);
+        const poste = p === undefined ? "autres_charges" : p;
         if (poste === null) { horsEbe += part; continue; }
         add(poste, part);
         details.push({ date: inv.date ?? null, poste, categorie: cat.label, fournisseur: fourn, libelle: inv.label ?? null, montant_ht: part, type: "facture", ref_externe: String(inv.id) });
@@ -228,7 +244,7 @@ export async function syncPennylaneMois(etabId: string, moisDebut: string, dossi
       const totalPoids = cats.reduce((s2, x) => s2 + (Number(x.weight) || 1), 0);
       for (const c of cats) {
         const label = c.label ?? "";
-        const poste = label in MAPPING ? MAPPING[label] : null;
+        const poste = posteDe(label) ?? null;
         if (poste === null || !ACCEPTES.includes(poste)) continue;
         const part = ht * ((Number(c.weight) || 1) / totalPoids);
         add(poste, part);
