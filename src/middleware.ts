@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
  *
  * Liste blanche (routes qui portent leur propre garde) :
  *  - /api/version, /api/client-error : sans données
+ *  - /api/widget/ca : jeton WIDGET_TOKEN vérifié dans la route
  *  - /api/cron/*, GET /api/pennylane/sync, GET /api/meteo?action=fetch :
  *    tâches planifiées, protégées par CRON_SECRET (lib/cronAuth.ts)
  */
@@ -16,6 +17,8 @@ function isPublic(req: NextRequest): boolean {
   const { pathname, searchParams } = req.nextUrl;
   if (PUBLIC_EXACT.has(pathname)) return true;
   if (pathname.startsWith("/api/cron/")) return true;
+  // Widget d'accueil iPhone : jeton WIDGET_TOKEN vérifié dans la route
+  if (req.method === "GET" && pathname === "/api/widget/ca") return true;
   if (req.method === "GET" && pathname === "/api/pennylane/sync") return true;
   if (req.method === "GET" && pathname === "/api/meteo" && searchParams.get("action") === "fetch") return true;
   return false;

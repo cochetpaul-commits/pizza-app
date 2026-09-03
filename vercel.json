@@ -30,6 +30,10 @@
     {
       "path": "/api/cron/factures-auto",
       "schedule": "40 6 * * *"
+    },
+    {
+      "path": "/api/cron/kezia-drive",
+      "schedule": "30 7 * * *"
     }
   ]
 }
