@@ -102,10 +102,13 @@ function parseJsonResponse(text: string): Record<string, unknown> {
 }
 
 // Try models in order until one works (quota/availability varies by project)
+// Ordre : les plus récents d'abord (les clés récentes n'ont plus accès aux 2.x ;
+// noms relevés dans les réponses de l'API elle-même, septembre 2026)
 const MODELS = [
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite",
-  "gemini-2.0-flash",
 ];
 
 async function callGeminiRest(
