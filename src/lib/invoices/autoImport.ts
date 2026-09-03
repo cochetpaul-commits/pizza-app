@@ -75,7 +75,7 @@ export async function autoImportFactures(etabId: string, days = 5, dossier: PlDo
     details: [],
   };
 
-  const log = async (inv: PlSupplierInvoice, fournisseur: string, statut: Statut, detail: string, parser?: string, lignes?: number) => {
+  const log = async (inv: PlSupplierInvoice, fournisseur: string, statut: Statut, detail: string, parser?: string, lignes?: number, texte?: string) => {
     await supabaseAdmin.from("auto_import_factures").upsert({
       pennylane_id: inv.id,
       etablissement_id: etabId,
@@ -84,6 +84,8 @@ export async function autoImportFactures(etabId: string, days = 5, dossier: PlDo
       invoice_date: inv.date ?? null,
       montant_ttc: Number(inv.currency_amount ?? 0) || null,
       statut, detail, parser: parser ?? null, lignes: lignes ?? null,
+      // Texte du PDF gardé uniquement quand la facture n'a PAS été importée (diagnostic)
+      raw_text: statut === "erreur" || statut === "a_verifier" ? (texte ? texte.slice(0, 40000) : null) : null,
     }, { onConflict: "pennylane_id" });
     if (statut === "importee") res.importees++;
     else if (statut === "deja_connue") res.dejaConnues++;
@@ -185,13 +187,13 @@ export async function autoImportFactures(etabId: string, days = 5, dossier: PlDo
           defaultUnit = "pc";
         } catch (e) {
           const msg = e instanceof Error ? e.message.split("\n")[0] : "scan IA impossible";
-          await log(inv, fournisseur, "erreur", `${diag ? diag + " · " : ""}scan IA : ${msg} ${trace}`);
+          await log(inv, fournisseur, "erreur", `${diag ? diag + " · " : ""}scan IA : ${msg} ${trace}`, undefined, undefined, rawText);
           continue;
         }
       }
 
       if (!payload || payload.lines.length === 0) {
-        await log(inv, fournisseur, "a_verifier", `aucun parser n'a lu cette facture — à importer à la main${diag ? " · " + diag : ""} ${trace}`);
+        await log(inv, fournisseur, "a_verifier", `aucun parser n'a lu cette facture — à importer à la main${diag ? " · " + diag : ""} ${trace}`, undefined, undefined, rawText);
         continue;
       }
 
