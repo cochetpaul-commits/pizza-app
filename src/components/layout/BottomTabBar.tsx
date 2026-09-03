@@ -389,6 +389,17 @@ const SECTION_SETTINGS: TabSection = {
   ],
 };
 
+/** Couleur d'identité de chaque section du menu */
+const SECTION_COLORS: Record<string, string> = {
+  Pilotage: "#D4775A",
+  Production: "#4a6741",
+  Achats: "#0284C7",
+  HACCP: "#c9882e",
+  Personnel: "#7C3AED",
+  Parametres: "#6b7280",
+  Events: "#C026D3",
+};
+
 const SECTIONS_BELLO: TabSection[] = [SECTION_PILOTAGE, SECTION_PRODUCTION, SECTION_ACHATS, SECTION_HACCP, SECTION_MY_PLANNING, SECTION_SETTINGS];
 const SECTIONS_PICCOLA: TabSection[] = [SECTION_PILOTAGE, SECTION_PRODUCTION_PICCOLA, SECTION_ACHATS_PICCOLA, SECTION_HACCP, SECTION_EVENTS, SECTION_MY_PLANNING, SECTION_SETTINGS];
 
@@ -590,6 +601,7 @@ function Tile({
   color,
   onClick,
   compact,
+  tinted,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -597,6 +609,8 @@ function Tile({
   color: string;
   onClick: () => void;
   compact?: boolean;
+  /** Icône toujours colorée (menu des sections) */
+  tinted?: boolean;
 }) {
   return (
     <button
@@ -607,9 +621,9 @@ function Tile({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: compact ? 6 : 8,
-        padding: compact ? "14px 8px" : "18px 8px",
-        borderRadius: 16,
+        gap: compact ? 5 : 8,
+        padding: compact ? "10px 6px" : "18px 8px",
+        borderRadius: 14,
         border: "none",
         cursor: "pointer",
         background: isActive
@@ -623,11 +637,11 @@ function Tile({
       }}
     >
       <div style={{
-        width: compact ? 38 : 44,
-        height: compact ? 38 : 44,
-        borderRadius: 12,
-        background: isActive ? `${color}22` : "rgba(0,0,0,0.03)",
-        color: isActive ? color : "#666",
+        width: compact ? 34 : 44,
+        height: compact ? 34 : 44,
+        borderRadius: 11,
+        background: isActive || tinted ? `${color}22` : "rgba(0,0,0,0.03)",
+        color: isActive || tinted ? color : "#666",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -782,8 +796,10 @@ export function BottomTabBar() {
                     icon={section.icon()}
                     label={section.label}
                     isActive={activeSection === section}
-                    color={etabColor}
+                    color={SECTION_COLORS[section.label] ?? etabColor}
                     onClick={() => handleSectionTap(section)}
+                    compact
+                    tinted
                   />
                 ))}
               </div>

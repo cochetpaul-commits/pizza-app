@@ -308,8 +308,14 @@ function EtabPill() {
 /* ── Main component ──────────────────────────────── */
 
 export function MobileHeader() {
-  // Zone centrale pilotee par les pages (ex. date-ranker de Ventes)
+  // Zone pilotee par les pages (ex. date-ranker de Ventes), sur une 2e ligne
   const { state } = useTopBar();
+  // Le contenu de la page réserve la hauteur du bandeau (CSS) : on lui
+  // signale la présence de la seconde ligne via une variable.
+  useEffect(() => {
+    document.documentElement.style.setProperty("--mobile-header-extra", state.actions ? "48px" : "0px");
+    return () => { document.documentElement.style.setProperty("--mobile-header-extra", "0px"); };
+  }, [state.actions]);
   return (
     <header className="mobile-header" style={{
       display: "none",
@@ -328,16 +334,20 @@ export function MobileHeader() {
       }}>
         {/* Gauche : entreprise courante (Bello Mio / Piccola Mia / Groupe) */}
         <EtabPill />
-        {/* Centre : contenu injecte par la page (date-ranker...) */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {state.actions ?? null}
-        </div>
+        <div style={{ flex: 1 }} />
         {/* Right: bell + avatar */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           <NotifBell />
           <UserAvatar />
         </div>
       </div>
+      {/* Seconde ligne : contenu injecté par la page (sélecteur de période…) —
+          sur sa propre ligne, il ne se bat plus avec la pastille d'entreprise */}
+      {state.actions && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "0 12px 8px", minHeight: 40 }}>
+          {state.actions}
+        </div>
+      )}
     </header>
   );
 }

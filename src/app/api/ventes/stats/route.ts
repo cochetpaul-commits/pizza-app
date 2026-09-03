@@ -989,9 +989,18 @@ async function buildFromDailySales(etabId: string, from: string, to: string) {
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     if (!r.rayons || typeof r.rayons !== "object") continue;
-    const rayonsObj = r.rayons as Record<string, unknown>;
-    const cats = rayonsObj.categories as Record<string, number> | undefined;
-    if (!cats) continue;
+    // Deux formes : tableau [{ name, ca_ttc }] (journal de synthèse PDF)
+    // ou objet { categories: { nom: montant } } (exports XLSX)
+    let cats: Record<string, number> | undefined;
+    if (Array.isArray(r.rayons)) {
+      cats = {};
+      for (const ry of r.rayons as { name?: string; ca_ttc?: number }[]) {
+        if (ry?.name) cats[ry.name] = (cats[ry.name] ?? 0) + (Number(ry.ca_ttc) || 0);
+      }
+    } else {
+      cats = (r.rayons as Record<string, unknown>).categories as Record<string, number> | undefined;
+    }
+    if (!cats || Object.keys(cats).length === 0) continue;
     for (const [cat, val] of Object.entries(cats)) {
       if (!rayonTotals[cat]) { rayonTotals[cat] = 0; rayonByDay[cat] = new Array(rows.length).fill(0); }
       rayonTotals[cat] += val;

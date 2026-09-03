@@ -86,6 +86,23 @@ function findValueAfterLabel(
 }
 
 /**
+ * Entier après un libellé (« Nbre factures/tickets ventes 35 annulations 0 » → 35,
+ * « Couverts 0 » → 0) : les compteurs n'ont pas de décimales.
+ */
+function findIntAfterLabel(lines: string[], labelRe: RegExp): number {
+  for (const line of lines) {
+    if (!labelRe.test(line)) continue;
+    const after = line.replace(labelRe, "");
+    const m = after.match(/-?\d[\d\s ]*/);
+    if (m) {
+      const n = parseInt(m[0].replace(/[\s ]/g, ""), 10);
+      if (!Number.isNaN(n)) return n;
+    }
+  }
+  return 0;
+}
+
+/**
  * Extract all French-formatted numbers from a string.
  * Matches patterns like "1 234,56" or "-12,34" or "0,00".
  */
@@ -137,8 +154,8 @@ export function parseKeziaSynthese(text: string): KeziaDaily {
 
   // ---- Key figures ----
   const caTtc = findValueAfterLabel(lines, /Total\s+Global\s+R[eé]glements/i);
-  const tickets = findValueAfterLabel(lines, /Nbre\s+factures?\s*\/?\s*tickets?\s+ventes?/i);
-  const couverts = findValueAfterLabel(lines, /(?<!Moy\.\s*)Couverts(?!\s+Moy)/i);
+  const tickets = findIntAfterLabel(lines, /Nbre\s+factures?\s*\/?\s*tickets?\s+ventes?/i);
+  const couverts = findIntAfterLabel(lines, /^\s*Couverts\b(?!\s+Moy)/i);
   const panierMoyen = findValueAfterLabel(lines, /Panier\s+Moyen/i);
 
   // Use integer parsing for tickets and couverts (they are counts)
@@ -197,7 +214,7 @@ export function parseKeziaSynthese(text: string): KeziaDaily {
     const line = lines[i];
 
     // Detect start of rayons table
-    if (/Rayon\b/i.test(line) && /Qt[eé]/i.test(line) && /CA\s*(HT|TTC)/i.test(line)) {
+    if (/Rayon\b/i.test(line) && /Qt[eéèÈÉ]/i.test(line) && /CA\s*(HT|TTC)/i.test(line)) {
       inRayonsSection = true;
       continue;
     }

@@ -236,7 +236,7 @@ body {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     /* Reserve space for fixed mobile header (52px) + safe-area */
-    padding-top: calc(52px + env(safe-area-inset-top, 0px));
+    padding-top: calc(52px + var(--mobile-header-extra, 0px) + env(safe-area-inset-top, 0px));
     /* Reserve space for bottom pill + FAB + safe-area */
     padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
   }
