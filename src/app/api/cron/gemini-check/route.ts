@@ -44,7 +44,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const models = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"];
+  // ?models=a,b pour limiter (chaque essai PDF pèse ~300 Ko ; 60 s max par appel)
+  const models = (req.nextUrl.searchParams.get("models") ?? "gemini-3.6-flash,gemini-2.5-flash").split(",").map((m) => m.trim()).filter(Boolean);
   const out: Record<string, unknown> = {};
   for (const m of models) {
     const r: Record<string, unknown> = {};
