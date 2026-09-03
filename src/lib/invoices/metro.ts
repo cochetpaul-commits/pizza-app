@@ -59,8 +59,21 @@ function parseLines(text: string): ParsedLine[] {
   const taxMap: Record<string, number> = { A: 2.1, B: 5.5, D: 20.0 };
 
   for (const r of rows) {
-    const lineMatch = r.match(/^\d{8,13}\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+(\d+)\s+\d+\s+([\d,]+)\s+([ABD])(?:\s+[A-Z])*\s*$/i);
+    // EAN NUM NOM PRIX_UNIT QTE COLISAGE MONTANT TVA — montant = prix × qté × colisage
+    const lineMatch = r.match(/^\d{8,13}\s+(\d{7})\s+(.+?)\s+([\d,]+)\s+(\d+)\s+(\d+)\s+([\d,]+)\s+([ABD])(?:\s+[A-Z])*\s*$/i);
     if (!lineMatch) {
+      // Remise / promo rattachée à la ligne PRÉCÉDENTE : « 4 POUR 3 8,47- »,
+      // « Offre Achetez Plus Payez Moins 2,10- » (montant suivi d'un tiret).
+      // Sans ça, la somme des lignes dépassait le total HT de la remise.
+      const promo = r.match(/^(?!\d{8,13}\s)(.+?)\s+(\d{1,3}(?:[ .]\d{3})*,\d{2})-\s*$/);
+      if (promo && tmp.length > 0) {
+        const remise = parseFrenchNumber(promo[2]) ?? 0;
+        const prev = tmp[tmp.length - 1];
+        prev.total_price = Math.round(((prev.total_price ?? 0) - remise) * 100) / 100;
+        if (prev.quantity && prev.quantity > 0) prev.unit_price = Math.round((prev.total_price / prev.quantity) * 1000) / 1000;
+        prev.notes = [prev.notes, `${promo[1].trim()} −${remise.toFixed(2)} €`].filter(Boolean).join(" · ");
+        continue;
+      }
       // VAP = vente au poids : EAN NUM NOM POIDS PRIX_KG QTE MONTANT TVA
       // (4 nombres apres le nom, pas de colisage). Distingué de PIECE via
       // 2 décimaux consécutifs au lieu de dec/int/int/dec.
@@ -90,14 +103,17 @@ function parseLines(text: string): ParsedLine[] {
       }
     }
 
+    const qte = parseFrenchNumber(lineMatch[4]) ?? 1;
+    const colisage = parseFrenchNumber(lineMatch[5]) ?? 1;
     tmp.push({
       sku: lineMatch[1],
       name,
-      quantity: parseFrenchNumber(lineMatch[4]),
+      // Unités réellement facturées (le prix unitaire est par unité, pas par carton)
+      quantity: qte * (colisage > 0 ? colisage : 1),
       unit,
       unit_price: parseFrenchNumber(lineMatch[3]),
-      total_price: parseFrenchNumber(lineMatch[5]),
-      tax_rate: taxMap[lineMatch[6].toUpperCase()] ?? null,
+      total_price: parseFrenchNumber(lineMatch[6]),
+      tax_rate: taxMap[lineMatch[7].toUpperCase()] ?? null,
       notes: null,
       piece_weight_g: pieceWeightG,
       piece_volume_ml: pieceVolumeMl,

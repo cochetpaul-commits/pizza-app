@@ -62,7 +62,7 @@ function extractMeta(text: string): Pick<ParsedInvoice, "invoice_number" | "invo
   const invoiceMatch = text.match(/Facture\s*N[°º]\s*([A-Z0-9]+)/i);
   const dateMatch = text.match(/(\d{2}\/\d{2}\/\d{4})/);
 
-  const totalHtMatch = text.match(/H\.T\.\s*:\s*([0-9][0-9 .,]*)/i);
+  const totalHtMatch = text.match(/H\.T\.\s*:\s*(-?[0-9][0-9 .,]*)/i);
 
   // TTC: captured from the line "T.V.A. : 36,61 702,30" (TTC follows TVA amount)
   // or fallback to "Net à payer" on same line
@@ -83,7 +83,7 @@ function normalizeLineHead(
 ): { name: string; qty: number | null; unit: "pc" | "kg" | "l" | null; notes: string | null; piece_volume_ml: number | null } {
   let head = cleanName(headRaw);
 
-  const varKg = head.match(/(\d+(?:[.,]\d+)?)\s*kg~\s*$/i);
+  const varKg = head.match(/(-?\d+(?:[.,]\d+)?)\s*kg~\s*$/i);
   if (varKg) {
     const q = parseFrenchNumber(varKg[1]);
     head = head.replace(/\s*\d+(?:[.,]\d+)?\s*kg~\s*$/i, "").trim();
@@ -91,7 +91,7 @@ function normalizeLineHead(
     return { name: head, qty: q, unit: "kg", notes: "poids variable", piece_volume_ml: null };
   }
 
-  const varL = head.match(/(\d+(?:[.,]\d+)?)\s*l~\s*$/i);
+  const varL = head.match(/(-?\d+(?:[.,]\d+)?)\s*l~\s*$/i);
   if (varL) {
     const q = parseFrenchNumber(varL[1]);
     head = head.replace(/\s*\d+(?:[.,]\d+)?\s*l~\s*$/i, "").trim();
@@ -100,7 +100,7 @@ function normalizeLineHead(
   }
 
   // Compter les unités (ex: "10 U", "6 PCS")
-  const uMatch = head.match(/\b(\d+(?:[.,]\d+)?)\s*(U|PIECE|PCS?)\b\s*$/i);
+  const uMatch = head.match(/(-?\d+(?:[.,]\d+)?)\s*(U|PIECE|PCS?)\b\s*$/i);
   let qty: number | null = null;
   if (uMatch) {
     qty = parseFrenchNumber(uMatch[1]);
@@ -143,7 +143,8 @@ function parseLines(text: string): ParsedLine[] {
     .map((x) => x.trim())
     .filter(Boolean);
 
-  const TAIL = /([0-9][0-9\s.,]*)\s+([0-9][0-9\s.,]*)\s+([0-9]{1,2}(?:[.,][0-9]+)?)\s*%?\s*$/;
+  // Montants éventuellement négatifs (avoirs / reprises : « -4,000 U 2,16 -8,64 2 »)
+  const TAIL = /(-?[0-9][0-9\s.,]*)\s+(-?[0-9][0-9\s.,]*)\s+([0-9]{1,2}(?:[.,][0-9]+)?)\s*%?\s*$/;
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
