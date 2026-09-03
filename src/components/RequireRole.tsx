@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import type { Role } from "@/lib/rbac";
@@ -49,11 +49,7 @@ export function RequireRole({
   }, [loading, allowed, role, router]);
 
   if (loading) {
-    return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "40vh" }}>
-        <span style={{ fontSize: 13, color: "#999" }}>Chargement…</span>
-      </div>
-    );
+    return <LoadingWithRescue />;
   }
 
   if (!allowed) {
@@ -61,4 +57,35 @@ export function RequireRole({
   }
 
   return <>{children}</>;
+}
+
+/**
+ * « Chargement… » qui ne peut pas durer éternellement : au-delà de 12 s
+ * (session coincée, réseau coupé), on propose de recharger l'app.
+ */
+function LoadingWithRescue() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 12000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, justifyContent: "center", alignItems: "center", minHeight: "40vh" }}>
+      <span style={{ fontSize: 13, color: "#999" }}>Chargement…</span>
+      {slow && (
+        <>
+          <span style={{ fontSize: 13, color: "#a4442e", textAlign: "center", maxWidth: 320 }}>
+            Le chargement prend trop de temps. La session est peut-être coincée : recharger l&apos;application règle le problème dans la plupart des cas.
+          </span>
+          <button
+            type="button"
+            onClick={() => { try { sessionStorage.removeItem("pizza-app-fresh-reload"); } catch { /* ignore */ } window.location.reload(); }}
+            style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#D4775A", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            Recharger
+          </button>
+        </>
+      )}
+    </div>
+  );
 }
