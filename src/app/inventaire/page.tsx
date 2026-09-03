@@ -42,8 +42,12 @@ const qk = (id: string, z: string) => `${id}|${zoneDbKey(z)}`;
  * fournisseurs). Un même produit peut donc apparaître dans plusieurs zones
  * (ex : le vin en CAVE A VIN et au BAR) sans être déplacé.
  */
-function zoneHasIngredient(zone: StorageZone, ing: Ingredient): boolean {
+/** Emplacements supplémentaires mémorisés (table ingredient_zones) : id produit → zones */
+type ExtraZones = Record<string, string[]>;
+
+function zoneHasIngredient(zone: StorageZone, ing: Ingredient, extra?: ExtraZones): boolean {
   if (ing.storage_zone === zone.name) return true;
+  if (extra?.[ing.id]?.includes(zone.name)) return true;
   if ((zone.category_slugs ?? []).includes(ing.category)) return true;
   const sups = zone.supplier_ids ?? [];
   if (sups.length > 0 && ing.supplier_id != null && sups.includes(ing.supplier_id)) return true;
@@ -59,8 +63,8 @@ function resolveZone(ing: Ingredient, zones: StorageZone[]): string {
 }
 
 /** Sans zone = n'apparaît dans AUCUNE zone (ni affectation ni critères) */
-function isUnzoned(ing: Ingredient, zones: StorageZone[]): boolean {
-  return !zones.some(z => zoneHasIngredient(z, ing));
+function isUnzoned(ing: Ingredient, zones: StorageZone[], extra?: ExtraZones): boolean {
+  return !zones.some(z => zoneHasIngredient(z, ing, extra));
 }
 
 function fmtDate(iso: string) {
@@ -154,6 +158,9 @@ export default function InventairePage() {
   }, [quantities]);
 
   const [zones, setZones] = useState<StorageZone[]>([]);
+  // Un produit peut être compté dans plusieurs zones (BAR + ANNEXE + CARAVANE…) :
+  // ces emplacements sont mémorisés à la clôture et réaffichés au prochain inventaire.
+  const [extraZones, setExtraZones] = useState<ExtraZones>({});
   const [activeZone, setActiveZone] = useState<string>(SANS_ZONE);
   const [showAddZone, setShowAddZone] = useState(false);
   const [newZoneName, setNewZoneName] = useState("");
@@ -228,7 +235,12 @@ export default function InventairePage() {
       if (etabId) supQ = supQ.eq("etablissement_id", etabId);
       // Tous les fournisseurs (les 2 etablissements) pour la pastille produit
       const supAllQ = supabase.from("suppliers").select("id, name, color").eq("is_active", true);
-      const [{ data, error }, { data: zData }, { data: packData }, { data: supData }, { data: supAllData }] = await Promise.all([q, zq, packQ, supQ, supAllQ]);
+      let xzQ = supabase.from("ingredient_zones").select("ingredient_id, zone");
+      if (etabId) xzQ = xzQ.eq("etablissement_id", etabId);
+      const [{ data, error }, { data: zData }, { data: packData }, { data: supData }, { data: supAllData }, { data: xzData }] = await Promise.all([q, zq, packQ, supQ, supAllQ, xzQ]);
+      const xz: ExtraZones = {};
+      for (const r of (xzData ?? []) as { ingredient_id: string; zone: string }[]) (xz[r.ingredient_id] ??= []).push(r.zone);
+      setExtraZones(xz);
       if (error) { console.error("ingredients query:", error); }
       setIngredients((data ?? []) as Ingredient[]);
       const zList = (zData ?? []) as StorageZone[];
@@ -473,6 +485,25 @@ export default function InventairePage() {
 
     if (error) { alert(error.message); setSaving(false); return; }
 
+    // Mémoriser les emplacements : chaque (produit, zone) compté > 0 est retenu
+    // pour le prochain inventaire (Molecola vu au BAR, à l'ANNEXE et en CARAVANE).
+    if (etab?.id) {
+      const rows: { etablissement_id: string; ingredient_id: string; zone: string; source: string; updated_at: string }[] = [];
+      for (const [key, v] of Object.entries(quantities)) {
+        if (v === "" || !(Number(v) > 0)) continue;
+        const [iid, zone] = key.split("|");
+        if (!zone) continue;
+        const ing = ingredients.find(i => i.id === iid);
+        if (!ing || ing.storage_zone === zone) continue;
+        rows.push({ etablissement_id: etab.id, ingredient_id: iid, zone, source: "inventaire", updated_at: new Date().toISOString() });
+      }
+      if (rows.length > 0) {
+        const { error: zErr } = await supabase.from("ingredient_zones").upsert(rows, { onConflict: "etablissement_id,ingredient_id,zone" });
+        if (zErr) console.error("[inventaire] mémorisation des emplacements :", zErr.message);
+        else setExtraZones(prev => { const n = { ...prev }; for (const r of rows) n[r.ingredient_id] = [...new Set([...(n[r.ingredient_id] ?? []), r.zone])]; return n; });
+      }
+    }
+
     // Create stock movements from inventory (adjustment to match real stock)
     const movements = ingredients
       .filter(ing => (ingTotals.totals[ing.id] ?? 0) > 0)
@@ -606,10 +637,27 @@ export default function InventairePage() {
     if (addProdSel.size === 0 || activeZone === SANS_ZONE) return;
     setAddingProducts(true);
     const ids = [...addProdSel];
-    const { error } = await supabase.from("ingredients").update({ storage_zone: activeZone }).in("id", ids);
+    // Produit sans aucune zone → devient sa zone principale ; sinon on AJOUTE un
+    // emplacement (avant, l'affectation écrasait la zone et le produit disparaissait
+    // du BAR quand on le rangeait aussi à l'ANNEXE).
+    const sansZone = ids.filter(id => { const ing = ingredients.find(i => i.id === id); return ing ? isUnzoned(ing, zones, extraZones) : false; });
+    const enPlus = ids.filter(id => !sansZone.includes(id));
+    let error: { message: string } | null = null;
+    if (sansZone.length > 0) {
+      const r = await supabase.from("ingredients").update({ storage_zone: activeZone }).in("id", sansZone);
+      error = r.error;
+    }
+    if (!error && enPlus.length > 0 && etab?.id) {
+      const r = await supabase.from("ingredient_zones").upsert(
+        enPlus.map(id => ({ etablissement_id: etab.id, ingredient_id: id, zone: activeZone, source: "manuel", updated_at: new Date().toISOString() })),
+        { onConflict: "etablissement_id,ingredient_id,zone" },
+      );
+      error = r.error;
+    }
     setAddingProducts(false);
     if (error) { alert(error.message); return; }
-    setIngredients(prev => prev.map(i => ids.includes(i.id) ? { ...i, storage_zone: activeZone } : i));
+    setIngredients(prev => prev.map(i => sansZone.includes(i.id) ? { ...i, storage_zone: activeZone } : i));
+    setExtraZones(prev => { const n = { ...prev }; for (const id of enPlus) n[id] = [...new Set([...(n[id] ?? []), activeZone])]; return n; });
     setAddProdSel(new Set());
     setShowAddProducts(false);
   }
@@ -645,19 +693,19 @@ export default function InventairePage() {
       seen.add(z.name);
       tabs.push({ id: z.name, nom: z.name });
     }
-    const hasUnassigned = ingredients.some(i => isUnzoned(i, zones));
+    const hasUnassigned = ingredients.some(i => isUnzoned(i, zones, extraZones));
     if (hasUnassigned) {
       tabs.push({ id: SANS_ZONE, nom: "Sans zone" });
     }
     return tabs;
-  }, [zones, ingredients]);
+  }, [zones, ingredients, extraZones]);
 
   const zoneIngredients = useMemo(() => {
-    if (activeZone === SANS_ZONE) return ingredients.filter((ing) => isUnzoned(ing, zones));
+    if (activeZone === SANS_ZONE) return ingredients.filter((ing) => isUnzoned(ing, zones, extraZones));
     const zone = zones.find(z => z.name === activeZone);
     if (!zone) return [];
-    return ingredients.filter((ing) => zoneHasIngredient(zone, ing));
-  }, [ingredients, activeZone, zones]);
+    return ingredients.filter((ing) => zoneHasIngredient(zone, ing, extraZones));
+  }, [ingredients, activeZone, zones, extraZones]);
 
   // Group by category
   const categoryGroups = useMemo(() => {
@@ -735,7 +783,7 @@ export default function InventairePage() {
     for (const ing of ingredients) {
       let inAny = false;
       for (const z of zones) {
-        if (zoneHasIngredient(z, ing)) {
+        if (zoneHasIngredient(z, ing, extraZones)) {
           const v = quantities[qk(ing.id, z.name)];
           bump(z.name, v !== undefined && v !== "");
           inAny = true;
@@ -747,7 +795,7 @@ export default function InventairePage() {
       }
     }
     return stats;
-  }, [ingredients, quantities, zones]);
+  }, [ingredients, quantities, zones, extraZones]);
 
   // ── Render: loading ───────────────────────────────────────
 
@@ -1148,7 +1196,7 @@ export default function InventairePage() {
               Zones de stockage
             </div>
             {zones.map((z) => {
-              const nbVisible = ingredients.filter(i => zoneHasIngredient(z, i)).length;
+              const nbVisible = ingredients.filter(i => zoneHasIngredient(z, i, extraZones)).length;
               const nbCats = (z.category_slugs ?? []).length;
               const editing = editCatsZoneId === z.id;
               return (
@@ -1218,7 +1266,7 @@ export default function InventairePage() {
           const q = addProdSearch.trim().toLowerCase();
           const activeZoneObj = zones.find(z => z.name === activeZone);
           const candidates = ingredients
-            .filter(i => !activeZoneObj || !zoneHasIngredient(activeZoneObj, i))
+            .filter(i => !activeZoneObj || !zoneHasIngredient(activeZoneObj, i, extraZones))
             .filter(i => !q || i.name.toLowerCase().includes(q))
             .slice(0, 60);
           const exactExists = ingredients.some(i => i.name.trim().toLowerCase() === q);
