@@ -104,11 +104,12 @@ function parseJsonResponse(text: string): Record<string, unknown> {
 // Try models in order until one works (quota/availability varies by project)
 // Ordre : les plus récents d'abord (les clés récentes n'ont plus accès aux 2.x ;
 // noms relevés dans les réponses de l'API elle-même, septembre 2026)
+// Vérifié en prod le 03/09/2026 (/api/cron/gemini-check) : 3.5-flash-lite lit
+// texte, images et PDF scannés ; 2.5-flash a des quotas serrés ; 3.6-flash est lent.
 const MODELS = [
-  "gemini-3.6-flash",
   "gemini-3.5-flash-lite",
   "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
+  "gemini-3.6-flash",
 ];
 
 async function callGeminiRest(
@@ -120,11 +121,12 @@ async function callGeminiRest(
 ): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const body = {
+    // Pièce jointe d'abord, puis une seule consigne : un PDF placé ENTRE deux
+    // textes était parfois refusé (« The document has no pages »).
     contents: [{
       parts: [
-        { text: SYSTEM_PROMPT },
         { inline_data: { mime_type: mimeType, data: base64Data } },
-        { text: prompt },
+        { text: `${SYSTEM_PROMPT}\n\n${prompt}` },
       ],
     }],
     generationConfig: { temperature: 0.1 },
