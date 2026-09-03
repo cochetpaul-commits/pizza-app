@@ -144,3 +144,22 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
 - [ ] Non fait, volontairement : filtrer `v_latest_offers` dans les 6 formulaires de recette — la vue
   ne fait que 1 249 lignes et les formulaires ont besoin des prix de tous les candidats à l'ajout ;
   à revoir seulement si la vue grossit (>5 000 lignes).
+
+## Vague 4 — 3 septembre 2026 (alléger)
+- [x] 31 pages orphelines supprimées (aucun lien entrant, vérifié une par une) : 13 `/invoices/<fournisseur>`
+  (les routes API homonymes restent), 4 `/recettes/new/*`, `/ventes/{insights,live,performances,articles}`,
+  `/rh/rapports`, `/admin/utilisateurs`, `/settings/pointeuse`, `/settings/employes/{acces,contrat,import,roles}`,
+  `/bello-mio/planning`, `/piccola-mia/{planning,evenements}`. Messagerie / Finances / Stats achats supprimées
+  la veille sur décision de Paul. HACCP laissé en l'état (décision produit en attente).
+- [x] Base : 2 index en double supprimés, index créés sur toutes les clés étrangères qui n'en avaient pas,
+  `search_path` figé sur 20 fonctions, fonctions SECURITY DEFINER retirées au rôle `anon` (13) et outils
+  d'administration (schéma, recalcul des coûts, purge) réservés au service role.
+- [x] `scripts/verify-parsers.ts` : re-parse toutes les factures en base (raw_text) et signale tout écart
+  lignes ↔ total HT > 1 € — à lancer après toute modification d'un parser (`npx tsx scripts/verify-parsers.ts [fournisseur]`).
+  Les PDF ne sont jamais commités (dépôt public).
+- [x] Clés VAPID régénérées (sans « = ») — **à coller dans Vercel** : `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+  puis redéployer et ré-autoriser les notifications sur chaque téléphone (l'ancien abonnement est invalidé).
+- [ ] Reste (au fil de l'eau) : découpage de commandes/page.tsx, ventes/page.tsx, CatalogueTab.tsx ; Next 16 ;
+  33 tables avec policies RLS redondantes (à consolider table par table, pas en bloc) ; 22 vues SECURITY DEFINER
+  (à passer en invoker une par une en vérifiant les droits) ; protection « mots de passe compromis » à activer
+  dans le tableau de bord Supabase (Auth → Settings).
