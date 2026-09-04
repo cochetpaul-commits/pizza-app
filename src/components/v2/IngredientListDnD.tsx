@@ -111,7 +111,8 @@ export function IngredientListDnD({
       const unitLabel = pul === "l" ? "€/L" : pul === "pc" || pul === "pcs" ? "€/pc" : "€/kg";
       rightBottom = `maison · ${i.purchase_price.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unitLabel}`;
     }
-    return { id: i.id, name: i.name, category: i.category, rightBottom, isPreparation: isMaison };
+    const meta = metaByIngredient?.[i.id];
+    return { id: i.id, name: i.name, category: i.category, rightBottom, isPreparation: isMaison, supplier: meta?.fournisseur ?? null, supplierColor: meta?.fournisseurColor ?? null };
   });
 
   function onDragEnd(result: DropResult) {

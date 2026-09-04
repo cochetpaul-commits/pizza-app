@@ -10,6 +10,9 @@ export type SmartSelectOption = {
   rightTop?: string | null;
   rightBottom?: string | null;
   isPreparation?: boolean;
+  /** Fournisseur (pastille colorée sous le nom, et cherchable) */
+  supplier?: string | null;
+  supplierColor?: string | null;
 };
 
 // Cache global partagé entre toutes les instances
@@ -93,7 +96,7 @@ export function SmartSelect(props: {
     return options
       .map((o) => {
         const n = norm(o.name);
-        const extra = norm(o.rightBottom ?? ""); // includes supplier name
+        const extra = norm(`${o.rightBottom ?? ""} ${o.supplier ?? ""}`); // prix + fournisseur cherchables
         const full = n + " " + extra;
         // Score: starts > includes > multi-word match > no match
         const starts = n.startsWith(qq);
@@ -227,9 +230,15 @@ export function SmartSelect(props: {
                       <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "#C026D3", opacity: 0.8 }}>MAISON</span>
                     )}
                   </div>
-                  {o.rightTop ? (
-                    <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {o.rightTop}
+                  {(o.rightTop || o.supplier) ? (
+                    <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 6 }}>
+                      {o.supplier && (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 800, letterSpacing: ".04em", textTransform: "uppercase", color: o.supplierColor ?? "#8a7a62" }}>
+                          <span style={{ width: 6, height: 6, borderRadius: 999, background: o.supplierColor ?? "#8a7a62", display: "inline-block" }} />
+                          {o.supplier}
+                        </span>
+                      )}
+                      {o.rightTop && <span style={{ opacity: 0.8 }}>{o.rightTop}</span>}
                     </div>
                   ) : null}
                 </div>
