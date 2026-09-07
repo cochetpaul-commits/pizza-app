@@ -62,13 +62,23 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
      `next/dynamic({ ssr: false })`. `import Chart from "chart.js/auto"` et
      le `useRef`/`useEffect` de dessin ont disparu de la page (au passage,
      l'import mort `AiInsightCard` a été retiré, -1 warning ESLint).
+   - [x] *(07/09/2026)* `achats` : les 2 graphiques (évolution mensuelle en
+     barres empilées, répartition fournisseurs en barres horizontales)
+     extraits dans `src/app/achats/EvolutionChart.tsx` et
+     `SupplierBarChart.tsx`, chargés via `next/dynamic({ ssr: false })`.
+     La page n'importe plus `chart.js/auto` du tout (même à la demande) —
+     tout le poids de la lib part avec le composant lazy. Au passage, un
+     `setState` synchrone dans le `useEffect` de chargement des top produits
+     (hors async) a été déplacé dans le bloc async — un `react-hooks/set-state-in-effect`
+     s'est mis à le signaler une fois les effets des graphiques retirés
+     (l'analyse du linter était probablement écourtée avant par la
+     complexité des effets Chart.js).
    - [ ] **Reste à faire** : `tresorerie` n'utilise déjà plus `chart.js/auto`
-     (vérifié — rien à faire dessus). Restent 3 pages : `ventes/marges`,
-     `ventes`, `achats`. Même principe que ci-dessus : sortir le `<canvas>`
-     + la logique `new Chart(...)` dans un composant `"use client"` séparé,
-     importé en `next/dynamic({ ssr: false })` depuis la page. Ces 3 pages
-     sont plus grosses (1250 à 2700 lignes) — probablement une page par
-     exécution pour rester dans le budget de lignes.
+     (vérifié — rien à faire dessus). Restent 2 pages : `ventes/marges`
+     (~2080 lignes), `ventes` (~2700 lignes). Même principe que ci-dessus :
+     sortir le `<canvas>` + la logique `new Chart(...)` dans un composant
+     `"use client"` séparé, importé en `next/dynamic({ ssr: false })` depuis
+     la page. Probablement une page par exécution vu leur taille.
 2. **`v_latest_offers` téléchargée en entier** (toutes les offres de tous les
    fournisseurs) à chaque ouverture d'un formulaire de recette — 6 composants
    concernés. Filtrer par les ingrédients affichés, comme le fait déjà

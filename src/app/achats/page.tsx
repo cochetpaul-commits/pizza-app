@@ -1,19 +1,21 @@
 "use client";
 
-import React, { Suspense, useEffect, useState, useMemo, useRef, type CSSProperties } from "react";
+import React, { Suspense, useEffect, useState, useMemo, type CSSProperties } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
-import type { Chart } from "chart.js";
-// Chart.js chargé à la demande : ~65 Ko gzip en moins au premier rendu
-const loadChart = () => import("chart.js/auto").then((m) => m.default);
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { setPendingInvoiceFile } from "@/lib/pendingInvoiceFile";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { useSearchParams } from "next/navigation";
 import { StatsAchatsContent } from "@/components/achats/StatsAchatsContent";
+
+// Chart.js chargé à la demande, hors du bundle initial de la page
+const EvolutionChart = dynamic(() => import("./EvolutionChart"), { ssr: false });
+const SupplierBarChart = dynamic(() => import("./SupplierBarChart"), { ssr: false });
 
 /* ── Types ── */
 
@@ -175,12 +177,6 @@ function AchatsContent() {
   const [topProductsLimit, setTopProductsLimit] = useState(20);
   const [topSupplierFilter, setTopSupplierFilter] = useState("");
 
-  // ── Chart refs ──
-  const evoChartRef = useRef<HTMLCanvasElement>(null);
-  const evoChartInstance = useRef<Chart | null>(null);
-  const supplierBarRef = useRef<HTMLCanvasElement>(null);
-  const supplierBarInstance = useRef<Chart | null>(null);
-
   // ── Load ALL invoices ──
   useEffect(() => {
     if (!etabId) return;
@@ -220,8 +216,8 @@ function AchatsContent() {
   useEffect(() => {
     if (!etabId || loading) return;
     const ids = rangeInvoices.map((i) => i.id);
-    if (ids.length === 0) { setTopProducts([]); return; }
     (async () => {
+      if (ids.length === 0) { setTopProducts([]); return; }
       setTopProductsLoading(true);
       const chunkSize = 200;
       const allLines: { name: string | null; quantity: number | null; unit: string | null; unit_price: number | null; total_price: number | null; invoice_id: string }[] = [];
@@ -522,106 +518,6 @@ function AchatsContent() {
     }
   }, [curFYMonths, evoView]);
 
-  useEffect(() => {
-    if (!evoChartRef.current || loading || curFYMonths.length === 0) return;
-    loadChart().then((ChartJS) => {
-    if (!evoChartRef.current) return;
-    if (evoChartInstance.current) evoChartInstance.current.destroy();
-    evoChartInstance.current = new ChartJS(evoChartRef.current, {
-      type: "bar",
-      data: evoChartData,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`,
-            },
-          },
-        },
-        scales: {
-          x: {
-            stacked: true,
-            ticks: { font: { size: 10 }, color: "#999" },
-            grid: { display: false },
-          },
-          y: {
-            stacked: true,
-            ticks: {
-              callback: (v) => {
-                const n = typeof v === "number" ? v : parseFloat(String(v));
-                return Math.round(n).toLocaleString("fr-FR") + "\u20AC";
-              },
-              font: { size: 10 },
-              color: "#999",
-            },
-            grid: { color: "#f2ede4" },
-          },
-        },
-      },
-    });
-    });
-    return () => { evoChartInstance.current?.destroy(); evoChartInstance.current = null; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evoChartData, loading]);
-
-  // ══════════════════════════════════════════════════════
-  //  CHART.JS — Horizontal bar (suppliers, selected range)
-  // ══════════════════════════════════════════════════════
-
-  useEffect(() => {
-    if (!supplierBarRef.current || loading || supplierTotalsRange.length === 0) return;
-    loadChart().then((ChartJS) => {
-    if (!supplierBarRef.current) return;
-    if (supplierBarInstance.current) supplierBarInstance.current.destroy();
-    supplierBarInstance.current = new ChartJS(supplierBarRef.current, {
-      type: "bar",
-      data: {
-        labels: supplierTotalsRange.map((s) => s.name),
-        datasets: [{
-          data: supplierTotalsRange.map((s) => s.total),
-          backgroundColor: supplierTotalsRange.map((s) => s.color),
-          borderRadius: 4,
-          barThickness: 18,
-        }],
-      },
-      options: {
-        indexAxis: "y",
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => fmt(ctx.parsed.x),
-            },
-          },
-        },
-        scales: {
-          x: {
-            ticks: {
-              callback: (v) => {
-                const n = typeof v === "number" ? v : parseFloat(String(v));
-                return Math.round(n).toLocaleString("fr-FR") + "\u20AC";
-              },
-              font: { size: 10 },
-              color: "#999",
-            },
-            grid: { color: "#f2ede4" },
-          },
-          y: {
-            ticks: { font: { size: 11, family: "DM Sans, sans-serif" }, color: "#555" },
-            grid: { display: false },
-          },
-        },
-      },
-    });
-    });
-    return () => { supplierBarInstance.current?.destroy(); supplierBarInstance.current = null; };
-  }, [supplierTotalsRange, loading]);
-
   // ══════════════════════════════════════════════════════
   //  ACTIONS
   // ══════════════════════════════════════════════════════
@@ -910,7 +806,7 @@ function AchatsContent() {
                   <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Aucune donnee pour cet exercice.</p>
                 ) : (
                   <div style={{ height: 300, position: "relative" }}>
-                    <canvas ref={evoChartRef} />
+                    <EvolutionChart labels={evoChartData.labels} datasets={evoChartData.datasets} />
                   </div>
                 )}
                 {/* Legend */}
@@ -982,7 +878,11 @@ function AchatsContent() {
                     </table>
                     {/* Horizontal bar chart */}
                     <div style={{ height: Math.max(supplierTotalsRange.length * 28, 120), position: "relative" }}>
-                      <canvas ref={supplierBarRef} />
+                      <SupplierBarChart
+                        labels={supplierTotalsRange.map((s) => s.name)}
+                        data={supplierTotalsRange.map((s) => s.total)}
+                        colors={supplierTotalsRange.map((s) => s.color)}
+                      />
                     </div>
                   </>
                 )}
