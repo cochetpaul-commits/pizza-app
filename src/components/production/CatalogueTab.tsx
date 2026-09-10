@@ -1248,8 +1248,9 @@ export function CatalogueContent() {
                     ▼
                   </span>
                 </div>
-                {/* Delete custom category */}
-                {tg.isCustom && canWrite && (
+                {/* Delete custom category — visible seulement quand elle est vide
+                    (une croix sur une catégorie pleine prêtait à confusion) */}
+                {tg.isCustom && canWrite && tg.count === 0 && (
                   <button type="button" onClick={async (e) => {
                     e.stopPropagation();
                     const cat = tg.type.replace("custom:", "");
