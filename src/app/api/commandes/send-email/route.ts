@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   // 1. Session + fournisseur
   const { data: session, error: sessErr } = await supabaseAdmin
     .from("commande_sessions")
-    .select("id, supplier_id, total_ht, notes, suppliers(name)")
+    .select("id, supplier_id, total_ht, notes, email_sent_at, suppliers(name)")
     .eq("id", session_id)
     .single();
 
@@ -115,7 +115,12 @@ export async function POST(request: NextRequest) {
     ? Number(session.total_ht).toLocaleString("fr-FR", { style: "currency", currency: "EUR" })
     : "—";
   const contactNames = (contacts ?? []).filter(c => recipients.includes(c.email as string)).map(c => c.name).filter(Boolean).join(", ");
-  const subject = `Commande ${etabName} — ${supplierName} — ${date}`;
+  // Renvoi (commande déjà envoyée, éventuellement modifiée) : le fournisseur
+  // doit comprendre que ce bon REMPLACE le précédent.
+  const dejaEnvoyeeLe = session.email_sent_at
+    ? new Date(session.email_sent_at as string).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })
+    : null;
+  const subject = `${dejaEnvoyeeLe ? "[MISE À JOUR] " : ""}Commande ${etabName} — ${supplierName} — ${date}`;
 
   const htmlBody = `
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
@@ -123,6 +128,7 @@ export async function POST(request: NextRequest) {
         <h1 style="margin: 0; font-size: 20px;">${etabName}</h1>
         <p style="margin: 4px 0 0; opacity: 0.85; font-size: 14px;">Bon de commande</p>
       </div>
+      ${dejaEnvoyeeLe ? `<div style="background: #fff4e5; border: 1px solid #f5c78a; color: #8a4b00; padding: 12px 16px; font-size: 14px; font-weight: 600;">Ce bon de commande remplace celui envoyé le ${dejaEnvoyeeLe}. Merci de ne tenir compte que de cette version.</div>` : ""}
       <div style="background: #fff; border: 1px solid #e0d8ce; border-top: none; padding: 24px; border-radius: 0 0 12px 12px;">
         <p>Bonjour${contactNames ? ` ${contactNames}` : ""},</p>
         <p>Veuillez trouver ci-joint notre bon de commande.</p>

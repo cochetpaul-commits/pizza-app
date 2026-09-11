@@ -1136,6 +1136,36 @@ function CommandesPage() {
     setTimeout(() => setConfirmation(null), 4000);
   }
 
+  // Depuis une carte « Réceptions en attente » : rouvrir la commande pour la
+  // modifier (retour en brouillon + ouverture chez le fournisseur), ou la
+  // renvoyer telle quelle par mail.
+  async function modifierCommandeValidee(r: { id: string; supplier_id: string; supplier_name: string; email_sent_at?: string | null }) {
+    if (!canValidateOrders) { alert("Vous n'avez pas la permission de modifier une commande validée."); return; }
+    const msg = r.email_sent_at
+      ? `Modifier la commande ${r.supplier_name} déjà envoyée ? Elle repasse en brouillon ; pense à la renvoyer une fois corrigée (le fournisseur recevra un mail « mise à jour »).`
+      : `Rouvrir la commande ${r.supplier_name} en brouillon ?`;
+    if (!confirm(msg)) return;
+    setSaving(true);
+    const res = await fetchApi("/api/commandes/session", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: r.id, status: "brouillon" }),
+    });
+    setSaving(false);
+    if (!res.ok) { alert("Impossible de rouvrir cette commande."); return; }
+    setPendingReceptions((prev) => prev.filter((x) => x.id !== r.id));
+    setDraftSupplierIds((prev) => new Set([...prev, r.supplier_id]));
+    setOpenSessionId(null);
+    setSelectedSupplierId(r.supplier_id);
+    setConfirmation(`Commande ${r.supplier_name} rouverte — modifie-la puis valide et renvoie`);
+    setTimeout(() => setConfirmation(null), 5000);
+  }
+
+  async function renvoyerMailCommande(r: { id: string; supplier_name: string; email_sent_at?: string | null }) {
+    if (!confirm(r.email_sent_at ? `Renvoyer la commande ${r.supplier_name} par mail ? Le fournisseur recevra un bon marqué « mise à jour ».` : `Envoyer la commande ${r.supplier_name} par mail ?`)) return;
+    await sendEmailOnly(r.id);
+    setPendingReceptions((prev) => prev.map((x) => x.id === r.id ? { ...x, email_sent_at: new Date().toISOString() } : x));
+  }
+
   async function downloadPdfById(sessionId: string, supplierName: string) {
     const res = await fetchApi(`/api/commandes/pdf?session_id=${sessionId}`);
     if (!res.ok) { alert("Erreur lors de la generation du PDF"); return; }
@@ -2430,7 +2460,27 @@ function CommandesPage() {
                   </div>
                 </div>
                 {renderSessionLignes(r.id)}
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  {canValidateOrders && (
+                    <button type="button" onClick={(e) => { e.stopPropagation(); void modifierCommandeValidee(r); }} disabled={saving}
+                      style={{
+                        fontSize: 11, fontWeight: 600, color: "#8a5a2b", background: "#fff",
+                        border: "1px solid #e6cfb0", borderRadius: 6, cursor: "pointer", padding: "5px 12px",
+                        fontFamily: "inherit",
+                      }}>
+                      Modifier
+                    </button>
+                  )}
+                  {canValidateOrders && (
+                    <button type="button" onClick={(e) => { e.stopPropagation(); void renvoyerMailCommande(r); }} disabled={sendingEmail || saving}
+                      style={{
+                        fontSize: 11, fontWeight: 600, color: "#2563EB", background: "#fff",
+                        border: "1px solid #bfd3f7", borderRadius: 6, cursor: "pointer", padding: "5px 12px",
+                        fontFamily: "inherit", opacity: sendingEmail ? 0.6 : 1,
+                      }}>
+                      {sendingEmail ? "Envoi…" : r.email_sent_at ? "Renvoyer" : "Envoyer"}
+                    </button>
+                  )}
                   <button type="button" onClick={(e) => { e.stopPropagation(); downloadPdfById(r.id, r.supplier_name); }}
                     style={{
                       fontSize: 11, fontWeight: 600, color: "#4a6741", background: "#fff",
