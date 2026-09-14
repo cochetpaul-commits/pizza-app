@@ -73,12 +73,21 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
      s'est mis à le signaler une fois les effets des graphiques retirés
      (l'analyse du linter était probablement écourtée avant par la
      complexité des effets Chart.js).
-   - [ ] **Reste à faire** : `tresorerie` n'utilise déjà plus `chart.js/auto`
-     (vérifié — rien à faire dessus). Restent 2 pages : `ventes/marges`
-     (~2080 lignes), `ventes` (~2700 lignes). Même principe que ci-dessus :
-     sortir le `<canvas>` + la logique `new Chart(...)` dans un composant
-     `"use client"` séparé, importé en `next/dynamic({ ssr: false })` depuis
-     la page. Probablement une page par exécution vu leur taille.
+   - [x] *(14/09/2026)* `tresorerie` n'utilise déjà plus `chart.js/auto`
+     (vérifié — rien à faire dessus). `ventes/marges` : les 2 graphiques
+     du haut (« Top 10 produits par marge », « Coût matière par catégorie »)
+     extraits dans `TopProductsMargeChart.tsx` et `FoodCostCategoryChart.tsx`
+     (colocalisés dans `src/app/ventes/marges/`), chargés via
+     `next/dynamic({ ssr: false })`. Au passage, l'import mort `AiInsightCard`
+     a été retiré.
+   - [ ] **Reste à faire** : sur `ventes/marges`, le graphique « Tendances »
+     (plus bas sur la page) utilise encore le `loadChart()` inline — ses
+     dépendances (trendData, trendMode, trendMetric, filteredTrendProducts…)
+     sont plus nombreuses, à extraire dans un futur passage avec plus de
+     marge. Page `ventes` (~2700 lignes) pas commencée : mêmes 2 patterns
+     (`catTrendChartRef` en haut de page + un composant `MiniChart` interne
+     réutilisé plusieurs fois en bas, lignes ~2576-2702) — prévoir une
+     exécution dédiée pour cette page vu sa taille.
 2. **`v_latest_offers` téléchargée en entier** (toutes les offres de tous les
    fournisseurs) à chaque ouverture d'un formulaire de recette — 6 composants
    concernés. Filtrer par les ingrédients affichés, comme le fait déjà

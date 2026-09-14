@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo, Suspense, type CSSProperties } from "react";
+import dynamic from "next/dynamic";
 import { useEtabAuto } from "@/lib/useEtabAuto";
 import { useSearchParams } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
-import { AiInsightCard } from "@/components/AiInsightCard";
 import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
 import { usePilotageRange } from "@/lib/pilotageRange";
 import { usePilotageTopBar } from "@/components/ui/PilotageRangeBar";
@@ -18,6 +18,12 @@ import type { Chart } from "chart.js";
 const loadChart = () => import("chart.js/auto").then((m) => m.default);
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
 import { fetchApi } from "@/lib/fetchApi";
+
+// Composants dédiés : chart.js n'est plus dans le bundle initial de la page
+// pour ces deux graphiques (le hook loadChart() ci-dessus reste utilisé pour
+// le graphique de tendances, encore inline).
+const TopProductsMargeChart = dynamic(() => import("./TopProductsMargeChart"), { ssr: false });
+const FoodCostCategoryChart = dynamic(() => import("./FoodCostCategoryChart"), { ssr: false });
 
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
@@ -292,10 +298,6 @@ function MargesPage() {
   const [trendLoading, setTrendLoading] = useState(false);
   const trendChartRef = useRef<HTMLCanvasElement>(null);
 
-  // Chart refs
-  const barRef = useRef<HTMLCanvasElement>(null);
-  const pieRef = useRef<HTMLCanvasElement>(null);
-
   // Compute date range
   const getRange = useCallback(() => {
     const { from, to } = range;
@@ -384,110 +386,27 @@ function MargesPage() {
     setExportingPdf(false);
   };
 
-  // Charts
-  useEffect(() => {
-    if (!data) return;
-    loadChart().then((ChartJS) => {
-
-    // Bar chart: Top 10 by marge_brute
-    if (barRef.current) {
-      destroyChart("margeBar");
-      const matched = data.products.filter(
-        (p) => p.matched && p.marge_brute !== null,
-      );
-      const top10 = [...matched]
-        .sort((a, b) => (b.marge_brute ?? 0) - (a.marge_brute ?? 0))
-        .slice(0, 10);
-
-      charts["margeBar"] = new ChartJS(barRef.current, {
-        type: "bar",
-        data: {
-          labels: top10.map((p) =>
-            p.name.length > 20 ? p.name.slice(0, 18) + "..." : p.name,
-          ),
-          datasets: [
-            {
-              label: "Marge brute",
-              data: top10.map((p) => p.marge_brute ?? 0),
-              backgroundColor: top10.map((p) =>
-                getCategoryColor(p.categorie),
-              ),
-              borderRadius: 6,
-            },
-          ],
-        },
-        options: {
-          indexAxis: "y",
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => `${fmtDec(ctx.raw as number)} marge`,
-              },
-            },
-          },
-          scales: {
-            x: {
-              ticks: { callback: (v) => fmt(v as number) },
-              grid: { color: "rgba(0,0,0,0.04)" },
-            },
-            y: {
-              ticks: { font: { size: 11 } },
-              grid: { display: false },
-            },
-          },
-        },
-      });
-    }
-
-    // Pie chart: food cost by category
-    if (pieRef.current) {
-      destroyChart("margePie");
-      const cats = data.categories.filter((c) => c.cogs > 0);
-
-      charts["margePie"] = new ChartJS(pieRef.current, {
-        type: "doughnut",
-        data: {
-          labels: cats.map((c) => c.cat),
-          datasets: [
-            {
-              data: cats.map((c) => c.cogs),
-              backgroundColor: getCategoryColors(cats.map(c => c.cat)),
-              borderWidth: 2,
-              borderColor: "#fff",
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: "55%",
-          plugins: {
-            legend: {
-              position: "right",
-              labels: { font: { size: 11 }, padding: 12 },
-            },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => {
-                  const cat = cats[ctx.dataIndex];
-                  return `${cat.cat}: ${fmtDec(cat.cogs)} (${cat.food_cost_pct}%)`;
-                },
-              },
-            },
-          },
-        },
-      });
-    }
-
-    });
-
-    return () => {
-      destroyChart("margeBar");
-      destroyChart("margePie");
+  // Bar chart data: Top 10 by marge_brute
+  const topProductsChartData = useMemo(() => {
+    if (!data) return null;
+    const matched = data.products.filter(
+      (p) => p.matched && p.marge_brute !== null,
+    );
+    const top10 = [...matched]
+      .sort((a, b) => (b.marge_brute ?? 0) - (a.marge_brute ?? 0))
+      .slice(0, 10);
+    return {
+      labels: top10.map((p) => (p.name.length > 20 ? p.name.slice(0, 18) + "..." : p.name)),
+      values: top10.map((p) => p.marge_brute ?? 0),
+      colors: top10.map((p) => getCategoryColor(p.categorie)),
     };
+  }, [data]);
+
+  // Pie chart data: food cost by category
+  const foodCostChartData = useMemo(() => {
+    if (!data) return null;
+    const cats = data.categories.filter((c) => c.cogs > 0);
+    return { categories: cats, colors: getCategoryColors(cats.map((c) => c.cat)) };
   }, [data]);
 
   // Sort & filter products
@@ -959,13 +878,24 @@ function MargesPage() {
               <div style={S.card}>
                 <div style={S.secTitle}>Top 10 produits par marge</div>
                 <div style={{ height: 340 }}>
-                  <canvas ref={barRef} />
+                  {topProductsChartData && (
+                    <TopProductsMargeChart
+                      labels={topProductsChartData.labels}
+                      values={topProductsChartData.values}
+                      colors={topProductsChartData.colors}
+                    />
+                  )}
                 </div>
               </div>
               <div style={S.card}>
                 <div style={S.secTitle}>Cout matiere par categorie</div>
                 <div style={{ height: 340 }}>
-                  <canvas ref={pieRef} />
+                  {foodCostChartData && (
+                    <FoodCostCategoryChart
+                      categories={foodCostChartData.categories}
+                      colors={foodCostChartData.colors}
+                    />
+                  )}
                 </div>
               </div>
             </div>
