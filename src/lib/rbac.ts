@@ -72,6 +72,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/dashboard":    ALL,
   "/mon-tableau":  ALL,
   "/mes-conges":   ALL,
+  "/petit-bac":    ALL, // jeu : tirage de lettres
   "/haccp":        MANAGERS,
   "/fournisseurs": ALL,
   "/rh/conges":    MANAGERS,
