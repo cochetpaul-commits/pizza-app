@@ -568,7 +568,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           name: fiche.nom.trim(),
           category: /sirop/i.test(fiche.sous_categorie ?? "") ? "sirops" : "preparation",
           purchase_price: costKg, purchase_unit: 1, purchase_unit_label: "kg", purchase_unit_name: "kg",
-          source: "recette_maison", recipe_id: savedId, is_active: true,
+          source: "recette_maison", recipe_id: savedId, is_active: true, status: "validated",
           piece_weight_g: fiche.portions > 1 && wRef > 0 ? Math.round((wRef / fiche.portions) * 100) / 100 : null,
           establishments: (fiche.establishments ?? []).map((e: string) => (e.includes("piccola") ? "piccola" : "bellomio")),
           ...(liquide ? { density_g_per_ml: 1 } : {}),
@@ -577,7 +577,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           const { error: e1 } = await withTimeout(supabase.from("ingredients").update(payload).eq("id", ingId));
           if (e1) showToast("Fiche enregistrée, mais l'ingrédient maison n'a pas pu être mis à jour : " + e1.message);
         } else {
-          const { data: cree, error: e2 } = await withTimeout(supabase.from("ingredients").insert({ ...payload, default_unit: "g", allergens: null, supplier_id: null }).select("id").single());
+          const { data: cree, error: e2 } = await withTimeout(supabase.from("ingredients").insert({ ...payload, default_unit: "g", allergens: null, supplier_id: null, etablissement_id: resolvedEtab?.id ?? null }).select("id").single());
           if (e2) showToast("Fiche enregistrée, mais l'ingrédient maison n'a pas pu être créé : " + e2.message);
           ingId = (cree as { id: string } | null)?.id ?? null;
         }
