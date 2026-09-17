@@ -72,6 +72,7 @@ export const PLANNING_ITEMS: NavItemV2[] = [
   { label: "Employes", href: "/rh/equipe", icon: "users" },
   { label: "Conges", href: "/rh/conges", icon: "beach" },
   { label: "Mes congés", href: "/mes-conges", icon: "beach" },
+  { label: "Petit bac", href: "/petit-bac", icon: "dice" },
 ];
 
 // PRODUCTION (fiches techniques, catalogue, articles de vente)
@@ -129,6 +130,7 @@ export const EVENEMENTIEL_SECTION: NavSubSection = { label: "Evenementiel", icon
 
 export const SIDEBAR_NAV_SIMPLE: SidebarEntry[] = [
   { kind: "item", label: "Mes congés", href: "/mes-conges", icon: "beach" },
+  { kind: "item", label: "Petit bac", href: "/petit-bac", icon: "dice" },
   { kind: "item", label: "Fiches techniques", href: "/recettes", icon: "fileText" },
   { kind: "item", label: "Catalogue", href: "/catalogue", icon: "book" },
   { kind: "item", label: "Inventaire", href: "/inventaire", icon: "clipboard" },

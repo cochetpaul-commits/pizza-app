@@ -287,3 +287,16 @@ export function IconMoreHorizontal({ size = 20, color = "currentColor" }: IconPr
     </svg>
   );
 }
+
+export function IconDice({ size = 20, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <circle cx="8" cy="8" r="1" fill={color} />
+      <circle cx="16" cy="8" r="1" fill={color} />
+      <circle cx="12" cy="12" r="1" fill={color} />
+      <circle cx="8" cy="16" r="1" fill={color} />
+      <circle cx="16" cy="16" r="1" fill={color} />
+    </svg>
+  );
+}

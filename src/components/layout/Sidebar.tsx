@@ -25,7 +25,7 @@ import {
   IconShoppingBag, IconTruck, IconFileText, IconPackage,
   IconBarChart, IconTrendingUp, IconBook, IconTag,
   IconCalendarEvent, IconBox, IconChefHat,
-  IconSwitch, IconBuilding, IconStore,
+  IconSwitch, IconBuilding, IconStore, IconDice,
 } from "./Icons";
 import type { Role } from "@/lib/rbac";
 
@@ -37,6 +37,7 @@ const ICON_MAP: Record<string, React.FC<{ size?: number; color?: string }>> = {
   package: IconPackage, barChart: IconBarChart, trendingUp: IconTrendingUp,
   book: IconBook, tag: IconTag, calendarEvent: IconCalendarEvent,
   box: IconBox, chefHat: IconChefHat, building: IconBuilding, store: IconStore,
+  dice: IconDice,
 };
 
 const ROLE_LABELS: Record<string, string> = {

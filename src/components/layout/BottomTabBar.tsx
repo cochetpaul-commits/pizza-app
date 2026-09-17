@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import type { Role } from "@/lib/rbac";
-import { ChefHat, ShoppingBasket } from "lucide-react";
+import { ChefHat, Dices, ShoppingBasket } from "lucide-react";
 import { useBottomBar, type BottomBarAction } from "@/lib/BottomBarContext";
 
 /* ── Icons ────────────────────────────────────────── */
@@ -263,11 +263,12 @@ type TabSection = {
 const SECTION_MY_PLANNING: TabSection = {
   label: "Personnel",
   href: "/mes-conges",
-  match: ["/mes-conges", "/rh/conges", "/rh/equipe", "/rh/employe"],
+  match: ["/mes-conges", "/petit-bac", "/rh/conges", "/rh/equipe", "/rh/employe"],
   icon: () => <IconUsers />,
   // Ouvert a tous : les equipiers y trouvent "Mes conges"
   tabs: [
     { label: "Mes conges", href: "/mes-conges", match: ["/mes-conges"], icon: () => <IconBeach /> },
+    { label: "Petit bac", href: "/petit-bac", match: ["/petit-bac"], icon: () => <Dices size={24} strokeWidth={1.5} /> },
     { label: "Employes", href: "/rh/equipe", match: ["/rh/equipe", "/rh/employe"], icon: () => <IconUsers />, roles: ["group_admin", "manager"] },
     { label: "Conges equipe", href: "/rh/conges", match: ["/rh/conges"], icon: () => <IconBeach />, roles: ["group_admin", "manager"] },
   ],
