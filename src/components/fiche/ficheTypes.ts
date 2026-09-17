@@ -39,6 +39,8 @@ export type IngredientRef = {
   allergenes: string[];
   /** Prix par unité complets (€/g, €/ml, €/pièce) — pour convertir g ⇄ cl sans perdre d'info */
   cpu?: { g?: number; ml?: number; pcs?: number };
+  /** "recette_maison" = fiche de la maison utilisable comme ingrédient */
+  source?: string | null;
 };
 
 export type LigneIngredient = {
@@ -73,6 +75,9 @@ export type FicheState = {
   sell_price_per_kg: number | null;
   sell_price_per_portion: number | null;
   cooked_weight_g: number | null;
+  /** La fiche produit un ingrédient « recette maison » (sirop, sauce, base…) réutilisable dans d'autres fiches */
+  comme_ingredient: boolean;
+  output_ingredient_id: string | null;
   // Multi-prix: [{mode: "portion"|"kg"|"piece"|"litre", prix: number, tva: number, label?: string}]
   prix_lignes: PrixLigne[];
   // Salle
@@ -215,6 +220,8 @@ export function defaultFiche(etabSlug: string): FicheState {
     sell_price_per_kg: null,
     sell_price_per_portion: null,
     cooked_weight_g: null,
+    comme_ingredient: false,
+    output_ingredient_id: null,
     prix_lignes: [],
     description: "",
     accord: "",

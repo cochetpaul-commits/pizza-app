@@ -20,6 +20,7 @@ type SupplierRow = {
   contact_name: string | null;
   notes: string | null;
   franco_minimum: number | null;
+  franco_bouteilles: number | null;
   franco_obligatoire: boolean | null;
   mercuriale_only: boolean | null;
   delivery_schedule: { day: string; cutoff: string; delivery_day: string }[] | null;
@@ -61,6 +62,7 @@ type ModalForm = {
   phone: string;
   email: string;
   franco_minimum: string;
+  franco_bouteilles: string;
   franco_obligatoire: boolean;
   mercuriale_only: boolean;
   notes: string;
@@ -109,6 +111,7 @@ const EMPTY_FORM: ModalForm = {
   phone: "",
   email: "",
   franco_minimum: "",
+  franco_bouteilles: "",
   franco_obligatoire: false,
   mercuriale_only: false,
   notes: "",
@@ -141,7 +144,7 @@ const readonlyBadge: React.CSSProperties = {
   padding: "2px 8px", borderRadius: 6, display: "inline-block",
 };
 
-const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code,color";
+const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_bouteilles,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code,color";
 
 // Accordion header pour la fiche fournisseur
 function AccordionHeader({ label, isOpen, onToggle }: { label: string; isOpen: boolean; onToggle: () => void }) {
@@ -328,6 +331,7 @@ export default function FournisseursPage() {
       phone: s.phone ?? "",
       email: s.email ?? "",
       franco_minimum: s.franco_minimum != null ? String(s.franco_minimum) : "",
+      franco_bouteilles: s.franco_bouteilles != null ? String(s.franco_bouteilles) : "",
       franco_obligatoire: s.franco_obligatoire ?? false,
       mercuriale_only: s.mercuriale_only ?? false,
       notes: s.notes ?? "",
@@ -422,6 +426,7 @@ export default function FournisseursPage() {
       contact_name: form.contact_name.trim() || null,
       notes: form.notes.trim() || null,
       franco_minimum: francoVal ? parseFloat(francoVal) : null,
+      franco_bouteilles: form.franco_bouteilles.trim() ? parseInt(form.franco_bouteilles, 10) : null,
       franco_obligatoire: form.franco_obligatoire,
       mercuriale_only: form.mercuriale_only,
       delivery_schedule: schedule.length > 0 ? schedule : null,
@@ -701,6 +706,10 @@ export default function FournisseursPage() {
               <div>
                 <div style={labelStyle}>Franco de port (EUR HT)</div>
                 <input style={{ ...inputStyle, width: 110 }} value={form.franco_minimum} onChange={(e) => setForm((f) => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 200" type="number" min="0" step="10" />
+              </div>
+              <div>
+                <div style={labelStyle}>ou franco en bouteilles</div>
+                <input style={{ ...inputStyle, width: 110 }} value={form.franco_bouteilles} onChange={(e) => setForm((f) => ({ ...f, franco_bouteilles: e.target.value }))} placeholder="ex: 36" type="number" min="0" step="6" />
               </div>
               <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", paddingTop: 14 }}>
                 <input type="checkbox" checked={form.mercuriale_only} onChange={(e) => setForm((f) => ({ ...f, mercuriale_only: e.target.checked }))} style={{ accentColor: bodyColor }} />

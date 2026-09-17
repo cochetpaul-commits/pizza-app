@@ -29,6 +29,9 @@ type DraftEntry = {
   id: string; ts: number; nom: string; categorie_slug: string; sous_categorie: string;
   step: number; fiche: FicheState; linkedPopina: string | null;
 };
+// Une fiche de préparation (sirop, sauce, base…) sert d'ingrédient à d'autres fiches
+const autoCommeIngredient = (cat?: string | null, sc?: string | null) =>
+  /^(preparation|production|sauce)$/i.test(cat ?? "") || /sirop|sauce|base|pr[ée]pa|infusion|pur[ée]e/i.test(sc ?? "");
 const ARCHIVE_TTL_MS = 72 * 60 * 60 * 1000;
 const archiveKey = (etabSlug: string) => `fiche-drafts:${etabSlug}`;
 function readArchive(etabSlug: string): DraftEntry[] {
@@ -91,6 +94,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const [fiche, setFiche] = useState<FicheState>(() => ({
     ...defaultFiche(etabSlug),
     ...(initialCategorie ? { categorie_slug: initialCategorie } : {}),
+    comme_ingredient: autoCommeIngredient(initialCategorie, initialSousCategorie),
     ...(initialSousCategorie ? { sous_categorie: initialSousCategorie } : {}),
   }));
   const [categories, setCategories] = useState<Categorie[]>([]);
@@ -122,7 +126,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       supabase.from("familles").select("*"),
       supabase.from("categories").select("*").order("sort_order").order("nom")
         .or(`establishments.cs.{"${etabSlug === "piccola" ? "piccola" : "bellomio"}"},establishments.is.null`),
-      supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, cost_per_kg, purchase_price, purchase_unit, purchase_unit_label, density_g_per_ml, piece_weight_g, piece_volume_ml, establishments")
+      supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, cost_per_kg, purchase_price, purchase_unit, purchase_unit_label, density_g_per_ml, piece_weight_g, piece_volume_ml, establishments, source")
         .or(`establishments.cs.{"${etabSlug === "piccola" ? "piccola" : "bellomio"}"},establishments.is.null`),
       supabase.from("recipes").select("id, name").order("name"),
       supabase.from("v_latest_offers").select("*"),
@@ -249,6 +253,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           unite_base: base,
           allergenes: allergens,
           cpu,
+          source: (i.source as string) ?? null,
         };
       });
       setMercuriale(mercs);
@@ -328,6 +333,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
             sell_price_per_kg: rec.sell_price_per_kg ? Number(rec.sell_price_per_kg) : null,
             sell_price_per_portion: rec.sell_price_per_portion ? Number(rec.sell_price_per_portion) : null,
             cooked_weight_g: rec.cooked_weight_g ? Number(rec.cooked_weight_g) : null,
+            comme_ingredient: !!rec.output_ingredient_id,
+            output_ingredient_id: (rec.output_ingredient_id as string) ?? null,
             prix_lignes: Array.isArray(rec.prix_lignes) ? rec.prix_lignes as PrixLigne[] : [],
             description: (rec.description_courte as string) ?? "",
             accord: (rec.accord as string) ?? (rec.wine_pairing as string) ?? "",
@@ -541,6 +548,48 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       if (linesToInsert.length > 0) {
         const { error: insErr } = await withTimeout(supabase.from("kitchen_recipe_lines").insert(linesToInsert));
         if (insErr) { showToast("Fiche enregistrée mais ingrédients refusés : " + insErr.message); setSaving(false); return; }
+      }
+    }
+
+    // Recette maison → ingrédient réutilisable (sirop de thym, sauce, base…).
+    // Prix au kg = coût matière / poids de référence (poids cuit s'il est saisi).
+    if (savedId) {
+      const wCru = fiche.lignes.reduce((a: number, l: LigneIngredient) => a + ligneWeightG(l), 0);
+      const wRef = fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? fiche.cooked_weight_g : wCru;
+      const costKg = wRef > 0 && saveTotalCost > 0 ? Math.round((saveTotalCost / wRef) * 1000 * 100) / 100 : null;
+      let ingId = fiche.output_ingredient_id;
+      if (!ingId) {
+        const { data: lie } = await withTimeout(supabase.from("ingredients").select("id").eq("source", "recette_maison").eq("recipe_id", savedId).limit(1));
+        ingId = (lie as { id: string }[] | null)?.[0]?.id ?? null;
+      }
+      if (fiche.comme_ingredient) {
+        const liquide = isBar || /sirop|jus|infusion/i.test(fiche.sous_categorie ?? "");
+        const payload = {
+          name: fiche.nom.trim(),
+          category: /sirop/i.test(fiche.sous_categorie ?? "") ? "sirops" : "preparation",
+          purchase_price: costKg, purchase_unit: 1, purchase_unit_label: "kg", purchase_unit_name: "kg",
+          source: "recette_maison", recipe_id: savedId, is_active: true,
+          piece_weight_g: fiche.portions > 1 && wRef > 0 ? Math.round((wRef / fiche.portions) * 100) / 100 : null,
+          establishments: (fiche.establishments ?? []).map((e: string) => (e.includes("piccola") ? "piccola" : "bellomio")),
+          ...(liquide ? { density_g_per_ml: 1 } : {}),
+        };
+        if (ingId) {
+          const { error: e1 } = await withTimeout(supabase.from("ingredients").update(payload).eq("id", ingId));
+          if (e1) showToast("Fiche enregistrée, mais l'ingrédient maison n'a pas pu être mis à jour : " + e1.message);
+        } else {
+          const { data: cree, error: e2 } = await withTimeout(supabase.from("ingredients").insert({ ...payload, default_unit: "g", allergens: null, supplier_id: null }).select("id").single());
+          if (e2) showToast("Fiche enregistrée, mais l'ingrédient maison n'a pas pu être créé : " + e2.message);
+          ingId = (cree as { id: string } | null)?.id ?? null;
+        }
+        if (ingId) {
+          await withTimeout(supabase.from("kitchen_recipes").update({ output_ingredient_id: ingId }).eq("id", savedId));
+          update({ output_ingredient_id: ingId });
+        }
+      } else if (ingId) {
+        // Case décochée : on retire l'ingrédient du choix seulement s'il ne sert nulle part
+        const { count } = await withTimeout(supabase.from("kitchen_recipe_lines").select("id", { count: "exact", head: true }).eq("ingredient_id", ingId));
+        if (!count) await withTimeout(supabase.from("ingredients").update({ is_active: false }).eq("id", ingId));
+        else showToast(`Toujours utilisée comme ingrédient dans ${count} ligne${count > 1 ? "s" : ""} de fiche : elle reste disponible.`);
       }
     }
 
@@ -816,7 +865,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
               update({ lignes: [...otherLines, ...fromLines(lines, zone)] });
             };
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const ingList = mercuriale.map(m => ({ id: m.id, name: m.nom_produit || m.nom_court, category: "" as any, allergens: m.allergenes })) as any[];
+            const ingList = mercuriale.map(m => ({ id: m.id, name: m.nom_produit || m.nom_court, category: "" as any, allergens: m.allergenes, source: m.source ?? null })) as any[];
             const priceMap: Record<string, CpuByUnit> = {};
             for (const m of mercuriale) {
               // Prix complets (€/g, €/ml, €/pièce) quand on les a — l'ancien
@@ -854,6 +903,17 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
               </>
             );
           })()}
+
+          {/* Recette maison réutilisable */}
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 14, padding: "10px 12px", borderRadius: 12, border: `1.5px solid ${fiche.comme_ingredient ? COLORS.ok : COLORS.line}`, background: fiche.comme_ingredient ? "#eef6ef" : "#fff", cursor: "pointer" }}>
+            <input type="checkbox" checked={!!fiche.comme_ingredient} onChange={e => update({ comme_ingredient: e.target.checked })} style={{ marginTop: 3, width: 18, height: 18, accentColor: COLORS.ok }} />
+            <span style={{ fontSize: 13.5 }}>
+              <strong>Utilisable comme ingrédient dans d&apos;autres fiches</strong>
+              <span style={{ display: "block", fontSize: 12, color: COLORS.muted, marginTop: 2 }}>
+                Sirop, sauce, base, préparation : à l&apos;enregistrement, elle apparaît dans la recherche d&apos;ingrédients avec l&apos;étiquette MAISON et son prix au kilo (coût matière ÷ poids de la recette, ou poids cuit s&apos;il est renseigné à l&apos;étape 4).
+              </span>
+            </span>
+          </label>
 
           {/* Total + poids + allergènes */}
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1.5px solid ${COLORS.line}` }}>

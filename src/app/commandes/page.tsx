@@ -21,7 +21,7 @@ import { inChunks } from "@/lib/supabaseChunks";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type DeliveryRule = { day: string; cutoff: string; delivery_day: string };
-type Supplier = { id: string; name: string; franco_minimum: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null; website: string | null; portal_login: string | null; portal_password: string | null };
+type Supplier = { id: string; name: string; franco_minimum: number | null; franco_bouteilles?: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null; website: string | null; portal_login: string | null; portal_password: string | null };
 
 type Ligne = {
   id: string;
@@ -676,7 +676,7 @@ function CommandesPage() {
       const { data, error } = await Promise.race([
         supabase
           .from("suppliers")
-          .select("id, name, etablissement_id, franco_minimum, delivery_schedule, color, website")
+          .select("id, name, etablissement_id, franco_minimum, franco_bouteilles, delivery_schedule, color, website")
           .eq("is_active", true)
           .order("name"),
         timeout,
@@ -1434,6 +1434,18 @@ function CommandesPage() {
     return sum + qty * item.prix_commande;
   }, 0);
   const francoPercent = francoMin && francoMin > 0 ? Math.min(100, (orderTotal / francoMin) * 100) : null;
+  // Franco en bouteilles (cavistes) : une ligne commandée « au carton » compte
+  // pour le nombre de bouteilles du carton (quantité de commande ou colisage).
+  const francoBtl = currentSupplier?.franco_bouteilles ?? null;
+  const orderBottles = catalog.reduce((sum, item) => {
+    const qty = Number(quantities[item.id] ?? 0);
+    if (qty <= 0) return sum;
+    const oq = item.order_quantity && Number.isInteger(item.order_quantity) && item.order_quantity > 1 ? item.order_quantity : null;
+    const parCarton = /carton|colis|caisse|pack|lot|×|x\s?\d/i.test(item.order_unit ?? "") && item.pack_count && item.pack_count > 1 ? item.pack_count : null;
+    return sum + qty * (oq ?? parCarton ?? 1);
+  }, 0);
+  const francoBtlPercent = francoBtl && francoBtl > 0 ? Math.min(100, (orderBottles / francoBtl) * 100) : null;
+  const francoAtteint = (francoMin != null && francoMin > 0 && orderTotal >= francoMin) || (francoBtl != null && francoBtl > 0 && orderBottles >= francoBtl);
 
   // Save order unit label
   async function saveOrderUnit(ingredientId: string, label: string) {
@@ -2662,23 +2674,40 @@ function CommandesPage() {
             </div>
 
             {/* Franco */}
-            {francoMin != null && francoMin > 0 && (
+            {((francoMin != null && francoMin > 0) || (francoBtl != null && francoBtl > 0)) && (
               <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
                   Franco
                 </div>
-                <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: orderTotal >= francoMin ? "#16a34a" : "#D4775A" }}>
-                  {orderTotal.toFixed(0)} € / {francoMin} €
-                </div>
-                <div style={{ height: 4, background: "#f0ebe2", borderRadius: 2, overflow: "hidden", marginTop: 6 }}>
-                  <div style={{
-                    height: "100%", borderRadius: 2, transition: "width 0.3s ease",
-                    width: `${francoPercent ?? 0}%`,
-                    background: orderTotal >= francoMin
-                      ? "linear-gradient(90deg, #16a34a, #22c55e)"
-                      : "linear-gradient(90deg, #D4775A, #E8956F)",
-                  }} />
-                </div>
+                {francoMin != null && francoMin > 0 && (<>
+                  <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: francoAtteint ? "#16a34a" : "#D4775A" }}>
+                    {orderTotal.toFixed(0)} € / {francoMin} €
+                  </div>
+                  <div style={{ height: 4, background: "#f0ebe2", borderRadius: 2, overflow: "hidden", marginTop: 6 }}>
+                    <div style={{
+                      height: "100%", borderRadius: 2, transition: "width 0.3s ease",
+                      width: `${francoPercent ?? 0}%`,
+                      background: francoAtteint
+                        ? "linear-gradient(90deg, #16a34a, #22c55e)"
+                        : "linear-gradient(90deg, #D4775A, #E8956F)",
+                    }} />
+                  </div>
+                </>)}
+                {francoBtl != null && francoBtl > 0 && (<>
+                  <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: francoMin ? 17 : 24, marginTop: francoMin ? 10 : 0, color: francoAtteint ? "#16a34a" : "#D4775A" }}>
+                    {francoMin ? "ou " : ""}{orderBottles} / {francoBtl} bouteilles
+                  </div>
+                  <div style={{ height: 4, background: "#f0ebe2", borderRadius: 2, overflow: "hidden", marginTop: 6 }}>
+                    <div style={{
+                      height: "100%", borderRadius: 2, transition: "width 0.3s ease",
+                      width: `${francoBtlPercent ?? 0}%`,
+                      background: francoAtteint
+                        ? "linear-gradient(90deg, #16a34a, #22c55e)"
+                        : "linear-gradient(90deg, #D4775A, #E8956F)",
+                    }} />
+                  </div>
+                </>)}
+                {francoAtteint && <div style={{ fontSize: 11, fontWeight: 700, color: "#16a34a", marginTop: 6 }}>✓ Franco atteint</div>}
               </div>
             )}
           </div>

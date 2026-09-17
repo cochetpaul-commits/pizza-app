@@ -35,7 +35,7 @@ type DeliveryRule = { day: string; cutoff: string; delivery_day: string };
 type SupplierFull = {
   id: string; name: string; is_active: boolean;
   email: string | null; phone: string | null; contact_name: string | null;
-  notes: string | null; franco_minimum: number | null;
+  notes: string | null; franco_minimum: number | null; franco_bouteilles: number | null;
   franco_obligatoire: boolean | null; mercuriale_only: boolean | null;
   delivery_schedule: DeliveryRule[] | null;
   address: string | null; city: string | null; postal_code: string | null;
@@ -80,7 +80,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
   const [saved, setSaved] = useState(false);
 
   const [form, setForm] = useState({
-    email: "", phone: "", contact_name: "", notes: "", franco_minimum: "",
+    email: "", phone: "", contact_name: "", notes: "", franco_minimum: "", franco_bouteilles: "",
     franco_obligatoire: false, mercuriale_only: false,
     address: "", city: "", postal_code: "", siret: "", category: "",
     payment_terms: "", delivery_days: "", website: "", tva_intra: "",
@@ -175,6 +175,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
           email: s.email ?? "", phone: s.phone ?? "",
           contact_name: s.contact_name ?? "", notes: s.notes ?? "",
           franco_minimum: s.franco_minimum != null ? String(s.franco_minimum) : "",
+          franco_bouteilles: s.franco_bouteilles != null ? String(s.franco_bouteilles) : "",
           franco_obligatoire: s.franco_obligatoire ?? false,
           mercuriale_only: s.mercuriale_only ?? false,
           address: s.address ?? "", city: s.city ?? "", postal_code: s.postal_code ?? "",
@@ -243,6 +244,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
       contact_name: form.contact_name.trim() || null,
       notes: form.notes.trim() || null,
       franco_minimum: francoVal ? parseFloat(francoVal) : null,
+      franco_bouteilles: form.franco_bouteilles.trim() ? parseInt(form.franco_bouteilles, 10) : null,
       franco_obligatoire: form.franco_obligatoire,
       mercuriale_only: form.mercuriale_only,
       delivery_schedule: schedule.length > 0 ? schedule : null,
@@ -450,6 +452,10 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
             <div>
               <div style={labelStyle}>Franco de port (EUR HT)</div>
               <input style={{ ...inputStyle, width: 120 }} value={form.franco_minimum} onChange={(e) => setForm((f) => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 200" type="number" min="0" step="10" />
+            </div>
+            <div>
+              <div style={labelStyle}>ou franco en bouteilles</div>
+              <input style={{ ...inputStyle, width: 120 }} value={form.franco_bouteilles} onChange={(e) => setForm((f) => ({ ...f, franco_bouteilles: e.target.value }))} placeholder="ex: 36" type="number" min="0" step="6" />
             </div>
             <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", paddingTop: 16 }}>
               <input type="checkbox" checked={form.mercuriale_only} onChange={(e) => setForm((f) => ({ ...f, mercuriale_only: e.target.checked }))} />
