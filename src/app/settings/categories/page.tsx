@@ -104,11 +104,13 @@ export default function CategoriesPage() {
     const [moved] = reordered.splice(result.source.index, 1);
     reordered.splice(result.destination.index, 0, moved);
     setCategories(reordered);
-    // Persist order
-    for (let i = 0; i < reordered.length; i++) {
-      if (reordered[i].sort_order !== i) {
-        await supabase.from("categories").update({ sort_order: i }).eq("id", reordered[i].id);
-      }
+    // Persist order en un seul aller-retour (upsert) au lieu d'un update par categorie
+    const changes = reordered
+      .map((c, i) => ({ id: c.id, sort_order: i, moved: c.sort_order !== i }))
+      .filter((c) => c.moved)
+      .map(({ id, sort_order }) => ({ id, sort_order }));
+    if (changes.length > 0) {
+      await supabase.from("categories").upsert(changes, { onConflict: "id" });
     }
   };
 

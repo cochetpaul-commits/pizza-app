@@ -95,6 +95,20 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
 3. **Requêtes en boucle (N+1)** : `commandes/page.tsx` fait une requête par
    fournisseur (2 boucles), `settings/categories` un update par catégorie…
    Remplacer par `.in(...)` et des upserts de tableau.
+   - [x] *(21/09/2026)* `commandes/page.tsx` : les 3 endroits qui bouclaient sur
+     les alias d'un fournisseur pour appeler `/api/commandes/historique` un
+     alias à la fois (KPI fournisseur, modale historique, « reprendre la
+     dernière ») envoient maintenant tous les alias en une seule requête
+     (`supplier_id=id1,id2,...`). La route API accepte désormais une liste
+     d'identifiants séparés par des virgules et fait un seul `.in(...)` côté
+     Supabase au lieu d'un `.eq(...)` par alias. Au passage, « reprendre la
+     dernière commande » compare maintenant vraiment les dates entre tous les
+     alias (avant : elle prenait la première commande du premier alias qui en
+     avait une, pas forcément la plus récente). `settings/categories` :
+     `handleDragEnd` faisait un `update()` par catégorie déplacée pour
+     persister l'ordre — remplacé par un seul `upsert()` groupé
+     (`{ id, sort_order }` uniquement, pour ne pas toucher aux autres colonnes
+     en cas d'édition concurrente).
 4. **Dashboard / bello-mio / piccola-mia / tresorerie** paginent
    `ventes_lignes` par 1000 côté client pour faire de simples sommes →
    déplacer l'agrégation côté serveur (comme `/api/ventes/stats`).

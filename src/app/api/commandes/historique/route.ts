@@ -4,7 +4,8 @@ import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 /**
  * GET /api/commandes/historique?supplier_id=xxx&limit=10
- * Retourne les commandes passées (non brouillon) pour un fournisseur.
+ * GET /api/commandes/historique?supplier_id=xxx,yyy&limit=10 (plusieurs alias fournisseur en une requête)
+ * Retourne les commandes passées (non brouillon) pour un ou plusieurs fournisseurs.
  */
 export async function GET(req: NextRequest) {
   let etabId: string;
@@ -15,17 +16,21 @@ export async function GET(req: NextRequest) {
     throw e;
   }
 
-  const supplierId = req.nextUrl.searchParams.get("supplier_id");
+  const supplierIdParam = req.nextUrl.searchParams.get("supplier_id");
   const limit = Number(req.nextUrl.searchParams.get("limit") || "10");
 
-  if (!supplierId) {
+  if (!supplierIdParam) {
+    return NextResponse.json({ error: "supplier_id requis" }, { status: 400 });
+  }
+  const supplierIds = supplierIdParam.split(",").map((s) => s.trim()).filter(Boolean);
+  if (supplierIds.length === 0) {
     return NextResponse.json({ error: "supplier_id requis" }, { status: 400 });
   }
 
   const { data: sessions } = await supabaseAdmin
     .from("commande_sessions")
     .select("*")
-    .eq("supplier_id", supplierId)
+    .in("supplier_id", supplierIds)
     .eq("etablissement_id", etabId)
     .not("status", "eq", "brouillon")
     .order("created_at", { ascending: false })

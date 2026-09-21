@@ -954,12 +954,9 @@ function CommandesPage() {
       void (async () => {
         const aliasIds = supplierAliases.get(selectedSupplierId);
         const ids = aliasIds ? Array.from(aliasIds) : [selectedSupplierId];
-        const allHist: HistItem[] = [];
-        for (const sid of ids) {
-          const res = await fetchApi(`/api/commandes/historique?supplier_id=${sid}&limit=10`);
-          const data = await res.json();
-          allHist.push(...(data.historique ?? []));
-        }
+        const res = await fetchApi(`/api/commandes/historique?supplier_id=${ids.join(",")}&limit=10`);
+        const data = await res.json();
+        const allHist: HistItem[] = data.historique ?? [];
         allHist.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setHistorique(allHist.slice(0, 10));
       })();
@@ -1333,12 +1330,9 @@ function CommandesPage() {
     if (!selectedSupplierId) return;
     const aliasIds = supplierAliases.get(selectedSupplierId);
     const ids = aliasIds ? Array.from(aliasIds) : [selectedSupplierId];
-    const allHist: HistItem[] = [];
-    for (const sid of ids) {
-      const res = await fetchApi(`/api/commandes/historique?supplier_id=${sid}&limit=10`);
-      const data = await res.json();
-      allHist.push(...(data.historique ?? []));
-    }
+    const res = await fetchApi(`/api/commandes/historique?supplier_id=${ids.join(",")}&limit=10`);
+    const data = await res.json();
+    const allHist: HistItem[] = data.historique ?? [];
     allHist.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     setHistorique(allHist.slice(0, 10));
     setHistOpen(true);
@@ -2724,12 +2718,10 @@ function CommandesPage() {
               if (!selectedSupplierId) return;
               const aliasIds = supplierAliases.get(selectedSupplierId);
               const ids = aliasIds ? Array.from(aliasIds) : [selectedSupplierId];
-              for (const sid of ids) {
-                const res = await fetchApi(`/api/commandes/historique?supplier_id=${sid}&limit=1`);
-                const data = await res.json();
-                const last = data.historique?.[0];
-                if (last) { dupliquerSession(last.id); return; }
-              }
+              const res = await fetchApi(`/api/commandes/historique?supplier_id=${ids.join(",")}&limit=1`);
+              const data = await res.json();
+              const last = data.historique?.[0];
+              if (last) { dupliquerSession(last.id); return; }
               alert("Aucune commande precedente a reprendre");
             }}
             disabled={saving}
