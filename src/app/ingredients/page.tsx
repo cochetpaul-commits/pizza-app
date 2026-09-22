@@ -1186,13 +1186,13 @@ function IngredientsPageInner() {
             </div>
 
             {/* Dropdowns + Search + Add — all on one row */}
-            <div className="ing-desktop-filters" style={{ gridTemplateColumns: "1fr 1fr 2fr auto auto", gap: 8 }}>
+            <div className="ing-desktop-filters" style={{ gridTemplateColumns: "minmax(190px, 1fr) minmax(190px, 1fr) minmax(220px, 2fr) auto auto", gap: 8, alignItems: "center" }}>
               {/* Fournisseur dropdown desktop */}
               <div style={{ position: "relative" }}>
                 <button type="button" onClick={() => setFilterDropdown(filterDropdown === "supplier" ? null : "supplier")}
-                  style={{ display: "flex", alignItems: "center", width: "100%", padding: "9px 14px", background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 10, cursor: "pointer" }}>
+                  style={{ display: "flex", alignItems: "center", width: "100%", padding: "0 14px", height: 40, background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 10, cursor: "pointer" }}>
                   {filterSupplier !== "all" && (() => { const s = suppliers.find(x => x.id === filterSupplier); return s ? <span style={{ width: 8, height: 8, borderRadius: "50%", background: cachedSupplierColor(s.name), flexShrink: 0, marginRight: 8 }} /> : null; })()}
-                  <span style={{ flex: 1, textAlign: "left", fontSize: 13, fontWeight: 600, color: filterSupplier === "all" ? "#999" : "#1a1a1a" }}>
+                  <span style={{ flex: 1, textAlign: "left", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: filterSupplier === "all" ? "#999" : "#1a1a1a" }}>
                     {filterSupplier === "all" ? "Tous fournisseurs" : suppliers.find(s => s.id === filterSupplier)?.name ?? "Fournisseur"}
                   </span>
                   <span style={{ color: "#999", fontSize: 10, transform: filterDropdown === "supplier" ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}>▼</span>
@@ -1219,9 +1219,9 @@ function IngredientsPageInner() {
               {/* Categorie dropdown desktop */}
               <div style={{ position: "relative" }}>
                 <button type="button" onClick={() => setFilterDropdown(filterDropdown === "category" ? null : "category")}
-                  style={{ display: "flex", alignItems: "center", width: "100%", padding: "9px 14px", background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 10, cursor: "pointer" }}>
+                  style={{ display: "flex", alignItems: "center", width: "100%", padding: "0 14px", height: 40, background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 10, cursor: "pointer" }}>
                   {filterCategory !== "all" && <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT_COLORS[filterCategory as Category], flexShrink: 0, marginRight: 8 }} />}
-                  <span style={{ flex: 1, textAlign: "left", fontSize: 13, fontWeight: 600, color: filterCategory === "all" ? "#999" : "#1a1a1a" }}>
+                  <span style={{ flex: 1, textAlign: "left", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: filterCategory === "all" ? "#999" : "#1a1a1a" }}>
                     {filterCategory === "all" ? "Toutes categories" : CAT_LABELS[filterCategory as Category]}
                   </span>
                   <span style={{ color: "#999", fontSize: 10, transform: filterDropdown === "category" ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}>▼</span>
@@ -1262,7 +1262,7 @@ function IngredientsPageInner() {
               </div>
               {userCanWrite && (
                 <button onClick={() => setShowImportExport(true)} title="Import / Export Excel de la base produits"
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 12px", height: 40, borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
                   ⇅ Excel
                 </button>
               )}
@@ -1270,7 +1270,7 @@ function IngredientsPageInner() {
                 <button
                   onClick={() => setShowCreateForm(true)}
                   style={{
-                    display: "flex", alignItems: "center", gap: 6, padding: "9px 16px",
+                    display: "flex", alignItems: "center", gap: 6, padding: "0 16px", height: 40,
                     borderRadius: 10, border: "none", background: accentColor,
                     color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
                   }}
