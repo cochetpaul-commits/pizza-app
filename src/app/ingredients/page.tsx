@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef, Suspense } from "react";
 import { RecoverProductsModal } from "@/components/RecoverProductsModal";
 import { DuplicatesModal } from "@/components/DuplicatesModal";
+import { ImportExportModal } from "@/components/ImportExportModal";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -342,6 +343,7 @@ function IngredientsPageInner() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showRecover, setShowRecover] = useState(false);
   const [showDoublons, setShowDoublons] = useState(false);
+  const [showImportExport, setShowImportExport] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [showSearchSheet, setShowSearchSheet] = useState(false);
 
@@ -1301,6 +1303,12 @@ function IngredientsPageInner() {
                 </button>
               )}
               {userCanWrite && (
+                <button onClick={() => setShowImportExport(true)} title="Import / Export Excel de la base produits"
+                  style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
+                  ⇅
+                </button>
+              )}
+              {userCanWrite && (
                 <button onClick={() => setShowDoublons(true)} title="Doublons probables à fusionner"
                   style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
                   ⧉
@@ -1350,6 +1358,9 @@ function IngredientsPageInner() {
             )}</>
             <>{showDoublons && (
               <DuplicatesModal onClose={() => { setShowDoublons(false); void mutate(); }} onDone={() => { void mutate(); }} />
+            )}
+            {showImportExport && (
+              <ImportExportModal etabSlug={etab?.slug ?? "bello_mio"} onClose={() => { setShowImportExport(false); void mutate(); }} onDone={() => { void mutate(); }} />
             )}</>
             <BottomSheet open={showCreateForm} onClose={() => setShowCreateForm(false)} title="Créer un ingrédient">
               <div style={{ padding: "0 4px 16px" }}>
