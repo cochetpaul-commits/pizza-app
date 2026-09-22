@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { roleDenied } from "@/lib/getEtablissement";
 import { CATEGORIES } from "@/types/ingredients";
-import { COLS, SHEET_PRODUITS, SHEET_LISTES, UNITES_BASE, CATEGORY_HELP, boolOut, estabsOut, allergensOut, statusOut } from "@/lib/ingredientsSheet";
+import { COLS, SHEET_PRODUITS, SHEET_LISTES, UNITES_BASE, CATEGORY_HELP, boolOut, estabsOut, allergensOut, statusOut, prixDepuisOffre } from "@/lib/ingredientsSheet";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   }
 
   const [{ data: offers }, { data: suppliers }, { data: zones }] = await Promise.all([
-    supabaseAdmin.from("v_latest_offers").select("ingredient_id, supplier_id, unit_price, unit, pack_price, pack_unit, pack_total_qty, density_kg_per_l, piece_weight_g").range(0, 4999),
+    supabaseAdmin.from("v_latest_offers").select("*").range(0, 4999),
     supabaseAdmin.from("suppliers").select("id, name"),
     supabaseAdmin.from("storage_zones").select("name").order("display_order"),
   ]);
@@ -65,9 +65,14 @@ export async function GET(req: NextRequest) {
     const o = offerBy.get(r.id as string) as Record<string, unknown> | undefined;
     const sid = (o?.supplier_id as string) ?? (r.supplier_id as string) ?? null;
     const cell: Record<string, unknown> = {};
+    const px = prixDepuisOffre(o, r);
     for (const c of COLS) {
       let v: unknown;
       switch (c.key) {
+        case "prix_base": v = px.base ?? ""; break;
+        case "prix_unitaire": v = px.unitaire; break;
+        case "prix_nb": v = px.nb; break;
+        case "prix_cond": v = px.cond; break;
         case "is_active": v = boolOut(r.is_active); break;
         case "favori_commande": v = boolOut(r.favori_commande); break;
         case "establishments": v = estabsOut(r.establishments); break;
@@ -110,6 +115,7 @@ export async function GET(req: NextRequest) {
     ["1. Corrige les cellules directement dans la feuille « Produits ». Tu peux trier et filtrer, ça n'a pas d'importance."],
     ["2. Ne touche pas à la colonne « ID » : c'est elle qui relie la ligne au produit dans l'appli."],
     ["3. Les colonnes marquées (info) sont indicatives et ne sont pas relues à l'import (fournisseur, prix au kg, libellé facture)."],
+    ["Prix : « Base de prix » dit si le produit s'achète au kg, au litre ou à la pièce (bouteille, boîte…). « Prix HT par kg, L ou pièce » est le prix de cette base. Si le produit arrive par carton / colis, indique le nombre d'unités par conditionnement et le prix du conditionnement (l'un des deux prix suffit, l'autre se déduit)."],
     ["4. Catégorie : utiliser le code (ex. « legumes_herbes »), voir la feuille Listes. Zones de stockage : le nom exact d'une zone existante."],
     ["5. Une ligne sans ID mais avec un Nom crée un nouveau produit."],
     ["6. Pour rendre un produit invisible sans le supprimer : Actif = non."],

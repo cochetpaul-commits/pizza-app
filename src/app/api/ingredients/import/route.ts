@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { roleDenied } from "@/lib/getEtablissement";
 import { CATEGORIES } from "@/types/ingredients";
-import { COLS, EDITABLE, HEADER_TO_KEY, SHEET_PRODUITS, UNITES_BASE, boolIn, numIn, estabsIn, allergensIn, statusIn, norm, type ColKey } from "@/lib/ingredientsSheet";
+import { COLS, EDITABLE, HEADER_TO_KEY, SHEET_PRODUITS, UNITES_BASE, boolIn, numIn, estabsIn, allergensIn, statusIn, norm, prixDepuisOffre, prixBaseIn, type ColKey, type PrixBase } from "@/lib/ingredientsSheet";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -11,8 +11,8 @@ export const maxDuration = 60;
 type Changement = { id: string | null; ligne: number; nom: string; nouveau: boolean; champs: Record<string, { avant: unknown; apres: unknown }> };
 type Erreur = { ligne: number; nom: string; message: string };
 
-const NUM_KEYS: ColKey[] = ["purchase_price", "purchase_unit", "order_quantity", "piece_weight_g", "piece_volume_ml", "density_g_per_ml", "stock_min", "stock_objectif", "stock_max"];
-const TXT_KEYS: ColKey[] = ["name", "sub_category", "purchase_unit_label", "order_unit_label", "storage_zone", "storage_zone_2", "popina_name"];
+const NUM_KEYS: ColKey[] = ["order_quantity", "piece_weight_g", "piece_volume_ml", "density_g_per_ml", "stock_min", "stock_objectif", "stock_max"];
+const TXT_KEYS: ColKey[] = ["name", "sub_category", "order_unit_label", "storage_zone", "storage_zone_2", "popina_name"];
 
 /**
  * POST /api/ingredients/import  (multipart : file, mode=preview|commit, etab=bellomio|piccola)
@@ -53,6 +53,8 @@ export async function POST(req: NextRequest) {
 
   const { data: zones } = await supabaseAdmin.from("storage_zones").select("name");
   const zoneByNorm = new Map((zones ?? []).map((z) => [norm(z.name), z.name as string]));
+  const { data: offersAll } = await supabaseAdmin.from("v_latest_offers").select("*").range(0, 4999);
+  const offerBy = new Map((offersAll ?? []).map((o) => [o.ingredient_id as string, o as Record<string, unknown>]));
 
   // Produits concernés (par tranches de 150 IDs)
   const ids = sheetRows.map((r) => String(r[[...headerMap.entries()].find(([, k]) => k === "id")![0]] ?? "").trim()).filter(Boolean);
@@ -104,13 +106,42 @@ export async function POST(req: NextRequest) {
           else if (TXT_KEYS.includes(key)) set(key, s || null);
       }
     }
+    // ── Prix (offre fournisseur active, comme la fiche produit) ──
+    const prixCells = { base: cellOf(row, "prix_base"), unitaire: cellOf(row, "prix_unitaire"), nb: cellOf(row, "prix_nb"), cond: cellOf(row, "prix_cond") };
+    if (Object.values(prixCells).some((v) => v !== undefined)) {
+      const actuel = prixDepuisOffre(id ? offerBy.get(id) : undefined, avant ?? {});
+      const b = prixBaseIn(prixCells.base);
+      const u = numIn(prixCells.unitaire), nb = numIn(prixCells.nb), cond = numIn(prixCells.cond);
+      if (b === "invalide") erreurs.push({ ligne, nom: nomCell, message: `Base de prix « ${String(prixCells.base)} » : kg, L ou pièce` });
+      else if (u === "invalide" || nb === "invalide" || cond === "invalide") erreurs.push({ ligne, nom: nomCell, message: "Prix : une des cellules n'est pas un nombre" });
+      else {
+        const base: PrixBase | null = b ?? actuel.base ?? (avant?.default_unit === "kg" || avant?.default_unit === "g" ? "kg" : avant?.default_unit === "l" ? "L" : "pièce");
+        let unitaire = u, condP = cond;
+        const nbU = nb;
+        if (unitaire == null && condP != null && nbU != null && nbU > 0) unitaire = Math.round((condP / nbU) * 10000) / 10000;
+        if (condP == null && unitaire != null && nbU != null && nbU > 0) condP = Math.round(unitaire * nbU * 100) / 100;
+        const diff = (x: number | null, y: number | null) => (x ?? null) !== (y ?? null) && !(x != null && y != null && Math.abs(x - y) < 0.005);
+        const change = base !== actuel.base || diff(unitaire, actuel.unitaire) || diff(nbU, actuel.nb) || diff(condP, actuel.cond);
+        if (change && unitaire != null && unitaire > 0) {
+          const sid = (id ? (offerBy.get(id)?.supplier_id as string | undefined) : undefined) ?? (avant?.supplier_id as string | undefined) ?? null;
+          if (!sid && !nouveau) erreurs.push({ ligne, nom: nomCell, message: "Prix non appliqué : ce produit n'a pas de fournisseur (à renseigner dans l'appli d'abord)" });
+          else {
+            (row as Record<string, unknown>).__prix = { base, unitaire, nb: nbU, cond: condP, sid };
+            champs.prix = { avant: actuel.unitaire != null ? `${actuel.unitaire} €/${actuel.base}${actuel.cond ? ` · ${actuel.cond} € les ${actuel.nb}` : ""}` : null, apres: `${unitaire} €/${base}${condP && nbU ? ` · ${condP} € les ${nbU}` : ""}` };
+          }
+        } else if (change && unitaire == null && (condP != null || nbU != null)) {
+          erreurs.push({ ligne, nom: nomCell, message: "Prix : il manque le prix unitaire ou le nombre d'unités par conditionnement" });
+        }
+      }
+    }
+
     if (nouveau) {
       if (!patch.category) { erreurs.push({ ligne, nom: nomCell, message: "Nouveau produit sans catégorie — ligne ignorée" }); return; }
       if (!patch.establishments) patch.establishments = [etabDefaut];
       if (!patch.default_unit) patch.default_unit = "g";
       patch.is_active = patch.is_active ?? true;
     }
-    if (Object.keys(patch).length) changements.push({ id, ligne, nom: nomCell || String(avant?.name ?? ""), nouveau, champs });
+    if (Object.keys(champs).length) changements.push({ id, ligne, nom: nomCell || String(avant?.name ?? ""), nouveau, champs });
     (row as Record<string, unknown>).__patch = patch;
   });
 
@@ -127,19 +158,43 @@ export async function POST(req: NextRequest) {
 
   let modifies = 0, crees = 0;
   const echecs: Erreur[] = [];
-  const todo = sheetRows.map((r, i) => ({ row: r, idx: i })).filter(({ row }) => Object.keys((row.__patch as Record<string, unknown>) ?? {}).length);
+  const todo = sheetRows.map((r, i) => ({ row: r, idx: i })).filter(({ row }) => Object.keys((row.__patch as Record<string, unknown>) ?? {}).length || row.__prix);
+  type Prix = { base: PrixBase; unitaire: number; nb: number | null; cond: number | null; sid: string | null };
+  const ecrireOffre = async (ingredientId: string, ing: Record<string, unknown> | undefined, p: Prix): Promise<string | null> => {
+    const sid = p.sid ?? (ing?.supplier_id as string | null) ?? null;
+    if (!sid) return "pas de fournisseur";
+    const etabId = (ing?.etablissement_id as string | null) ?? null;
+    const commun = { user_id: userId, ingredient_id: ingredientId, supplier_id: sid, is_active: true, density_kg_per_l: null, piece_weight_g: (ing?.piece_weight_g as number | null) ?? null, ...(etabId ? { etablissement_id: etabId } : {}) };
+    const pack = p.nb != null && p.nb > 0 && p.cond != null && p.cond > 0;
+    const payload = p.base === "pièce"
+      ? (pack ? { ...commun, price_kind: "pack_composed", pack_price: p.cond, price: p.cond, pack_count: p.nb, pack_each_unit: "pc", pack_each_qty: null }
+              : { ...commun, price_kind: "unit", unit: "pc", unit_price: p.unitaire, price: p.unitaire })
+      : (pack ? { ...commun, price_kind: "pack_simple", pack_price: p.cond, price: p.cond, pack_total_qty: p.nb, pack_unit: p.base === "kg" ? "kg" : "l", unit: p.base === "kg" ? "kg" : "l", unit_price: p.unitaire }
+              : { ...commun, price_kind: "unit", unit: p.base === "kg" ? "kg" : "l", unit_price: p.unitaire, price: p.unitaire });
+    const off = await supabaseAdmin.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", ingredientId).eq("is_active", true);
+    if (off.error) return off.error.message;
+    const ins = await supabaseAdmin.from("supplier_offers").insert(payload);
+    return ins.error ? ins.error.message : null;
+  };
   for (let i = 0; i < todo.length; i += 20) {
     await Promise.all(todo.slice(i, i + 20).map(async ({ row, idx }) => {
       const patch = row.__patch as Record<string, unknown>;
       const id = String(cellOf(row, "id") ?? "").trim() || null;
       const ligne = idx + 2;
+      const prix = row.__prix as Prix | undefined;
       if (id) {
-        const { error } = await supabaseAdmin.from("ingredients").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
-        if (error) echecs.push({ ligne, nom: String(patch.name ?? ""), message: error.message }); else modifies++;
+        if (Object.keys(patch).length) {
+          const { error } = await supabaseAdmin.from("ingredients").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
+          if (error) { echecs.push({ ligne, nom: String(patch.name ?? ""), message: error.message }); return; }
+        }
+        if (prix) { const e = await ecrireOffre(id, existing.get(id), prix); if (e) { echecs.push({ ligne, nom: String(patch.name ?? existing.get(id)?.name ?? ""), message: `prix : ${e}` }); return; } }
+        modifies++;
       } else {
         const estabs = (patch.establishments as string[]) ?? [etabDefaut];
-        const { error } = await supabaseAdmin.from("ingredients").insert({ ...patch, user_id: userId, etablissement_id: etabIdOf(estabs[0]) ?? etabIdOf(etabDefaut), status: patch.status ?? "to_check" });
-        if (error) echecs.push({ ligne, nom: String(patch.name ?? ""), message: error.message }); else crees++;
+        const { data: cree, error } = await supabaseAdmin.from("ingredients").insert({ ...patch, user_id: userId, etablissement_id: etabIdOf(estabs[0]) ?? etabIdOf(etabDefaut), status: patch.status ?? "to_check" }).select("id, etablissement_id, piece_weight_g, supplier_id").single();
+        if (error) { echecs.push({ ligne, nom: String(patch.name ?? ""), message: error.message }); return; }
+        crees++;
+        if (prix && cree && prix.sid) { const e = await ecrireOffre(cree.id as string, cree as Record<string, unknown>, prix); if (e) echecs.push({ ligne, nom: String(patch.name ?? ""), message: `créé, mais prix non enregistré : ${e}` }); }
       }
     }));
   }

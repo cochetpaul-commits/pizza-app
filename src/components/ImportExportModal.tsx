@@ -11,7 +11,7 @@ type Preview = { lignes: number; a_modifier: number; a_creer: number; changement
 
 const LIBELLES: Record<string, string> = {
   name: "Nom", is_active: "Actif", establishments: "Établissements", category: "Catégorie", sub_category: "Sous-catégorie",
-  purchase_price: "Prix d'achat", purchase_unit_label: "Unité d'achat", purchase_unit: "Contenu unité d'achat",
+  prix: "Prix fournisseur",
   order_unit_label: "Conditionnement", order_quantity: "Qté / conditionnement", default_unit: "Unité de base",
   piece_weight_g: "Poids pièce (g)", piece_volume_ml: "Volume pièce (ml)", density_g_per_ml: "Densité",
   storage_zone: "Zone", storage_zone_2: "Zone 2", stock_min: "Stock mini", stock_objectif: "Stock objectif", stock_max: "Stock maxi",

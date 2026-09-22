@@ -20,10 +20,11 @@ export const COLS = [
   { key: "category", header: "Catégorie", edit: true },
   { key: "sub_category", header: "Sous-catégorie", edit: true },
   { key: "fournisseur", header: "Fournisseur (info)", edit: false },
+  { key: "prix_base", header: "Base de prix (kg / L / pièce)", edit: true },
+  { key: "prix_unitaire", header: "Prix HT par kg, L ou pièce", edit: true },
+  { key: "prix_nb", header: "Nb de kg / L / pièces par conditionnement (prix)", edit: true },
+  { key: "prix_cond", header: "Prix HT du conditionnement", edit: true },
   { key: "prix_kg", header: "Prix au kg / L (info)", edit: false },
-  { key: "purchase_price", header: "Prix d'achat HT", edit: true },
-  { key: "purchase_unit_label", header: "Unité d'achat (kg, L, bouteille, carton…)", edit: true },
-  { key: "purchase_unit", header: "Contenu de l'unité d'achat (ex. 6 pour un carton de 6)", edit: true },
   { key: "order_unit_label", header: "Conditionnement de commande", edit: true },
   { key: "order_quantity", header: "Qté par conditionnement", edit: true },
   { key: "default_unit", header: "Unité de base (g/kg/l/pc)", edit: true },
@@ -101,3 +102,47 @@ export function statusIn(v: unknown): "validated" | "to_check" | undefined | "in
   return "invalide";
 }
 export const norm = (s: unknown) => String(s ?? "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+/* ── Prix : lecture de l'offre active (même logique que la fiche produit) ── */
+export type PrixBase = "kg" | "L" | "pièce";
+export type PrixInfo = { base: PrixBase | null; unitaire: number | null; nb: number | null; cond: number | null };
+const r2 = (n: number) => Math.round(n * 100) / 100;
+export function prixDepuisOffre(o: Record<string, unknown> | undefined | null, ing: Record<string, unknown>): PrixInfo {
+  const vide: PrixInfo = { base: null, unitaire: null, nb: null, cond: null };
+  if (!o) {
+    // Ancien modèle : prix porté par le produit
+    const pp = Number(ing.purchase_price) || 0, pu = Number(ing.purchase_unit) || 1, pul = String(ing.purchase_unit_label ?? "").toLowerCase();
+    if (!(pp > 0)) return vide;
+    const base: PrixBase = pul === "kg" ? "kg" : pul === "l" || pul === "litre" ? "L" : "pièce";
+    return { base, unitaire: r2(pp / pu), nb: null, cond: null };
+  }
+  const kind = String(o.price_kind ?? "");
+  const unit = String(o.unit ?? o.pack_unit ?? "").toLowerCase();
+  const toBase = (u: string): PrixBase => (u === "kg" || u === "g" ? "kg" : u === "l" || u === "ml" ? "L" : "pièce");
+  if (kind === "unit") {
+    const up = Number(o.unit_price) || 0;
+    return { base: toBase(unit), unitaire: up > 0 ? r2(unit === "g" ? up * 1000 : unit === "ml" ? up * 1000 : up) : null, nb: null, cond: null };
+  }
+  if (kind === "pack_simple") {
+    const pp = Number(o.pack_price) || 0, tq = Number(o.pack_total_qty) || 0;
+    const base = toBase(String(o.pack_unit ?? unit));
+    return { base, unitaire: pp > 0 && tq > 0 ? r2(pp / tq) : null, nb: tq || null, cond: pp || null };
+  }
+  if (kind === "pack_composed") {
+    const pp = Number(o.pack_price) || 0, pc = Number(o.pack_count) || 0, eq = Number(o.pack_each_qty) || 0, eu = String(o.pack_each_unit ?? "pc").toLowerCase();
+    if (eq > 0 && (eu === "kg" || eu === "g" || eu === "l" || eu === "ml")) {
+      const total = pc * eq * (eu === "g" || eu === "ml" ? 0.001 : 1);
+      return { base: toBase(eu), unitaire: pp > 0 && total > 0 ? r2(pp / total) : null, nb: total || null, cond: pp || null };
+    }
+    return { base: "pièce", unitaire: pp > 0 && pc > 0 ? r2(pp / pc) : null, nb: pc || null, cond: pp || null };
+  }
+  return vide;
+}
+export function prixBaseIn(v: unknown): PrixBase | undefined | "invalide" {
+  const s = norm(v);
+  if (!s) return undefined;
+  if (s === "kg" || s === "kilo" || s === "kilos") return "kg";
+  if (s === "l" || s === "litre" || s === "litres") return "L";
+  if (/^(piece|pieces|pc|pcs|bouteille|bouteilles|unite|unites|btl)$/.test(s)) return "pièce";
+  return "invalide";
+}
