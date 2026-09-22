@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fetchApi } from "@/lib/fetchApi";
+import { supabase } from "@/lib/supabaseClient";
+import { CATEGORIES, CAT_LABELS, type Category } from "@/types/ingredients";
 
 type Chg = { id: string | null; ligne: number; nom: string; nouveau: boolean; champs: Record<string, { avant: unknown; apres: unknown }> };
 type Err = { ligne: number; nom: string; message: string };
@@ -24,16 +26,33 @@ export function ImportExportModal({ etabSlug, onClose, onDone }: { etabSlug: str
   const [preview, setPreview] = useState<Preview | null>(null);
   const [result, setResult] = useState<{ modifies: number; crees: number; echecs: Err[] } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [perimetre, setPerimetre] = useState<string>(monEtab);
+  const [inactifs, setInactifs] = useState(false);
+  const [cats, setCats] = useState<Set<string>>(new Set());
+  const [fourns, setFourns] = useState<Set<string>>(new Set()); // noms (un fournisseur peut exister en double)
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string; color: string | null }[]>([]);
+  useEffect(() => {
+    supabase.from("suppliers").select("id, name, color").eq("is_active", true).order("name").then(({ data }) => setSuppliers((data ?? []) as { id: string; name: string; color: string | null }[]));
+  }, []);
+  // Un nom → tous ses identifiants (Bello + Piccola)
+  const idsByName = useMemo(() => { const m = new Map<string, string[]>(); for (const s of suppliers) { const k = s.name.trim().toLowerCase(); m.set(k, [...(m.get(k) ?? []), s.id]); } return m; }, [suppliers]);
+  const nomsUniques = useMemo(() => { const seen = new Map<string, { name: string; color: string | null }>(); for (const s of suppliers) { const k = s.name.trim().toLowerCase(); if (!seen.has(k)) seen.set(k, { name: s.name, color: s.color }); } return [...seen.entries()].map(([k, v]) => ({ key: k, ...v })); }, [suppliers]);
+  const toggle = (set: Set<string>, v: string, setter: (s: Set<string>) => void) => { const n = new Set(set); n.has(v) ? n.delete(v) : n.add(v); setter(n); };
+  const nbFiltres = cats.size + fourns.size;
 
-  async function exporter(etab: string, inactifs: boolean) {
+  async function exporter() {
     setBusy("export"); setMsg(null);
     try {
-      const res = await fetchApi(`/api/ingredients/export?etab=${etab}&inactifs=${inactifs ? 1 : 0}`);
+      const params = new URLSearchParams({ etab: perimetre, inactifs: inactifs ? "1" : "0" });
+      if (cats.size) params.set("cats", [...cats].join(","));
+      if (fourns.size) params.set("fournisseurs", [...fourns].flatMap((k) => idsByName.get(k) ?? []).join(","));
+      const res = await fetchApi(`/api/ingredients/export?${params}`);
       if (!res.ok) throw new Error(String(res.status));
       const blob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `base-produits-${etab}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const suffixe = [[...cats].join("+"), [...fourns].map((k) => k.replace(/[^a-z0-9]+/g, "")).join("+")].filter(Boolean).join("-");
+      a.download = `base-produits-${perimetre}${suffixe ? "-" + suffixe : ""}-${new Date().toISOString().slice(0, 10)}.xlsx`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 30_000);
     } catch { setMsg("L'export a échoué. Réessaie dans un instant."); }
@@ -65,6 +84,7 @@ export function ImportExportModal({ etabSlug, onClose, onDone }: { etabSlug: str
     setBusy(null);
   }
 
+  const chip = (on: boolean, color: string): React.CSSProperties => ({ padding: "6px 11px", borderRadius: 999, border: `1.5px solid ${on ? color : "#e5ddd0"}`, background: on ? color : "#fff", color: on ? "#fff" : "#4a4030", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", lineHeight: 1.2 });
   const btn = (primary = false): React.CSSProperties => ({ padding: "9px 14px", borderRadius: 10, border: primary ? "none" : "1.5px solid #e5ddd0", background: primary ? "#D4775A" : "#fff", color: primary ? "#fff" : "#1a1a1a", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" });
 
   return (
@@ -78,10 +98,38 @@ export function ImportExportModal({ etabSlug, onClose, onDone }: { etabSlug: str
         <section style={{ border: "1px solid #e5ddd0", borderRadius: 14, padding: 14, marginBottom: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: "#8a7a62", marginBottom: 8 }}>1 · Exporter</div>
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "#6f6656" }}>Un classeur Excel avec une ligne par produit : catégorie, sous-catégorie, conditionnement, prix, zones de stockage, stocks… Trie et corrige dans Excel, puis réimporte le même fichier.</p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button style={btn(true)} disabled={!!busy} onClick={() => exporter(monEtab, false)}>{busy === "export" ? "Préparation…" : monEtab === "piccola" ? "Piccola Mia" : "Bello Mio"}</button>
-            <button style={btn()} disabled={!!busy} onClick={() => exporter("tous", false)}>Les deux établissements</button>
-            <button style={btn()} disabled={!!busy} onClick={() => exporter("tous", true)}>Tout, inactifs inclus</button>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+            {[["bellomio", "Bello Mio"], ["piccola", "Piccola Mia"], ["tous", "Les deux"]].map(([v, l]) => (
+              <button key={v} onClick={() => setPerimetre(v)} style={{ ...chip(perimetre === v, "#D4775A"), fontWeight: 700 }}>{l}</button>
+            ))}
+            <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#6f6656", marginLeft: 6, cursor: "pointer" }}>
+              <input type="checkbox" checked={inactifs} onChange={(e) => setInactifs(e.target.checked)} /> inactifs inclus
+            </label>
+          </div>
+
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: "#8a7a62", margin: "8px 0 6px" }}>Catégories <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>· rien de coché = toutes</span></div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {CATEGORIES.map((c) => (
+              <button key={c} onClick={() => toggle(cats, c, setCats)} style={chip(cats.has(c), "#4a6741")}>{CAT_LABELS[c as Category] ?? c}</button>
+            ))}
+          </div>
+
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: "#8a7a62", margin: "12px 0 6px" }}>Fournisseurs <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>· rien de coché = tous</span></div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 150, overflow: "auto" }}>
+            {nomsUniques.map((f) => (
+              <button key={f.key} onClick={() => toggle(fourns, f.key, setFourns)} style={chip(fourns.has(f.key), f.color ?? "#3f6a8a")}>{f.name}</button>
+            ))}
+            {!nomsUniques.length && <span style={{ fontSize: 12.5, color: "#999" }}>Chargement des fournisseurs…</span>}
+          </div>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14, flexWrap: "wrap" }}>
+            <button style={btn(true)} disabled={!!busy} onClick={exporter}>{busy === "export" ? "Préparation…" : "Télécharger le classeur Excel"}</button>
+            {nbFiltres > 0 && <button style={btn()} onClick={() => { setCats(new Set()); setFourns(new Set()); }}>Effacer les filtres ({nbFiltres})</button>}
+            <span style={{ fontSize: 12.5, color: "#6f6656" }}>
+              {perimetre === "tous" ? "Les deux établissements" : perimetre === "piccola" ? "Piccola Mia" : "Bello Mio"}
+              {cats.size ? ` · ${cats.size} catégorie${cats.size > 1 ? "s" : ""}` : " · toutes catégories"}
+              {fourns.size ? ` · ${fourns.size} fournisseur${fourns.size > 1 ? "s" : ""}` : " · tous fournisseurs"}
+            </span>
           </div>
         </section>
 

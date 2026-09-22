@@ -20,6 +20,9 @@ export async function GET(req: NextRequest) {
 
   const etab = (req.nextUrl.searchParams.get("etab") ?? "tous").toLowerCase();
   const inactifs = req.nextUrl.searchParams.get("inactifs") === "1";
+  // Filtres facultatifs : ?cats=vins,soft&fournisseurs=<id>,<id> (fournisseur = meilleure offre ou fournisseur par défaut)
+  const cats = (req.nextUrl.searchParams.get("cats") ?? "").split(",").map((c) => c.trim().toLowerCase()).filter(Boolean);
+  const fournisseurs = (req.nextUrl.searchParams.get("fournisseurs") ?? "").split(",").map((c) => c.trim()).filter(Boolean);
 
   // Tout charger par tranches (pas de plafond PostgREST)
   const rows: Record<string, unknown>[] = [];
@@ -27,6 +30,7 @@ export async function GET(req: NextRequest) {
     let q = supabaseAdmin.from("ingredients").select("*").order("category").order("sub_category").order("name").range(from, from + 999);
     if (etab === "bellomio" || etab === "piccola") q = q.or(`establishments.cs.{"${etab}"},establishments.is.null`);
     if (!inactifs) q = q.eq("is_active", true);
+    if (cats.length) q = q.in("category", cats);
     const { data, error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     rows.push(...((data ?? []) as Record<string, unknown>[]));
@@ -40,6 +44,12 @@ export async function GET(req: NextRequest) {
   ]);
   const supName = new Map((suppliers ?? []).map((s) => [s.id as string, s.name as string]));
   const offerBy = new Map((offers ?? []).map((o) => [o.ingredient_id as string, o]));
+  // Filtre fournisseur : on compare par NOM (un même fournisseur existe en double, un par établissement)
+  const fournNoms = new Set(fournisseurs.map((id) => (supName.get(id) ?? "").trim().toLowerCase()).filter(Boolean));
+  const rowsFiltrees = fournNoms.size
+    ? rows.filter((r) => { const o = offerBy.get(r.id as string) as Record<string, unknown> | undefined; const sid = (o?.supplier_id as string) ?? (r.supplier_id as string) ?? null; return sid ? fournNoms.has((supName.get(sid) ?? "").trim().toLowerCase()) : false; })
+    : rows;
+  rows.length = 0; rows.push(...rowsFiltrees);
 
   const prixKg = (r: Record<string, unknown>, o?: Record<string, unknown>): number | null => {
     if (r.cost_per_kg) return Math.round(Number(r.cost_per_kg) * 100) / 100;
@@ -105,7 +115,7 @@ export async function GET(req: NextRequest) {
     ["6. Pour rendre un produit invisible sans le supprimer : Actif = non."],
     ["7. Réimporte le fichier depuis Base produits → bouton Import / Export : l'appli montre d'abord ce qui va changer, tu confirmes ensuite."],
     [""],
-    [`Export du ${new Date().toLocaleString("fr-FR")} · ${rows.length} produits · périmètre : ${etab === "bellomio" ? "Bello Mio" : etab === "piccola" ? "Piccola Mia" : "les deux établissements"}${inactifs ? " (inactifs inclus)" : ""}`],
+    [`Export du ${new Date().toLocaleString("fr-FR")} · ${rows.length} produits · périmètre : ${etab === "bellomio" ? "Bello Mio" : etab === "piccola" ? "Piccola Mia" : "les deux établissements"}${inactifs ? " (inactifs inclus)" : ""}${cats.length ? " · catégories : " + cats.join(", ") : ""}${fournNoms.size ? " · fournisseurs : " + [...fournNoms].join(", ") : ""}`],
     [`Codes catégories : ${CATEGORIES.join(", ")}`],
   ];
   const wsA = XLSX.utils.aoa_to_sheet(aide);
@@ -113,7 +123,8 @@ export async function GET(req: NextRequest) {
   XLSX.utils.book_append_sheet(wb, wsA, "Mode d'emploi");
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
-  const nom = `base-produits-${etab}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const suffixe = [cats.length ? cats.join("+") : "", fournNoms.size ? [...fournNoms].map((n) => n.replace(/[^a-z0-9]+/g, "")).join("+") : ""].filter(Boolean).join("-");
+  const nom = `base-produits-${etab}${suffixe ? "-" + suffixe : ""}-${new Date().toISOString().slice(0, 10)}.xlsx`;
   return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
