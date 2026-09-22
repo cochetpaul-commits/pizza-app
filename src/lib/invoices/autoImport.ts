@@ -195,6 +195,28 @@ export async function autoImportFactures(etabId: string, days = 5, dossier: PlDo
         }
       }
 
+      // AVOIR : Pennylane donne un montant négatif. Si le parseur a lu des
+      // lignes positives (parseur sans gestion des avoirs, ou scan IA), on
+      // inverse quantités et totaux pour ne pas compter un achat à la place
+      // d'un remboursement (vécu : Armor FA00069242 du 18/09/2026, −136,54 €
+      // importé comme +113,78 € HT). Les prix unitaires restent valables.
+      if (payload && Number(inv.currency_amount ?? 0) < 0) {
+        const somme = payload.lines.reduce((a, l) => a + (l.total_price ?? 0), 0);
+        if (somme > 0) {
+          payload = {
+            ...payload,
+            total_ht: payload.total_ht != null ? -Math.abs(payload.total_ht) : payload.total_ht,
+            total_ttc: payload.total_ttc != null ? -Math.abs(payload.total_ttc) : payload.total_ttc,
+            lines: payload.lines.map((l) => ({
+              ...l,
+              quantity: l.quantity != null ? -Math.abs(l.quantity) : l.quantity,
+              total_price: l.total_price != null ? -Math.abs(l.total_price) : l.total_price,
+            })),
+          };
+          diag = `${diag ? diag + " · " : ""}avoir : lignes passées en négatif`;
+        }
+      }
+
       if (!payload || payload.lines.length === 0) {
         await log(inv, fournisseur, "a_verifier", `aucun parser n'a lu cette facture — à importer à la main${diag ? " · " + diag : ""} ${trace}`, undefined, undefined, rawText);
         continue;
@@ -210,7 +232,7 @@ export async function autoImportFactures(etabId: string, days = 5, dossier: PlDo
       await log(
         inv, fournisseur,
         r.invoiceAlreadyImported ? "deja_connue" : "importee",
-        `${payload.lines.length} lignes · ${payload.total_ht != null ? `${payload.total_ht.toFixed(2)} € HT · ` : ""}${r.ingredientsCreated} produit(s) créé(s), ${r.offersInserted} prix mis à jour`,
+        `${Number(inv.currency_amount ?? 0) < 0 ? "AVOIR · " : ""}${payload.lines.length} lignes · ${payload.total_ht != null ? `${payload.total_ht.toFixed(2)} € HT · ` : ""}${r.ingredientsCreated} produit(s) créé(s), ${r.offersInserted} prix mis à jour`,
         parserUtilise, payload.lines.length,
       );
     } catch (e) {
