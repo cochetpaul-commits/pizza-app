@@ -344,6 +344,7 @@ function IngredientsPageInner() {
   const [showRecover, setShowRecover] = useState(false);
   const [showDoublons, setShowDoublons] = useState(false);
   const [showImportExport, setShowImportExport] = useState(false);
+  const [showTools, setShowTools] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [showSearchSheet, setShowSearchSheet] = useState(false);
 
@@ -1185,7 +1186,7 @@ function IngredientsPageInner() {
             </div>
 
             {/* Dropdowns + Search + Add — all on one row */}
-            <div className="ing-desktop-filters" style={{ gridTemplateColumns: "1fr 1fr 2fr auto", gap: 8 }}>
+            <div className="ing-desktop-filters" style={{ gridTemplateColumns: "1fr 1fr 2fr auto auto", gap: 8 }}>
               {/* Fournisseur dropdown desktop */}
               <div style={{ position: "relative" }}>
                 <button type="button" onClick={() => setFilterDropdown(filterDropdown === "supplier" ? null : "supplier")}
@@ -1260,6 +1261,12 @@ function IngredientsPageInner() {
                 />
               </div>
               {userCanWrite && (
+                <button onClick={() => setShowImportExport(true)} title="Import / Export Excel de la base produits"
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  ⇅ Excel
+                </button>
+              )}
+              {userCanWrite && (
                 <button
                   onClick={() => setShowCreateForm(true)}
                   style={{
@@ -1293,25 +1300,36 @@ function IngredientsPageInner() {
               <button onClick={() => setShowFilters(true)} style={{ padding: "9px 14px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 Filtres{filterActive ? " ●" : ""}
               </button>
-              <button onClick={toggleCompact} style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
-                {compactMode ? "⊞" : "☰"}
-              </button>
+              {/* Outils secondaires regroupés : la barre débordait sur téléphone */}
               {userCanWrite && (
-                <button onClick={() => setShowRecover(true)} title="Récupérer un produit supprimé"
-                  style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
-                  🛟
-                </button>
+                <div style={{ position: "relative" }}>
+                  <button onClick={() => setShowTools((v) => !v)} aria-label="Outils" aria-expanded={showTools}
+                    style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: showTools ? "#f0ebe2" : "#fff", fontSize: 16, lineHeight: 1, cursor: "pointer" }}>
+                    ⋯
+                  </button>
+                  {showTools && (
+                    <>
+                      <div onClick={() => setShowTools(false)} style={{ position: "fixed", inset: 0, zIndex: 45 }} />
+                      <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 46, background: "#fff", border: "1px solid #e5ddd0", borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,.14)", minWidth: 230, padding: 6 }}>
+                        {[
+                          { label: compactMode ? "Affichage détaillé" : "Affichage compact", icon: compactMode ? "⊞" : "☰", act: toggleCompact },
+                          { label: "Import / Export Excel", icon: "⇅", act: () => setShowImportExport(true) },
+                          { label: "Doublons à fusionner", icon: "⧉", act: () => setShowDoublons(true) },
+                          { label: "Récupérer un produit supprimé", icon: "🛟", act: () => setShowRecover(true) },
+                        ].map((o) => (
+                          <button key={o.label} onClick={() => { setShowTools(false); o.act(); }}
+                            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 10px", border: "none", background: "transparent", borderRadius: 8, fontSize: 13.5, fontWeight: 600, cursor: "pointer", color: "#1a1a1a" }}>
+                            <span style={{ width: 22, textAlign: "center", fontSize: 15 }}>{o.icon}</span>{o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
-              {userCanWrite && (
-                <button onClick={() => setShowImportExport(true)} title="Import / Export Excel de la base produits"
-                  style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
-                  ⇅
-                </button>
-              )}
-              {userCanWrite && (
-                <button onClick={() => setShowDoublons(true)} title="Doublons probables à fusionner"
-                  style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
-                  ⧉
+              {!userCanWrite && (
+                <button onClick={toggleCompact} style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
+                  {compactMode ? "⊞" : "☰"}
                 </button>
               )}
               {userCanWrite && (
