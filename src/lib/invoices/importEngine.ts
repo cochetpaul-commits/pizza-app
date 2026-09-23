@@ -8,6 +8,7 @@ import { detectCategoryFromName, normalizeIngredientName } from "@/lib/invoices/
 import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { extractPackFromName, extractVolumeFromName, extractWeightGFromName, extractWeightFromName } from "@/lib/invoices/utils";
 import type { Category } from "@/types/ingredients";
+import { aliasFournisseur, chargerIndexFiches, trouverFiche } from "@/lib/invoices/rapprochement";
 
 const execFileAsync = promisify(execFile);
 
@@ -93,17 +94,6 @@ function notesWithTax(base: string | null, taxRate: number | null): string | nul
  *  "BLANC D'OEUF LIQUIDE 1 KG"  → "blanc d'oeuf liquide"
  *  "CREAM CHEESE 25%"            → "cream cheese"
  */
-function baseProductName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\d+\s*%/g, "")                    // remove percentages
-    .replace(/\d[\d\s.,xX×]*\s*(g|gr|kg|ml|cl|l|pc|pcs|pce|pces)\b/gi, "")  // remove weight/volume
-    .replace(/\d+\s*x\s*\d+/gi, "")             // remove "8 x 200" patterns
-    .replace(/\b(c\d+|fb\d+)\b/gi, "")          // remove codes like C1, FB7060
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function toOfferUnit(u: "pc" | "kg" | "l" | null): "pc" | "kg" | "l" {
   if (u === "kg") return "kg";
   if (u === "l") return "l";
@@ -312,75 +302,10 @@ export async function runImport(options: {
     // une référence article vaut pour toutes ses lignes. Et les fiches appartiennent à
     // plusieurs utilisateurs (Paul, Pierre, import auto) : NE PAS filtrer par user_id,
     // sinon l'import recrée des doublons de fiches déjà existantes.
-    const { data: aliasRows } = await supabase.from("suppliers").select("id, name");
-    // « SAS MAEL », « Mael », « MAEL » : même fournisseur — on ignore la forme juridique
-    const cleFournisseur = (n: string) => normalizeIngredientName(n).replace(/\b(sas|sarl|sa|eurl|sasu|societe|ste|ets|etablissements|france|europe)\b/g, " ").replace(/\s+/g, " ").trim();
-    const supplierNameNorm = cleFournisseur(String((aliasRows ?? []).find((r) => r.id === supplierId)?.name ?? supplierName));
-    const supplierAliasIds = (aliasRows ?? []).filter((r) => cleFournisseur(String(r.name ?? "")) === supplierNameNorm).map((r) => r.id as string);
-    if (!supplierAliasIds.includes(supplierId)) supplierAliasIds.push(supplierId);
-
-    const skuToIngId = new Map<string, string>();
-    if (skus.length) {
-      const skuQ = supabase
-        .from("ingredients")
-        .select("id,supplier_sku,is_active,supplier_id")
-        .in("supplier_id", supplierAliasIds)
-        .in("supplier_sku", skus);
-      const { data: bySku, error: eSku } = await skuQ;
-
-      if (eSku) throw new Error(eSku.message);
-      // Priorité : fiche active, puis fiche rattachée au fournisseur exact
-      const rows = ((bySku ?? []) as Array<{ id: string; supplier_sku: string | null; is_active: boolean; supplier_id: string }>)
-        .sort((a, b) => Number(b.is_active) - Number(a.is_active) || Number(b.supplier_id === supplierId) - Number(a.supplier_id === supplierId));
-      for (const r of rows) {
-        const k = String(r.supplier_sku ?? "").trim();
-        if (k && !skuToIngId.has(k)) skuToIngId.set(k, r.id);
-      }
-    }
-
-    // Lookup par nom exact ET normalisé pour éviter les doublons (apostrophes, accents)
-    // Utilise import_name comme clé stable ; fallback sur name pour rétrocompatiblité.
-    const nameToIngId = new Map<string, string>();
-    const normalizedToIngId = new Map<string, string>();
-    // Do NOT filter by etablissement_id — dedup must be global to find validated ingredients
-    // Toutes les fiches actives, quel que soit le propriétaire (par tranches : plafond PostgREST)
-    const allExisting: Array<{ id: string; name: string; import_name: string | null }> = [];
-    for (let from = 0; ; from += 1000) {
-      const { data: page, error: ePage } = await supabase
-        .from("ingredients")
-        .select("id,name,import_name")
-        .eq("is_active", true)
-        .order("created_at")
-        .range(from, from + 999);
-      if (ePage) throw new Error(ePage.message);
-      allExisting.push(...((page ?? []) as Array<{ id: string; name: string; import_name: string | null }>));
-      if (!page || page.length < 1000) break;
-    }
-
-    const baseNameToIngId = new Map<string, string>();
-    for (const r of (allExisting ?? []) as Array<{ id: string; name: string; import_name: string | null }>) {
-      // Clé primaire = import_name (stable) ; si absent, fallback sur name
-      const primary = ((r.import_name ?? r.name) ?? "").trim();
-      nameToIngId.set(primary.toLowerCase(), r.id);
-      normalizedToIngId.set(normalizeIngredientName(primary), r.id);
-      // Base name index (strips weight/packaging) for fuzzy matching
-      const bn = baseProductName(primary);
-      if (bn.length >= 3 && !baseNameToIngId.has(bn)) {
-        baseNameToIngId.set(bn, r.id);
-      }
-      // Indexer aussi le name courant comme fallback (rétrocompat : ancien import_name non renseigné)
-      if (r.import_name && r.name) {
-        const legacy = (r.name ?? "").trim();
-        if (legacy.toLowerCase() !== primary.toLowerCase()) {
-          nameToIngId.set(legacy.toLowerCase(), r.id);
-          normalizedToIngId.set(normalizeIngredientName(legacy), r.id);
-          const bnLegacy = baseProductName(legacy);
-          if (bnLegacy.length >= 3 && !baseNameToIngId.has(bnLegacy)) {
-            baseNameToIngId.set(bnLegacy, r.id);
-          }
-        }
-      }
-    }
+    // Logique partagée avec l'écran « Lignes en attente » (rapprochement.ts).
+    const supplierAliasIds = await aliasFournisseur(supabase, supplierId, supplierName);
+    const idx = await chargerIndexFiches(supabase, supplierId, supplierAliasIds, skus);
+    const { skuToIngId, nameToIngId, normalizedToIngId } = idx;
 
     // 7. Création des ingrédients manquants
     const toCreate: Array<Record<string, unknown>> = [];
@@ -389,32 +314,7 @@ export async function runImport(options: {
       const nm = (l.name ?? "").trim().toUpperCase();
       if (!nm) continue;
 
-      let already =
-        (sku && skuToIngId.has(sku)) ||
-        nameToIngId.has(nm.toLowerCase()) ||
-        normalizedToIngId.has(normalizeIngredientName(nm));
-      // Fallback 1: prefix match — existing ingredient name is prefix of parsed name
-      if (!already) {
-        const nmLower = nm.toLowerCase();
-        for (const [existingName, existingId] of nameToIngId) {
-          if (nmLower.startsWith(existingName + " ") || existingName.startsWith(nmLower + " ")) {
-            nameToIngId.set(nmLower, existingId);
-            normalizedToIngId.set(normalizeIngredientName(nm), existingId);
-            already = true;
-            break;
-          }
-        }
-      }
-      // Fallback 2: base name match — strips weight/packaging (e.g. "BURRATA DE VACHE")
-      if (!already) {
-        const bn = baseProductName(nm);
-        const matchId = bn.length >= 3 ? baseNameToIngId.get(bn) : undefined;
-        if (matchId) {
-          nameToIngId.set(nm.toLowerCase(), matchId);
-          normalizedToIngId.set(normalizeIngredientName(nm), matchId);
-          already = true;
-        }
-      }
+      const already = trouverFiche(idx, sku, nm) != null;
       if (already) continue;
       if (!creerFiches) { lignesSansFiche.push(`${sku ? sku + " " : ""}${nm}`); continue; }
 
@@ -531,26 +431,7 @@ export async function runImport(options: {
       .map((l) => {
         const sku = (l.sku ?? "").trim();
         const nm = (l.name ?? "").trim().toUpperCase();
-        let ingId =
-          (sku && skuToIngId.get(sku)) ||
-          nameToIngId.get(nm.toLowerCase()) ||
-          normalizedToIngId.get(normalizeIngredientName(nm)) ||
-          null;
-        // Fallback 1: prefix match
-        if (!ingId) {
-          const nmLower = nm.toLowerCase();
-          for (const [existingName, existingId] of nameToIngId) {
-            if (nmLower.startsWith(existingName + " ") || existingName.startsWith(nmLower + " ")) {
-              ingId = existingId;
-              break;
-            }
-          }
-        }
-        // Fallback 2: base name match (strips weight/packaging)
-        if (!ingId) {
-          const bn = baseProductName(nm);
-          ingId = (bn.length >= 3 ? baseNameToIngId.get(bn) : undefined) ?? null;
-        }
+        const ingId = trouverFiche(idx, sku, nm);
 
         const u = toOfferUnit(l.unit);
         const p = l.unit_price;
@@ -639,18 +520,25 @@ export async function runImport(options: {
       const dateFacture = invoiceDateIso ?? new Date().toISOString().slice(0, 10);
       const candidatIds = Array.from(new Set(offerRows.map((x) => String(x.ingredient_id))));
       const plusRecentes = new Set<string>();
+      // Rejouer une facture déjà importée (relance du rapprochement) ne doit pas
+      // empiler une offre identique à la même date : même prix, même date → rien.
+      const identiques = new Set<string>();
+      const candidatParIng = new Map(offerRows.map((x) => [String(x.ingredient_id), x]));
       // La règle vaut pour les deux lignes d'un même fournisseur (Mael Bello / Mael Piccola)
       for (let i = 0; i < candidatIds.length; i += 150) {
         const { data: actives } = await supabase
-          .from("supplier_offers").select("ingredient_id, valid_from, created_at")
+          .from("supplier_offers").select("ingredient_id, valid_from, created_at, price_kind, unit_price, pack_price")
           .in("supplier_id", supplierAliasIds).eq("is_active", true).in("ingredient_id", candidatIds.slice(i, i + 150));
         for (const a of actives ?? []) {
           const vf = String(a.valid_from ?? a.created_at ?? "").slice(0, 10);
           if (vf && vf > dateFacture) plusRecentes.add(String(a.ingredient_id));
+          const c = candidatParIng.get(String(a.ingredient_id));
+          const meme = (x: unknown, y: unknown) => Math.abs(Number(x ?? 0) - Number(y ?? 0)) < 0.0005;
+          if (vf === dateFacture && c && c.price_kind === a.price_kind && meme(c.unit_price, a.unit_price) && meme(c.pack_price, a.pack_price)) identiques.add(String(a.ingredient_id));
         }
       }
       const offerRowsAppliquees: Record<string, unknown>[] = offerRows
-        .filter((x) => !plusRecentes.has(String(x.ingredient_id)))
+        .filter((x) => !plusRecentes.has(String(x.ingredient_id)) && !identiques.has(String(x.ingredient_id)))
         .map((x) => ({ ...x, valid_from: (x.valid_from as string | undefined) ?? dateFacture }));
       const ingredientIds = Array.from(new Set(offerRowsAppliquees.map((x) => String(x.ingredient_id))));
 

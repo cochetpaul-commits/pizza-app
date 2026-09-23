@@ -78,18 +78,31 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
 export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[]; /** nb max de factures traitées par appel (fonction serveur limitée à 60 s) */ limit?: number };
 
 /**
- * Client lu dans l'en-tête de la facture : « SASHA » / « BELLO MIO » = Bello Mio,
- * « I FRATELLI » / « PICCOLA » = Piccola Mia. null si absent, ou si les deux
- * figurent (facturation ≠ livraison : Vinoflo, SDPF). On ne lit que l'en-tête
- * pour ne pas confondre avec un libellé produit.
+ * Client lu sur la facture : « SASHA » / « BELLO MIO » = Bello Mio,
+ * « I FRATELLI » / « PICCOLA » = Piccola Mia (lettres éventuellement espacées :
+ * Vinoflo écrit « S A S H A »). Règle : l'adresse de FACTURATION fait foi, pas la
+ * livraison. Si les deux noms figurent dans l'en-tête, on lit le bloc qui suit
+ * « facturation » et le premier nom rencontré gagne ; sans bloc lisible (SDPF :
+ * « BELLO MIO » et « I FRATELLI » côte à côte) → null, le dossier Pennylane décide.
  */
 export function clientLuSurFacture(texte: string): "bello" | "piccola" | null {
   const tete = (texte ?? "").slice(0, 2500);
-  const bello = /SASHA|BELLO\s*MIO/i.test(tete);
-  const piccola = /I\s*FRATELLI|PICCOLA/i.test(tete);
+  const reBello = /S\s*A\s*S\s*H\s*A|B\s*E\s*L\s*L\s*O\s+M\s*I\s*O/i;
+  const rePiccola = /I\s*F\s*R\s*A\s*T\s*E\s*L\s*L\s*I|P\s*I\s*C\s*C\s*O\s*L\s*A/i;
+  const bello = reBello.test(tete);
+  const piccola = rePiccola.test(tete);
   if (bello && !piccola) return "bello";
   if (piccola && !bello) return "piccola";
-  return null;
+  if (!bello && !piccola) return null;
+  // Les deux : bloc « facturation » (adresse de facturation, facturé à…), premier nom trouvé
+  const m = /factur(?:ation|[ée]e?\s+[àa])/i.exec(tete);
+  if (!m) return null;
+  const bloc = tete.slice(m.index + m[0].length, m.index + m[0].length + 300);
+  const iB = bloc.search(reBello), iP = bloc.search(rePiccola);
+  if (iB < 0 && iP < 0) return null;
+  if (iB < 0) return "piccola";
+  if (iP < 0) return "bello";
+  return iB < iP ? "bello" : "piccola";
 }
 
 export async function autoImportFactures(etabId: string, days = 30, dossier: PlDossier = "bello", opts: AutoImportOptions = {}): Promise<AutoImportResult> {
