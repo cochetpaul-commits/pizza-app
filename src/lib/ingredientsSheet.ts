@@ -25,6 +25,8 @@ export const COLS = [
   { key: "prix_nb", header: "Nb de kg / L / pièces par conditionnement (prix)", edit: true },
   { key: "prix_cond", header: "Prix HT du conditionnement", edit: true },
   { key: "prix_kg", header: "Prix au kg / L (info)", edit: false },
+  { key: "supplier_sku", header: "Réf. fournisseur", edit: true },
+  { key: "prix_date", header: "Date du prix (AAAA-MM-JJ)", edit: true },
   { key: "order_unit_label", header: "Conditionnement de commande", edit: true },
   { key: "order_quantity", header: "Qté par conditionnement", edit: true },
   { key: "default_unit", header: "Unité de base (g/kg/l/pc)", edit: true },
@@ -105,7 +107,16 @@ export const norm = (s: unknown) => String(s ?? "").trim().toLowerCase().normali
 
 /* ── Prix : lecture de l'offre active (même logique que la fiche produit) ── */
 export type PrixBase = "kg" | "L" | "pièce";
-export type PrixInfo = { base: PrixBase | null; unitaire: number | null; nb: number | null; cond: number | null };
+export type PrixInfo = { base: PrixBase | null; unitaire: number | null; nb: number | null; cond: number | null; sku?: string | null; date?: string | null };
+/** Date Excel (nombre de jours depuis 1899-12-30) ou texte → AAAA-MM-JJ */
+export function dateIn(v: unknown): string | null | "invalide" {
+  if (v === null || v === undefined || v === "") return null;
+  if (typeof v === "number") { const d = new Date(Math.round((v - 25569) * 86400 * 1000)); return isNaN(d.getTime()) ? "invalide" : d.toISOString().slice(0, 10); }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  return "invalide";
+}
 const r2 = (n: number) => Math.round(n * 100) / 100;
 export function prixDepuisOffre(o: Record<string, unknown> | undefined | null, ing: Record<string, unknown>): PrixInfo {
   const vide: PrixInfo = { base: null, unitaire: null, nb: null, cond: null };
@@ -118,23 +129,24 @@ export function prixDepuisOffre(o: Record<string, unknown> | undefined | null, i
   }
   const kind = String(o.price_kind ?? "");
   const unit = String(o.unit ?? o.pack_unit ?? "").toLowerCase();
+  const meta = { sku: (o.supplier_sku as string | null) ?? null, date: o.valid_from ? String(o.valid_from).slice(0, 10) : o.created_at ? String(o.created_at).slice(0, 10) : null };
   const toBase = (u: string): PrixBase => (u === "kg" || u === "g" ? "kg" : u === "l" || u === "ml" ? "L" : "pièce");
   if (kind === "unit") {
     const up = Number(o.unit_price) || 0;
-    return { base: toBase(unit), unitaire: up > 0 ? r2(unit === "g" ? up * 1000 : unit === "ml" ? up * 1000 : up) : null, nb: null, cond: null };
+    return { base: toBase(unit), unitaire: up > 0 ? r2(unit === "g" ? up * 1000 : unit === "ml" ? up * 1000 : up) : null, nb: null, cond: null, ...meta };
   }
   if (kind === "pack_simple") {
     const pp = Number(o.pack_price) || 0, tq = Number(o.pack_total_qty) || 0;
     const base = toBase(String(o.pack_unit ?? unit));
-    return { base, unitaire: pp > 0 && tq > 0 ? r2(pp / tq) : null, nb: tq || null, cond: pp || null };
+    return { base, unitaire: pp > 0 && tq > 0 ? r2(pp / tq) : null, nb: tq || null, cond: pp || null, ...meta };
   }
   if (kind === "pack_composed") {
     const pp = Number(o.pack_price) || 0, pc = Number(o.pack_count) || 0, eq = Number(o.pack_each_qty) || 0, eu = String(o.pack_each_unit ?? "pc").toLowerCase();
     if (eq > 0 && (eu === "kg" || eu === "g" || eu === "l" || eu === "ml")) {
       const total = pc * eq * (eu === "g" || eu === "ml" ? 0.001 : 1);
-      return { base: toBase(eu), unitaire: pp > 0 && total > 0 ? r2(pp / total) : null, nb: total || null, cond: pp || null };
+      return { base: toBase(eu), unitaire: pp > 0 && total > 0 ? r2(pp / total) : null, nb: total || null, cond: pp || null, ...meta };
     }
-    return { base: "pièce", unitaire: pp > 0 && pc > 0 ? r2(pp / pc) : null, nb: pc || null, cond: pp || null };
+    return { base: "pièce", unitaire: pp > 0 && pc > 0 ? r2(pp / pc) : null, nb: pc || null, cond: pp || null, ...meta };
   }
   return vide;
 }

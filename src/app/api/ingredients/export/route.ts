@@ -73,6 +73,8 @@ export async function GET(req: NextRequest) {
         case "prix_unitaire": v = px.unitaire; break;
         case "prix_nb": v = px.nb; break;
         case "prix_cond": v = px.cond; break;
+        case "supplier_sku": v = px.sku ?? (r.supplier_sku as string | null) ?? ""; break;
+        case "prix_date": v = px.date ?? ""; break;
         case "is_active": v = boolOut(r.is_active); break;
         case "favori_commande": v = boolOut(r.favori_commande); break;
         case "establishments": v = estabsOut(r.establishments); break;
@@ -114,6 +116,7 @@ export async function GET(req: NextRequest) {
     [""],
     ["1. Corrige les cellules directement dans la feuille « Produits ». Tu peux trier et filtrer, ça n'a pas d'importance."],
     ["2. Ne touche pas à la colonne « ID » : c'est elle qui relie la ligne au produit dans l'appli."],
+    ["Réf. fournisseur et Date du prix : la référence article chez le fournisseur et la date à laquelle ce prix a été relevé. Modifiables : elles sont reprises dans l'offre enregistrée à l'import."],
     ["3. Les colonnes marquées (info) sont indicatives et ne sont pas relues à l'import (fournisseur, prix au kg, libellé facture)."],
     ["Prix : « Base de prix » dit si le produit s'achète au kg, au litre ou à la pièce (bouteille, boîte…). « Prix HT par kg, L ou pièce » est le prix de cette base. Si le produit arrive par carton / colis, indique le nombre d'unités par conditionnement et le prix du conditionnement (l'un des deux prix suffit, l'autre se déduit)."],
     ["4. Catégorie : utiliser le code (ex. « legumes_herbes »), voir la feuille Listes. Zones de stockage : le nom exact d'une zone existante."],

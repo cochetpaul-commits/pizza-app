@@ -532,6 +532,12 @@ export async function runImport(options: {
         // Detect unit weight/volume in name (e.g., "1,5KG", "500G", "75CL")
         // Used to detect that a price is per-pack, not per-kg/L
         const weightInName = l.name ? extractWeightFromName(l.name) : null;
+        // Ligne vendue au poids réel : la quantité est un poids et le prix est
+        // déjà au kilo (ou au litre). Ne jamais le diviser par le poids du
+        // libellé (« JAMBON ROSTELLO ~8 KG » à 11,88 €/kg n'est pas 1,485 €/kg).
+        //  - Mael : notes « poids variable » / « volume variable », libellé avec « ~ »
+        //  - Metro : notes « VAP=… » (vente au poids), quantité = poids pesé
+        const prixDejaAuPoids = /variable|\bVAP\b/i.test(l.notes ?? "") || /~/.test(l.name ?? "");
 
         const offerRow: Record<string, unknown> = {
           user_id: userId,
@@ -559,10 +565,11 @@ export async function runImport(options: {
             offerRow.pack_each_unit = "pc";
           }
           offerRow.piece_weight_g = l.piece_weight_g ?? null;
-        } else if (weightInName && weightInName.totalQty !== 1 && u === weightInName.unit) {
+        } else if (weightInName && weightInName.totalQty !== 1 && u === weightInName.unit && !prixDejaAuPoids) {
           // Weight/volume detected in product name AND matches the offer unit
           // e.g. "HACHE VR 1,5KG" with unit="kg" → price is per barquette (1.5kg), not per kg
-          // Create pack_simple so the unit price is correctly derived
+          // Create pack_simple so the unit price is correctly derived.
+          // Exclu : poids variable (Mael « 8 kg~ », Metro VAP) — le prix est DÉJÀ au kilo.
           offerRow.price_kind = "pack_simple";
           offerRow.pack_price = p;
           offerRow.pack_total_qty = weightInName.totalQty;

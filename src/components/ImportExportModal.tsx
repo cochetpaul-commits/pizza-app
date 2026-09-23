@@ -7,7 +7,7 @@ import { CATEGORIES, CAT_LABELS, type Category } from "@/types/ingredients";
 
 type Chg = { id: string | null; ligne: number; nom: string; nouveau: boolean; champs: Record<string, { avant: unknown; apres: unknown }> };
 type Err = { ligne: number; nom: string; message: string };
-type Preview = { lignes: number; a_modifier: number; a_creer: number; changements: Chg[]; erreurs: Err[] };
+type Preview = { lignes: number; a_modifier: number; a_creer: number; prix_maj?: number; changements: Chg[]; erreurs: Err[] };
 
 const LIBELLES: Record<string, string> = {
   name: "Nom", is_active: "Actif", establishments: "Établissements", category: "Catégorie", sub_category: "Sous-catégorie",
@@ -24,7 +24,7 @@ export function ImportExportModal({ etabSlug, onClose, onDone }: { etabSlug: str
   const [busy, setBusy] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
-  const [result, setResult] = useState<{ modifies: number; crees: number; echecs: Err[] } | null>(null);
+  const [result, setResult] = useState<{ modifies: number; crees: number; prix_maj?: number; echecs: Err[] } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [perimetre, setPerimetre] = useState<string>(monEtab);
   const [inactifs, setInactifs] = useState(false);
@@ -145,6 +145,7 @@ export function ImportExportModal({ etabSlug, onClose, onDone }: { etabSlug: str
                 <span style={{ fontSize: 13 }}><strong>{preview.lignes}</strong> lignes lues</span>
                 <span style={{ fontSize: 13, color: "#2f7a4a" }}><strong>{preview.a_modifier}</strong> à modifier</span>
                 <span style={{ fontSize: 13, color: "#3f6a8a" }}><strong>{preview.a_creer}</strong> à créer</span>
+                {preview.prix_maj ? <span style={{ fontSize: 13, color: "#8a5a2b" }}>dont <strong>{preview.prix_maj}</strong> prix mis à jour</span> : null}
                 <span style={{ fontSize: 13, color: preview.erreurs.length ? "#b91c1c" : "#6f6656" }}><strong>{preview.erreurs.length}</strong> avertissement{preview.erreurs.length > 1 ? "s" : ""}</span>
               </div>
               {preview.erreurs.length > 0 && (
@@ -180,7 +181,7 @@ export function ImportExportModal({ etabSlug, onClose, onDone }: { etabSlug: str
 
           {result && (
             <div style={{ marginTop: 12, background: result.echecs.length ? "#fbf0dc" : "#e6f2e9", borderRadius: 10, padding: "10px 12px", fontSize: 13 }}>
-              <strong>{result.modifies}</strong> produit{result.modifies > 1 ? "s" : ""} modifié{result.modifies > 1 ? "s" : ""}{result.crees ? <>, <strong>{result.crees}</strong> créé{result.crees > 1 ? "s" : ""}</> : null}.
+              <strong>{result.modifies}</strong> produit{result.modifies > 1 ? "s" : ""} modifié{result.modifies > 1 ? "s" : ""}{result.crees ? <>, <strong>{result.crees}</strong> créé{result.crees > 1 ? "s" : ""}</> : null}{result.prix_maj ? <>, <strong>{result.prix_maj}</strong> prix mis à jour</> : null}.
               {result.echecs.length > 0 && <div style={{ marginTop: 6, color: "#7a2e26" }}>{result.echecs.length} ligne{result.echecs.length > 1 ? "s" : ""} refusée{result.echecs.length > 1 ? "s" : ""} : {result.echecs.slice(0, 5).map((e) => `L${e.ligne} ${e.nom} (${e.message})`).join(" · ")}</div>}
             </div>
           )}

@@ -40,7 +40,42 @@ function isoDaysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export async function autoImportFactures(etabId: string, days = 5, dossier: PlDossier = "bello"): Promise<AutoImportResult> {
+export type AutoImportCandidat = { pennylane_id: number; fournisseur: string; invoice_number: string | null; date: string | null; montant_ttc: number | null; fichier: boolean; deja_dans_app: boolean; libelle_pennylane: string | null };
+
+/** Liste ce que l'import automatique traiterait sur la fenêtre, SANS rien écrire (factures de la mercuriale non encore passées). */
+export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello"): Promise<{ periode: { from: string; to: string }; candidats: AutoImportCandidat[] }> {
+  const from = isoDaysAgo(days);
+  const to = new Date().toISOString().slice(0, 10);
+  const [invoices, plSuppliers, { data: appSuppliers }] = await Promise.all([
+    getSupplierInvoices(from, to, dossier), getSuppliers(dossier),
+    supabaseAdmin.from("suppliers").select("name").eq("is_active", true),
+  ]);
+  const plNameById = new Map(plSuppliers.map((s) => [s.id, s.name]));
+  const mercuriale = (appSuppliers ?? []).map((s) => norm(s.name as string)).filter((n) => n.length > 3);
+  const ids = invoices.map((i) => i.id);
+  const traitees = new Set<number>();
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data } = await supabaseAdmin.from("auto_import_factures").select("pennylane_id, statut").in("pennylane_id", ids.slice(i, i + 100));
+    for (const r of data ?? []) if (r.statut !== "erreur") traitees.add(Number(r.pennylane_id));
+  }
+  const numeros = invoices.map((i) => i.invoice_number).filter((n): n is string => !!n);
+  const connues = new Set<string>();
+  for (let i = 0; i < numeros.length; i += 100) {
+    const { data } = await supabaseAdmin.from("supplier_invoices").select("invoice_number").in("invoice_number", numeros.slice(i, i + 100));
+    for (const r of data ?? []) connues.add(String(r.invoice_number));
+  }
+  const candidats: AutoImportCandidat[] = [];
+  for (const inv of invoices) {
+    if (traitees.has(inv.id) || inv.archived_at) continue;
+    const fournisseur = inv.supplier?.id ? (plNameById.get(inv.supplier.id) ?? "?") : "?";
+    const nf = norm(fournisseur);
+    if (!(nf.length > 3 && mercuriale.some((m) => nf.includes(m) || m.includes(nf)))) continue;
+    candidats.push({ pennylane_id: inv.id, fournisseur, invoice_number: inv.invoice_number ?? null, date: inv.date ?? null, montant_ttc: Number(inv.currency_amount ?? 0) || null, fichier: !!inv.public_file_url, deja_dans_app: !!inv.invoice_number && connues.has(inv.invoice_number), libelle_pennylane: (inv as { label?: string }).label ?? null });
+  }
+  return { periode: { from, to }, candidats };
+}
+
+export async function autoImportFactures(etabId: string, days = 30, dossier: PlDossier = "bello"): Promise<AutoImportResult> {
   const from = isoDaysAgo(days);
   const to = new Date().toISOString().slice(0, 10);
   const userId = process.env.AUTO_IMPORT_USER_ID ?? "bd335e2e-6a50-4311-89b4-8f735cf6bc0b";
