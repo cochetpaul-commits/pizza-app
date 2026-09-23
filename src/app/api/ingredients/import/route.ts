@@ -151,7 +151,8 @@ export async function POST(req: NextRequest) {
       if (b === "invalide") erreurs.push({ ligne, nom: nomCell, message: `Base de prix « ${String(prixCells.base)} » : kg, L ou pièce` });
       else if (u === "invalide" || nb === "invalide" || cond === "invalide") erreurs.push({ ligne, nom: nomCell, message: "Prix : une des cellules n'est pas un nombre" });
       else {
-        const base: PrixBase | null = b ?? actuel.base ?? (avant?.default_unit === "kg" || avant?.default_unit === "g" ? "kg" : avant?.default_unit === "l" ? "L" : "pièce");
+        const uniteFiche = (avant?.default_unit ?? patch.default_unit) as string | undefined;
+        const base: PrixBase | null = b ?? actuel.base ?? (uniteFiche === "kg" || uniteFiche === "g" ? "kg" : uniteFiche === "l" ? "L" : "pièce");
         let unitaire = u, condP = cond;
         const nbU = nb;
         if (unitaire == null && condP != null && nbU != null && nbU > 0) unitaire = Math.round((condP / nbU) * 10000) / 10000;
@@ -199,6 +200,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Conflit de nom (index unique établissement + nom) : signalé ici plutôt que refusé à l'enregistrement
+    if (nouveau && !patch.supplier_id) {
+      // Nouvelle fiche : le fournisseur vient de la colonne « Fournisseur (info) », sinon d'une réf. connue
+      const etabNouv = etabIdOf(((patch.establishments as string[]) ?? [etabDefaut])[0]);
+      const skuNouv = String(cellOf(row, "supplier_sku") ?? "").trim();
+      const sidNouv = fournisseurParNom(cellOf(row, "fournisseur"), etabNouv) ?? (skuNouv ? fournisseurParRef.get(skuNouv) : undefined) ?? null;
+      if (sidNouv) { patch.supplier_id = sidNouv; patch.default_supplier_id = sidNouv; champs.fournisseur = { avant: null, apres: (fournisseursAll ?? []).find((f) => f.id === sidNouv)?.name ?? sidNouv }; }
+      else if (cellOf(row, "fournisseur")) erreurs.push({ ligne, nom: nomCell, message: `Fournisseur « ${String(cellOf(row, "fournisseur"))} » inconnu pour cet établissement — fiche créée sans fournisseur` });
+    }
     if (patch.name) {
       const etabFiche = (avant?.etablissement_id as string | null) ?? etabIdOf(((patch.establishments as string[]) ?? [etabDefaut])[0]);
       const conflit = nomsParEtab.get(`${etabFiche}|${lowerKey(patch.name)}`);
