@@ -63,11 +63,20 @@ export function RequireRole({
  * « Chargement… » qui ne peut pas durer éternellement : au-delà de 12 s
  * (session coincée, réseau coupé), on propose de recharger l'app.
  */
-function LoadingWithRescue() {
+export function LoadingWithRescue() {
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setSlow(true), 12000);
-    return () => clearTimeout(t);
+    // Au-delà de 20 s, un rechargement automatique — une seule fois par
+    // session, pour ne pas boucler si le réseau est vraiment coupé.
+    const auto = setTimeout(() => {
+      try {
+        if (sessionStorage.getItem("pizza-app-auto-reload") === "1") return;
+        sessionStorage.setItem("pizza-app-auto-reload", "1");
+        window.location.reload();
+      } catch { /* stockage indisponible : on laisse le bouton */ }
+    }, 20000);
+    return () => { clearTimeout(t); clearTimeout(auto); };
   }, []);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, justifyContent: "center", alignItems: "center", minHeight: "40vh" }}>

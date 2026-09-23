@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { LoadingWithRescue } from "@/components/RequireRole";
 
 export default function RootPage() {
   const router = useRouter();
@@ -45,15 +46,11 @@ export default function RootPage() {
     router.replace("/dashboard");
   }, [profileLoading, etabLoading, role, isGroupAdmin, etablissements, setCurrent, setGroupView, router]);
 
+  // Même écran de secours que les pages protégées : bouton Recharger après
+  // 12 s, rechargement automatique après 20 s (app bureau coincée au démarrage).
   return (
-    <div style={{
-      minHeight: "100dvh",
-      background: "#f5f3f0",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-    }}>
-      <span style={{ fontSize: 13, color: "#999" }}>Chargement...</span>
+    <div style={{ minHeight: "100dvh", background: "#f5f3f0", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <LoadingWithRescue />
     </div>
   );
 }
