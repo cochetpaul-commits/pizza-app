@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { roleDenied } from "@/lib/getEtablissement";
 import { CATEGORIES } from "@/types/ingredients";
-import { COLS, EDITABLE, HEADER_TO_KEY, SHEET_PRODUITS, UNITES_BASE, boolIn, numIn, estabsIn, allergensIn, statusIn, norm, prixDepuisOffre, prixBaseIn, type ColKey, type PrixBase } from "@/lib/ingredientsSheet";
+import { COLS, EDITABLE, HEADER_TO_KEY, SHEET_PRODUITS, UNITES_BASE, boolIn, numIn, estabsIn, allergensIn, statusIn, norm, prixDepuisOffre, prixBaseIn, dateIn, type ColKey, type PrixBase } from "@/lib/ingredientsSheet";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -13,6 +13,7 @@ type Erreur = { ligne: number; nom: string; message: string };
 
 const NUM_KEYS: ColKey[] = ["order_quantity", "piece_weight_g", "piece_volume_ml", "density_g_per_ml", "stock_min", "stock_objectif", "stock_max"];
 const TXT_KEYS: ColKey[] = ["name", "sub_category", "order_unit_label", "storage_zone", "storage_zone_2", "popina_name"];
+// supplier_sku et prix_date sont traités avec le bloc prix (ils vivent sur l'offre, pas sur le produit)
 
 /**
  * POST /api/ingredients/import  (multipart : file, mode=preview|commit, etab=bellomio|piccola)
@@ -53,8 +54,20 @@ export async function POST(req: NextRequest) {
 
   const { data: zones } = await supabaseAdmin.from("storage_zones").select("name");
   const zoneByNorm = new Map((zones ?? []).map((z) => [norm(z.name), z.name as string]));
-  const { data: offersAll } = await supabaseAdmin.from("v_latest_offers").select("*").range(0, 4999);
-  const offerBy = new Map((offersAll ?? []).map((o) => [o.ingredient_id as string, o as Record<string, unknown>]));
+  const { data: offersAll } = await supabaseAdmin.from("supplier_offers").select("*").eq("is_active", true).order("created_at", { ascending: false }).range(0, 4999);
+  const offerBy = new Map<string, Record<string, unknown>>();
+  for (const o of (offersAll ?? []) as Record<string, unknown>[]) if (!offerBy.has(o.ingredient_id as string)) offerBy.set(o.ingredient_id as string, o);
+  const [{ data: etabs }, { data: fournisseursAll }] = await Promise.all([
+    supabaseAdmin.from("etablissements").select("id, slug"),
+    supabaseAdmin.from("suppliers").select("id, name, etablissement_id").eq("is_active", true),
+  ]);
+  const etabIdOf = (slug: string) => (etabs ?? []).find((e) => String(e.slug).includes(slug === "bellomio" ? "bello" : "piccola"))?.id ?? null;
+  // Fournisseur de secours : par NOM, pour l'établissement de la fiche (Mael Bello ≠ Mael Piccola)
+  const fournisseurParNom = (nom: unknown, etabId: string | null): string | null => {
+    const k = norm(nom); if (!k) return null;
+    const cands = (fournisseursAll ?? []).filter((f) => norm(f.name) === k);
+    return (cands.find((f) => f.etablissement_id === etabId) ?? cands[0])?.id ?? null;
+  };
 
   // Produits concernés (par tranches de 150 IDs)
   const ids = sheetRows.map((r) => String(r[[...headerMap.entries()].find(([, k]) => k === "id")![0]] ?? "").trim()).filter(Boolean);
@@ -62,6 +75,15 @@ export async function POST(req: NextRequest) {
   for (let i = 0; i < ids.length; i += 150) {
     const { data } = await supabaseAdmin.from("ingredients").select("*").in("id", ids.slice(i, i + 150));
     for (const r of data ?? []) existing.set(r.id as string, r as Record<string, unknown>);
+  }
+
+  // Noms du fichier → fiches existantes portant ce nom (pour le contrôle de conflit)
+  const lowerKey = (v: unknown) => String(v ?? "").trim().toLowerCase();
+  const nomsFichier = [...new Set(sheetRows.map((r) => { const h = [...headerMap.entries()].find(([, k]) => k === "name")?.[0]; return h ? lowerKey(r[h]) : ""; }).filter(Boolean))];
+  const nomsParEtab = new Map<string, { id: string; name: string; is_active: boolean }>();
+  for (let i = 0; i < nomsFichier.length; i += 100) {
+    const { data } = await supabaseAdmin.from("ingredients").select("id, name, is_active, etablissement_id").in("name_key", nomsFichier.slice(i, i + 100));
+    for (const r of data ?? []) nomsParEtab.set(`${r.etablissement_id}|${lowerKey(r.name)}`, { id: r.id as string, name: r.name as string, is_active: !!r.is_active });
   }
 
   const changements: Changement[] = [];
@@ -94,6 +116,7 @@ export async function POST(req: NextRequest) {
       const s = String(raw ?? "").trim();
       switch (key) {
         case "name": if (s) set("name", s); else if (!nouveau) erreurs.push({ ligne, nom: String(avant?.name ?? ""), message: "Nom vide — conservé" }); break;
+        case "supplier_sku": case "prix_date": break; // traités avec le prix
         case "is_active": case "favori_commande": { const b = boolIn(s); if (s && b === undefined) erreurs.push({ ligne, nom: nomCell, message: `${key} : « ${s} » n'est ni oui ni non` }); else if (b !== undefined) set(key, b); break; }
         case "establishments": { const e = estabsIn(s); if (e === "invalide") erreurs.push({ ligne, nom: nomCell, message: `Établissements « ${s} » non reconnus` }); else if (e) set("establishments", e); break; }
         case "category": { if (!s) break; const c = s.toLowerCase(); if (!(CATEGORIES as readonly string[]).includes(c)) erreurs.push({ ligne, nom: nomCell, message: `Catégorie « ${s} » inconnue (voir feuille Listes)` }); else set("category", c); break; }
@@ -122,16 +145,46 @@ export async function POST(req: NextRequest) {
         if (condP == null && unitaire != null && nbU != null && nbU > 0) condP = Math.round(unitaire * nbU * 100) / 100;
         const diff = (x: number | null, y: number | null) => (x ?? null) !== (y ?? null) && !(x != null && y != null && Math.abs(x - y) < 0.005);
         const change = base !== actuel.base || diff(unitaire, actuel.unitaire) || diff(nbU, actuel.nb) || diff(condP, actuel.cond);
-        if (change && unitaire != null && unitaire > 0) {
-          const sid = (id ? (offerBy.get(id)?.supplier_id as string | undefined) : undefined) ?? (avant?.supplier_id as string | undefined) ?? null;
-          if (!sid && !nouveau) erreurs.push({ ligne, nom: nomCell, message: "Prix non appliqué : ce produit n'a pas de fournisseur (à renseigner dans l'appli d'abord)" });
+        const skuCell = cellOf(row, "supplier_sku"), dateCell = cellOf(row, "prix_date");
+        const sku = skuCell === undefined ? (actuel.sku ?? null) : (String(skuCell ?? "").trim() || null);
+        const dateP = dateCell === undefined ? null : dateIn(dateCell);
+        if (dateP === "invalide") erreurs.push({ ligne, nom: nomCell, message: `Date du prix « ${String(dateCell)} » illisible (AAAA-MM-JJ ou JJ/MM/AAAA)` });
+        const skuChange = skuCell !== undefined && (sku ?? null) !== (actuel.sku ?? null) && actuel.unitaire != null;
+        const dateChange = dateP != null && dateP !== "invalide" && actuel.unitaire != null && dateP !== (actuel.date ?? null);
+        if (!change && (skuChange || dateChange) && id && offerBy.get(id)) {
+          // Prix inchangé : on corrige l'offre active sur place, pas de nouvelle offre
+          (row as Record<string, unknown>).__offreMaj = { offre_id: offerBy.get(id)!.id as string, sku, date: dateP === "invalide" ? null : dateP };
+          champs.prix_ref = { avant: `${actuel.sku ? "réf. " + actuel.sku : "sans réf."} · ${actuel.date ?? "sans date"}`, apres: `${sku ? "réf. " + sku : "sans réf."} · ${dateP && dateP !== "invalide" ? dateP : actuel.date ?? "sans date"}` };
+          if (skuChange) { patch.supplier_sku = sku; }
+        } else if (change && unitaire != null && unitaire > 0) {
+          const etabFiche = (avant?.etablissement_id as string | null) ?? etabIdOf(((patch.establishments as string[]) ?? [etabDefaut])[0]);
+          // Ordre : fournisseur de l'offre active (celui que le produit utilise déjà),
+          // puis fournisseur par défaut / de la fiche, puis le nom de la colonne.
+          const sid = (id ? (offerBy.get(id)?.supplier_id as string | undefined) : undefined)
+            ?? (avant?.default_supplier_id as string | undefined)
+            ?? (avant?.supplier_id as string | undefined)
+            ?? fournisseurParNom(cellOf(row, "fournisseur"), etabFiche)
+            ?? null;
+          if (!sid) erreurs.push({ ligne, nom: nomCell, message: `Prix non appliqué : aucun fournisseur trouvé${cellOf(row, "fournisseur") ? ` (« ${String(cellOf(row, "fournisseur"))} » inconnu pour cet établissement)` : " (colonne Fournisseur vide)"}` });
           else {
-            (row as Record<string, unknown>).__prix = { base, unitaire, nb: nbU, cond: condP, sid };
-            champs.prix = { avant: actuel.unitaire != null ? `${actuel.unitaire} €/${actuel.base}${actuel.cond ? ` · ${actuel.cond} € les ${actuel.nb}` : ""}` : null, apres: `${unitaire} €/${base}${condP && nbU ? ` · ${condP} € les ${nbU}` : ""}` };
+            (row as Record<string, unknown>).__prix = { base, unitaire, nb: nbU, cond: condP, sid, sku, date: dateP === "invalide" ? null : dateP };
+            if (sku && sku !== (avant?.supplier_sku ?? null)) patch.supplier_sku = sku;
+            const dApres = dateP && dateP !== "invalide" ? dateP : new Date().toISOString().slice(0, 10);
+            champs.prix = { avant: actuel.unitaire != null ? `${actuel.unitaire} €/${actuel.base}${actuel.cond ? ` · ${actuel.cond} € les ${actuel.nb}` : ""}${actuel.sku ? ` · réf. ${actuel.sku}` : ""}${actuel.date ? ` · ${actuel.date}` : ""}` : null, apres: `${unitaire} €/${base}${condP && nbU ? ` · ${condP} € les ${nbU}` : ""}${sku ? ` · réf. ${sku}` : ""} · ${dApres}` };
           }
         } else if (change && unitaire == null && (condP != null || nbU != null)) {
           erreurs.push({ ligne, nom: nomCell, message: "Prix : il manque le prix unitaire ou le nombre d'unités par conditionnement" });
         }
+      }
+    }
+
+    // Conflit de nom (index unique établissement + nom) : signalé ici plutôt que refusé à l'enregistrement
+    if (patch.name) {
+      const etabFiche = (avant?.etablissement_id as string | null) ?? etabIdOf(((patch.establishments as string[]) ?? [etabDefaut])[0]);
+      const conflit = nomsParEtab.get(`${etabFiche}|${lowerKey(patch.name)}`);
+      if (conflit && conflit.id !== id) {
+        erreurs.push({ ligne, nom: nomCell, message: `Nom déjà pris dans cet établissement par « ${conflit.name} » (${conflit.is_active ? "active" : "inactive"}) — le renommage est ignoré${conflit.is_active ? "" : " ; fusionne ou renomme l'ancienne fiche d'abord"}` });
+        delete patch.name; delete champs.name;
       }
     }
 
@@ -146,35 +199,43 @@ export async function POST(req: NextRequest) {
   });
 
   if (mode !== "commit") {
-    return NextResponse.json({ ok: true, mode: "preview", lignes: sheetRows.length, a_modifier: changements.filter((c) => !c.nouveau).length, a_creer: changements.filter((c) => c.nouveau).length, changements: changements.slice(0, 400), erreurs });
+    return NextResponse.json({ ok: true, mode: "preview", lignes: sheetRows.length, a_modifier: changements.filter((c) => !c.nouveau).length, a_creer: changements.filter((c) => c.nouveau).length, prix_maj: changements.filter((c) => c.champs.prix).length, refs_maj: changements.filter((c) => c.champs.prix_ref).length, changements: changements.slice(0, 400), erreurs });
   }
 
   // Application
   const authHeader = req.headers.get("authorization") ?? "";
   const { data: auth } = await supabaseAdmin.auth.getUser(authHeader.replace(/^Bearer\s+/i, ""));
   const userId = auth?.user?.id ?? null;
-  const { data: etabs } = await supabaseAdmin.from("etablissements").select("id, slug");
-  const etabIdOf = (slug: string) => (etabs ?? []).find((e) => String(e.slug).includes(slug === "bellomio" ? "bello" : "piccola"))?.id ?? null;
 
-  let modifies = 0, crees = 0;
+  let modifies = 0, crees = 0, prixMaj = 0, refsMaj = 0;
   const echecs: Erreur[] = [];
-  const todo = sheetRows.map((r, i) => ({ row: r, idx: i })).filter(({ row }) => Object.keys((row.__patch as Record<string, unknown>) ?? {}).length || row.__prix);
-  type Prix = { base: PrixBase; unitaire: number; nb: number | null; cond: number | null; sid: string | null };
+  const todo = sheetRows.map((r, i) => ({ row: r, idx: i })).filter(({ row }) => Object.keys((row.__patch as Record<string, unknown>) ?? {}).length || row.__prix || row.__offreMaj);
+  type Prix = { base: PrixBase; unitaire: number; nb: number | null; cond: number | null; sid: string | null; sku: string | null; date: string | null };
   const ecrireOffre = async (ingredientId: string, ing: Record<string, unknown> | undefined, p: Prix): Promise<string | null> => {
     const sid = p.sid ?? (ing?.supplier_id as string | null) ?? null;
     if (!sid) return "pas de fournisseur";
     const etabId = (ing?.etablissement_id as string | null) ?? null;
-    const commun = { user_id: userId, ingredient_id: ingredientId, supplier_id: sid, is_active: true, density_kg_per_l: null, piece_weight_g: (ing?.piece_weight_g as number | null) ?? null, ...(etabId ? { etablissement_id: etabId } : {}) };
+    const aujourdhui = new Date().toISOString().slice(0, 10);
+    const commun = { user_id: userId, ingredient_id: ingredientId, supplier_id: sid, is_active: true, density_kg_per_l: null, piece_weight_g: (ing?.piece_weight_g as number | null) ?? null, supplier_sku: p.sku, valid_from: p.date ?? aujourdhui, ...(etabId ? { etablissement_id: etabId } : {}) };
     const pack = p.nb != null && p.nb > 0 && p.cond != null && p.cond > 0;
     const payload = p.base === "pièce"
       ? (pack ? { ...commun, price_kind: "pack_composed", pack_price: p.cond, price: p.cond, pack_count: p.nb, pack_each_unit: "pc", pack_each_qty: null }
               : { ...commun, price_kind: "unit", unit: "pc", unit_price: p.unitaire, price: p.unitaire })
       : (pack ? { ...commun, price_kind: "pack_simple", pack_price: p.cond, price: p.cond, pack_total_qty: p.nb, pack_unit: p.base === "kg" ? "kg" : "l", unit: p.base === "kg" ? "kg" : "l", unit_price: p.unitaire }
               : { ...commun, price_kind: "unit", unit: p.base === "kg" ? "kg" : "l", unit_price: p.unitaire, price: p.unitaire });
-    const off = await supabaseAdmin.from("supplier_offers").update({ is_active: false }).eq("ingredient_id", ingredientId).eq("is_active", true);
-    if (off.error) return off.error.message;
+    // L'ancienne offre est clôturée (valid_to), jamais supprimée : l'historique des prix reste.
+    // valid_to ne descend jamais sous le valid_from de l'offre fermée.
+    const { data: anciennes } = await supabaseAdmin.from("supplier_offers").select("id, valid_from").eq("ingredient_id", ingredientId).eq("is_active", true);
+    const dateNouvelle = p.date ?? aujourdhui;
+    for (const a of anciennes ?? []) {
+      const vf = String(a.valid_from ?? "").slice(0, 10);
+      const off = await supabaseAdmin.from("supplier_offers").update({ is_active: false, valid_to: vf && vf > dateNouvelle ? vf : dateNouvelle }).eq("id", a.id);
+      if (off.error) return off.error.message;
+    }
     const ins = await supabaseAdmin.from("supplier_offers").insert(payload);
-    return ins.error ? ins.error.message : null;
+    if (ins.error) return ins.error.message;
+    prixMaj++;
+    return null;
   };
   for (let i = 0; i < todo.length; i += 20) {
     await Promise.all(todo.slice(i, i + 20).map(async ({ row, idx }) => {
@@ -182,7 +243,15 @@ export async function POST(req: NextRequest) {
       const id = String(cellOf(row, "id") ?? "").trim() || null;
       const ligne = idx + 2;
       const prix = row.__prix as Prix | undefined;
+      const offreMaj = row.__offreMaj as { offre_id: string; sku: string | null; date: string | null } | undefined;
       if (id) {
+        if (offreMaj) {
+          const upd: Record<string, unknown> = { supplier_sku: offreMaj.sku, updated_at: new Date().toISOString() };
+          if (offreMaj.date) upd.valid_from = offreMaj.date;
+          const { error } = await supabaseAdmin.from("supplier_offers").update(upd).eq("id", offreMaj.offre_id);
+          if (error) { echecs.push({ ligne, nom: String(patch.name ?? existing.get(id)?.name ?? ""), message: `réf./date : ${error.message}` }); return; }
+          refsMaj++;
+        }
         if (Object.keys(patch).length) {
           const { error } = await supabaseAdmin.from("ingredients").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
           if (error) { echecs.push({ ligne, nom: String(patch.name ?? ""), message: error.message }); return; }
@@ -198,5 +267,5 @@ export async function POST(req: NextRequest) {
       }
     }));
   }
-  return NextResponse.json({ ok: echecs.length === 0, mode: "commit", modifies, crees, echecs, erreurs });
+  return NextResponse.json({ ok: echecs.length === 0, mode: "commit", modifies, crees, prix_maj: prixMaj, refs_maj: refsMaj, echecs, erreurs });
 }

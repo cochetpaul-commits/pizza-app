@@ -532,6 +532,12 @@ export async function runImport(options: {
         // Detect unit weight/volume in name (e.g., "1,5KG", "500G", "75CL")
         // Used to detect that a price is per-pack, not per-kg/L
         const weightInName = l.name ? extractWeightFromName(l.name) : null;
+        // Ligne vendue au poids réel : la quantité est un poids et le prix est
+        // déjà au kilo (ou au litre). Ne jamais le diviser par le poids du
+        // libellé (« JAMBON ROSTELLO ~8 KG » à 11,88 €/kg n'est pas 1,485 €/kg).
+        //  - Mael : notes « poids variable » / « volume variable », libellé avec « ~ »
+        //  - Metro : notes « VAP=… » (vente au poids), quantité = poids pesé
+        const prixDejaAuPoids = /variable|\bVAP\b/i.test(l.notes ?? "") || /~/.test(l.name ?? "");
 
         const offerRow: Record<string, unknown> = {
           user_id: userId,
@@ -559,10 +565,11 @@ export async function runImport(options: {
             offerRow.pack_each_unit = "pc";
           }
           offerRow.piece_weight_g = l.piece_weight_g ?? null;
-        } else if (weightInName && weightInName.totalQty !== 1 && u === weightInName.unit) {
+        } else if (weightInName && weightInName.totalQty !== 1 && u === weightInName.unit && !prixDejaAuPoids) {
           // Weight/volume detected in product name AND matches the offer unit
           // e.g. "HACHE VR 1,5KG" with unit="kg" → price is per barquette (1.5kg), not per kg
-          // Create pack_simple so the unit price is correctly derived
+          // Create pack_simple so the unit price is correctly derived.
+          // Exclu : poids variable (Mael « 8 kg~ », Metro VAP) — le prix est DÉJÀ au kilo.
           offerRow.price_kind = "pack_simple";
           offerRow.pack_price = p;
           offerRow.pack_total_qty = weightInName.totalQty;
@@ -595,14 +602,32 @@ export async function runImport(options: {
     const offerRows = Array.from(offerByIngredient.values());
 
     if (offerRows.length) {
-      const ingredientIds = Array.from(new Set(offerRows.map((x) => String(x.ingredient_id))));
+      // Une facture ancienne ne doit jamais écraser un prix plus récent : on
+      // ne remplace l'offre active que si la date de facture est ≥ son valid_from
+      // (rattrapage d'historique, import Excel daté du jour, etc.).
+      const dateFacture = invoiceDateIso ?? new Date().toISOString().slice(0, 10);
+      const candidatIds = Array.from(new Set(offerRows.map((x) => String(x.ingredient_id))));
+      const plusRecentes = new Set<string>();
+      for (let i = 0; i < candidatIds.length; i += 150) {
+        const { data: actives } = await supabase
+          .from("supplier_offers").select("ingredient_id, valid_from, created_at")
+          .eq("supplier_id", supplierId).eq("is_active", true).in("ingredient_id", candidatIds.slice(i, i + 150));
+        for (const a of actives ?? []) {
+          const vf = String(a.valid_from ?? a.created_at ?? "").slice(0, 10);
+          if (vf && vf > dateFacture) plusRecentes.add(String(a.ingredient_id));
+        }
+      }
+      const offerRowsAppliquees: Record<string, unknown>[] = offerRows
+        .filter((x) => !plusRecentes.has(String(x.ingredient_id)))
+        .map((x) => ({ ...x, valid_from: (x.valid_from as string | undefined) ?? dateFacture }));
+      const ingredientIds = Array.from(new Set(offerRowsAppliquees.map((x) => String(x.ingredient_id))));
 
       // Deactivate previous offers for ALL ingredients (including validated ones)
       // Validation protects ingredient metadata, not prices — imports must always update prices
       if (ingredientIds.length) {
         const dPrev = await supabase
           .from("supplier_offers")
-          .update({ is_active: false })
+          .update({ is_active: false, valid_to: dateFacture })
           .eq("supplier_id", supplierId)
           .in("ingredient_id", ingredientIds)
           .eq("is_active", true);
@@ -610,7 +635,7 @@ export async function runImport(options: {
         if (dPrev.error) throw new Error(dPrev.error.message);
       }
 
-      for (const row of offerRows) {
+      for (const row of offerRowsAppliquees) {
         const ingId = String(row.ingredient_id);
 
         let r = await supabase.from("supplier_offers").insert(row);
@@ -618,7 +643,7 @@ export async function runImport(options: {
         if (r.error && (r.error as { code?: string }).code === "23505") {
           const d2 = await supabase
             .from("supplier_offers")
-            .update({ is_active: false })
+            .update({ is_active: false, valid_to: dateFacture })
             .eq("supplier_id", supplierId)
             .eq("ingredient_id", ingId)
             .eq("is_active", true);
