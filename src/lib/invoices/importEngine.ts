@@ -308,21 +308,31 @@ export async function runImport(options: {
       new Set(lines.map((l) => (l.name ?? "").trim()).filter((s) => s.length > 0))
     );
 
+    // Le même fournisseur existe une fois par établissement (Mael Bello / Mael Piccola) :
+    // une référence article vaut pour toutes ses lignes. Et les fiches appartiennent à
+    // plusieurs utilisateurs (Paul, Pierre, import auto) : NE PAS filtrer par user_id,
+    // sinon l'import recrée des doublons de fiches déjà existantes.
+    const { data: aliasRows } = await supabase.from("suppliers").select("id, name");
+    const supplierNameNorm = normalizeIngredientName(String((aliasRows ?? []).find((r) => r.id === supplierId)?.name ?? supplierName));
+    const supplierAliasIds = (aliasRows ?? []).filter((r) => normalizeIngredientName(String(r.name ?? "")) === supplierNameNorm).map((r) => r.id as string);
+    if (!supplierAliasIds.includes(supplierId)) supplierAliasIds.push(supplierId);
+
     const skuToIngId = new Map<string, string>();
     if (skus.length) {
-      // Do NOT filter by etablissement_id here — dedup must be global to avoid duplicates
       const skuQ = supabase
         .from("ingredients")
-        .select("id,supplier_sku")
-        .eq("user_id", userId)
-        .eq("supplier_id", supplierId)
+        .select("id,supplier_sku,is_active,supplier_id")
+        .in("supplier_id", supplierAliasIds)
         .in("supplier_sku", skus);
       const { data: bySku, error: eSku } = await skuQ;
 
       if (eSku) throw new Error(eSku.message);
-      for (const r of (bySku ?? []) as Array<{ id: string; supplier_sku: string | null }>) {
+      // Priorité : fiche active, puis fiche rattachée au fournisseur exact
+      const rows = ((bySku ?? []) as Array<{ id: string; supplier_sku: string | null; is_active: boolean; supplier_id: string }>)
+        .sort((a, b) => Number(b.is_active) - Number(a.is_active) || Number(b.supplier_id === supplierId) - Number(a.supplier_id === supplierId));
+      for (const r of rows) {
         const k = String(r.supplier_sku ?? "").trim();
-        if (k) skuToIngId.set(k, r.id);
+        if (k && !skuToIngId.has(k)) skuToIngId.set(k, r.id);
       }
     }
 
@@ -331,11 +341,20 @@ export async function runImport(options: {
     const nameToIngId = new Map<string, string>();
     const normalizedToIngId = new Map<string, string>();
     // Do NOT filter by etablissement_id — dedup must be global to find validated ingredients
-    const allQ = supabase
-      .from("ingredients")
-      .select("id,name,import_name")
-      .eq("user_id", userId);
-    const { data: allExisting, error: eAll } = await allQ;
+    // Toutes les fiches actives, quel que soit le propriétaire (par tranches : plafond PostgREST)
+    const allExisting: Array<{ id: string; name: string; import_name: string | null }> = [];
+    for (let from = 0; ; from += 1000) {
+      const { data: page, error: ePage } = await supabase
+        .from("ingredients")
+        .select("id,name,import_name")
+        .eq("is_active", true)
+        .order("created_at")
+        .range(from, from + 999);
+      if (ePage) throw new Error(ePage.message);
+      allExisting.push(...((page ?? []) as Array<{ id: string; name: string; import_name: string | null }>));
+      if (!page || page.length < 1000) break;
+    }
+    const eAll = null;
 
     if (eAll) throw new Error(eAll.message);
     const baseNameToIngId = new Map<string, string>();
@@ -470,16 +489,17 @@ export async function runImport(options: {
     if (skus.length) {
       const skuQ2 = supabase
         .from("ingredients")
-        .select("id,supplier_sku")
-        .eq("user_id", userId)
-        .eq("supplier_id", supplierId)
+        .select("id,supplier_sku,is_active,supplier_id")
+        .in("supplier_id", supplierAliasIds)
         .in("supplier_sku", skus);
       const { data: bySku2, error: eSku2 } = await skuQ2;
 
       if (eSku2) throw new Error(eSku2.message);
-      for (const r of (bySku2 ?? []) as Array<{ id: string; supplier_sku: string | null }>) {
+      const rows2 = ((bySku2 ?? []) as Array<{ id: string; supplier_sku: string | null; is_active: boolean; supplier_id: string }>)
+        .sort((a, b) => Number(b.is_active) - Number(a.is_active) || Number(b.supplier_id === supplierId) - Number(a.supplier_id === supplierId));
+      for (const r of rows2) {
         const k = String(r.supplier_sku ?? "").trim();
-        if (k) skuToIngId.set(k, r.id);
+        if (k && !skuToIngId.has(k)) skuToIngId.set(k, r.id);
       }
     }
 
