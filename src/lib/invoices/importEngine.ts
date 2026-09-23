@@ -639,10 +639,11 @@ export async function runImport(options: {
       const dateFacture = invoiceDateIso ?? new Date().toISOString().slice(0, 10);
       const candidatIds = Array.from(new Set(offerRows.map((x) => String(x.ingredient_id))));
       const plusRecentes = new Set<string>();
+      // La règle vaut pour les deux lignes d'un même fournisseur (Mael Bello / Mael Piccola)
       for (let i = 0; i < candidatIds.length; i += 150) {
         const { data: actives } = await supabase
           .from("supplier_offers").select("ingredient_id, valid_from, created_at")
-          .eq("supplier_id", supplierId).eq("is_active", true).in("ingredient_id", candidatIds.slice(i, i + 150));
+          .in("supplier_id", supplierAliasIds).eq("is_active", true).in("ingredient_id", candidatIds.slice(i, i + 150));
         for (const a of actives ?? []) {
           const vf = String(a.valid_from ?? a.created_at ?? "").slice(0, 10);
           if (vf && vf > dateFacture) plusRecentes.add(String(a.ingredient_id));
@@ -659,7 +660,7 @@ export async function runImport(options: {
         const dPrev = await supabase
           .from("supplier_offers")
           .update({ is_active: false, valid_to: dateFacture })
-          .eq("supplier_id", supplierId)
+          .in("supplier_id", supplierAliasIds)
           .in("ingredient_id", ingredientIds)
           .eq("is_active", true);
 
@@ -675,7 +676,7 @@ export async function runImport(options: {
           const d2 = await supabase
             .from("supplier_offers")
             .update({ is_active: false, valid_to: dateFacture })
-            .eq("supplier_id", supplierId)
+            .in("supplier_id", supplierAliasIds)
             .eq("ingredient_id", ingId)
             .eq("is_active", true);
 
