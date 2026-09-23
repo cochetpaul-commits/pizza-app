@@ -228,7 +228,7 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
     // (sinon l'offre partait en pack_composed sans unit_price : vécu sur les offres Excel du 23/09)
     const pack = p.nb != null && p.nb > 1 && p.cond != null && p.cond > 0;
     const payload = p.base === "pièce"
-      ? (pack ? { ...commun, price_kind: "pack_composed", pack_price: p.cond, price: p.cond, pack_count: p.nb, pack_each_unit: "pc", pack_each_qty: null }
+      ? (pack ? { ...commun, price_kind: "pack_composed", pack_price: p.cond, price: p.cond, pack_count: p.nb, pack_each_unit: "pc", pack_each_qty: null, unit: "pc", unit_price: Math.round((p.cond! / p.nb!) * 10000) / 10000 }
               : { ...commun, price_kind: "unit", unit: "pc", unit_price: p.unitaire, price: p.unitaire })
       : (pack ? { ...commun, price_kind: "pack_simple", pack_price: p.cond, price: p.cond, pack_total_qty: p.nb, pack_unit: p.base === "kg" ? "kg" : "l", unit: p.base === "kg" ? "kg" : "l", unit_price: p.unitaire }
               : { ...commun, price_kind: "unit", unit: p.base === "kg" ? "kg" : "l", unit_price: p.unitaire, price: p.unitaire });
