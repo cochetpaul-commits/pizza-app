@@ -354,9 +354,7 @@ export async function runImport(options: {
       allExisting.push(...((page ?? []) as Array<{ id: string; name: string; import_name: string | null }>));
       if (!page || page.length < 1000) break;
     }
-    const eAll = null;
 
-    if (eAll) throw new Error(eAll.message);
     const baseNameToIngId = new Map<string, string>();
     for (const r of (allExisting ?? []) as Array<{ id: string; name: string; import_name: string | null }>) {
       // Clé primaire = import_name (stable) ; si absent, fallback sur name
