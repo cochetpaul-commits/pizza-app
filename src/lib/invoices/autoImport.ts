@@ -175,7 +175,10 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
     const estMercuriale = nf.length > 3 && mercuriale.some((m) => nf.includes(m) || m.includes(nf));
     // Nom du fournisseur tel qu'il existe dans l'appli (« Mael »), pas le libellé Pennylane
     // (« SAS MAEL ») : sinon le scan IA créait une ligne fournisseur parallèle sans fiches.
-    const fournisseurApp = (appSuppliers ?? []).map((s) => s.name as string).find((n) => { const k = norm(n); return k.length > 3 && (nf.includes(k) || k.includes(nf)); }) ?? fournisseur;
+    // Nom du fournisseur côté appli : correspondance exacte d'abord, sinon le nom le plus long qui
+    // correspond (« Armor Emballages » avant « Armor » : vécu 23/09, deux lignes créées pour Bello).
+    const candidatsApp = (appSuppliers ?? []).map((s) => s.name as string).filter((n) => { const k = norm(n); return k.length > 3 && (nf.includes(k) || k.includes(nf)); });
+    const fournisseurApp = candidatsApp.find((n) => norm(n) === nf) ?? candidatsApp.sort((a, b) => b.length - a.length)[0] ?? fournisseur;
     // Rattrapage par lots : ne traiter que certains fournisseurs, sans marquer les autres
     if (seulement.length && !seulement.some((f) => nf.includes(f) || f.includes(nf))) { res.examinees--; continue; }
     if (numeros.size && !numeros.has(String(inv.invoice_number ?? "").trim())) { res.examinees--; continue; }
@@ -262,7 +265,10 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
           const scan = await geminiVisionParse(bytes, mime, fournisseur);
           payload = scan.invoice as unknown as ParsedInvoice;
           parserUtilise = "scan-ia";
-          supplierName = fournisseurApp.toUpperCase();
+          // Même nom que le parser dédié quand le fournisseur est reconnu dans le texte (une seule ligne fournisseur)
+          const detScan = rawText ? detectInvoice(rawText) : null;
+          const entryScan = detScan?.supplier ? PARSERS[detScan.supplier.slug] : undefined;
+          supplierName = entryScan?.supplierName ?? fournisseurApp.toUpperCase();
           defaultUnit = "pc";
         } catch (e) {
           // Message complet (un item par modèle essayé) pour comprendre un refus en prod
