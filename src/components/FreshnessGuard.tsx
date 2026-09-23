@@ -7,12 +7,29 @@ import { useEffect } from "react";
  * garde en mémoire des fichiers qui n'existent plus sur le serveur — au
  * retour au premier plan, plus rien ne répond (menu vide, écran figé).
  *
- *  1. Au retour au premier plan (et toutes les 15 min), on compare la
+ *  1. Au retour au premier plan (et toutes les 5 min), on compare la
  *     version du serveur à celle chargée : différente → rechargement.
  *  2. Si un fichier de l'app (/_next/…) ne se charge plus → rechargement.
  * Anti-boucle : au plus un rechargement automatique par minute.
  */
 const RELOAD_KEY = "pizza-app-fresh-reload";
+
+declare global { interface Window { __pizzaAppVersion?: string | null } }
+
+/**
+ * À appeler avant une action sensible (import de la base produits…) : true si une
+ * nouvelle version est en ligne depuis l'ouverture de la page. La page est alors
+ * rechargée pour que l'écran corresponde au serveur.
+ */
+export async function versionPerimee(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/version", { cache: "no-store" });
+    const { v } = (await res.json()) as { v?: string };
+    const initial = window.__pizzaAppVersion;
+    if (!v || v === "dev" || !initial) return false;
+    return v !== initial;
+  } catch { return false; }
+}
 
 function safeReload() {
   try {
@@ -33,7 +50,7 @@ export function FreshnessGuard() {
         const res = await fetch("/api/version", { cache: "no-store" });
         const { v } = (await res.json()) as { v?: string };
         if (cancelled || !v || v === "dev") return;
-        if (initial == null) { initial = v; return; }
+        if (initial == null) { initial = v; window.__pizzaAppVersion = v; return; }
         if (v !== initial) safeReload();
       } catch { /* hors ligne : on réessaiera */ }
     };
@@ -44,7 +61,7 @@ export function FreshnessGuard() {
     // Restauration depuis le cache navigateur (retour PWA) : re-vérifier aussi
     const onPageShow = (e: PageTransitionEvent) => { if (e.persisted) check(); };
     window.addEventListener("pageshow", onPageShow);
-    const timer = window.setInterval(check, 15 * 60_000);
+    const timer = window.setInterval(check, 5 * 60_000);
 
     // Échec de chargement d'un chunk Next (script ou CSS) → app périmée
     const onResourceError = (e: Event) => {

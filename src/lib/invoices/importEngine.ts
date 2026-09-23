@@ -8,7 +8,7 @@ import { detectCategoryFromName, normalizeIngredientName } from "@/lib/invoices/
 import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { extractPackFromName, extractVolumeFromName, extractWeightGFromName, extractWeightFromName } from "@/lib/invoices/utils";
 import type { Category } from "@/types/ingredients";
-import { aliasFournisseur, chargerIndexFiches, trouverFiche, estLigneDeFrais, cleReference, estFournisseurInterne } from "@/lib/invoices/rapprochement";
+import { aliasFournisseur, chargerIndexFiches, trouverFiche, estLigneDeFrais, cleReference, estFournisseurInterne, canoniserNomFournisseur } from "@/lib/invoices/rapprochement";
 
 const execFileAsync = promisify(execFile);
 
@@ -170,25 +170,36 @@ export async function runImport(options: {
   let offresAValider = 0;
   if (estFournisseurInterne(supplierName)) throw new Error("Fournisseur interne (sans facture) : aucun import possible");
 
-  // 1. Upsert supplier (normalize name to Title Case to avoid duplicates)
-  const normalizedName = supplierName
+  // 1. Fournisseur : nom canonique (« Armor Emballages » → « Armor »), Title Case, puis ligne existante
+  // de l'établissement. Une ligne DÉSACTIVÉE (fusionnée) n'est jamais réactivée : on refuse l'import
+  // (vécu 23/09 : « Armor Emballages » Piccola ressuscitée par l'import après sa désactivation).
+  const nomCanon = canoniserNomFournisseur(supplierName);
+  const normalizedName = nomCanon
     .split(/\s+/)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(" ");
-  const supplierRow: Record<string, unknown> = { user_id: userId, name: normalizedName, is_active: true };
-  if (etabId) supplierRow.etablissement_id = etabId;
-  const { data: supRows, error: supErr } = await supabase
-    .from("suppliers")
-    .upsert(supplierRow, { onConflict: "etablissement_id,name" })
-    .select("id,category")
-    .limit(1);
-
-  if (supErr) throw new Error(supErr.message);
-  const supplierId = (supRows?.[0]?.id as string | undefined) ?? null;
+  let supplierId: string | null = null;
+  let existingCat: string | null = null;
+  {
+    let q = supabase.from("suppliers").select("id,category,is_active").eq("name", normalizedName);
+    q = etabId ? q.eq("etablissement_id", etabId) : q.is("etablissement_id", null);
+    const { data: found, error: eFound } = await q.limit(1);
+    if (eFound) throw new Error(eFound.message);
+    const f = found?.[0] as { id: string; category: string | null; is_active: boolean } | undefined;
+    if (f && f.is_active === false) throw new Error(`Fournisseur « ${normalizedName} » désactivé (fusionné ?) : import refusé, à rattacher au bon fournisseur`);
+    if (f) { supplierId = f.id; existingCat = f.category ?? null; }
+  }
+  if (!supplierId) {
+    const supplierRow: Record<string, unknown> = { user_id: userId, name: normalizedName, is_active: true };
+    if (etabId) supplierRow.etablissement_id = etabId;
+    const { data: supRows, error: supErr } = await supabase.from("suppliers").insert(supplierRow).select("id,category").limit(1);
+    if (supErr) throw new Error(supErr.message);
+    supplierId = (supRows?.[0]?.id as string | undefined) ?? null;
+    existingCat = (supRows?.[0]?.category as string | null) ?? null;
+  }
   if (!supplierId) throw new Error(`Supplier ${normalizedName}: id manquant`);
 
   // Auto-fill category if not yet set
-  const existingCat = supRows?.[0]?.category as string | null;
   if (!existingCat) {
     const detectedCat = detectSupplierCategory(normalizedName);
     if (detectedCat) {

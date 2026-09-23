@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchApi } from "@/lib/fetchApi";
+import { versionPerimee } from "@/components/FreshnessGuard";
 import { supabase } from "@/lib/supabaseClient";
 import { CATEGORIES, CAT_LABELS, type Category } from "@/types/ingredients";
 
@@ -60,6 +61,7 @@ export function ImportExportModal({ etabSlug, onClose, onDone }: { etabSlug: str
   }
 
   async function analyser(f: File) {
+    if (await versionPerimee()) { setMsg("Une nouvelle version de l'application est en ligne : la page va se recharger, relancez l'analyse ensuite."); setTimeout(() => window.location.reload(), 1500); return; }
     setBusy("preview"); setMsg(null); setPreview(null); setResult(null);
     const fd = new FormData(); fd.append("file", f); fd.append("mode", "preview"); fd.append("etab", monEtab);
     try {
@@ -72,6 +74,7 @@ export function ImportExportModal({ etabSlug, onClose, onDone }: { etabSlug: str
 
   async function appliquer() {
     if (!file || !preview) return;
+    if (await versionPerimee()) { setMsg("Une nouvelle version de l'application est en ligne : la page va se recharger, refaites l'analyse avant d'appliquer."); setTimeout(() => window.location.reload(), 1500); return; }
     const n = preview.a_modifier + preview.a_creer;
     if (!confirm(`Appliquer ${preview.a_modifier} modification${preview.a_modifier > 1 ? "s" : ""}${preview.a_creer ? ` et créer ${preview.a_creer} produit${preview.a_creer > 1 ? "s" : ""}` : ""} ? (${n} ligne${n > 1 ? "s" : ""})`)) return;
     setBusy("commit");

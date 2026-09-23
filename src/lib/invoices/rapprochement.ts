@@ -17,6 +17,26 @@ type Db = SupabaseClient<any, any, any>;
 export const cleFournisseur = (n: string) =>
   normalizeIngredientName(n).replace(/\b(sas|sarl|sa|eurl|sasu|societe|ste|ets|etablissements|france|europe)\b/g, " ").replace(/\s+/g, " ").trim();
 
+/** Correspondance des noms fournisseurs (parser, Pennylane, scan IA) → nom unique dans l'appli. Clé = nom normalisé sans forme juridique. */
+const NOMS_FOURNISSEURS: Record<string, string> = {
+  "armor emballages": "Armor",
+  "mael": "Mael",
+  "sas mael": "Mael",
+  "carniato europe": "Carniato",
+  "societe de distribution de produits fins s d p f": "Sdpf",
+  "sdpf": "Sdpf",
+  "masse nantes": "Masse",
+  "cozigou cote d emeraude": "Cozigou",
+  "pomona terreazur": "Pomona Terreazur",
+  "terre azur": "Pomona Terreazur",
+  "terreazur": "Pomona Terreazur",
+  "metro": "Metro",
+};
+export function canoniserNomFournisseur(nom: string): string {
+  const cle = cleFournisseur(nom).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  return NOMS_FOURNISSEURS[cle] ?? nom;
+}
+
 /** Fournisseur « Interne (sans facture) » : ingrédients sans achat (eau du robinet…). Jamais de facture, de rapprochement ni d'attente. */
 export function estFournisseurInterne(nom: string | null | undefined): boolean {
   return /^\s*interne\b/i.test(nom ?? "");
