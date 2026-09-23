@@ -141,6 +141,9 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
     const fournisseur = inv.supplier?.id ? (plNameById.get(inv.supplier.id) ?? "?") : "?";
     const nf = norm(fournisseur);
     const estMercuriale = nf.length > 3 && mercuriale.some((m) => nf.includes(m) || m.includes(nf));
+    // Nom du fournisseur tel qu'il existe dans l'appli (« Mael »), pas le libellé Pennylane
+    // (« SAS MAEL ») : sinon le scan IA créait une ligne fournisseur parallèle sans fiches.
+    const fournisseurApp = (appSuppliers ?? []).map((s) => s.name as string).find((n) => { const k = norm(n); return k.length > 3 && (nf.includes(k) || k.includes(nf)); }) ?? fournisseur;
     // Rattrapage par lots : ne traiter que certains fournisseurs, sans marquer les autres
     if (seulement.length && !seulement.some((f) => nf.includes(f) || f.includes(nf))) { res.examinees--; continue; }
 
@@ -190,7 +193,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
       let payload: ParsedInvoice | null = null;
       let rawText = "";
       let parserUtilise = "";
-      let supplierName = fournisseur.toUpperCase();
+      let supplierName = fournisseurApp.toUpperCase();
       let defaultUnit: "g" | "pc" | "kg" | "l" = "g";
       let diag = "";
 
@@ -226,7 +229,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
           const scan = await geminiVisionParse(bytes, mime, fournisseur);
           payload = scan.invoice as unknown as ParsedInvoice;
           parserUtilise = "scan-ia";
-          supplierName = (scan.supplierName || fournisseur).toUpperCase();
+          supplierName = fournisseurApp.toUpperCase();
           defaultUnit = "pc";
         } catch (e) {
           // Message complet (un item par modèle essayé) pour comprendre un refus en prod

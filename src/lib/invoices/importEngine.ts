@@ -313,8 +313,10 @@ export async function runImport(options: {
     // plusieurs utilisateurs (Paul, Pierre, import auto) : NE PAS filtrer par user_id,
     // sinon l'import recrée des doublons de fiches déjà existantes.
     const { data: aliasRows } = await supabase.from("suppliers").select("id, name");
-    const supplierNameNorm = normalizeIngredientName(String((aliasRows ?? []).find((r) => r.id === supplierId)?.name ?? supplierName));
-    const supplierAliasIds = (aliasRows ?? []).filter((r) => normalizeIngredientName(String(r.name ?? "")) === supplierNameNorm).map((r) => r.id as string);
+    // « SAS MAEL », « Mael », « MAEL » : même fournisseur — on ignore la forme juridique
+    const cleFournisseur = (n: string) => normalizeIngredientName(n).replace(/\b(sas|sarl|sa|eurl|sasu|societe|ste|ets|etablissements|france|europe)\b/g, " ").replace(/\s+/g, " ").trim();
+    const supplierNameNorm = cleFournisseur(String((aliasRows ?? []).find((r) => r.id === supplierId)?.name ?? supplierName));
+    const supplierAliasIds = (aliasRows ?? []).filter((r) => cleFournisseur(String(r.name ?? "")) === supplierNameNorm).map((r) => r.id as string);
     if (!supplierAliasIds.includes(supplierId)) supplierAliasIds.push(supplierId);
 
     const skuToIngId = new Map<string, string>();
