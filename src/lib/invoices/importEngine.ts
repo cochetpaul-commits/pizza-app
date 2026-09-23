@@ -582,7 +582,7 @@ export async function runImport(options: {
           establishment: "both",
         };
 
-        if (packInfo && packInfo.count > 1 && l.total_price && l.total_price > 0) {
+        if (packInfo && packInfo.count > 1 && l.total_price && l.total_price > 0 && !prixDejaAuPoids) {
           // Pack detected — use pack_composed or pack_simple
           offerRow.price_kind = "pack_composed";
           offerRow.pack_price = p * (l.quantity ?? 1) > l.total_price ? l.total_price / (l.quantity ?? 1) : p;
