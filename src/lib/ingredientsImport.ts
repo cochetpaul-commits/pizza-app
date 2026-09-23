@@ -224,7 +224,9 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
     const etabId = (ing?.etablissement_id as string | null) ?? null;
     const aujourdhui = new Date().toISOString().slice(0, 10);
     const commun = { user_id: userId, ingredient_id: ingredientId, supplier_id: sid, is_active: true, density_kg_per_l: null, piece_weight_g: (ing?.piece_weight_g as number | null) ?? null, supplier_sku: p.sku, valid_from: p.date ?? aujourdhui, ...(etabId ? { etablissement_id: etabId } : {}) };
-    const pack = p.nb != null && p.nb > 0 && p.cond != null && p.cond > 0;
+    // Un conditionnement de 1 n'est pas un colis : offre à l'unité avec son prix unitaire
+    // (sinon l'offre partait en pack_composed sans unit_price : vécu sur les offres Excel du 23/09)
+    const pack = p.nb != null && p.nb > 1 && p.cond != null && p.cond > 0;
     const payload = p.base === "pièce"
       ? (pack ? { ...commun, price_kind: "pack_composed", pack_price: p.cond, price: p.cond, pack_count: p.nb, pack_each_unit: "pc", pack_each_qty: null }
               : { ...commun, price_kind: "unit", unit: "pc", unit_price: p.unitaire, price: p.unitaire })
