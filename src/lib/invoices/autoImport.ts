@@ -67,7 +67,7 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
   }
   const candidats: AutoImportCandidat[] = [];
   for (const inv of invoices) {
-    if (traitees.has(inv.id) || inv.archived_at) continue;
+    if (traitees.has(inv.id) || (inv.archived_at && !opts.archivees) || !inv.date) continue;
     const fournisseur = inv.supplier?.id ? (plNameById.get(inv.supplier.id) ?? "?") : "?";
     const nf = norm(fournisseur);
     if (!(nf.length > 3 && mercuriale.some((m) => nf.includes(m) || m.includes(nf)))) continue;
