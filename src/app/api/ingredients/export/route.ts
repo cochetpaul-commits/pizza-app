@@ -38,12 +38,14 @@ export async function GET(req: NextRequest) {
   }
 
   const [{ data: offers }, { data: suppliers }, { data: zones }] = await Promise.all([
-    supabaseAdmin.from("v_latest_offers").select("*").range(0, 4999),
+    supabaseAdmin.from("supplier_offers").select("*").eq("is_active", true).order("created_at", { ascending: false }).range(0, 4999),
     supabaseAdmin.from("suppliers").select("id, name"),
     supabaseAdmin.from("storage_zones").select("name").order("display_order"),
   ]);
   const supName = new Map((suppliers ?? []).map((s) => [s.id as string, s.name as string]));
-  const offerBy = new Map((offers ?? []).map((o) => [o.ingredient_id as string, o]));
+  // Une offre active par produit : la plus récente si plusieurs fournisseurs
+  const offerBy = new Map<string, Record<string, unknown>>();
+  for (const o of (offers ?? []) as Record<string, unknown>[]) if (!offerBy.has(o.ingredient_id as string)) offerBy.set(o.ingredient_id as string, o);
   // Filtre fournisseur : on compare par NOM (un même fournisseur existe en double, un par établissement)
   const fournNoms = new Set(fournisseurs.map((id) => (supName.get(id) ?? "").trim().toLowerCase()).filter(Boolean));
   const rowsFiltrees = fournNoms.size

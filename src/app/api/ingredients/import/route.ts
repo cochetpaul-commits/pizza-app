@@ -54,8 +54,9 @@ export async function POST(req: NextRequest) {
 
   const { data: zones } = await supabaseAdmin.from("storage_zones").select("name");
   const zoneByNorm = new Map((zones ?? []).map((z) => [norm(z.name), z.name as string]));
-  const { data: offersAll } = await supabaseAdmin.from("v_latest_offers").select("*").range(0, 4999);
-  const offerBy = new Map((offersAll ?? []).map((o) => [o.ingredient_id as string, o as Record<string, unknown>]));
+  const { data: offersAll } = await supabaseAdmin.from("supplier_offers").select("*").eq("is_active", true).order("created_at", { ascending: false }).range(0, 4999);
+  const offerBy = new Map<string, Record<string, unknown>>();
+  for (const o of (offersAll ?? []) as Record<string, unknown>[]) if (!offerBy.has(o.ingredient_id as string)) offerBy.set(o.ingredient_id as string, o);
   const [{ data: etabs }, { data: fournisseursAll }] = await Promise.all([
     supabaseAdmin.from("etablissements").select("id, slug"),
     supabaseAdmin.from("suppliers").select("id, name, etablissement_id").eq("is_active", true),
@@ -149,17 +150,27 @@ export async function POST(req: NextRequest) {
         const dateP = dateCell === undefined ? null : dateIn(dateCell);
         if (dateP === "invalide") erreurs.push({ ligne, nom: nomCell, message: `Date du prix « ${String(dateCell)} » illisible (AAAA-MM-JJ ou JJ/MM/AAAA)` });
         const skuChange = skuCell !== undefined && (sku ?? null) !== (actuel.sku ?? null) && actuel.unitaire != null;
-        if ((change || skuChange) && unitaire != null && unitaire > 0) {
+        const dateChange = dateP != null && dateP !== "invalide" && actuel.unitaire != null && dateP !== (actuel.date ?? null);
+        if (!change && (skuChange || dateChange) && id && offerBy.get(id)) {
+          // Prix inchangé : on corrige l'offre active sur place, pas de nouvelle offre
+          (row as Record<string, unknown>).__offreMaj = { offre_id: offerBy.get(id)!.id as string, sku, date: dateP === "invalide" ? null : dateP };
+          champs.prix_ref = { avant: `${actuel.sku ? "réf. " + actuel.sku : "sans réf."} · ${actuel.date ?? "sans date"}`, apres: `${sku ? "réf. " + sku : "sans réf."} · ${dateP && dateP !== "invalide" ? dateP : actuel.date ?? "sans date"}` };
+          if (skuChange) { patch.supplier_sku = sku; }
+        } else if (change && unitaire != null && unitaire > 0) {
           const etabFiche = (avant?.etablissement_id as string | null) ?? etabIdOf(((patch.establishments as string[]) ?? [etabDefaut])[0]);
-          const sid = (avant?.default_supplier_id as string | undefined)
+          // Ordre : fournisseur de l'offre active (celui que le produit utilise déjà),
+          // puis fournisseur par défaut / de la fiche, puis le nom de la colonne.
+          const sid = (id ? (offerBy.get(id)?.supplier_id as string | undefined) : undefined)
+            ?? (avant?.default_supplier_id as string | undefined)
             ?? (avant?.supplier_id as string | undefined)
-            ?? (id ? (offerBy.get(id)?.supplier_id as string | undefined) : undefined)
             ?? fournisseurParNom(cellOf(row, "fournisseur"), etabFiche)
             ?? null;
           if (!sid) erreurs.push({ ligne, nom: nomCell, message: `Prix non appliqué : aucun fournisseur trouvé${cellOf(row, "fournisseur") ? ` (« ${String(cellOf(row, "fournisseur"))} » inconnu pour cet établissement)` : " (colonne Fournisseur vide)"}` });
           else {
             (row as Record<string, unknown>).__prix = { base, unitaire, nb: nbU, cond: condP, sid, sku, date: dateP === "invalide" ? null : dateP };
-            champs.prix = { avant: actuel.unitaire != null ? `${actuel.unitaire} €/${actuel.base}${actuel.cond ? ` · ${actuel.cond} € les ${actuel.nb}` : ""}${actuel.sku ? ` · réf. ${actuel.sku}` : ""}` : null, apres: `${unitaire} €/${base}${condP && nbU ? ` · ${condP} € les ${nbU}` : ""}${sku ? ` · réf. ${sku}` : ""}` };
+            if (sku && sku !== (avant?.supplier_sku ?? null)) patch.supplier_sku = sku;
+            const dApres = dateP && dateP !== "invalide" ? dateP : new Date().toISOString().slice(0, 10);
+            champs.prix = { avant: actuel.unitaire != null ? `${actuel.unitaire} €/${actuel.base}${actuel.cond ? ` · ${actuel.cond} € les ${actuel.nb}` : ""}${actuel.sku ? ` · réf. ${actuel.sku}` : ""}${actuel.date ? ` · ${actuel.date}` : ""}` : null, apres: `${unitaire} €/${base}${condP && nbU ? ` · ${condP} € les ${nbU}` : ""}${sku ? ` · réf. ${sku}` : ""} · ${dApres}` };
           }
         } else if (change && unitaire == null && (condP != null || nbU != null)) {
           erreurs.push({ ligne, nom: nomCell, message: "Prix : il manque le prix unitaire ou le nombre d'unités par conditionnement" });
@@ -188,7 +199,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (mode !== "commit") {
-    return NextResponse.json({ ok: true, mode: "preview", lignes: sheetRows.length, a_modifier: changements.filter((c) => !c.nouveau).length, a_creer: changements.filter((c) => c.nouveau).length, prix_maj: changements.filter((c) => c.champs.prix).length, changements: changements.slice(0, 400), erreurs });
+    return NextResponse.json({ ok: true, mode: "preview", lignes: sheetRows.length, a_modifier: changements.filter((c) => !c.nouveau).length, a_creer: changements.filter((c) => c.nouveau).length, prix_maj: changements.filter((c) => c.champs.prix).length, refs_maj: changements.filter((c) => c.champs.prix_ref).length, changements: changements.slice(0, 400), erreurs });
   }
 
   // Application
@@ -196,9 +207,9 @@ export async function POST(req: NextRequest) {
   const { data: auth } = await supabaseAdmin.auth.getUser(authHeader.replace(/^Bearer\s+/i, ""));
   const userId = auth?.user?.id ?? null;
 
-  let modifies = 0, crees = 0, prixMaj = 0;
+  let modifies = 0, crees = 0, prixMaj = 0, refsMaj = 0;
   const echecs: Erreur[] = [];
-  const todo = sheetRows.map((r, i) => ({ row: r, idx: i })).filter(({ row }) => Object.keys((row.__patch as Record<string, unknown>) ?? {}).length || row.__prix);
+  const todo = sheetRows.map((r, i) => ({ row: r, idx: i })).filter(({ row }) => Object.keys((row.__patch as Record<string, unknown>) ?? {}).length || row.__prix || row.__offreMaj);
   type Prix = { base: PrixBase; unitaire: number; nb: number | null; cond: number | null; sid: string | null; sku: string | null; date: string | null };
   const ecrireOffre = async (ingredientId: string, ing: Record<string, unknown> | undefined, p: Prix): Promise<string | null> => {
     const sid = p.sid ?? (ing?.supplier_id as string | null) ?? null;
@@ -213,8 +224,14 @@ export async function POST(req: NextRequest) {
       : (pack ? { ...commun, price_kind: "pack_simple", pack_price: p.cond, price: p.cond, pack_total_qty: p.nb, pack_unit: p.base === "kg" ? "kg" : "l", unit: p.base === "kg" ? "kg" : "l", unit_price: p.unitaire }
               : { ...commun, price_kind: "unit", unit: p.base === "kg" ? "kg" : "l", unit_price: p.unitaire, price: p.unitaire });
     // L'ancienne offre est clôturée (valid_to), jamais supprimée : l'historique des prix reste.
-    const off = await supabaseAdmin.from("supplier_offers").update({ is_active: false, valid_to: p.date ?? aujourdhui }).eq("ingredient_id", ingredientId).eq("is_active", true);
-    if (off.error) return off.error.message;
+    // valid_to ne descend jamais sous le valid_from de l'offre fermée.
+    const { data: anciennes } = await supabaseAdmin.from("supplier_offers").select("id, valid_from").eq("ingredient_id", ingredientId).eq("is_active", true);
+    const dateNouvelle = p.date ?? aujourdhui;
+    for (const a of anciennes ?? []) {
+      const vf = String(a.valid_from ?? "").slice(0, 10);
+      const off = await supabaseAdmin.from("supplier_offers").update({ is_active: false, valid_to: vf && vf > dateNouvelle ? vf : dateNouvelle }).eq("id", a.id);
+      if (off.error) return off.error.message;
+    }
     const ins = await supabaseAdmin.from("supplier_offers").insert(payload);
     if (ins.error) return ins.error.message;
     prixMaj++;
@@ -226,7 +243,15 @@ export async function POST(req: NextRequest) {
       const id = String(cellOf(row, "id") ?? "").trim() || null;
       const ligne = idx + 2;
       const prix = row.__prix as Prix | undefined;
+      const offreMaj = row.__offreMaj as { offre_id: string; sku: string | null; date: string | null } | undefined;
       if (id) {
+        if (offreMaj) {
+          const upd: Record<string, unknown> = { supplier_sku: offreMaj.sku, updated_at: new Date().toISOString() };
+          if (offreMaj.date) upd.valid_from = offreMaj.date;
+          const { error } = await supabaseAdmin.from("supplier_offers").update(upd).eq("id", offreMaj.offre_id);
+          if (error) { echecs.push({ ligne, nom: String(patch.name ?? existing.get(id)?.name ?? ""), message: `réf./date : ${error.message}` }); return; }
+          refsMaj++;
+        }
         if (Object.keys(patch).length) {
           const { error } = await supabaseAdmin.from("ingredients").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
           if (error) { echecs.push({ ligne, nom: String(patch.name ?? ""), message: error.message }); return; }
@@ -242,5 +267,5 @@ export async function POST(req: NextRequest) {
       }
     }));
   }
-  return NextResponse.json({ ok: echecs.length === 0, mode: "commit", modifies, crees, prix_maj: prixMaj, echecs, erreurs });
+  return NextResponse.json({ ok: echecs.length === 0, mode: "commit", modifies, crees, prix_maj: prixMaj, refs_maj: refsMaj, echecs, erreurs });
 }
