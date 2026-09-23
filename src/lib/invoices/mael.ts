@@ -148,7 +148,10 @@ function parseLines(text: string): ParsedLine[] {
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    const m = r.match(/\b(ART[0-9A-Z]{3,})\b\s+(.*)$/i);
+    // Codes article : « ART1234 » (catalogue) mais aussi « RESTO5.5 » (articles
+    // hors catalogue, taxés 5,5 %) — sans eux la somme des lignes ne recollait
+    // pas au total et la facture partait au scan IA.
+    const m = r.match(/\b(ART[0-9A-Z]{3,}|RESTO[0-9.]+)\b\s+(.*)$/i);
     if (!m) continue;
 
     const sku = m[1].toUpperCase();
@@ -170,7 +173,7 @@ function parseLines(text: string): ParsedLine[] {
     const suite: string[] = [];
     for (let k = 1; k <= 2 && i + k < rows.length; k++) {
       const next = rows[i + k];
-      if (/\bART[0-9A-Z]{3,}\b/i.test(next)) break;
+      if (/\b(ART[0-9A-Z]{3,}|RESTO[0-9.]+)\b/i.test(next)) break;
       if (NON_CONTINUATION.test(next)) break;
       if (TAIL.test(next) && /\d+,\d{2}\s+\d+,\d{2}/.test(next)) break; // une autre ligne chiffrée
       suite.push(cleanContinuation(next));
