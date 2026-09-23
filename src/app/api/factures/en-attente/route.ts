@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { roleDenied } from "@/lib/getEtablissement";
-import { aliasFournisseur, chargerIndexFiches, trouverFiche, estLigneDeFrais } from "@/lib/invoices/rapprochement";
-import { normalizeIngredientName } from "@/lib/invoices/categoryDetector";
+import { aliasFournisseur, chargerIndexFiches, trouverFiche, estLigneDeFrais, cleReference, estRefGenerique } from "@/lib/invoices/rapprochement";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -15,7 +14,8 @@ export type ProduitEnAttente = {
   quantite: number | null; unite: string | null; montant_ht: number;
   dernier_prix: number | null; derniere_date: string | null; derniere_facture_id: string | null; derniere_facture_numero: string | null;
 };
-export type FournisseurEnAttente = { supplier_id: string; nom: string; lignes: number; montant_ht: number; factures_total: number; produits: ProduitEnAttente[] };
+export type RefIgnoree = { id: string; supplier_id: string; sku: string; label: string | null; created_at: string };
+export type FournisseurEnAttente = { supplier_id: string; nom: string; lignes: number; montant_ht: number; factures_total: number; produits: ProduitEnAttente[]; ignorees: RefIgnoree[] };
 
 /**
  * GET /api/factures/en-attente?mois=6  (x-etablissement-id)
@@ -83,8 +83,10 @@ export async function GET(req: NextRequest) {
       if (!nm && !l.sku) continue;
       if (estLigneDeFrais(nm)) continue; // forfait livraison, transport : un frais, pas un produit
       if (trouverFiche(idx, l.sku, nm)) continue;
-      const sku = (l.sku ?? "").trim() || null;
-      const cle = sku ?? `n:${normalizeIngredientName(nm)}`;
+      const cle = cleReference(l.sku, nm);
+      if (idx.ignorees.has(cle)) continue; // produit abandonné, ignoré depuis cet écran
+      const sku = cle.startsWith("n:") ? null : cle;
+      void estRefGenerique;
       const f = factById.get(l.invoice_id);
       let g = groupes.get(cle);
       if (!g) {
@@ -103,14 +105,16 @@ export async function GET(req: NextRequest) {
     }
     const produits = Array.from(groupes.values()).map(({ _factures, ...g }) => ({ ...g, factures: _factures.size, montant_ht: Math.round(g.montant_ht * 100) / 100, quantite: g.quantite == null ? null : Math.round(g.quantite * 1000) / 1000 }))
       .sort((a, b) => b.montant_ht - a.montant_ht);
-    if (!produits.length) continue;
+    const { data: ignRows } = await supabaseAdmin.from("supplier_refs_ignorees").select("id, supplier_id, sku, label, created_at").in("supplier_id", alias).order("created_at").range(0, 4999);
+    const ignorees = (ignRows ?? []) as RefIgnoree[];
+    if (!produits.length && !ignorees.length) continue;
     out.push({
-      supplier_id: sid, nom: supName.get(sid) ?? "?", produits,
+      supplier_id: sid, nom: supName.get(sid) ?? "?", produits, ignorees,
       lignes: produits.reduce((a, p) => a + p.lignes, 0),
       montant_ht: Math.round(produits.reduce((a, p) => a + p.montant_ht, 0) * 100) / 100,
       factures_total: fact.filter((f) => f.supplier_id === sid).length,
     });
   }
-  out.sort((a, b) => b.montant_ht - a.montant_ht);
+  out.sort((a, b) => b.montant_ht - a.montant_ht || b.produits.length - a.produits.length);
   return NextResponse.json({ ok: true, periode: { depuis: depuisIso, mois }, factures: fact.length, lignes: lignes.length, fournisseurs: out });
 }

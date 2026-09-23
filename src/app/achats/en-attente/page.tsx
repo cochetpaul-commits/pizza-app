@@ -12,7 +12,8 @@ type Produit = {
   quantite: number | null; unite: string | null; montant_ht: number;
   dernier_prix: number | null; derniere_date: string | null; derniere_facture_id: string | null; derniere_facture_numero: string | null;
 };
-type Fournisseur = { supplier_id: string; nom: string; lignes: number; montant_ht: number; factures_total: number; produits: Produit[] };
+type RefIgnoree = { id: string; supplier_id: string; sku: string; label: string | null; created_at: string };
+type Fournisseur = { supplier_id: string; nom: string; lignes: number; montant_ht: number; factures_total: number; produits: Produit[]; ignorees: RefIgnoree[] };
 type Reponse = { ok: boolean; periode: { depuis: string; mois: number }; factures: number; lignes: number; fournisseurs: Fournisseur[]; error?: string };
 
 const eur = (n: number | null | undefined) => n == null ? "—" : n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -59,6 +60,33 @@ function Contenu() {
   }, [fiches]);
 
   const ouvrirPicker = (f: Fournisseur, p: Produit) => { setPicker({ f, p }); setRecherche(p.libelle.replace(/\b(c\d|fr|es|ma|nl|it|be|pt|za|cr)\b/gi, "").replace(/[\d,./~°xX×]+\s*(g|gr|kg|k|ml|cl|l|f|p|px)?\b/gi, " ").replace(/\s+/g, " ").trim().split(" ").slice(0, 2).join(" ")); void chargerFiches(); };
+
+  const [voirIgnorees, setVoirIgnorees] = useState<Record<string, boolean>>({});
+
+  const ignorer = async (f: Fournisseur, p: Produit) => {
+    const k = `${f.supplier_id}:${p.cle}`;
+    setEnCours((s) => ({ ...s, [k]: "…" })); setMessage(null);
+    try {
+      const r = await fetchApi("/api/factures/ignorer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ supplier_id: f.supplier_id, sku: p.sku, nom: p.libelle, label: p.libelle }) });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+      setMessage(`${p.libelle} : ignoré. Les factures restent intactes, aucune fiche ne sera créée pour cette référence.`);
+      await charger();
+    } catch (e) {
+      setMessage(`${p.libelle} : ${e instanceof Error ? e.message : "erreur"}`);
+    } finally { setEnCours((s) => { const n = { ...s }; delete n[k]; return n; }); }
+  };
+
+  const reactiver = async (f: Fournisseur, i: RefIgnoree) => {
+    setMessage(null);
+    try {
+      const r = await fetchApi("/api/factures/ignorer", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: i.id }) });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+      setMessage(`${i.label ?? i.sku} (${f.nom}) : de nouveau en attente.`);
+      await charger();
+    } catch (e) { setMessage(e instanceof Error ? e.message : "erreur"); }
+  };
 
   const rattacher = async (ficheId: string, ficheNom: string) => {
     if (!picker) return;
@@ -150,7 +178,7 @@ function Contenu() {
         </label>
       </div>
       <p style={{ fontSize: 13, color: "#666", margin: "0 0 14px" }}>
-        Achats facturés qui ne correspondent à aucune fiche produit. « Créer la fiche » crée le produit et son prix à partir de la dernière facture ;
+        Achats facturés qui ne correspondent à aucune fiche produit. « Rattacher… » ajoute la référence à une fiche existante (plusieurs références par fiche) ; « Créer la fiche » crée le produit et son prix à partir de la dernière facture ; « Ignorer » sort un produit abandonné de la liste ;
         « Relancer le rapprochement » rejoue les factures déjà en base pour rattacher l&apos;historique aux fiches créées depuis, sans écraser un prix plus récent.
       </p>
       {message && <div style={{ background: "#fff7e6", border: "1px solid #ffd591", borderRadius: 10, padding: "10px 12px", fontSize: 13, marginBottom: 12 }}>{message}</div>}
@@ -206,6 +234,7 @@ function Contenu() {
                                 <div style={{ display: "inline-flex", gap: 6 }}>
                                   {p.sku && <button type="button" disabled={!!enCours[k]} onClick={() => ouvrirPicker(f, p)} style={btn}>Rattacher…</button>}
                                   <button type="button" disabled={!!enCours[k] || !p.derniere_facture_id} onClick={() => creerFiche(f, p)} style={btn}>{enCours[k] ?? "Créer la fiche"}</button>
+                                  <button type="button" disabled={!!enCours[k]} onClick={() => ignorer(f, p)} title="Produit abandonné : sortir de la liste sans toucher aux factures" style={{ ...btn, color: "#999" }}>Ignorer</button>
                                 </div>
                               </td>
                             </tr>
@@ -213,6 +242,23 @@ function Contenu() {
                         })}
                       </tbody>
                     </table>
+                    {f.ignorees.length > 0 && (
+                      <div style={{ padding: "8px 14px 12px", fontSize: 12, color: "#888" }}>
+                        <button type="button" onClick={() => setVoirIgnorees((v) => ({ ...v, [f.supplier_id]: !v[f.supplier_id] }))} style={{ ...btn, border: "none", padding: 0, color: "#888", fontWeight: 500 }}>
+                          {f.ignorees.length} référence{f.ignorees.length > 1 ? "s" : ""} ignorée{f.ignorees.length > 1 ? "s" : ""} {voirIgnorees[f.supplier_id] ? "▾" : "▸"}
+                        </button>
+                        {voirIgnorees[f.supplier_id] && (
+                          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                            {f.ignorees.map((i) => (
+                              <li key={i.id} style={{ marginBottom: 4 }}>
+                                {i.label ?? i.sku}{!i.sku.startsWith("n:") ? <span style={{ color: "#bbb" }}> · {i.sku}</span> : null}{" "}
+                                <button type="button" onClick={() => reactiver(f, i)} style={{ ...btn, padding: "1px 8px", fontSize: 11, marginLeft: 6 }}>Réactiver</button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </section>

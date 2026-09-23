@@ -8,7 +8,7 @@ import { detectCategoryFromName, normalizeIngredientName } from "@/lib/invoices/
 import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { extractPackFromName, extractVolumeFromName, extractWeightGFromName, extractWeightFromName } from "@/lib/invoices/utils";
 import type { Category } from "@/types/ingredients";
-import { aliasFournisseur, chargerIndexFiches, trouverFiche, estLigneDeFrais } from "@/lib/invoices/rapprochement";
+import { aliasFournisseur, chargerIndexFiches, trouverFiche, estLigneDeFrais, cleReference } from "@/lib/invoices/rapprochement";
 
 const execFileAsync = promisify(execFile);
 
@@ -316,6 +316,8 @@ export async function runImport(options: {
       if (!nm) continue;
 
       const already = trouverFiche(idx, sku, nm) != null;
+      // Produit abandonné (référence ignorée depuis « Lignes en attente ») : ni fiche ni attente
+      if (!already && idx.ignorees.has(cleReference(sku, nm))) continue;
       if (already) continue;
       if (!creerFiches) { lignesSansFiche.push(`${sku ? sku + " " : ""}${nm}`); continue; }
 

@@ -44,7 +44,21 @@ export async function aliasFournisseur(supabase: Db, supplierId: string, supplie
   return ids;
 }
 
+/** Référence « générique » qui n'identifie pas un produit (Mael : RESTO5.5 = taux de TVA sur les lignes hors catalogue). */
+export function estRefGenerique(sku: string | null | undefined): boolean {
+  return /^RESTO[0-9.,]*$/i.test((sku ?? "").trim());
+}
+
+/** Clé d'une ligne pour les alias / ignorés / regroupements : la référence, sinon « n:<libellé normalisé> ». */
+export function cleReference(sku: string | null | undefined, nom: string | null | undefined): string {
+  const s = (sku ?? "").trim();
+  if (s && !estRefGenerique(s)) return s;
+  return `n:${normalizeIngredientName((nom ?? "").trim())}`;
+}
+
 export type IndexFiches = {
+  /** Références (ou clés « n:… ») ignorées : produits abandonnés, jamais de fiche */
+  ignorees: Set<string>;
   skuToIngId: Map<string, string>;
   nameToIngId: Map<string, string>;
   normalizedToIngId: Map<string, string>;
@@ -118,7 +132,13 @@ export async function chargerIndexFiches(supabase: Db, supplierId: string, suppl
       }
     }
   }
-  return { skuToIngId, nameToIngId, normalizedToIngId, baseNameToIngId };
+  const ignorees = new Set<string>();
+  {
+    const { data: ign, error: eIgn } = await supabase.from("supplier_refs_ignorees").select("sku").in("supplier_id", supplierAliasIds).range(0, 4999);
+    if (eIgn) throw new Error(eIgn.message);
+    for (const r of (ign ?? []) as Array<{ sku: string }>) ignorees.add(String(r.sku));
+  }
+  return { ignorees, skuToIngId, nameToIngId, normalizedToIngId, baseNameToIngId };
 }
 
 /** Fiche correspondant à une ligne (référence puis nom), ou null = « sans fiche ». Mémorise les correspondances trouvées par repli. */
@@ -126,7 +146,7 @@ export function trouverFiche(idx: IndexFiches, skuBrut: string | null | undefine
   const sku = (skuBrut ?? "").trim();
   const nm = (nomBrut ?? "").trim().toUpperCase();
   if (!nm && !sku) return null;
-  if (sku && idx.skuToIngId.has(sku)) return idx.skuToIngId.get(sku)!;
+  if (sku && !estRefGenerique(sku) && idx.skuToIngId.has(sku)) return idx.skuToIngId.get(sku)!;
   if (!nm) return null;
   const direct = idx.nameToIngId.get(nm.toLowerCase()) ?? idx.normalizedToIngId.get(normalizeIngredientName(nm));
   if (direct) return direct;
