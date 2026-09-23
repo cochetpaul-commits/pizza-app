@@ -75,7 +75,7 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
   return { periode: { from, to }, candidats };
 }
 
-export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[] };
+export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[]; /** nb max de factures traitées par appel (fonction serveur limitée à 60 s) */ limit?: number };
 
 export async function autoImportFactures(etabId: string, days = 30, dossier: PlDossier = "bello", opts: AutoImportOptions = {}): Promise<AutoImportResult> {
   const creerFiches = opts.creerFiches !== false;
@@ -136,6 +136,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
 
   for (const inv of invoices) {
     if (dejaTraitees.has(inv.id) || inv.archived_at) continue;
+    if (opts.limit && res.examinees >= opts.limit) break;
     res.examinees++;
 
     const fournisseur = inv.supplier?.id ? (plNameById.get(inv.supplier.id) ?? "?") : "?";
