@@ -75,7 +75,11 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
   return { periode: { from, to }, candidats };
 }
 
-export async function autoImportFactures(etabId: string, days = 30, dossier: PlDossier = "bello"): Promise<AutoImportResult> {
+export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[] };
+
+export async function autoImportFactures(etabId: string, days = 30, dossier: PlDossier = "bello", opts: AutoImportOptions = {}): Promise<AutoImportResult> {
+  const creerFiches = opts.creerFiches !== false;
+  const seulement = (opts.fournisseurs ?? []).map(norm).filter(Boolean);
   const from = isoDaysAgo(days);
   const to = new Date().toISOString().slice(0, 10);
   const userId = process.env.AUTO_IMPORT_USER_ID ?? "bd335e2e-6a50-4311-89b4-8f735cf6bc0b";
@@ -137,6 +141,8 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
     const fournisseur = inv.supplier?.id ? (plNameById.get(inv.supplier.id) ?? "?") : "?";
     const nf = norm(fournisseur);
     const estMercuriale = nf.length > 3 && mercuriale.some((m) => nf.includes(m) || m.includes(nf));
+    // Rattrapage par lots : ne traiter que certains fournisseurs, sans marquer les autres
+    if (seulement.length && !seulement.some((f) => nf.includes(f) || f.includes(nf))) { res.examinees--; continue; }
 
     try {
       if (!estMercuriale) {
@@ -261,13 +267,13 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
         supabase: supabaseAdmin, userId, supplierName, payload,
         sourceFileName: inv.filename ?? `pennylane_${inv.id}`,
         rawText: rawText || `pennylane_${inv.id}`, mode: "commit",
-        establishment: dossier === "piccola" ? "piccola" : "bellomio", defaultUnit, etabId,
+        establishment: dossier === "piccola" ? "piccola" : "bellomio", defaultUnit, etabId, creerFiches,
       });
 
       await log(
         inv, fournisseur,
         r.invoiceAlreadyImported ? "deja_connue" : "importee",
-        `${Number(inv.currency_amount ?? 0) < 0 ? "AVOIR · " : ""}${payload.lines.length} lignes · ${payload.total_ht != null ? `${payload.total_ht.toFixed(2)} € HT · ` : ""}${r.ingredientsCreated} produit(s) créé(s), ${r.offersInserted} prix mis à jour`,
+        `${Number(inv.currency_amount ?? 0) < 0 ? "AVOIR · " : ""}${payload.lines.length} lignes · ${payload.total_ht != null ? `${payload.total_ht.toFixed(2)} € HT · ` : ""}${r.ingredientsCreated} produit(s) créé(s), ${r.offersInserted} prix mis à jour${r.lignesSansFiche.length ? ` · ${r.lignesSansFiche.length} ligne(s) sans fiche en attente : ${r.lignesSansFiche.join(" | ").slice(0, 1500)}` : ""}`,
         parserUtilise, payload.lines.length,
       );
     } catch (e) {

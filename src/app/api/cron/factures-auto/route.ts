@@ -15,6 +15,7 @@ export const maxDuration = 60;
  * ?days=N pour élargir la fenêtre (défaut 30, max 200). 30 jours parce que
  * certaines factures (Mael…) arrivent dans Pennylane bien après leur date ;
  * la déduplication par identifiant Pennylane évite tout doublon.
+ * ?creer=0 : pas de création de fiche (lignes inconnues en attente) · ?fournisseurs=a,b · ?etab=bello|piccola
  * ?liste=1 : n'écrit RIEN, renvoie seulement les factures qui seraient traitées
  * (pour valider un rattrapage avant de le lancer).
  */
@@ -25,6 +26,10 @@ export async function GET(req: NextRequest) {
 
   const days = Math.min(Math.max(parseInt(req.nextUrl.searchParams.get("days") ?? "30", 10) || 30, 1), 200);
   const listeSeule = req.nextUrl.searchParams.get("liste") === "1";
+  // Rattrapage : ?creer=0 (aucune fiche créée, lignes inconnues en attente) · ?fournisseurs=mael,metro · ?etab=bello|piccola
+  const creerFiches = req.nextUrl.searchParams.get("creer") !== "0";
+  const fournisseurs = (req.nextUrl.searchParams.get("fournisseurs") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const etabFiltre = (req.nextUrl.searchParams.get("etab") ?? "").toLowerCase();
 
   const { data: etabs } = await supabaseAdmin
     .from("etablissements").select("id, slug, nom").eq("actif", true);
@@ -33,10 +38,11 @@ export async function GET(req: NextRequest) {
   for (const etab of etabs ?? []) {
     const dossier: PlDossier = ((etab.slug as string) ?? "").includes("bello") ? "bello" : "piccola";
     if (!pennylaneConfigured(dossier)) continue;
+    if (etabFiltre && !((etab.slug as string) ?? "").includes(etabFiltre)) continue;
     try {
       out[(etab.nom as string) ?? (etab.slug as string)] = listeSeule
         ? await autoImportCandidats(days, dossier)
-        : await autoImportFactures(etab.id as string, days, dossier);
+        : await autoImportFactures(etab.id as string, days, dossier, { creerFiches, fournisseurs });
     } catch (e) {
       out[(etab.nom as string) ?? (etab.slug as string)] = { erreur: e instanceof Error ? e.message : "erreur" };
     }

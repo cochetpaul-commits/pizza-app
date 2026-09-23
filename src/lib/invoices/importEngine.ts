@@ -42,6 +42,8 @@ export interface ImportResult {
   invoiceAlreadyImported: boolean;
   ingredientsCreated: number;
   offersInserted: number;
+  /** Lignes sans fiche correspondante (mode sans création : mises en attente, pas d'offre) */
+  lignesSansFiche: string[];
 }
 
 // ── Utilitaires ────────────────────────────────────────────────────────────────
@@ -149,6 +151,8 @@ export async function runImport(options: {
   establishment?: "bellomio" | "piccola" | "both";
   etabId?: string;
   filterLine?: (l: ParsedLine) => boolean;
+  /** false = ne jamais créer de fiche : les lignes inconnues sont listées dans lignesSansFiche (rattrapage d'historique) */
+  creerFiches?: boolean;
 }): Promise<ImportResult> {
   const {
     supabase,
@@ -161,7 +165,9 @@ export async function runImport(options: {
     defaultUnit = "g",
     etabId,
     filterLine,
+    creerFiches = true,
   } = options;
+  const lignesSansFiche: string[] = [];
 
   // 1. Upsert supplier (normalize name to Title Case to avoid duplicates)
   const normalizedName = supplierName
@@ -272,7 +278,7 @@ export async function runImport(options: {
 
   // 5. Retour précoce pour preview
   if (mode !== "commit") {
-    return { supplierId, invoiceId, invoiceAlreadyImported, ingredientsCreated: 0, offersInserted: 0 };
+    return { supplierId, invoiceId, invoiceAlreadyImported, ingredientsCreated: 0, offersInserted: 0, lignesSansFiche };
   }
 
   // 6. COMMIT : lookup ingrédients normalisé
@@ -391,6 +397,7 @@ export async function runImport(options: {
         }
       }
       if (already) continue;
+      if (!creerFiches) { lignesSansFiche.push(`${sku ? sku + " " : ""}${nm}`); continue; }
 
       const cat = (l.category ?? detectCategoryFromName(nm) ?? fallbackCategory) as Category;
 
@@ -689,5 +696,5 @@ export async function runImport(options: {
     }
   }
 
-  return { supplierId, invoiceId, invoiceAlreadyImported, ingredientsCreated, offersInserted };
+  return { supplierId, invoiceId, invoiceAlreadyImported, ingredientsCreated, offersInserted, lignesSansFiche };
 }
