@@ -523,7 +523,11 @@ export async function runImport(options: {
     }
 
     // 9. Construction offres + deactivate anciens + insert nouveaux
-    const offerCandidates = lines
+    // Un AVOIR (facture à total négatif) ou une ligne négative (reprise, remise)
+    // ne crée ni ne remplace jamais une offre : ce n'est pas un prix d'achat.
+    const estAvoir = (payload.total_ht ?? 0) < 0 || (payload.total_ttc ?? 0) < 0;
+    const lignesPrix = estAvoir ? [] : lines.filter((l) => (l.quantity ?? 0) >= 0 && (l.total_price ?? 0) >= 0 && (l.unit_price ?? 0) > 0);
+    const offerCandidates = lignesPrix
       .map((l) => {
         const sku = (l.sku ?? "").trim();
         const nm = (l.name ?? "").trim().toUpperCase();
