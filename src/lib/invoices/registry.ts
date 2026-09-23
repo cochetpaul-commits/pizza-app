@@ -36,7 +36,7 @@ export const PARSERS: Record<string, ParserEntry> = {
   carniato:   { parse: parseCarniatoInvoiceText,   supplierName: "CARNIATO",         defaultUnit: "g" },
   barspirits: { parse: parseBarSpiritsInvoiceText, supplierName: "BAR SPIRITS",      defaultUnit: "pc" },
   sum:        { parse: parseSumInvoiceText,        supplierName: "SUM",              defaultUnit: "g" },
-  armor:      { parse: parseArmorInvoiceText,      supplierName: "ARMOR EMBALLAGES", defaultUnit: "g" },
+  armor:      { parse: parseArmorInvoiceText,      supplierName: "ARMOR",            defaultUnit: "g" }, // lignes « Armor » de Paul (Bello fb6b970a, Piccola 8b9f9014)
   lmdw:       { parse: parseLmdwInvoiceText,       supplierName: "LMDW",             defaultUnit: "pc" },
   sdpf:       { parse: parseSdpfInvoiceText,       supplierName: "SDPF",             defaultUnit: "kg" },
   elien:      { parse: parseElienInvoiceText,      supplierName: "ELIEN",            defaultUnit: "l" },

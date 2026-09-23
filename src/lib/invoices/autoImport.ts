@@ -57,7 +57,7 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
   const traitees = new Set<number>();
   for (let i = 0; i < ids.length; i += 100) {
     const { data } = await supabaseAdmin.from("auto_import_factures").select("pennylane_id, statut").in("pennylane_id", ids.slice(i, i + 100));
-    for (const r of data ?? []) if (r.statut !== "erreur") traitees.add(Number(r.pennylane_id));
+    for (const r of data ?? []) if (r.statut !== "erreur" && r.statut !== "hors_mercuriale") traitees.add(Number(r.pennylane_id));
   }
   const numeros = invoices.map((i) => i.invoice_number).filter((n): n is string => !!n);
   const connues = new Set<string>();
@@ -71,6 +71,7 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
     const fournisseur = inv.supplier?.id ? (plNameById.get(inv.supplier.id) ?? "?") : "?";
     const nf = norm(fournisseur);
     if (!(nf.length > 3 && mercuriale.some((m) => nf.includes(m) || m.includes(nf)))) continue;
+    if (/^\s*DV/i.test(String(inv.invoice_number ?? ""))) continue; // devis
     candidats.push({ pennylane_id: inv.id, fournisseur, invoice_number: inv.invoice_number ?? null, date: inv.date ?? null, montant_ttc: Number(inv.currency_amount ?? 0) || null, fichier: !!inv.public_file_url, deja_dans_app: !!inv.invoice_number && connues.has(inv.invoice_number), libelle_pennylane: (inv as { label?: string }).label ?? null });
   }
   return { periode: { from, to }, candidats };
@@ -135,7 +136,8 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
       .select("pennylane_id, statut")
       .in("pennylane_id", ids.slice(i, i + 100));
     for (const r of data ?? []) {
-      if (r.statut !== "erreur") dejaTraitees.add(Number(r.pennylane_id));
+      // erreur : retentée ; hors_mercuriale : retentée aussi (le fournisseur a pu être créé dans l'appli depuis)
+      if (r.statut !== "erreur" && r.statut !== "hors_mercuriale") dejaTraitees.add(Number(r.pennylane_id));
     }
   }
 
@@ -167,6 +169,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
 
   for (const inv of invoices) {
     if (dejaTraitees.has(inv.id) || inv.archived_at) continue;
+    if (/^\s*DV/i.test(String(inv.invoice_number ?? ""))) continue; // devis (Armor « DV… ») : pas une facture
     if (opts.limit && res.examinees >= opts.limit) break;
     res.examinees++;
 
