@@ -44,11 +44,11 @@ function isoDaysAgo(days: number): string {
 export type AutoImportCandidat = { pennylane_id: number; fournisseur: string; invoice_number: string | null; date: string | null; montant_ttc: number | null; fichier: boolean; deja_dans_app: boolean; libelle_pennylane: string | null };
 
 /** Liste ce que l'import automatique traiterait sur la fenêtre, SANS rien écrire (factures de la mercuriale non encore passées). */
-export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello"): Promise<{ periode: { from: string; to: string }; candidats: AutoImportCandidat[] }> {
+export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello", opts: { archivees?: boolean } = {}): Promise<{ periode: { from: string; to: string }; candidats: AutoImportCandidat[] }> {
   const from = isoDaysAgo(days);
   const to = new Date().toISOString().slice(0, 10);
   const [invoices, plSuppliers, { data: appSuppliers }] = await Promise.all([
-    getSupplierInvoices(from, to, dossier), getSuppliers(dossier),
+    getSupplierInvoices(from, to, dossier, { archivees: opts.archivees }), getSuppliers(dossier),
     supabaseAdmin.from("suppliers").select("name").eq("is_active", true),
   ]);
   const plNameById = new Map(plSuppliers.map((s) => [s.id, s.name]));
@@ -77,7 +77,7 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
   return { periode: { from, to }, candidats };
 }
 
-export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[]; /** nb max de factures traitées par appel (fonction serveur limitée à 60 s) */ limit?: number; /** false = facture et lignes seulement, aucun prix (offre) écrit */ prix?: boolean; /** ne traiter que ces numéros de facture */ numeros?: string[] };
+export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[]; /** nb max de factures traitées par appel (fonction serveur limitée à 60 s) */ limit?: number; /** false = facture et lignes seulement, aucun prix (offre) écrit */ prix?: boolean; /** ne traiter que ces numéros de facture */ numeros?: string[]; /** garder les pièces archivées (hors doublons) */ archivees?: boolean };
 
 /**
  * Client lu sur la facture : « SASHA » / « BELLO MIO » = Bello Mio,
@@ -116,7 +116,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
   const userId = process.env.AUTO_IMPORT_USER_ID ?? "bd335e2e-6a50-4311-89b4-8f735cf6bc0b";
 
   const [invoices, plSuppliers, { data: appSuppliers }] = await Promise.all([
-    getSupplierInvoices(from, to, dossier),
+    getSupplierInvoices(from, to, dossier, { archivees: opts.archivees }),
     getSuppliers(dossier),
     supabaseAdmin.from("suppliers").select("name").eq("is_active", true),
   ]);
@@ -168,7 +168,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
   };
 
   for (const inv of invoices) {
-    if (dejaTraitees.has(inv.id) || inv.archived_at) continue;
+    if (dejaTraitees.has(inv.id) || (inv.archived_at && !opts.archivees) || !inv.date) continue;
     if (/^\s*DV/i.test(String(inv.invoice_number ?? ""))) continue; // devis (Armor « DV… ») : pas une facture
     if (opts.limit && res.examinees >= opts.limit) break;
     res.examinees++;

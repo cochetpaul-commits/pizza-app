@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
   const prix = req.nextUrl.searchParams.get("prix") !== "0"; // ?prix=0 : facture et lignes seulement, aucun prix écrit
   const fournisseurs = (req.nextUrl.searchParams.get("fournisseurs") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   const numeros = (req.nextUrl.searchParams.get("numeros") ?? "").split(",").map((x) => x.trim()).filter(Boolean); // ?numeros=FA1,FA2 : seulement ces factures
+  const archivees = req.nextUrl.searchParams.get("archivees") === "1"; // ?archivees=1 : pièces archivées comprises (hors doublons)
   const etabFiltre = (req.nextUrl.searchParams.get("etab") ?? "").toLowerCase();
   const limit = Math.max(0, parseInt(req.nextUrl.searchParams.get("limit") ?? "0", 10) || 0) || undefined;
 
@@ -44,8 +45,8 @@ export async function GET(req: NextRequest) {
     if (etabFiltre && !((etab.slug as string) ?? "").includes(etabFiltre)) continue;
     try {
       out[(etab.nom as string) ?? (etab.slug as string)] = listeSeule
-        ? await autoImportCandidats(days, dossier)
-        : await autoImportFactures(etab.id as string, days, dossier, { creerFiches, fournisseurs, limit, prix, numeros });
+        ? await autoImportCandidats(days, dossier, { archivees })
+        : await autoImportFactures(etab.id as string, days, dossier, { creerFiches, fournisseurs, limit, prix, numeros, archivees });
     } catch (e) {
       out[(etab.nom as string) ?? (etab.slug as string)] = { erreur: e instanceof Error ? e.message : "erreur" };
     }

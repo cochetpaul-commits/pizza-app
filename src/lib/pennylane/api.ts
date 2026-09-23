@@ -76,7 +76,12 @@ export type PlCategory = { id: number; label: string; direction: string };
 type Paged<T> = { items: T[]; has_more: boolean; next_cursor: string | null };
 
 /** Toutes les factures fournisseurs d'une période (pagination suivie). */
-export async function getSupplierInvoices(from: string, to: string, dossier: PlDossier = "bello"): Promise<PlSupplierInvoice[]> {
+/**
+ * @param archivees true = garder aussi les pièces archivées, sauf les doublons (même n° qu'une pièce non archivée,
+ *   ou même n° en double : on garde la plus ancienne). Vécu Armor 23/09 : les factures mensuelles à 0 €
+ *   (livraisons de stock perso) sont archivées dans Pennylane mais portent les quantités.
+ */
+export async function getSupplierInvoices(from: string, to: string, dossier: PlDossier = "bello", opts: { archivees?: boolean } = {}): Promise<PlSupplierInvoice[]> {
   const filter = encodeURIComponent(JSON.stringify([
     { field: "date", operator: "gteq", value: from },
     { field: "date", operator: "lteq", value: to },
@@ -90,8 +95,23 @@ export async function getSupplierInvoices(from: string, to: string, dossier: PlD
     if (!data.has_more || !data.next_cursor) break;
     cursor = data.next_cursor;
   }
-  // Les factures archivées sont des doublons/erreurs : on les écarte
-  return out.filter(i => !i.archived_at);
+  // Les factures archivées sont des doublons/erreurs : on les écarte (sauf demande explicite, hors doublons)
+  if (!opts.archivees) return out.filter(i => !i.archived_at);
+  const parNum = new Map<string, PlSupplierInvoice[]>();
+  const sansNum: PlSupplierInvoice[] = [];
+  for (const i of out) {
+    const n = String(i.invoice_number ?? "").trim();
+    if (!n) { if (!i.archived_at) sansNum.push(i); continue; }
+    if (!parNum.has(n)) parNum.set(n, []);
+    parNum.get(n)!.push(i);
+  }
+  const garde: PlSupplierInvoice[] = [...sansNum];
+  for (const lot of parNum.values()) {
+    const actives = lot.filter(i => !i.archived_at);
+    if (actives.length) garde.push(...actives);
+    else garde.push(lot.sort((a, b) => a.id - b.id)[0]);
+  }
+  return garde;
 }
 
 /** Catégories analytiques d'une facture (une facture peut en avoir plusieurs). */
