@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { roleDenied } from "@/lib/getEtablissement";
-import { aliasFournisseur, chargerIndexFiches, trouverFiche } from "@/lib/invoices/rapprochement";
+import { aliasFournisseur, chargerIndexFiches, trouverFiche, estLigneDeFrais } from "@/lib/invoices/rapprochement";
 import { normalizeIngredientName } from "@/lib/invoices/categoryDetector";
 
 export const runtime = "nodejs";
@@ -81,6 +81,7 @@ export async function GET(req: NextRequest) {
     for (const l of ls) {
       const nm = (l.name ?? "").trim();
       if (!nm && !l.sku) continue;
+      if (estLigneDeFrais(nm)) continue; // forfait livraison, transport : un frais, pas un produit
       if (trouverFiche(idx, l.sku, nm)) continue;
       const sku = (l.sku ?? "").trim() || null;
       const cle = sku ?? `n:${normalizeIngredientName(nm)}`;

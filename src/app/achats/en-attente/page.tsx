@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { supabase } from "@/lib/supabaseClient";
 
 type Produit = {
   cle: string; sku: string | null; libelle: string; lignes: number; factures: number;
@@ -42,6 +43,39 @@ function Contenu() {
   const [ouverts, setOuverts] = useState<Record<string, boolean>>({});
   const [enCours, setEnCours] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
+  const [fiches, setFiches] = useState<Array<{ id: string; name: string; category: string | null; supplier_sku: string | null }> | null>(null);
+  const [picker, setPicker] = useState<{ f: Fournisseur; p: Produit } | null>(null);
+  const [recherche, setRecherche] = useState("");
+
+  const chargerFiches = useCallback(async () => {
+    if (fiches) return;
+    const out: Array<{ id: string; name: string; category: string | null; supplier_sku: string | null }> = [];
+    for (let from = 0; ; from += 1000) {
+      const { data } = await supabase.from("ingredients").select("id, name, category, supplier_sku").eq("is_active", true).order("name").range(from, from + 999);
+      out.push(...((data ?? []) as typeof out));
+      if (!data || data.length < 1000) break;
+    }
+    setFiches(out);
+  }, [fiches]);
+
+  const ouvrirPicker = (f: Fournisseur, p: Produit) => { setPicker({ f, p }); setRecherche(p.libelle.replace(/\b(c\d|fr|es|ma|nl|it|be|pt|za|cr)\b/gi, "").replace(/[\d,./~°xX×]+\s*(g|gr|kg|k|ml|cl|l|f|p|px)?\b/gi, " ").replace(/\s+/g, " ").trim().split(" ").slice(0, 2).join(" ")); void chargerFiches(); };
+
+  const rattacher = async (ficheId: string, ficheNom: string) => {
+    if (!picker) return;
+    const { f, p } = picker;
+    const k = `${f.supplier_id}:${p.cle}`;
+    setEnCours((s) => ({ ...s, [k]: "Rattachement…" })); setPicker(null); setMessage(null);
+    try {
+      if (!p.sku) throw new Error("ligne sans référence fournisseur : créez la fiche ou renommez-la à l'identique");
+      const r = await fetchApi("/api/factures/alias", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ supplier_id: f.supplier_id, sku: p.sku, ingredient_id: ficheId, label: p.libelle }) });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+      setMessage(`Référence ${p.sku} (${p.libelle}) rattachée à « ${ficheNom} ». Relancez le rapprochement de ${f.nom} pour enregistrer les prix.`);
+      await charger();
+    } catch (e) {
+      setMessage(`${p.libelle} : ${e instanceof Error ? e.message : "erreur"}`);
+    } finally { setEnCours((s) => { const n = { ...s }; delete n[k]; return n; }); }
+  };
 
   const charger = useCallback(async () => {
     setLoading(true); setErreur(null);
@@ -169,7 +203,10 @@ function Contenu() {
                               <td style={num}>{p.dernier_prix == null ? "—" : `${eur(p.dernier_prix)}${p.unite ? " / " + unite(p.unite) : ""}`}</td>
                               <td style={{ ...td, whiteSpace: "nowrap", color: "#666" }}>{dateFr(p.derniere_date)}{p.derniere_facture_numero ? <span style={{ color: "#aaa" }}> · {p.derniere_facture_numero}</span> : null}</td>
                               <td style={{ ...td, textAlign: "right" }}>
-                                <button type="button" disabled={!!enCours[k] || !p.derniere_facture_id} onClick={() => creerFiche(f, p)} style={btn}>{enCours[k] ?? "Créer la fiche"}</button>
+                                <div style={{ display: "inline-flex", gap: 6 }}>
+                                  {p.sku && <button type="button" disabled={!!enCours[k]} onClick={() => ouvrirPicker(f, p)} style={btn}>Rattacher…</button>}
+                                  <button type="button" disabled={!!enCours[k] || !p.derniere_facture_id} onClick={() => creerFiche(f, p)} style={btn}>{enCours[k] ?? "Créer la fiche"}</button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -182,6 +219,29 @@ function Contenu() {
             );
           })}
         </>
+      )}
+      {picker && (
+        <div role="dialog" aria-modal="true" onClick={() => setPicker(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.35)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 1000 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", width: "100%", maxWidth: 560, maxHeight: "80dvh", borderRadius: "16px 16px 0 0", padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ fontWeight: 800 }}>Rattacher « {picker.p.libelle} » <span style={{ color: "#888", fontWeight: 500 }}>(réf. {picker.p.sku})</span></div>
+            <div style={{ fontSize: 12, color: "#666" }}>La référence devient un alias de la fiche choisie : les prochaines factures et la relance du rapprochement la reconnaîtront.</div>
+            <input autoFocus value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher une fiche…" style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd", fontSize: 14 }} />
+            <div style={{ overflowY: "auto", flex: 1, border: "1px solid #eee", borderRadius: 10 }}>
+              {!fiches ? <p style={{ padding: 12, color: "#999", fontSize: 13 }}>Chargement des fiches…</p> : (() => {
+                const mots = recherche.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/\s+/).filter(Boolean);
+                const norm = (x: string) => x.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                const res = fiches.filter((x) => mots.every((m) => norm(x.name).includes(m))).slice(0, 40);
+                return res.length ? res.map((x) => (
+                  <button key={x.id} type="button" onClick={() => rattacher(x.id, x.name)} style={{ display: "flex", width: "100%", textAlign: "left", gap: 10, padding: "10px 12px", border: "none", borderBottom: "1px solid #f3f3f3", background: "#fff", cursor: "pointer", fontSize: 13 }}>
+                    <span style={{ flex: 1 }}>{x.name}</span>
+                    <span style={{ color: "#999", fontSize: 11 }}>{x.category ?? ""}{x.supplier_sku ? ` · ${x.supplier_sku}` : ""}</span>
+                  </button>
+                )) : <p style={{ padding: 12, color: "#999", fontSize: 13 }}>Aucune fiche ne correspond.</p>;
+              })()}
+            </div>
+            <button type="button" onClick={() => setPicker(null)} style={{ ...btn, alignSelf: "flex-end" }}>Annuler</button>
+          </div>
+        </div>
       )}
     </div>
   );

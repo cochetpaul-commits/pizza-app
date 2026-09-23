@@ -8,7 +8,7 @@ import { detectCategoryFromName, normalizeIngredientName } from "@/lib/invoices/
 import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { extractPackFromName, extractVolumeFromName, extractWeightGFromName, extractWeightFromName } from "@/lib/invoices/utils";
 import type { Category } from "@/types/ingredients";
-import { aliasFournisseur, chargerIndexFiches, trouverFiche } from "@/lib/invoices/rapprochement";
+import { aliasFournisseur, chargerIndexFiches, trouverFiche, estLigneDeFrais } from "@/lib/invoices/rapprochement";
 
 const execFileAsync = promisify(execFile);
 
@@ -287,7 +287,8 @@ export async function runImport(options: {
   let ingredientsCreated = 0;
   let offersInserted = 0;
 
-  const allLines = (payload.lines ?? []).filter((l) => (l.name ?? "").trim().length > 0);
+  // Les lignes de frais (forfait livraison, transport…) ne font ni fiche ni offre
+  const allLines = (payload.lines ?? []).filter((l) => (l.name ?? "").trim().length > 0 && !estLigneDeFrais(l.name));
   const lines = filterLine ? allLines.filter(filterLine) : allLines;
 
   if (lines.length) {
@@ -533,7 +534,8 @@ export async function runImport(options: {
           const vf = String(a.valid_from ?? a.created_at ?? "").slice(0, 10);
           if (vf && vf > dateFacture) plusRecentes.add(String(a.ingredient_id));
           const c = candidatParIng.get(String(a.ingredient_id));
-          const meme = (x: unknown, y: unknown) => Math.abs(Number(x ?? 0) - Number(y ?? 0)) < 0.0005;
+          // Tolérance : un prix repassé par le classeur Excel est arrondi au centime (2,468 → 2,47)
+          const meme = (x: unknown, y: unknown) => Math.abs(Number(x ?? 0) - Number(y ?? 0)) < 0.0051;
           if (vf === dateFacture && c && c.price_kind === a.price_kind && meme(c.unit_price, a.unit_price) && meme(c.pack_price, a.pack_price)) identiques.add(String(a.ingredient_id));
         }
       }

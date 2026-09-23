@@ -17,6 +17,11 @@ type Db = SupabaseClient<any, any, any>;
 export const cleFournisseur = (n: string) =>
   normalizeIngredientName(n).replace(/\b(sas|sarl|sa|eurl|sasu|societe|ste|ets|etablissements|france|europe)\b/g, " ").replace(/\s+/g, " ").trim();
 
+/** Ligne de frais (forfait livraison, port, transport…) : ni fiche ni offre, jamais « en attente ». */
+export function estLigneDeFrais(nom: string | null | undefined): boolean {
+  return /forfait|frais\s+de\s+(port|livraison|transport)|livraison\s+sur\s+seuil|\bport\b.*\bemballage|participation\s+(transport|livraison)|\btransport\b/i.test(nom ?? "");
+}
+
 export function baseProductName(name: string): string {
   return name
     .toLowerCase()
@@ -65,6 +70,19 @@ export async function chargerIndexFiches(supabase: Db, supplierId: string, suppl
     for (const r of rows) {
       const k = String(r.supplier_sku ?? "").trim();
       if (k && !skuToIngId.has(k)) skuToIngId.set(k, r.id);
+    }
+  }
+  // Références multiples (alias) : Terre Azur / Mael changent de code selon origine ou calibre
+  for (let i = 0; i < skus.length; i += 200) {
+    const { data: alias, error: eAlias } = await supabase
+      .from("ingredient_supplier_refs")
+      .select("sku, ingredient_id")
+      .in("supplier_id", supplierAliasIds)
+      .in("sku", skus.slice(i, i + 200));
+    if (eAlias) throw new Error(eAlias.message);
+    for (const r of (alias ?? []) as Array<{ sku: string; ingredient_id: string }>) {
+      const k = String(r.sku ?? "").trim();
+      if (k && !skuToIngId.has(k)) skuToIngId.set(k, r.ingredient_id);
     }
   }
 
