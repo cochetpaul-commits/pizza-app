@@ -116,7 +116,10 @@ export async function POST(req: NextRequest) {
       const s = String(raw ?? "").trim();
       switch (key) {
         case "name": if (s) set("name", s); else if (!nouveau) erreurs.push({ ligne, nom: String(avant?.name ?? ""), message: "Nom vide — conservé" }); break;
-        case "supplier_sku": case "prix_date": break; // traités avec le prix
+        // Réf. fournisseur : écrite sur la FICHE (création comme modification) dès qu'elle est renseignée,
+        // indépendamment du bloc prix ; l'offre active est synchronisée plus bas. Vide = inchangée.
+        case "supplier_sku": if (s) set("supplier_sku", s); break;
+        case "prix_date": break; // traité avec le prix
         case "is_active": case "favori_commande": { const b = boolIn(s); if (s && b === undefined) erreurs.push({ ligne, nom: nomCell, message: `${key} : « ${s} » n'est ni oui ni non` }); else if (b !== undefined) set(key, b); break; }
         case "establishments": { const e = estabsIn(s); if (e === "invalide") erreurs.push({ ligne, nom: nomCell, message: `Établissements « ${s} » non reconnus` }); else if (e) set("establishments", e); break; }
         case "category": { if (!s) break; const c = s.toLowerCase(); if (!(CATEGORIES as readonly string[]).includes(c)) erreurs.push({ ligne, nom: nomCell, message: `Catégorie « ${s} » inconnue (voir feuille Listes)` }); else set("category", c); break; }
@@ -174,6 +177,11 @@ export async function POST(req: NextRequest) {
           }
         } else if (change && unitaire == null && (condP != null || nbU != null)) {
           erreurs.push({ ligne, nom: nomCell, message: "Prix : il manque le prix unitaire ou le nombre d'unités par conditionnement" });
+        }
+        // Réf. modifiée sans prix exploitable (offre sans prix unitaire, ligne sans prix) : on aligne quand même l'offre active
+        if (!(row as Record<string, unknown>).__prix && !(row as Record<string, unknown>).__offreMaj && id && offerBy.get(id) && sku && sku !== (actuel.sku ?? null)) {
+          (row as Record<string, unknown>).__offreMaj = { offre_id: offerBy.get(id)!.id as string, sku, date: null };
+          champs.prix_ref = { avant: actuel.sku ? "réf. " + actuel.sku : "sans réf.", apres: "réf. " + sku };
         }
       }
     }
