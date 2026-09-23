@@ -72,6 +72,8 @@ export async function POST(req: NextRequest) {
         sourceFileName: `rapprochement_${f.id}`, rawText: f.raw_text ?? `rapprochement_${f.id}`, mode: "commit",
         defaultUnit: entry?.defaultUnit ?? "pc", establishment: slug.includes("piccola") ? "piccola" : "bellomio", etabId,
         creerFiches: creer, filterLine,
+        // Relance : on comble les trous, on n'écrase jamais un prix existant de date égale ou plus récente (vécu 23/09 : prix Excel de Paul remplacés)
+        seulementCombler: !creer,
       });
       offres += r.offersInserted; fiches += r.ingredientsCreated; sansFiche += r.lignesSansFiche.length;
       details.push({ facture: f.invoice_number, date: f.invoice_date, offres: r.offersInserted, fiches: r.ingredientsCreated, sans_fiche: r.lignesSansFiche.length });

@@ -145,6 +145,9 @@ export async function runImport(options: {
   creerFiches?: boolean;
   /** true = enregistrer la facture et ses lignes sans toucher aux prix (offres) */
   sansOffres?: boolean;
+  /** true (relance du rapprochement) : ne remplace JAMAIS une offre active de date égale ou plus récente,
+   *  quelle que soit sa valeur — on ne fait que combler les trous (produit sans prix chez ce fournisseur, ou facture strictement plus récente) */
+  seulementCombler?: boolean;
 }): Promise<ImportResult> {
   const {
     supabase,
@@ -159,6 +162,7 @@ export async function runImport(options: {
     filterLine,
     creerFiches = true,
     sansOffres = false,
+    seulementCombler = false,
   } = options;
   const lignesSansFiche: string[] = [];
 
@@ -541,7 +545,7 @@ export async function runImport(options: {
         for (const a of actives ?? []) {
           activesMemeFournisseur.push({ id: String(a.id), ingredient_id: String(a.ingredient_id), valid_from: a.valid_from ? String(a.valid_from).slice(0, 10) : null });
           const vf = String(a.valid_from ?? a.created_at ?? "").slice(0, 10);
-          if (vf && vf > dateFacture) plusRecentes.add(String(a.ingredient_id));
+          if (vf && (vf > dateFacture || (seulementCombler && vf >= dateFacture))) plusRecentes.add(String(a.ingredient_id));
           const c = candidatParIng.get(String(a.ingredient_id));
           // Tolérance : un prix repassé par le classeur Excel est arrondi au centime (2,468 → 2,47)
           const meme = (x: unknown, y: unknown) => Math.abs(Number(x ?? 0) - Number(y ?? 0)) < 0.0051;
