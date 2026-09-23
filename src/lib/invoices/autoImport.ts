@@ -77,6 +77,21 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
 
 export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[]; /** nb max de factures traitées par appel (fonction serveur limitée à 60 s) */ limit?: number };
 
+/**
+ * Client lu dans l'en-tête de la facture : « SASHA » / « BELLO MIO » = Bello Mio,
+ * « I FRATELLI » / « PICCOLA » = Piccola Mia. null si absent, ou si les deux
+ * figurent (facturation ≠ livraison : Vinoflo, SDPF). On ne lit que l'en-tête
+ * pour ne pas confondre avec un libellé produit.
+ */
+export function clientLuSurFacture(texte: string): "bello" | "piccola" | null {
+  const tete = (texte ?? "").slice(0, 2500);
+  const bello = /SASHA|BELLO\s*MIO/i.test(tete);
+  const piccola = /I\s*FRATELLI|PICCOLA/i.test(tete);
+  if (bello && !piccola) return "bello";
+  if (piccola && !bello) return "piccola";
+  return null;
+}
+
 export async function autoImportFactures(etabId: string, days = 30, dossier: PlDossier = "bello", opts: AutoImportOptions = {}): Promise<AutoImportResult> {
   const creerFiches = opts.creerFiches !== false;
   const seulement = (opts.fournisseurs ?? []).map(norm).filter(Boolean);
@@ -264,6 +279,17 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
 
       if (!payload || payload.lines.length === 0) {
         await log(inv, fournisseur, "a_verifier", `aucun parser n'a lu cette facture — à importer à la main${diag ? " · " + diag : ""} ${trace}`, undefined, undefined, rawText);
+        continue;
+      }
+
+      // Mauvais dossier : facture adressée à l'autre restaurant (vécu : FB9725
+      // Mael « BELLO MIO SASHA » présente dans le Pennylane de Piccola Mia et
+      // importée chez Mael Piccola). On n'importe pas, on signale.
+      const clientLu = clientLuSurFacture(rawText);
+      const dossierAttendu = dossier === "piccola" ? "piccola" : "bello";
+      if (clientLu && clientLu !== dossierAttendu) {
+        const nom = (d: "bello" | "piccola") => (d === "bello" ? "Bello Mio (SASHA)" : "Piccola Mia (I Fratelli)");
+        await log(inv, fournisseur, "a_verifier", `client lu sur la facture : ${nom(clientLu)} ≠ dossier Pennylane ${nom(dossierAttendu)} — non importée, à vérifier avec le comptable ${trace}`, parserUtilise, payload.lines.length, rawText);
         continue;
       }
 
