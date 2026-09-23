@@ -5,6 +5,7 @@ import { detectInvoice } from "@/lib/invoices/invoiceDetector";
 import { PARSERS } from "@/lib/invoices/registry";
 import { runImport, type ParsedInvoice } from "@/lib/invoices/importEngine";
 import { geminiVisionParse } from "@/lib/invoices/geminiVisionParser";
+import { estFournisseurInterne } from "@/lib/invoices/rapprochement";
 
 /**
  * Récupération automatique des factures depuis Pennylane (Bello Mio).
@@ -51,7 +52,7 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
     supabaseAdmin.from("suppliers").select("name").eq("is_active", true),
   ]);
   const plNameById = new Map(plSuppliers.map((s) => [s.id, s.name]));
-  const mercuriale = (appSuppliers ?? []).map((s) => norm(s.name as string)).filter((n) => n.length > 3);
+  const mercuriale = (appSuppliers ?? []).filter((s) => !estFournisseurInterne(s.name as string)).map((s) => norm(s.name as string)).filter((n) => n.length > 3);
   const ids = invoices.map((i) => i.id);
   const traitees = new Set<number>();
   for (let i = 0; i < ids.length; i += 100) {
@@ -75,7 +76,7 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
   return { periode: { from, to }, candidats };
 }
 
-export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[]; /** nb max de factures traitées par appel (fonction serveur limitée à 60 s) */ limit?: number; /** false = facture et lignes seulement, aucun prix (offre) écrit */ prix?: boolean };
+export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[]; /** nb max de factures traitées par appel (fonction serveur limitée à 60 s) */ limit?: number; /** false = facture et lignes seulement, aucun prix (offre) écrit */ prix?: boolean; /** ne traiter que ces numéros de facture */ numeros?: string[] };
 
 /**
  * Client lu sur la facture : « SASHA » / « BELLO MIO » = Bello Mio,
@@ -108,6 +109,7 @@ export function clientLuSurFacture(texte: string): "bello" | "piccola" | null {
 export async function autoImportFactures(etabId: string, days = 30, dossier: PlDossier = "bello", opts: AutoImportOptions = {}): Promise<AutoImportResult> {
   const creerFiches = opts.creerFiches !== false;
   const seulement = (opts.fournisseurs ?? []).map(norm).filter(Boolean);
+  const numeros = new Set((opts.numeros ?? []).map((n) => n.trim()).filter(Boolean));
   const from = isoDaysAgo(days);
   const to = new Date().toISOString().slice(0, 10);
   const userId = process.env.AUTO_IMPORT_USER_ID ?? "bd335e2e-6a50-4311-89b4-8f735cf6bc0b";
@@ -119,6 +121,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
   ]);
   const plNameById = new Map(plSuppliers.map((s) => [s.id, s.name]));
   const mercuriale = (appSuppliers ?? [])
+    .filter((s) => !estFournisseurInterne(s.name as string))
     .map((s) => norm(s.name as string))
     .filter((n) => n.length > 3);
 
@@ -175,6 +178,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
     const fournisseurApp = (appSuppliers ?? []).map((s) => s.name as string).find((n) => { const k = norm(n); return k.length > 3 && (nf.includes(k) || k.includes(nf)); }) ?? fournisseur;
     // Rattrapage par lots : ne traiter que certains fournisseurs, sans marquer les autres
     if (seulement.length && !seulement.some((f) => nf.includes(f) || f.includes(nf))) { res.examinees--; continue; }
+    if (numeros.size && !numeros.has(String(inv.invoice_number ?? "").trim())) { res.examinees--; continue; }
 
     try {
       if (!estMercuriale) {
@@ -316,7 +320,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
       await log(
         inv, fournisseur,
         r.invoiceAlreadyImported ? "deja_connue" : "importee",
-        `${Number(inv.currency_amount ?? 0) < 0 ? "AVOIR · " : ""}${payload.lines.length} lignes · ${payload.total_ht != null ? `${payload.total_ht.toFixed(2)} € HT · ` : ""}${r.ingredientsCreated} produit(s) créé(s), ${r.offersInserted} prix mis à jour${r.lignesSansFiche.length ? ` · ${r.lignesSansFiche.length} ligne(s) sans fiche en attente : ${r.lignesSansFiche.join(" | ").slice(0, 1500)}` : ""}`,
+        `${Number(inv.currency_amount ?? 0) < 0 ? "AVOIR · " : ""}${payload.lines.length} lignes · ${payload.total_ht != null ? `${payload.total_ht.toFixed(2)} € HT · ` : ""}${r.ingredientsCreated} produit(s) créé(s), ${r.offersInserted} prix mis à jour${r.offresAValider ? ` · ${r.offresAValider} baisse(s) de prix à valider` : ""}${r.lignesSansFiche.length ? ` · ${r.lignesSansFiche.length} ligne(s) sans fiche en attente : ${r.lignesSansFiche.join(" | ").slice(0, 1500)}` : ""}`,
         parserUtilise, payload.lines.length,
       );
     } catch (e) {

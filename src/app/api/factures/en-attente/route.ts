@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { roleDenied } from "@/lib/getEtablissement";
-import { aliasFournisseur, chargerIndexFiches, trouverFiche, estLigneDeFrais, cleReference, estRefGenerique } from "@/lib/invoices/rapprochement";
+import { aliasFournisseur, chargerIndexFiches, trouverFiche, estLigneDeFrais, cleReference, estRefGenerique, estFournisseurInterne } from "@/lib/invoices/rapprochement";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -74,6 +74,7 @@ export async function GET(req: NextRequest) {
 
   const out: FournisseurEnAttente[] = [];
   for (const [sid, ls] of parFourn) {
+    if (estFournisseurInterne(supName.get(sid))) continue; // « Interne (sans facture) » : hors rapprochement
     const alias = await aliasFournisseur(supabaseAdmin, sid, supName.get(sid));
     const skus = Array.from(new Set(ls.map((l) => (l.sku ?? "").trim()).filter(Boolean)));
     const idx = await chargerIndexFiches(supabaseAdmin, sid, alias, skus);

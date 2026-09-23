@@ -164,15 +164,18 @@ function parseLines(text: string): ParsedLine[] {
     name = name.replace(/\s+/g, " ").trim();
     if (!name) continue;
 
+    // Coût = montant HT de la ligne ÷ quantité : droits d'accises INCLUS (règle Pierre 23/09, comme Cozigou).
+    // Le P.U. imprimé est hors droits ; on le garde en note.
+    const puDroitsInclus = montant != null && qty > 0 ? Math.round((montant / qty) * 10000) / 10000 : pu;
     result.push({
       sku: entry.sku,
       name,
       quantity: qty,
       unit: "pc",
-      unit_price: pu,
+      unit_price: puDroitsInclus,
       total_price: montant,
       tax_rate: taxRate,
-      notes: null,
+      notes: pu != null && puDroitsInclus != null && Math.abs(pu - puDroitsInclus) > 0.0001 ? `droits inclus (P.U. hors droits ${pu})` : null,
       piece_weight_g: null,
       piece_volume_ml: null,
     });
@@ -181,9 +184,24 @@ function parseLines(text: string): ParsedLine[] {
   return result;
 }
 
+/** Colonne SERVICES du bloc TVA (participation transport, frais fixes) : « A3 15,44 15,44 20,00 » */
+function extractServices(text: string): number | null {
+  const m = text.match(/\bA3\s+([\d\s,]+?)\s+([\d\s,]+?)\s+20,00\b/);
+  return m ? parseFrenchNumber(m[1].replace(/\s/g, "")) : null;
+}
+
 export function parseCarniatoInvoiceText(text: string): ParsedInvoice {
   const meta = extractMeta(text);
   const lines = parseLines(text);
+  // Participation transport / frais fixes (colonne SERVICES) : une ligne de frais, jamais une fiche ni une offre,
+  // pour que la somme des lignes recolle au total HT (201009732 : 114,00 + 15,44).
+  const services = extractServices(text);
+  if (services != null && services > 0 && meta.total_ht != null) {
+    const somme = lines.reduce((a, l) => a + (l.total_price ?? 0), 0);
+    if (Math.abs(somme + services - meta.total_ht) < 0.02) {
+      lines.push({ sku: "FRAIS", name: "PARTICIPATION TRANSPORT (frais)", quantity: 1, unit: "pc", unit_price: services, total_price: services, tax_rate: 20, notes: "frais | TVA=20", piece_weight_g: null, piece_volume_ml: null });
+    }
+  }
 
   return {
     supplier: "CARNIATO",

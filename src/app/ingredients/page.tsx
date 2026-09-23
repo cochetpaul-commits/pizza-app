@@ -508,8 +508,10 @@ function IngredientsPageInner() {
   };
 
   function buildOfferFromCreate(ingredient_id: string, uid: string, ingEtabId?: string | null): SupplierOfferPayload | null {
-    const supplier_id = normalizeSupplierId(newSupplierId);
-    if (!supplier_id) { alert("Fournisseur obligatoire pour enregistrer une offre."); return null; }
+    // Sans fournisseur choisi : « Interne (sans facture) » (ingrédients sans achat, ex. eau du robinet)
+    const interne = suppliers.find((s) => /^\s*interne\b/i.test(s.name ?? ""));
+    const supplier_id = normalizeSupplierId(newSupplierId) ?? interne?.id ?? null;
+    if (!supplier_id) { alert("Fournisseur obligatoire pour enregistrer une offre (ou créez le fournisseur « Interne (sans facture) »)."); return null; }
     if (!uid) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return null; }
     const resolvedEtabId = etab?.id ?? ingEtabId;
     const etabExtra = resolvedEtabId ? { etablissement_id: resolvedEtabId } : {};

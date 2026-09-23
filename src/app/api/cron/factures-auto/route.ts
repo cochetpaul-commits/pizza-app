@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
   const creerFiches = req.nextUrl.searchParams.get("creer") !== "0";
   const prix = req.nextUrl.searchParams.get("prix") !== "0"; // ?prix=0 : facture et lignes seulement, aucun prix écrit
   const fournisseurs = (req.nextUrl.searchParams.get("fournisseurs") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const numeros = (req.nextUrl.searchParams.get("numeros") ?? "").split(",").map((x) => x.trim()).filter(Boolean); // ?numeros=FA1,FA2 : seulement ces factures
   const etabFiltre = (req.nextUrl.searchParams.get("etab") ?? "").toLowerCase();
   const limit = Math.max(0, parseInt(req.nextUrl.searchParams.get("limit") ?? "0", 10) || 0) || undefined;
 
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
     try {
       out[(etab.nom as string) ?? (etab.slug as string)] = listeSeule
         ? await autoImportCandidats(days, dossier)
-        : await autoImportFactures(etab.id as string, days, dossier, { creerFiches, fournisseurs, limit, prix });
+        : await autoImportFactures(etab.id as string, days, dossier, { creerFiches, fournisseurs, limit, prix, numeros });
     } catch (e) {
       out[(etab.nom as string) ?? (etab.slug as string)] = { erreur: e instanceof Error ? e.message : "erreur" };
     }

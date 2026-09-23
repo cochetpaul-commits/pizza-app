@@ -8,7 +8,7 @@ import { detectCategoryFromName, normalizeIngredientName } from "@/lib/invoices/
 import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { extractPackFromName, extractVolumeFromName, extractWeightGFromName, extractWeightFromName } from "@/lib/invoices/utils";
 import type { Category } from "@/types/ingredients";
-import { aliasFournisseur, chargerIndexFiches, trouverFiche, estLigneDeFrais, cleReference } from "@/lib/invoices/rapprochement";
+import { aliasFournisseur, chargerIndexFiches, trouverFiche, estLigneDeFrais, cleReference, estFournisseurInterne } from "@/lib/invoices/rapprochement";
 
 const execFileAsync = promisify(execFile);
 
@@ -43,6 +43,8 @@ export interface ImportResult {
   invoiceAlreadyImported: boolean;
   ingredientsCreated: number;
   offersInserted: number;
+  /** Baisses de prix de plus de 20 % mises « à valider » (non appliquées) */
+  offresAValider?: number;
   /** Lignes sans fiche correspondante (mode sans création : mises en attente, pas d'offre) */
   lignesSansFiche: string[];
 }
@@ -165,6 +167,8 @@ export async function runImport(options: {
     seulementCombler = false,
   } = options;
   const lignesSansFiche: string[] = [];
+  let offresAValider = 0;
+  if (estFournisseurInterne(supplierName)) throw new Error("Fournisseur interne (sans facture) : aucun import possible");
 
   // 1. Upsert supplier (normalize name to Title Case to avoid duplicates)
   const normalizedName = supplierName
@@ -537,13 +541,13 @@ export async function runImport(options: {
       // Offres actives DU MÊME FOURNISSEUR (Mael Bello / Mael Piccola regroupés). Celles des
       // autres fournisseurs ne sont jamais touchées : Paul achète le poulpe chez Terre Azur ET
       // chez Le Père Billard, les deux prix restent actifs.
-      const activesMemeFournisseur: Array<{ id: string; ingredient_id: string; valid_from: string | null }> = [];
+      const activesMemeFournisseur: Array<{ id: string; ingredient_id: string; valid_from: string | null; unit_price: number | null; unit: string | null }> = [];
       for (let i = 0; i < candidatIds.length; i += 150) {
         const { data: actives } = await supabase
-          .from("supplier_offers").select("id, ingredient_id, valid_from, created_at, price_kind, unit_price, pack_price")
+          .from("supplier_offers").select("id, ingredient_id, valid_from, created_at, price_kind, unit_price, pack_price, unit")
           .in("supplier_id", supplierAliasIds).eq("is_active", true).in("ingredient_id", candidatIds.slice(i, i + 150));
         for (const a of actives ?? []) {
-          activesMemeFournisseur.push({ id: String(a.id), ingredient_id: String(a.ingredient_id), valid_from: a.valid_from ? String(a.valid_from).slice(0, 10) : null });
+          activesMemeFournisseur.push({ id: String(a.id), ingredient_id: String(a.ingredient_id), valid_from: a.valid_from ? String(a.valid_from).slice(0, 10) : null, unit_price: a.unit_price == null ? null : Number(a.unit_price), unit: (a.unit as string | null) ?? null });
           const vf = String(a.valid_from ?? a.created_at ?? "").slice(0, 10);
           if (vf && (vf > dateFacture || (seulementCombler && vf >= dateFacture))) plusRecentes.add(String(a.ingredient_id));
           const c = candidatParIng.get(String(a.ingredient_id));
@@ -552,8 +556,35 @@ export async function runImport(options: {
           if (vf === dateFacture && c && c.price_kind === a.price_kind && meme(c.unit_price, a.unit_price) && meme(c.pack_price, a.pack_price)) identiques.add(String(a.ingredient_id));
         }
       }
+      // Baisse de plus de 20 % du prix unitaire (même fournisseur, même unité) : pas appliquée, mise « à valider »
+      // (règle Pierre 23/09 : une promo ne doit pas remplacer le prix habituel sans validation).
+      const aValider = new Set<string>();
+      {
+        const actParIng = new Map(activesMemeFournisseur.map((a) => [a.ingredient_id, a]));
+        const lignesAValider: Record<string, unknown>[] = [];
+        for (const x of offerRows) {
+          const ing = String(x.ingredient_id);
+          if (plusRecentes.has(ing) || identiques.has(ing)) continue;
+          const a = actParIng.get(ing);
+          const nouveau = Number(x.unit_price ?? NaN);
+          if (!a || a.unit_price == null || a.unit_price <= 0 || !Number.isFinite(nouveau) || nouveau <= 0) continue;
+          if ((a.unit ?? null) !== ((x.unit as string | null) ?? null)) continue;
+          const ecart = (nouveau / a.unit_price - 1) * 100;
+          if (ecart < -20) {
+            aValider.add(ing);
+            lignesAValider.push({ ingredient_id: ing, supplier_id: supplierId, etablissement_id: etabId ?? null, offre: { ...x, valid_from: (x.valid_from as string | undefined) ?? dateFacture },
+              ancien_prix: a.unit_price, nouveau_prix: nouveau, ecart_pct: Math.round(ecart * 10) / 10, unite: (x.unit as string | null) ?? null,
+              source: `${normalizedName}${invoiceNumber ? " " + invoiceNumber : ""}${payload.invoice_date ? " du " + payload.invoice_date : ""}` });
+          }
+        }
+        if (lignesAValider.length) {
+          const ins = await supabase.from("supplier_offers_a_valider").insert(lignesAValider);
+          if (ins.error) throw new Error(ins.error.message);
+          offresAValider += lignesAValider.length;
+        }
+      }
       const offerRowsAppliquees: Record<string, unknown>[] = offerRows
-        .filter((x) => !plusRecentes.has(String(x.ingredient_id)) && !identiques.has(String(x.ingredient_id)))
+        .filter((x) => !plusRecentes.has(String(x.ingredient_id)) && !identiques.has(String(x.ingredient_id)) && !aValider.has(String(x.ingredient_id)))
         .map((x) => ({ ...x, valid_from: (x.valid_from as string | undefined) ?? dateFacture }));
       const ingredientIds = Array.from(new Set(offerRowsAppliquees.map((x) => String(x.ingredient_id))));
 
@@ -616,5 +647,5 @@ export async function runImport(options: {
     }
   }
 
-  return { supplierId, invoiceId, invoiceAlreadyImported, ingredientsCreated, offersInserted, lignesSansFiche };
+  return { supplierId, invoiceId, invoiceAlreadyImported, ingredientsCreated, offersInserted, offresAValider, lignesSansFiche };
 }

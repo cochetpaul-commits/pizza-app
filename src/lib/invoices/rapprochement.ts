@@ -17,6 +17,11 @@ type Db = SupabaseClient<any, any, any>;
 export const cleFournisseur = (n: string) =>
   normalizeIngredientName(n).replace(/\b(sas|sarl|sa|eurl|sasu|societe|ste|ets|etablissements|france|europe)\b/g, " ").replace(/\s+/g, " ").trim();
 
+/** Fournisseur « Interne (sans facture) » : ingrédients sans achat (eau du robinet…). Jamais de facture, de rapprochement ni d'attente. */
+export function estFournisseurInterne(nom: string | null | undefined): boolean {
+  return /^\s*interne\b/i.test(nom ?? "");
+}
+
 /** Ligne de frais (forfait livraison, port, transport…) : ni fiche ni offre, jamais « en attente ». */
 export function estLigneDeFrais(nom: string | null | undefined): boolean {
   return /forfait|frais\s+de\s+(port|livraison|transport)|livraison\s+sur\s+seuil|\bport\b.*\bemballage|participation\s+(transport|livraison)|\btransport\b/i.test(nom ?? "");

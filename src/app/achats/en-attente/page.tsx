@@ -62,6 +62,22 @@ function Contenu() {
   const ouvrirPicker = (f: Fournisseur, p: Produit) => { setPicker({ f, p }); setRecherche(p.libelle.replace(/\b(c\d|fr|es|ma|nl|it|be|pt|za|cr)\b/gi, "").replace(/[\d,./~°xX×]+\s*(g|gr|kg|k|ml|cl|l|f|p|px)?\b/gi, " ").replace(/\s+/g, " ").trim().split(" ").slice(0, 2).join(" ")); void chargerFiches(); };
 
   const [voirIgnorees, setVoirIgnorees] = useState<Record<string, boolean>>({});
+  type PrixAValider = { id: string; produit: string; fournisseur: string; ancien_prix: number | null; nouveau_prix: number | null; ecart_pct: number | null; unite: string | null; source: string | null; created_at: string };
+  const [prixAValider, setPrixAValider] = useState<PrixAValider[]>([]);
+  const chargerPrix = useCallback(async () => {
+    try { const r = await fetchApi("/api/factures/prix-a-valider"); const j = await r.json(); if (r.ok && j.ok) setPrixAValider(j.prix as PrixAValider[]); } catch { /* encart facultatif */ }
+  }, []);
+  useEffect(() => { void chargerPrix(); }, [chargerPrix, current?.id]);
+  const deciderPrix = async (p: PrixAValider, action: "accepter" | "refuser") => {
+    setMessage(null);
+    try {
+      const r = await fetchApi("/api/factures/prix-a-valider", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, action }) });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+      setMessage(`${p.produit} (${p.fournisseur}) : baisse ${action === "accepter" ? "acceptée, prix appliqué" : "refusée, prix habituel conservé"}.`);
+      await chargerPrix();
+    } catch (e) { setMessage(e instanceof Error ? e.message : "erreur"); }
+  };
 
   const ignorer = async (f: Fournisseur, p: Produit) => {
     const k = `${f.supplier_id}:${p.cle}`;
@@ -182,6 +198,31 @@ function Contenu() {
         « Relancer le rapprochement » rejoue les factures déjà en base pour rattacher l&apos;historique aux fiches créées depuis, sans écraser un prix plus récent.
       </p>
       {message && <div style={{ background: "#fff7e6", border: "1px solid #ffd591", borderRadius: 10, padding: "10px 12px", fontSize: 13, marginBottom: 12 }}>{message}</div>}
+      {prixAValider.length > 0 && (
+        <section style={{ ...card, border: "1px solid #ffd591" }}>
+          <div style={{ padding: "12px 14px", fontWeight: 800, fontSize: 15 }}>Baisses de prix à valider <span style={{ color: "#888", fontWeight: 500, fontSize: 12 }}>· plus de 20 % sous le prix habituel, non appliquées</span></div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
+              <thead><tr><th style={th}>Produit</th><th style={th}>Fournisseur</th><th style={{ ...th, textAlign: "right" }}>Prix habituel</th><th style={{ ...th, textAlign: "right" }}>Prix facturé</th><th style={{ ...th, textAlign: "right" }}>Écart</th><th style={th}>Source</th><th style={th}></th></tr></thead>
+              <tbody>
+                {prixAValider.map((p) => (
+                  <tr key={p.id}>
+                    <td style={td}>{p.produit}</td><td style={td}>{p.fournisseur}</td>
+                    <td style={num}>{eur(p.ancien_prix)}{p.unite ? " / " + unite(p.unite) : ""}</td>
+                    <td style={{ ...num, fontWeight: 700 }}>{eur(p.nouveau_prix)}{p.unite ? " / " + unite(p.unite) : ""}</td>
+                    <td style={{ ...num, color: "#b45309" }}>{p.ecart_pct != null ? `${p.ecart_pct} %` : "—"}</td>
+                    <td style={{ ...td, color: "#666", whiteSpace: "nowrap" }}>{p.source ?? "—"}</td>
+                    <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
+                      <button type="button" onClick={() => deciderPrix(p, "accepter")} style={{ ...btn, marginRight: 6 }}>Accepter</button>
+                      <button type="button" onClick={() => deciderPrix(p, "refuser")} style={{ ...btn, color: "#999" }}>Refuser</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
       {erreur && <div style={{ background: "#fff1f0", border: "1px solid #ffa39e", borderRadius: 10, padding: "10px 12px", fontSize: 13, marginBottom: 12 }}>{erreur}</div>}
       {loading && !data ? (
         <p style={{ color: "#999", textAlign: "center", marginTop: 40 }}>Analyse des factures…</p>

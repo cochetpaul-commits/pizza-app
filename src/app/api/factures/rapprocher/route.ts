@@ -5,6 +5,7 @@ import { runImport, type ParsedInvoice, type ParsedLine } from "@/lib/invoices/i
 import { detectInvoice } from "@/lib/invoices/invoiceDetector";
 import { PARSERS } from "@/lib/invoices/registry";
 import { normalizeIngredientName } from "@/lib/invoices/categoryDetector";
+import { estFournisseurInterne } from "@/lib/invoices/rapprochement";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -63,6 +64,7 @@ export async function POST(req: NextRequest) {
     try {
       if (!f.parsed_json || !f.supplier_id || !f.invoice_number) { details.push({ facture: f.invoice_number, date: f.invoice_date, offres: 0, fiches: 0, sans_fiche: 0, erreur: "facture sans détail lu ou sans numéro" }); continue; }
       const s = sup.get(f.supplier_id);
+      if (estFournisseurInterne(s?.name)) { details.push({ facture: f.invoice_number, date: f.invoice_date, offres: 0, fiches: 0, sans_fiche: 0, erreur: "fournisseur interne : hors rapprochement" }); continue; }
       const etabId = f.etablissement_id ?? s?.etablissement_id ?? undefined;
       const slug = etabId ? (slugById.get(etabId) ?? "") : "";
       const det = f.raw_text ? detectInvoice(f.raw_text) : null;
