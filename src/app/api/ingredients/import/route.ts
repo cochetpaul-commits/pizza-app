@@ -61,6 +61,16 @@ export async function POST(req: NextRequest) {
     supabaseAdmin.from("etablissements").select("id, slug"),
     supabaseAdmin.from("suppliers").select("id, name, etablissement_id").eq("is_active", true),
   ]);
+  // Même fournisseur sous plusieurs lignes (Mael Bello / Mael Piccola, « SAS Cozigou Côte d'Émeraude ») : forme juridique ignorée
+  const cleF = (n: unknown) => norm(String(n ?? "").replace(/\b(sas|sarl|sa|eurl|sasu|societe|société|ste|ets|etablissements|france|europe)\b/gi, " "));
+  const aliasDe = (sid: string): string[] => { const k = cleF((fournisseursAll ?? []).find((f) => f.id === sid)?.name); return k ? (fournisseursAll ?? []).filter((f) => cleF(f.name) === k).map((f) => f.id as string) : [sid]; };
+  // Réf. fournisseur connue → fournisseur (offres actives et alias de références)
+  const fournisseurParRef = new Map<string, string>();
+  for (const o of (offersAll ?? []) as Record<string, unknown>[]) if (o.supplier_sku && !fournisseurParRef.has(String(o.supplier_sku))) fournisseurParRef.set(String(o.supplier_sku), o.supplier_id as string);
+  {
+    const { data: refs } = await supabaseAdmin.from("ingredient_supplier_refs").select("sku, supplier_id").range(0, 4999);
+    for (const r of (refs ?? []) as Array<{ sku: string; supplier_id: string }>) if (!fournisseurParRef.has(r.sku)) fournisseurParRef.set(r.sku, r.supplier_id);
+  }
   const etabIdOf = (slug: string) => (etabs ?? []).find((e) => String(e.slug).includes(slug === "bellomio" ? "bello" : "piccola"))?.id ?? null;
   // Fournisseur de secours : par NOM, pour l'établissement de la fiche (Mael Bello ≠ Mael Piccola)
   const fournisseurParNom = (nom: unknown, etabId: string | null): string | null => {
@@ -161,12 +171,14 @@ export async function POST(req: NextRequest) {
           if (skuChange) { patch.supplier_sku = sku; }
         } else if (change && unitaire != null && unitaire > 0) {
           const etabFiche = (avant?.etablissement_id as string | null) ?? etabIdOf(((patch.establishments as string[]) ?? [etabDefaut])[0]);
-          // Ordre : fournisseur de l'offre active (celui que le produit utilise déjà),
-          // puis fournisseur par défaut / de la fiche, puis le nom de la colonne.
-          const sid = (id ? (offerBy.get(id)?.supplier_id as string | undefined) : undefined)
+          // Le prix va chez le fournisseur DE LA LIGNE : colonne « Fournisseur (info) », sinon
+          // fournisseur connu pour cette réf., sinon celui de l'offre active, sinon celui de la fiche.
+          // (vécu 23/09 : prix Terre Azur du poulpe écrit chez Le Père Billard, fournisseur par défaut de la fiche)
+          const sid = fournisseurParNom(cellOf(row, "fournisseur"), etabFiche)
+            ?? (sku ? fournisseurParRef.get(sku) : undefined)
+            ?? (id ? (offerBy.get(id)?.supplier_id as string | undefined) : undefined)
             ?? (avant?.default_supplier_id as string | undefined)
             ?? (avant?.supplier_id as string | undefined)
-            ?? fournisseurParNom(cellOf(row, "fournisseur"), etabFiche)
             ?? null;
           if (!sid) erreurs.push({ ligne, nom: nomCell, message: `Prix non appliqué : aucun fournisseur trouvé${cellOf(row, "fournisseur") ? ` (« ${String(cellOf(row, "fournisseur"))} » inconnu pour cet établissement)` : " (colonne Fournisseur vide)"}` });
           else {
@@ -233,7 +245,8 @@ export async function POST(req: NextRequest) {
               : { ...commun, price_kind: "unit", unit: p.base === "kg" ? "kg" : "l", unit_price: p.unitaire, price: p.unitaire });
     // L'ancienne offre est clôturée (valid_to), jamais supprimée : l'historique des prix reste.
     // valid_to ne descend jamais sous le valid_from de l'offre fermée.
-    const { data: anciennes } = await supabaseAdmin.from("supplier_offers").select("id, valid_from").eq("ingredient_id", ingredientId).eq("is_active", true);
+    // Seule l'offre active DU MÊME FOURNISSEUR est fermée : plusieurs fournisseurs actifs sur une fiche, c'est normal.
+    const { data: anciennes } = await supabaseAdmin.from("supplier_offers").select("id, valid_from").eq("ingredient_id", ingredientId).eq("is_active", true).in("supplier_id", aliasDe(sid));
     const dateNouvelle = p.date ?? aujourdhui;
     for (const a of anciennes ?? []) {
       const vf = String(a.valid_from ?? "").slice(0, 10);

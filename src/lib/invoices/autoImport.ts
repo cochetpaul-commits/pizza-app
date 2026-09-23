@@ -75,7 +75,7 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
   return { periode: { from, to }, candidats };
 }
 
-export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[]; /** nb max de factures traitées par appel (fonction serveur limitée à 60 s) */ limit?: number };
+export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[]; /** nb max de factures traitées par appel (fonction serveur limitée à 60 s) */ limit?: number; /** false = facture et lignes seulement, aucun prix (offre) écrit */ prix?: boolean };
 
 /**
  * Client lu sur la facture : « SASHA » / « BELLO MIO » = Bello Mio,
@@ -310,7 +310,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
         supabase: supabaseAdmin, userId, supplierName, payload,
         sourceFileName: inv.filename ?? `pennylane_${inv.id}`,
         rawText: rawText || `pennylane_${inv.id}`, mode: "commit",
-        establishment: dossier === "piccola" ? "piccola" : "bellomio", defaultUnit, etabId, creerFiches,
+        establishment: dossier === "piccola" ? "piccola" : "bellomio", defaultUnit, etabId, creerFiches, sansOffres: opts.prix === false,
       });
 
       await log(

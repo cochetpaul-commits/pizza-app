@@ -143,6 +143,8 @@ export async function runImport(options: {
   filterLine?: (l: ParsedLine) => boolean;
   /** false = ne jamais créer de fiche : les lignes inconnues sont listées dans lignesSansFiche (rattrapage d'historique) */
   creerFiches?: boolean;
+  /** true = enregistrer la facture et ses lignes sans toucher aux prix (offres) */
+  sansOffres?: boolean;
 }): Promise<ImportResult> {
   const {
     supabase,
@@ -156,6 +158,7 @@ export async function runImport(options: {
     etabId,
     filterLine,
     creerFiches = true,
+    sansOffres = false,
   } = options;
   const lignesSansFiche: string[] = [];
 
@@ -429,7 +432,7 @@ export async function runImport(options: {
     // Un AVOIR (facture à total négatif) ou une ligne négative (reprise, remise)
     // ne crée ni ne remplace jamais une offre : ce n'est pas un prix d'achat.
     const estAvoir = (payload.total_ht ?? 0) < 0 || (payload.total_ttc ?? 0) < 0;
-    const lignesPrix = estAvoir ? [] : lines.filter((l) => (l.quantity ?? 0) >= 0 && (l.total_price ?? 0) >= 0 && (l.unit_price ?? 0) > 0);
+    const lignesPrix = estAvoir || sansOffres ? [] : lines.filter((l) => (l.quantity ?? 0) >= 0 && (l.total_price ?? 0) >= 0 && (l.unit_price ?? 0) > 0);
     const offerCandidates = lignesPrix
       .map((l) => {
         const sku = (l.sku ?? "").trim();
@@ -527,12 +530,16 @@ export async function runImport(options: {
       // empiler une offre identique à la même date : même prix, même date → rien.
       const identiques = new Set<string>();
       const candidatParIng = new Map(offerRows.map((x) => [String(x.ingredient_id), x]));
-      // La règle vaut pour les deux lignes d'un même fournisseur (Mael Bello / Mael Piccola)
+      // Offres actives DU MÊME FOURNISSEUR (Mael Bello / Mael Piccola regroupés). Celles des
+      // autres fournisseurs ne sont jamais touchées : Paul achète le poulpe chez Terre Azur ET
+      // chez Le Père Billard, les deux prix restent actifs.
+      const activesMemeFournisseur: Array<{ id: string; ingredient_id: string; valid_from: string | null }> = [];
       for (let i = 0; i < candidatIds.length; i += 150) {
         const { data: actives } = await supabase
-          .from("supplier_offers").select("ingredient_id, valid_from, created_at, price_kind, unit_price, pack_price")
+          .from("supplier_offers").select("id, ingredient_id, valid_from, created_at, price_kind, unit_price, pack_price")
           .in("supplier_id", supplierAliasIds).eq("is_active", true).in("ingredient_id", candidatIds.slice(i, i + 150));
         for (const a of actives ?? []) {
+          activesMemeFournisseur.push({ id: String(a.id), ingredient_id: String(a.ingredient_id), valid_from: a.valid_from ? String(a.valid_from).slice(0, 10) : null });
           const vf = String(a.valid_from ?? a.created_at ?? "").slice(0, 10);
           if (vf && vf > dateFacture) plusRecentes.add(String(a.ingredient_id));
           const c = candidatParIng.get(String(a.ingredient_id));
@@ -546,18 +553,15 @@ export async function runImport(options: {
         .map((x) => ({ ...x, valid_from: (x.valid_from as string | undefined) ?? dateFacture }));
       const ingredientIds = Array.from(new Set(offerRowsAppliquees.map((x) => String(x.ingredient_id))));
 
-      // Deactivate previous offers for ALL ingredients (including validated ones)
-      // Validation protects ingredient metadata, not prices — imports must always update prices
-      if (ingredientIds.length) {
-        const dPrev = await supabase
-          .from("supplier_offers")
-          .update({ is_active: false, valid_to: dateFacture })
-          .in("supplier_id", supplierAliasIds)
-          .in("ingredient_id", ingredientIds)
-          .eq("is_active", true);
-
-        if (dPrev.error) throw new Error(dPrev.error.message);
-      }
+      // Clôture de l'offre active du même fournisseur (jamais supprimée : historique des prix).
+      // valid_to ne descend jamais sous le valid_from de l'offre fermée.
+      const fermer = async (o: { id: string; valid_from: string | null }) => {
+        const vt = o.valid_from && o.valid_from > dateFacture ? o.valid_from : dateFacture;
+        const d = await supabase.from("supplier_offers").update({ is_active: false, valid_to: vt }).eq("id", o.id).eq("is_active", true);
+        if (d.error) throw new Error(d.error.message);
+      };
+      const aFermer = new Set(ingredientIds);
+      for (const o of activesMemeFournisseur) if (aFermer.has(o.ingredient_id)) await fermer(o);
 
       for (const row of offerRowsAppliquees) {
         const ingId = String(row.ingredient_id);
@@ -565,14 +569,9 @@ export async function runImport(options: {
         let r = await supabase.from("supplier_offers").insert(row);
 
         if (r.error && (r.error as { code?: string }).code === "23505") {
-          const d2 = await supabase
-            .from("supplier_offers")
-            .update({ is_active: false, valid_to: dateFacture })
-            .in("supplier_id", supplierAliasIds)
-            .eq("ingredient_id", ingId)
-            .eq("is_active", true);
-
-          if (d2.error) throw new Error(d2.error.message);
+          const { data: encore } = await supabase.from("supplier_offers").select("id, valid_from")
+            .in("supplier_id", supplierAliasIds).eq("ingredient_id", ingId).eq("is_active", true);
+          for (const o of encore ?? []) await fermer({ id: String(o.id), valid_from: o.valid_from ? String(o.valid_from).slice(0, 10) : null });
           r = await supabase.from("supplier_offers").insert(row);
         }
 
