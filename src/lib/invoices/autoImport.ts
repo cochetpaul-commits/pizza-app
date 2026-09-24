@@ -351,7 +351,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
         const htPl = Number(inv.currency_amount_before_tax ?? NaN);
         if (Number.isFinite(htPl) && inv.date) {
           const { data: memes } = await supabaseAdmin.from("supplier_invoices").select("id, invoice_number, total_ht, suppliers!inner(name)")
-            .eq("invoice_date", inv.date).eq("etablissement_id", etabId).eq("suppliers.name", fournisseurApp.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")).limit(20);
+            .eq("invoice_date", inv.date).eq("etablissement_id", etabId).in("suppliers.name", [fournisseurApp, fournisseurApp.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")]).limit(20);
           const m = (memes ?? []).find((x) => x.total_ht != null && Math.abs(Number(x.total_ht) - htPl) <= 0.05);
           if (m) { await log(inv, fournisseur, "deja_connue", `même date et même HT (${htPl.toFixed(2)} €) que ${m.invoice_number ?? "une facture"} déjà dans l'app`); continue; }
         }

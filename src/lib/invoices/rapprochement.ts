@@ -35,6 +35,9 @@ const NOMS_FOURNISSEURS: Record<string, string> = {
   "my spirits srls": "My Spirits",
   "my spirits": "My Spirits",
   "s d p f": "Sdpf",
+  "snak srl": "La Via del Tè", // fournisseur renommé 24/09 (Bello 14f1ebdd) ; factures au nom légal SNAK Srl, Pennylane « LA VIA DEL TE » (143228497)
+  "snak": "La Via del Tè",
+  "la via del te": "La Via del Tè",
   "sas cheville 35": "Maison Hardy", // Cheville 35 rachetée par Maison Hardy ; Pennylane Bello 73054131 « CHEVILLE 35 »
   "cheville 35": "Maison Hardy",
   "soc nouvelle produit aliment": "Lmdw", // libellé Pennylane de La Maison du Whisky (Piccola 113859628, Bello 74871754)

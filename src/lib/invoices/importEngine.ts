@@ -177,7 +177,8 @@ export async function runImport(options: {
   // de l'établissement. Une ligne DÉSACTIVÉE (fusionnée) n'est jamais réactivée : on refuse l'import
   // (vécu 23/09 : « Armor Emballages » Piccola ressuscitée par l'import après sa désactivation).
   const nomCanon = canoniserNomFournisseur(supplierName);
-  const normalizedName = nomCanon
+  // Nom issu de la table de correspondance : déjà le nom exact de l'appli (« La Via del Tè »), pas de Title Case (« Del »)
+  const normalizedName = nomCanon !== supplierName ? nomCanon : nomCanon
     .split(/\s+/)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(" ");
