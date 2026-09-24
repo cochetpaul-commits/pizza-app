@@ -150,6 +150,8 @@ export async function runImport(options: {
   /** true (relance du rapprochement) : ne remplace JAMAIS une offre active de date égale ou plus récente,
    *  quelle que soit sa valeur — on ne fait que combler les trous (produit sans prix chez ce fournisseur, ou facture strictement plus récente) */
   seulementCombler?: boolean;
+  /** true (rattrapage) : n'écrit une offre que pour un produit qui n'a AUCUNE offre active chez ce fournisseur */
+  seulementManquantes?: boolean;
 }): Promise<ImportResult> {
   const {
     supabase,
@@ -165,6 +167,7 @@ export async function runImport(options: {
     creerFiches = true,
     sansOffres = false,
     seulementCombler = false,
+    seulementManquantes = false,
   } = options;
   const lignesSansFiche: string[] = [];
   let offresAValider = 0;
@@ -560,7 +563,7 @@ export async function runImport(options: {
         for (const a of actives ?? []) {
           activesMemeFournisseur.push({ id: String(a.id), ingredient_id: String(a.ingredient_id), valid_from: a.valid_from ? String(a.valid_from).slice(0, 10) : null, unit_price: a.unit_price == null ? null : Number(a.unit_price), unit: (a.unit as string | null) ?? null });
           const vf = String(a.valid_from ?? a.created_at ?? "").slice(0, 10);
-          if (vf && (vf > dateFacture || (seulementCombler && vf >= dateFacture))) plusRecentes.add(String(a.ingredient_id));
+          if (seulementManquantes || (vf && (vf > dateFacture || (seulementCombler && vf >= dateFacture)))) plusRecentes.add(String(a.ingredient_id));
           const c = candidatParIng.get(String(a.ingredient_id));
           // Tolérance : un prix repassé par le classeur Excel est arrondi au centime (2,468 → 2,47)
           const meme = (x: unknown, y: unknown) => Math.abs(Number(x ?? 0) - Number(y ?? 0)) < 0.0051;

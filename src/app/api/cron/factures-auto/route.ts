@@ -29,7 +29,8 @@ export async function GET(req: NextRequest) {
   const listeSeule = req.nextUrl.searchParams.get("liste") === "1";
   // Rattrapage : ?creer=0 (aucune fiche créée, lignes inconnues en attente) · ?fournisseurs=mael,metro · ?etab=bello|piccola
   const creerFiches = req.nextUrl.searchParams.get("creer") !== "0";
-  const prix = req.nextUrl.searchParams.get("prix") !== "0"; // ?prix=0 : facture et lignes seulement, aucun prix écrit
+  const prixParam = req.nextUrl.searchParams.get("prix"); // ?prix=0 : aucun prix écrit · ?prix=manquantes : offre seulement si le produit n'en a aucune chez ce fournisseur
+  const prix: boolean | "manquantes" = prixParam === "0" ? false : prixParam === "manquantes" ? "manquantes" : true;
   const fournisseurs = (req.nextUrl.searchParams.get("fournisseurs") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   const numeros = (req.nextUrl.searchParams.get("numeros") ?? "").split(",").map((x) => x.trim()).filter(Boolean); // ?numeros=FA1,FA2 : seulement ces factures
   const archivees = req.nextUrl.searchParams.get("archivees") === "1"; // ?archivees=1 : pièces archivées comprises (hors doublons)
