@@ -13,7 +13,7 @@ export const maxDuration = 60;
  * chaque établissement dont le dossier a une clé API :
  *  - Bello Mio   → SARL SASHA
  *  - Piccola Mia → SARL I FRATELLI
- * ?days=N pour élargir la fenêtre (défaut 30, max 200). 30 jours parce que
+ * ?days=N pour élargir la fenêtre (défaut 30, max 400). 30 jours parce que
  * certaines factures (Mael…) arrivent dans Pennylane bien après leur date ;
  * la déduplication par identifiant Pennylane évite tout doublon.
  * ?creer=0 : pas de création de fiche (lignes inconnues en attente) · ?fournisseurs=a,b · ?etab=bello|piccola
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   const denied = await cronOrAdminUnauthorized(req);
   if (denied) return denied;
 
-  const days = Math.min(Math.max(parseInt(req.nextUrl.searchParams.get("days") ?? "30", 10) || 30, 1), 200);
+  const days = Math.min(Math.max(parseInt(req.nextUrl.searchParams.get("days") ?? "30", 10) || 30, 1), 400); // rattrapage : jusqu'à 400 jours
   const listeSeule = req.nextUrl.searchParams.get("liste") === "1";
   // Rattrapage : ?creer=0 (aucune fiche créée, lignes inconnues en attente) · ?fournisseurs=mael,metro · ?etab=bello|piccola
   const creerFiches = req.nextUrl.searchParams.get("creer") !== "0";

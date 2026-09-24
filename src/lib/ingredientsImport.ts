@@ -218,7 +218,9 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
   const echecs: Erreur[] = [];
   const todo = sheetRows.map((r, i) => ({ row: r, idx: i })).filter(({ row }) => Object.keys((row.__patch as Record<string, unknown>) ?? {}).length || row.__prix || row.__offreMaj);
   type Prix = { base: PrixBase; unitaire: number; nb: number | null; cond: number | null; sid: string | null; sku: string | null; date: string | null };
-  const ecrireOffre = async (ingredientId: string, ing: Record<string, unknown> | undefined, p: Prix): Promise<string | null> => {
+  const ecrireOffre = async (ingredientId: string, ing: Record<string, unknown> | undefined, p: Prix, actif = true): Promise<string | null> => {
+    // Fiche « Actif = non » : on ne crée ni ne réactive d'offre (vécu 24/09 : deux fiches Sum désactivées ressorties avec une offre active)
+    if (!actif) return null;
     const sid = p.sid ?? (ing?.supplier_id as string | null) ?? null;
     if (!sid) return "pas de fournisseur";
     const etabId = (ing?.etablissement_id as string | null) ?? null;
@@ -266,14 +268,15 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
           const { error } = await supabaseAdmin.from("ingredients").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
           if (error) { echecs.push({ ligne, nom: String(patch.name ?? ""), message: error.message }); return; }
         }
-        if (prix) { const e = await ecrireOffre(id, existing.get(id), prix); if (e) { echecs.push({ ligne, nom: String(patch.name ?? existing.get(id)?.name ?? ""), message: `prix : ${e}` }); return; } }
+        const actif = patch.is_active !== undefined ? !!patch.is_active : existing.get(id)?.is_active !== false;
+        if (prix) { const e = await ecrireOffre(id, existing.get(id), prix, actif); if (e) { echecs.push({ ligne, nom: String(patch.name ?? existing.get(id)?.name ?? ""), message: `prix : ${e}` }); return; } }
         modifies++;
       } else {
         const estabs = (patch.establishments as string[]) ?? [etabDefaut];
         const { data: cree, error } = await supabaseAdmin.from("ingredients").insert({ ...patch, user_id: userId, etablissement_id: etabIdOf(estabs[0]) ?? etabIdOf(etabDefaut), status: patch.status ?? "to_check" }).select("id, etablissement_id, piece_weight_g, supplier_id").single();
         if (error) { echecs.push({ ligne, nom: String(patch.name ?? ""), message: error.message }); return; }
         crees++;
-        if (prix && cree && prix.sid) { const e = await ecrireOffre(cree.id as string, cree as Record<string, unknown>, prix); if (e) echecs.push({ ligne, nom: String(patch.name ?? ""), message: `créé, mais prix non enregistré : ${e}` }); }
+        if (prix && cree && prix.sid) { const e = await ecrireOffre(cree.id as string, cree as Record<string, unknown>, prix, patch.is_active !== false); if (e) echecs.push({ ligne, nom: String(patch.name ?? ""), message: `créé, mais prix non enregistré : ${e}` }); }
       }
     }));
   }
