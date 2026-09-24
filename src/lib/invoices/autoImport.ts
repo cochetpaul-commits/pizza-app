@@ -215,7 +215,8 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
     const candidatsApp = (appSuppliers ?? []).map((s) => s.name as string).filter((n) => { const k = norm(n); return k.length >= 3 && nomsCorrespondent(nf, k); });
     const fournisseurApp = candidatsApp.find((n) => norm(n) === nf) ?? candidatsApp.sort((a, b) => b.length - a.length)[0] ?? fournisseur;
     // Rattrapage par lots : ne traiter que certains fournisseurs, sans marquer les autres
-    if (seulement.length && !seulement.some((f) => nf.includes(f) || f.includes(nf))) { res.examinees--; continue; }
+    // Pièce sans fournisseur Pennylane (nf vide) : jamais retenue par un filtre (« ».includes → true bloquait la boucle limit=4, vécu 24/09)
+    if (seulement.length && (!nf || !seulement.some((f) => nf.includes(f) || f.includes(nf)))) { res.examinees--; continue; }
     if (numeros.size && !numeros.has(String(inv.invoice_number ?? "").trim())) { res.examinees--; continue; }
     if ((opts.exclure ?? []).includes(String(inv.invoice_number ?? "").trim())) { res.examinees--; continue; }
 
