@@ -35,6 +35,9 @@ const NOMS_FOURNISSEURS: Record<string, string> = {
   "my spirits srls": "My Spirits",
   "my spirits": "My Spirits",
   "s d p f": "Sdpf",
+  "soc nouvelle produit aliment": "Lmdw", // libellé Pennylane de La Maison du Whisky (Piccola 113859628, Bello 74871754)
+  "societe nouvelle de produits alimentaires": "Lmdw",
+  "lmdw": "Lmdw",
   "cafe celtik": "Cafés Celtik",
   "cafes celtik": "Cafés Celtik",
   "cafés celtik": "Cafés Celtik",
