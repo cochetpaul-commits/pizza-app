@@ -128,6 +128,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     supabase
       .from("suppliers")
       .select("id,name,is_active,etablissement_id")
+      .eq("is_active", true) // fournisseurs désactivés (fusionnés) : ni dans les filtres ni dans les listes de choix
       .order("name", { ascending: true })
       .then(({ data, error: err }) => {
         if (!err) {

@@ -31,6 +31,11 @@ const NOMS_FOURNISSEURS: Record<string, string> = {
   "terre azur": "Pomona Terreazur",
   "terreazur": "Pomona Terreazur",
   "metro": "Metro",
+  "metro france": "Metro",
+  "my spirits srls": "My Spirits",
+  "my spirits": "My Spirits",
+  "s d p f": "Sdpf",
+  "societe de distribution de produits fins": "Sdpf",
 };
 export function canoniserNomFournisseur(nom: string): string {
   const cle = cleFournisseur(nom).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
@@ -44,7 +49,7 @@ export function estFournisseurInterne(nom: string | null | undefined): boolean {
 
 /** Ligne de frais (forfait livraison, port, transport…) : ni fiche ni offre, jamais « en attente ». */
 export function estLigneDeFrais(nom: string | null | undefined): boolean {
-  return /forfait|frais\s+de\s+(port|livraison|transport)|livraison\s+sur\s+seuil|\bport\b.*\bemballage|participation\s+(transport|livraison)|\btransport\b/i.test(nom ?? "");
+  return /forfait|frais\s+de\s+(port|livraison|transport)|livraison\s+sur\s+seuil|\bport\b.*\bemballage|participation\s+(transport|livraison)|\btransport\b|indexation\s+energie|\bconsigne\b|\bcaution\b|^E\d{3}\s+FUT\b/i.test(nom ?? "");
 }
 
 export function baseProductName(name: string): string {
