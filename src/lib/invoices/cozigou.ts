@@ -123,8 +123,6 @@ function parseLines(text: string): ParsedLine[] {
 
     const puNet = parseFrenchNumber(pm[3]);
     const accise = pm[4] ? parseFrenchNumber(pm[4]) : null;
-    // Real unit price = PU NET HT + ACCISE (excise duty per unit)
-    const unitPrice = (puNet ?? 0) + (accise ?? 0);
     const tvaCode = parseInt(pm[2], 10);
     const montHt = parseFrenchNumber(pm[5]);
     const tax_rate = tvaCode === 1 ? 5.5 : tvaCode === 2 ? 20.0 : null;
@@ -170,6 +168,10 @@ function parseLines(text: string): ParsedLine[] {
     }
 
     const pieceVolumeMl = containerCl != null ? containerCl * 10 : null;
+
+    // Prix unitaire retenu = MONT. HT ÷ quantité (Col/Pack), accise incluse — règle Pierre 24/09.
+    // À défaut (quantité nulle) : PU NET HT + ACCISE.
+    const unitPrice = montHt != null && qty > 0 ? Math.round((montHt / qty) * 10000) / 10000 : (puNet ?? 0) + (accise ?? 0);
 
     lines.push({
       sku,
