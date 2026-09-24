@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { cronOrAdminUnauthorized } from "@/lib/cronAuth";
-import { getSupplierInvoices, getSuppliers, pennylaneConfigured, type PlDossier } from "@/lib/pennylane/api";
+import { getSuppliers, pennylaneConfigured, type PlDossier } from "@/lib/pennylane/api";
 import { estFournisseurInterne } from "@/lib/invoices/rapprochement";
+import { facturesPeriode } from "@/lib/invoices/autoImport";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -34,7 +35,8 @@ export async function GET(req: NextRequest) {
   for (const etab of etabs ?? []) {
     const dossier: PlDossier = ((etab.slug as string) ?? "").includes("bello") ? "bello" : "piccola";
     if (!pennylaneConfigured(dossier)) continue;
-    const [inv, sups] = await Promise.all([getSupplierInvoices(fromIso, toIso, dossier), getSuppliers(dossier)]);
+    const sups = await getSuppliers(dossier);
+    const inv = await facturesPeriode(fromIso, toIso, dossier, sups, mercuriale);
     const nom = new Map(sups.map((s) => [s.id, s.name]));
     const candidates = inv.filter((i) => !i.archived_at && i.date && !/^\s*DV/i.test(String(i.invoice_number ?? "")));
     const numeros = Array.from(new Set(candidates.map((i) => String(i.invoice_number ?? "").trim()).filter(Boolean)));

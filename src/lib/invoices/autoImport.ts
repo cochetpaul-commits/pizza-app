@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getSupplierInvoices, getSuppliers, type PlSupplierInvoice, type PlDossier } from "@/lib/pennylane/api";
+import { getSupplierInvoices, getSuppliers, getSupplierInvoicesParFournisseur, type PlSupplierInvoice, type PlDossier } from "@/lib/pennylane/api";
 import { pdfToText } from "@/lib/pdfToText";
 import { detectInvoice } from "@/lib/invoices/invoiceDetector";
 import { PARSERS } from "@/lib/invoices/registry";
@@ -41,18 +41,41 @@ function isoDaysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Factures Pennylane d'une période : liste filtrée par date + liste par fournisseur (sans filtre de date)
+ * pour chaque fournisseur Pennylane de la mercuriale, fusionnées par id. Vécu 24/09 : le filtre de date
+ * de l'API laissait passer des factures Mael/Masse/Armor/Vinoflo de janvier-mars côté Piccola.
+ */
+export async function facturesPeriode(from: string, to: string, dossier: PlDossier, plSuppliers: Array<{ id: number; name: string }>, mercuriale: string[], opts: { archivees?: boolean } = {}): Promise<PlSupplierInvoice[]> {
+  const parId = new Map<number, PlSupplierInvoice>();
+  for (const i of await getSupplierInvoices(from, to, dossier, opts)) parId.set(i.id, i);
+  const cibles = plSuppliers.filter((s) => { const n = norm(s.name); return n.length > 3 && mercuriale.some((m) => n.includes(m) || m.includes(n)); });
+  for (const s of cibles) {
+    try {
+      const lot = await getSupplierInvoicesParFournisseur(s.id, dossier);
+      for (const i of lot) {
+        if (!i.date || i.date < from || i.date > to) continue;
+        if (i.archived_at && !opts.archivees) continue;
+        if (!parId.has(i.id)) parId.set(i.id, i);
+      }
+    } catch { /* un fournisseur en erreur ne bloque pas les autres */ }
+  }
+  return Array.from(parId.values());
+}
+
 export type AutoImportCandidat = { pennylane_id: number; fournisseur: string; invoice_number: string | null; date: string | null; montant_ttc: number | null; fichier: boolean; deja_dans_app: boolean; libelle_pennylane: string | null };
 
 /** Liste ce que l'import automatique traiterait sur la fenêtre, SANS rien écrire (factures de la mercuriale non encore passées). */
 export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello", opts: { archivees?: boolean } = {}): Promise<{ periode: { from: string; to: string }; candidats: AutoImportCandidat[] }> {
   const from = isoDaysAgo(days);
   const to = new Date().toISOString().slice(0, 10);
-  const [invoices, plSuppliers, { data: appSuppliers }] = await Promise.all([
-    getSupplierInvoices(from, to, dossier, { archivees: opts.archivees }), getSuppliers(dossier),
+  const [plSuppliers, { data: appSuppliers }] = await Promise.all([
+    getSuppliers(dossier),
     supabaseAdmin.from("suppliers").select("name").eq("is_active", true),
   ]);
   const plNameById = new Map(plSuppliers.map((s) => [s.id, s.name]));
   const mercuriale = (appSuppliers ?? []).filter((s) => !estFournisseurInterne(s.name as string)).map((s) => norm(s.name as string)).filter((n) => n.length > 3);
+  const invoices = await facturesPeriode(from, to, dossier, plSuppliers, mercuriale, { archivees: opts.archivees });
   const ids = invoices.map((i) => i.id);
   const traitees = new Set<number>();
   for (let i = 0; i < ids.length; i += 100) {
@@ -77,7 +100,7 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
   return { periode: { from, to }, candidats };
 }
 
-export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[]; /** nb max de factures traitées par appel (fonction serveur limitée à 60 s) */ limit?: number; /** false = facture et lignes seulement, aucun prix (offre) écrit ; "manquantes" = offre créée seulement si le produit n'a aucune offre active chez ce fournisseur */ prix?: boolean | "manquantes"; /** ne traiter que ces numéros de facture */ numeros?: string[]; /** garder les pièces archivées (hors doublons) */ archivees?: boolean };
+export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[]; /** nb max de factures traitées par appel (fonction serveur limitée à 60 s) */ limit?: number; /** false = facture et lignes seulement, aucun prix (offre) écrit ; "manquantes" = offre créée seulement si le produit n'a aucune offre active chez ce fournisseur */ prix?: boolean | "manquantes"; /** ne traiter que ces numéros de facture */ numeros?: string[]; /** garder les pièces archivées (hors doublons) */ archivees?: boolean; /** numéros à ne pas traiter */ exclure?: string[] };
 
 /**
  * Client lu sur la facture : « SASHA » / « BELLO MIO » = Bello Mio,
@@ -115,8 +138,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
   const to = new Date().toISOString().slice(0, 10);
   const userId = process.env.AUTO_IMPORT_USER_ID ?? "bd335e2e-6a50-4311-89b4-8f735cf6bc0b";
 
-  const [invoices, plSuppliers, { data: appSuppliers }] = await Promise.all([
-    getSupplierInvoices(from, to, dossier, { archivees: opts.archivees }),
+  const [plSuppliers, { data: appSuppliers }] = await Promise.all([
     getSuppliers(dossier),
     supabaseAdmin.from("suppliers").select("name").eq("is_active", true),
   ]);
@@ -125,6 +147,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
     .filter((s) => !estFournisseurInterne(s.name as string))
     .map((s) => norm(s.name as string))
     .filter((n) => n.length > 3);
+  const invoices = await facturesPeriode(from, to, dossier, plSuppliers, mercuriale, { archivees: opts.archivees });
 
   // Factures déjà passées par ce pipeline — sauf celles en erreur,
   // qu'on retente au passage suivant (fichier momentanément illisible…)
@@ -185,6 +208,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
     // Rattrapage par lots : ne traiter que certains fournisseurs, sans marquer les autres
     if (seulement.length && !seulement.some((f) => nf.includes(f) || f.includes(nf))) { res.examinees--; continue; }
     if (numeros.size && !numeros.has(String(inv.invoice_number ?? "").trim())) { res.examinees--; continue; }
+    if ((opts.exclure ?? []).includes(String(inv.invoice_number ?? "").trim())) { res.examinees--; continue; }
 
     try {
       if (!estMercuriale) {
@@ -311,6 +335,17 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
       // Mauvais dossier : facture adressée à l'autre restaurant (vécu : FB9725
       // Mael « BELLO MIO SASHA » présente dans le Pennylane de Piccola Mia et
       // importée chez Mael Piccola). On n'importe pas, on signale.
+      // Déjà dans l'appli sous un autre numéro (OCR Metro : « 0/0(107)0052/0059302 », « (2 »…) :
+      // même fournisseur (nom appli), même date, même HT à 5 centimes près → déjà connue.
+      {
+        const htPl = Number(inv.currency_amount_before_tax ?? NaN);
+        if (Number.isFinite(htPl) && inv.date) {
+          const { data: memes } = await supabaseAdmin.from("supplier_invoices").select("id, invoice_number, total_ht, suppliers!inner(name)")
+            .eq("invoice_date", inv.date).eq("suppliers.name", fournisseurApp.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")).limit(20);
+          const m = (memes ?? []).find((x) => x.total_ht != null && Math.abs(Number(x.total_ht) - htPl) <= 0.05);
+          if (m) { await log(inv, fournisseur, "deja_connue", `même date et même HT (${htPl.toFixed(2)} €) que ${m.invoice_number ?? "une facture"} déjà dans l'app`); continue; }
+        }
+      }
       const clientLu = clientLuSurFacture(rawText);
       const dossierAttendu = dossier === "piccola" ? "piccola" : "bello";
       if (clientLu && clientLu !== dossierAttendu) {

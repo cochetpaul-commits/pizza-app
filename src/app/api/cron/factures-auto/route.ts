@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
   const fournisseurs = (req.nextUrl.searchParams.get("fournisseurs") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   const numeros = (req.nextUrl.searchParams.get("numeros") ?? "").split(",").map((x) => x.trim()).filter(Boolean); // ?numeros=FA1,FA2 : seulement ces factures
   const archivees = req.nextUrl.searchParams.get("archivees") === "1"; // ?archivees=1 : pièces archivées comprises (hors doublons)
+  const exclure = (req.nextUrl.searchParams.get("exclure") ?? "").split(",").map((x) => x.trim()).filter(Boolean); // ?exclure=n1,n2
   // Diagnostic : ?brut=1&filtre=armor → pièces Pennylane brutes (toutes, archivées comprises) dont le fournisseur ou le libellé contient le filtre
   const brut = req.nextUrl.searchParams.get("brut") === "1";
   const filtre = (req.nextUrl.searchParams.get("filtre") ?? "").toLowerCase();
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
       }
       out[(etab.nom as string) ?? (etab.slug as string)] = listeSeule
         ? await autoImportCandidats(days, dossier, { archivees })
-        : await autoImportFactures(etab.id as string, days, dossier, { creerFiches, fournisseurs, limit, prix, numeros, archivees });
+        : await autoImportFactures(etab.id as string, days, dossier, { creerFiches, fournisseurs, limit, prix, numeros, archivees, exclure });
     } catch (e) {
       out[(etab.nom as string) ?? (etab.slug as string)] = { erreur: e instanceof Error ? e.message : "erreur" };
     }
