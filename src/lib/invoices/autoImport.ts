@@ -47,6 +47,11 @@ function isoDaysAgo(days: number): string {
  * de l'API laissait passer des factures Mael/Masse/Armor/Vinoflo de janvier-mars côté Piccola.
  */
 /** Deux noms de fournisseur se correspondent : identiques, ou l'un contient l'autre quand les deux dépassent 3 lettres (« SUM » ne se compare qu'à l'exact). */
+/** Pièce Pennylane à ne jamais traiter : archivée, ou à 0 € (vécu 24/09 : Metro 0/0(062)0052/003, 0,00 €, archivée, PDF vide). */
+export function pieceExclue(inv: { archived_at?: string | null; currency_amount?: string | number | null }): boolean {
+  return !!inv.archived_at || (Number(inv.currency_amount ?? 0) || 0) === 0;
+}
+
 export function nomsCorrespondent(a: string, b: string): boolean {
   return a === b || (a.length > 3 && b.length > 3 && (a.includes(b) || b.includes(a)));
 }
@@ -61,7 +66,7 @@ export async function facturesPeriode(from: string, to: string, dossier: PlDossi
       const lot = await getSupplierInvoicesParFournisseur(s.id, dossier);
       for (const i of lot) {
         if (!i.date || i.date < from || i.date > to) continue;
-        if (i.archived_at && !opts.archivees) continue;
+        if (pieceExclue(i)) continue; // archivées et 0 € toujours exclues (l'option archivees ne les ramène plus)
         if (!parId.has(i.id)) parId.set(i.id, i);
       }
     } catch { /* un fournisseur en erreur ne bloque pas les autres */ }
@@ -96,7 +101,7 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
   }
   const candidats: AutoImportCandidat[] = [];
   for (const inv of invoices) {
-    if (traitees.has(inv.id) || (inv.archived_at && !opts.archivees) || !inv.date) continue;
+    if (traitees.has(inv.id) || pieceExclue(inv) || !inv.date) continue;
     const fournisseur = inv.supplier?.id ? (plNameById.get(inv.supplier.id) ?? "?") : "?";
     const nf = norm(fournisseur);
     if (!(nf.length > 3 && mercuriale.some((m) => nf.includes(m) || m.includes(nf)))) continue;
@@ -200,7 +205,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
   };
 
   for (const inv of invoices) {
-    if (dejaTraitees.has(inv.id) || (inv.archived_at && !opts.archivees) || !inv.date) continue;
+    if (dejaTraitees.has(inv.id) || pieceExclue(inv) || !inv.date) continue;
     if (/^\s*DV/i.test(String(inv.invoice_number ?? ""))) continue; // devis (Armor « DV… ») : pas une facture
     if (opts.limit && res.examinees >= opts.limit) break;
     res.examinees++;

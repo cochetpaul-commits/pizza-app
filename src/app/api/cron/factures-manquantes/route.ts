@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { cronOrAdminUnauthorized } from "@/lib/cronAuth";
 import { getSuppliers, pennylaneConfigured, type PlDossier } from "@/lib/pennylane/api";
-import { estFournisseurInterne } from "@/lib/invoices/rapprochement";
-import { facturesPeriode } from "@/lib/invoices/autoImport";
+import { canoniserNomFournisseur, estFournisseurInterne } from "@/lib/invoices/rapprochement";
+import { facturesPeriode, nomsCorrespondent, pieceExclue } from "@/lib/invoices/autoImport";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     supabaseAdmin.from("etablissements").select("id, slug, nom").eq("actif", true),
     supabaseAdmin.from("suppliers").select("name").eq("is_active", true),
   ]);
-  const mercuriale = (appSuppliers ?? []).filter((s) => !estFournisseurInterne(s.name as string)).map((s) => norm(s.name as string)).filter((n) => n.length > 3);
+  const mercuriale = (appSuppliers ?? []).filter((s) => !estFournisseurInterne(s.name as string)).map((s) => norm(s.name as string)).filter((n) => n.length >= 3);
 
   const lignes: Array<Record<string, unknown>> = [];
   const resume: Record<string, unknown> = {};
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     const sups = await getSuppliers(dossier);
     const inv = await facturesPeriode(fromIso, toIso, dossier, sups, mercuriale);
     const nom = new Map(sups.map((s) => [s.id, s.name]));
-    const candidates = inv.filter((i) => !i.archived_at && i.date && !/^\s*DV/i.test(String(i.invoice_number ?? "")));
+    const candidates = inv.filter((i) => !pieceExclue(i) && i.date && !/^\s*DV/i.test(String(i.invoice_number ?? ""))); // ni archivées, ni 0 €
     const numeros = Array.from(new Set(candidates.map((i) => String(i.invoice_number ?? "").trim()).filter(Boolean)));
     const connues = new Set<string>();
     for (let i = 0; i < numeros.length; i += 200) {
@@ -48,8 +48,8 @@ export async function GET(req: NextRequest) {
     let manquantes = 0, sansNumero = 0;
     for (const i of candidates) {
       const fournisseur = nom.get(i.supplier?.id ?? -1) ?? String((i as { label?: string }).label ?? "");
-      const nf = norm(fournisseur);
-      if (!(nf.length > 3 && mercuriale.some((m) => nf.includes(m) || m.includes(nf)))) continue;
+      const nf = norm(canoniserNomFournisseur(fournisseur));
+      if (!(nf.length >= 3 && mercuriale.some((m) => nomsCorrespondent(nf, m)))) continue;
       const num = String(i.invoice_number ?? "").trim();
       if (!num) { sansNumero++; lignes.push({ etablissement_id: etab.id, dossier, fournisseur, pennylane_id: i.id, invoice_number: null, invoice_date: i.date, montant_ttc: Number(i.currency_amount ?? 0) || null, motif: "sans numéro dans Pennylane" }); continue; }
       if (connues.has(num)) continue;
