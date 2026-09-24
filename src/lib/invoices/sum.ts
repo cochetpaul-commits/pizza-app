@@ -76,6 +76,10 @@ function extractMeta(
   };
 }
 
+// Plateaux de pâtisserie facturés au poids : quantité en kg, PU au kilo (Paul, 24/09).
+const PAN_AU_KILO = new Set(["PAN107","PAN108","PAN109","PAN110","PAN111","PAN112","PAN113","PAN114","PAN115","PAN116","PAN117","PAN118","PAN119","PAN120","PAN121","PAN122","PAN321","PAN322","PAN020","PAN021"]);
+const auKilo = (sku: string | null): boolean => !!sku && PAN_AU_KILO.has(sku.toUpperCase());
+
 // Alphanumeric product code: 2+ letters + 2+ digits + optional trailing letter
 const CODE_RE = /^[A-Z]{2,}[A-Z0-9]*\d{2,}[A-Z]?$/;
 
@@ -126,8 +130,8 @@ function parseLines(text: string): ParsedLine[] {
       : parseFrenchNumber(m[5]);
     if (!name || qty == null) return false;
     result.push({
-      sku: m[1], name, quantity: qty, unit: "pc",
-      unit_price: pu, total_price: total, tax_rate: 5.5, notes: null,
+      sku: m[1], name, quantity: qty, unit: auKilo(m[1]) ? "kg" : "pc",
+      unit_price: pu, total_price: total, tax_rate: 5.5, notes: auKilo(m[1]) ? "prix au kg (poids variable)" : null,
       piece_weight_g: extractWeightGFromName(name),
       piece_volume_ml: extractVolumeFromName(name),
     });
@@ -257,11 +261,11 @@ function parseLines(text: string): ParsedLine[] {
             sku: code,
             name,
             quantity: qty,
-            unit: "pc",
+            unit: auKilo(code) ? "kg" : "pc",
             unit_price: pu,
             total_price: total,
             tax_rate: 5.5,
-            notes: null,
+            notes: auKilo(code) ? "prix au kg (poids variable)" : null,
             piece_weight_g: extractWeightGFromName(name),
             piece_volume_ml: extractVolumeFromName(name),
           });

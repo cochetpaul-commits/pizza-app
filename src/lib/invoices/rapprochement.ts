@@ -35,6 +35,9 @@ const NOMS_FOURNISSEURS: Record<string, string> = {
   "my spirits srls": "My Spirits",
   "my spirits": "My Spirits",
   "s d p f": "Sdpf",
+  "cafe celtik": "Cafés Celtik",
+  "cafes celtik": "Cafés Celtik",
+  "cafés celtik": "Cafés Celtik",
   "societe de distribution de produits fins": "Sdpf",
 };
 export function canoniserNomFournisseur(nom: string): string {

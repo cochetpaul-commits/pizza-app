@@ -5,7 +5,7 @@ import { detectInvoice } from "@/lib/invoices/invoiceDetector";
 import { PARSERS } from "@/lib/invoices/registry";
 import { runImport, type ParsedInvoice } from "@/lib/invoices/importEngine";
 import { geminiVisionParse } from "@/lib/invoices/geminiVisionParser";
-import { estFournisseurInterne } from "@/lib/invoices/rapprochement";
+import { estFournisseurInterne, canoniserNomFournisseur } from "@/lib/invoices/rapprochement";
 
 /**
  * Récupération automatique des factures depuis Pennylane (Bello Mio).
@@ -49,7 +49,8 @@ function isoDaysAgo(days: number): string {
 export async function facturesPeriode(from: string, to: string, dossier: PlDossier, plSuppliers: Array<{ id: number; name: string }>, mercuriale: string[], opts: { archivees?: boolean } = {}): Promise<PlSupplierInvoice[]> {
   const parId = new Map<number, PlSupplierInvoice>();
   for (const i of await getSupplierInvoices(from, to, dossier, opts)) parId.set(i.id, i);
-  const cibles = plSuppliers.filter((s) => { const n = norm(s.name); return n.length > 3 && mercuriale.some((m) => n.includes(m) || m.includes(n)); });
+  // Nom Pennylane canonisé d'abord (« CAFE CELTIK » → « Cafés Celtik ») : sinon « cafe celtik » ⊄ « cafes celtik » et le fournisseur passait hors mercuriale
+  const cibles = plSuppliers.filter((s) => { const n = norm(canoniserNomFournisseur(s.name)); return n.length > 3 && mercuriale.some((m) => n.includes(m) || m.includes(n)); });
   for (const s of cibles) {
     try {
       const lot = await getSupplierInvoicesParFournisseur(s.id, dossier);
@@ -112,6 +113,9 @@ export type AutoImportOptions = { creerFiches?: boolean; fournisseurs?: string[]
  */
 export function clientLuSurFacture(texte: string): "bello" | "piccola" | null {
   const tete = (texte ?? "").slice(0, 2500);
+  // Cafés Celtik : le n° client tranche (le produit « BLEND BELLO MIO » apparaît aussi sur les factures Piccola)
+  if (/\b0P501709\b/.test(tete)) return "bello";
+  if (/\b0P501777\b/.test(tete)) return "piccola";
   const reBello = /S\s*A\s*S\s*H\s*A|B\s*E\s*L\s*L\s*O\s+M\s*I\s*O/i;
   const rePiccola = /I\s*F\s*R\s*A\s*T\s*E\s*L\s*L\s*I|P\s*I\s*C\s*C\s*O\s*L\s*A/i;
   const bello = reBello.test(tete);
@@ -197,7 +201,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
     res.examinees++;
 
     const fournisseur = inv.supplier?.id ? (plNameById.get(inv.supplier.id) ?? "?") : "?";
-    const nf = norm(fournisseur);
+    const nf = norm(canoniserNomFournisseur(fournisseur));
     const estMercuriale = nf.length > 3 && mercuriale.some((m) => nf.includes(m) || m.includes(nf));
     // Nom du fournisseur tel qu'il existe dans l'appli (« Mael »), pas le libellé Pennylane
     // (« SAS MAEL ») : sinon le scan IA créait une ligne fournisseur parallèle sans fiches.

@@ -48,6 +48,7 @@ const SUPPLIER_KEYWORDS: Record<string, { name: string; keywords: string[] }> = 
   elien:    { name: "Eric Elien", keywords: ["ERIC ELIEN", "ELIEN", "ARTISAN GLACIER"] },
   hardy:    { name: "Maison Hardy", keywords: ["MAISON HARDY", "CHEVILLE 35", "CHEVI35", "SAS CHEVILLE"] },
   snak:     { name: "SNAK", keywords: ["SNAK SRL", "SNAK"] },
+  celtik:   { name: "Cafés Celtik", keywords: ["CAFES-CELTIK", "CAFES CELTIK", "CAFÉS CELTIK"] },
 };
 
 /**

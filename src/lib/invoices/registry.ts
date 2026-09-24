@@ -15,6 +15,7 @@ import { parseHardyInvoiceText } from "@/lib/invoices/hardy";
 import { parseSnakInvoiceText } from "@/lib/invoices/snak";
 import { parsePomonaInvoiceText } from "@/lib/invoices/pomona";
 import { parseBillardInvoiceText } from "@/lib/invoices/billard";
+import { parseCeltikInvoiceText } from "@/lib/invoices/celtik";
 
 /**
  * Registre des parsers dédiés : slug de détection (invoiceDetector) →
@@ -43,5 +44,6 @@ export const PARSERS: Record<string, ParserEntry> = {
   hardy:      { parse: parseHardyInvoiceText,      supplierName: "MAISON HARDY",     defaultUnit: "kg" },
   snak:       { parse: parseSnakInvoiceText,       supplierName: "SNAK",             defaultUnit: "pc" },
   pomona:     { parse: parsePomonaInvoiceText,     supplierName: "POMONA TERREAZUR", defaultUnit: "g" },
+  celtik:     { parse: parseCeltikInvoiceText,     supplierName: "CAFES CELTIK",     defaultUnit: "kg" }, // café au kilo (Bello 66a991aa, Piccola 1dd3cdf3)
   billard:    { parse: parseBillardInvoiceText,    supplierName: "LE PERE BILLARD",  defaultUnit: "kg" },
 };
