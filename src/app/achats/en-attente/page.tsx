@@ -62,6 +62,12 @@ function Contenu() {
   const ouvrirPicker = (f: Fournisseur, p: Produit) => { setPicker({ f, p }); setRecherche(p.libelle.replace(/\b(c\d|fr|es|ma|nl|it|be|pt|za|cr)\b/gi, "").replace(/[\d,./~°xX×]+\s*(g|gr|kg|k|ml|cl|l|f|p|px)?\b/gi, " ").replace(/\s+/g, " ").trim().split(" ").slice(0, 2).join(" ")); void chargerFiches(); };
 
   const [voirIgnorees, setVoirIgnorees] = useState<Record<string, boolean>>({});
+  type Manquante = { id: string; dossier: string; fournisseur: string | null; invoice_number: string | null; invoice_date: string | null; montant_ttc: number | null; motif: string | null; controle_le: string };
+  const [manquantes, setManquantes] = useState<Manquante[]>([]);
+  useEffect(() => {
+    supabase.from("controle_factures_manquantes").select("id, dossier, fournisseur, invoice_number, invoice_date, montant_ttc, motif, controle_le").order("fournisseur").order("invoice_date")
+      .then(({ data }) => setManquantes((data ?? []) as Manquante[]));
+  }, [current?.id]);
   type PrixAValider = { id: string; produit: string; fournisseur: string; ancien_prix: number | null; nouveau_prix: number | null; ecart_pct: number | null; unite: string | null; source: string | null; created_at: string };
   const [prixAValider, setPrixAValider] = useState<PrixAValider[]>([]);
   const chargerPrix = useCallback(async () => {
@@ -198,6 +204,19 @@ function Contenu() {
         « Relancer le rapprochement » rejoue les factures déjà en base pour rattacher l&apos;historique aux fiches créées depuis, sans écraser un prix plus récent.
       </p>
       {message && <div style={{ background: "#fff7e6", border: "1px solid #ffd591", borderRadius: 10, padding: "10px 12px", fontSize: 13, marginBottom: 12 }}>{message}</div>}
+      {manquantes.length > 0 && (
+        <section style={{ ...card, border: "1px solid #91caff" }}>
+          <div style={{ padding: "12px 14px", fontWeight: 800, fontSize: 15 }}>Factures Pennylane absentes de l&apos;appli <span style={{ color: "#888", fontWeight: 500, fontSize: 12 }}>· contrôle hebdomadaire des 30 derniers jours, dernier passage le {dateFr(manquantes[0].controle_le.slice(0, 10))}</span></div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560 }}>
+              <thead><tr><th style={th}>Dossier</th><th style={th}>Fournisseur</th><th style={th}>N°</th><th style={th}>Date</th><th style={{ ...th, textAlign: "right" }}>TTC</th><th style={th}>Motif</th></tr></thead>
+              <tbody>{manquantes.map((m) => (
+                <tr key={m.id}><td style={td}>{m.dossier === "bello" ? "Bello Mio" : "Piccola Mia"}</td><td style={td}>{m.fournisseur ?? "—"}</td><td style={{ ...td, fontFamily: "ui-monospace, monospace", fontSize: 12 }}>{m.invoice_number ?? "—"}</td><td style={td}>{dateFr(m.invoice_date)}</td><td style={num}>{eur(m.montant_ttc)}</td><td style={{ ...td, color: "#666" }}>{m.motif}</td></tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </section>
+      )}
       {prixAValider.length > 0 && (
         <section style={{ ...card, border: "1px solid #ffd591" }}>
           <div style={{ padding: "12px 14px", fontWeight: 800, fontSize: 15 }}>Baisses de prix à valider <span style={{ color: "#888", fontWeight: 500, fontSize: 12 }}>· plus de 20 % sous le prix habituel, non appliquées</span></div>
