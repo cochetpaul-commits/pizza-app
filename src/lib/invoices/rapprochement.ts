@@ -103,7 +103,7 @@ export type IndexFiches = {
  */
 export async function chargerIndexFiches(supabase: Db, supplierId: string, supplierAliasIds: string[], skus: string[]): Promise<IndexFiches> {
   const refsParFiche = new Map<string, Set<string>>();
-  const ajouterRef = (ingId: string, sku: string | null | undefined) => { const k = String(sku ?? "").trim(); if (!k || estRefGenerique(k)) return; if (!refsParFiche.has(ingId)) refsParFiche.set(ingId, new Set()); refsParFiche.get(ingId)!.add(k); };
+  const ajouterRef = (ingId: string, sku: string | null | undefined) => { const k = String(sku ?? "").trim(); if (!k || estRefGenerique(k) || k.startsWith("n:")) return; if (!refsParFiche.has(ingId)) refsParFiche.set(ingId, new Set()); refsParFiche.get(ingId)!.add(k); };
   const skuToIngId = new Map<string, string>();
   for (let i = 0; i < skus.length; i += 200) {
     const { data: bySku, error: eSku } = await supabase
@@ -119,6 +119,12 @@ export async function chargerIndexFiches(supabase: Db, supplierId: string, suppl
       const k = String(r.supplier_sku ?? "").trim();
       if (k && !skuToIngId.has(k)) skuToIngId.set(k, r.id);
     }
+  }
+  // Alias par libellé (« n:… ») : lignes sans référence (Elien, Bar Spirits) rattachées à une fiche depuis l'écran ou à la main
+  {
+    const { data: aliasNoms, error: eNoms } = await supabase.from("ingredient_supplier_refs").select("sku, ingredient_id").in("supplier_id", supplierAliasIds).like("sku", "n:%").range(0, 1999);
+    if (eNoms) throw new Error(eNoms.message);
+    for (const r of (aliasNoms ?? []) as Array<{ sku: string; ingredient_id: string }>) { if (!skuToIngId.has(r.sku)) skuToIngId.set(r.sku, r.ingredient_id); ajouterRef(r.ingredient_id, r.sku); }
   }
   // Références multiples (alias) : Terre Azur / Mael changent de code selon origine ou calibre
   for (let i = 0; i < skus.length; i += 200) {
@@ -196,6 +202,8 @@ function trouverFicheBrut(idx: IndexFiches, skuBrut: string | null | undefined, 
   if (!nm && !sku) return null;
   if (sku && !estRefGenerique(sku) && idx.skuToIngId.has(sku)) return idx.skuToIngId.get(sku)!;
   if (!nm) return null;
+  // Ligne sans référence : alias par libellé exact (clé « n:<libellé normalisé> »)
+  { const cle = cleReference(sku, nm); if (cle.startsWith("n:") && idx.skuToIngId.has(cle)) return idx.skuToIngId.get(cle)!; }
   // Une ligne qui porte une vraie référence ne se rattache pas PAR LE NOM à une fiche qui en
   // connaît une autre (Moretti 7001 ≠ Moretti Zero 7024 ; Piment rouge 114185 ≠ Peperoncini).
   const coherent = (id: string | undefined | null): string | null => {
