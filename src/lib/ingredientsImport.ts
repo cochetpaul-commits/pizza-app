@@ -33,6 +33,8 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
   const { data: offersAll } = await supabaseAdmin.from("supplier_offers").select("*").eq("is_active", true).order("created_at", { ascending: false }).range(0, 4999);
   const offerBy = new Map<string, Record<string, unknown>>();
   for (const o of (offersAll ?? []) as Record<string, unknown>[]) if (!offerBy.has(o.ingredient_id as string)) offerBy.set(o.ingredient_id as string, o);
+  const nbOffresActives = new Map<string, number>();
+  for (const o of (offersAll ?? []) as Record<string, unknown>[]) nbOffresActives.set(o.ingredient_id as string, (nbOffresActives.get(o.ingredient_id as string) ?? 0) + 1);
   const [{ data: etabs }, { data: fournisseursAll }] = await Promise.all([
     supabaseAdmin.from("etablissements").select("id, slug"),
     supabaseAdmin.from("suppliers").select("id, name, etablissement_id").eq("is_active", true),
@@ -204,19 +206,26 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
       if (!patch.default_unit) patch.default_unit = "g";
       patch.is_active = patch.is_active ?? true;
     }
+    // Fiche « Actif = non » dans le fichier (même sans autre changement) : ses offres actives sont fermées
+    // (vécu 24/09 : 161 offres restées actives sur des fiches désactivées après l'import Metro).
+    if (!nouveau && id) {
+      const actifFinal = patch.is_active !== undefined ? !!patch.is_active : avant?.is_active !== false;
+      const n = nbOffresActives.get(id) ?? 0;
+      if (!actifFinal && n > 0) { (row as Record<string, unknown>).__fermerOffres = n; champs.offres = { avant: `${n} offre${n > 1 ? "s" : ""} active${n > 1 ? "s" : ""}`, apres: "fermée(s), fiche inactive" }; }
+    }
     if (Object.keys(champs).length) changements.push({ id, ligne, nom: nomCell || String(avant?.name ?? ""), nouveau, champs });
     (row as Record<string, unknown>).__patch = patch;
   });
 
   if (mode !== "commit") {
-    return { status: 200, body: { ok: true, mode: "preview", lignes: sheetRows.length, a_modifier: changements.filter((c) => !c.nouveau).length, a_creer: changements.filter((c) => c.nouveau).length, prix_maj: changements.filter((c) => c.champs.prix).length, refs_maj: changements.filter((c) => c.champs.prix_ref).length, changements: changements.slice(0, 400), erreurs } };
+    return { status: 200, body: { ok: true, mode: "preview", lignes: sheetRows.length, a_modifier: changements.filter((c) => !c.nouveau).length, a_creer: changements.filter((c) => c.nouveau).length, prix_maj: changements.filter((c) => c.champs.prix).length, refs_maj: changements.filter((c) => c.champs.prix_ref).length, offres_fermees: changements.filter((c) => c.champs.offres).length, changements: changements.slice(0, 400), erreurs } };
   }
 
   // Application
 
-  let modifies = 0, crees = 0, prixMaj = 0, refsMaj = 0;
+  let modifies = 0, crees = 0, prixMaj = 0, refsMaj = 0, offresFermees = 0;
   const echecs: Erreur[] = [];
-  const todo = sheetRows.map((r, i) => ({ row: r, idx: i })).filter(({ row }) => Object.keys((row.__patch as Record<string, unknown>) ?? {}).length || row.__prix || row.__offreMaj);
+  const todo = sheetRows.map((r, i) => ({ row: r, idx: i })).filter(({ row }) => Object.keys((row.__patch as Record<string, unknown>) ?? {}).length || row.__prix || row.__offreMaj || row.__fermerOffres);
   type Prix = { base: PrixBase; unitaire: number; nb: number | null; cond: number | null; sid: string | null; sku: string | null; date: string | null };
   const ecrireOffre = async (ingredientId: string, ing: Record<string, unknown> | undefined, p: Prix, actif = true): Promise<string | null> => {
     // Fiche « Actif = non » : on ne crée ni ne réactive d'offre (vécu 24/09 : deux fiches Sum désactivées ressorties avec une offre active)
@@ -269,6 +278,11 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
           if (error) { echecs.push({ ligne, nom: String(patch.name ?? ""), message: error.message }); return; }
         }
         const actif = patch.is_active !== undefined ? !!patch.is_active : existing.get(id)?.is_active !== false;
+        if (!actif && row.__fermerOffres) {
+          const { data: fermees, error } = await supabaseAdmin.from("supplier_offers").update({ is_active: false, valid_to: new Date().toISOString().slice(0, 10), updated_at: new Date().toISOString() }).eq("ingredient_id", id).eq("is_active", true).select("id");
+          if (error) { echecs.push({ ligne, nom: String(patch.name ?? existing.get(id)?.name ?? ""), message: `fermeture des offres : ${error.message}` }); return; }
+          offresFermees += (fermees ?? []).length;
+        }
         if (prix) { const e = await ecrireOffre(id, existing.get(id), prix, actif); if (e) { echecs.push({ ligne, nom: String(patch.name ?? existing.get(id)?.name ?? ""), message: `prix : ${e}` }); return; } }
         modifies++;
       } else {
@@ -280,5 +294,5 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
       }
     }));
   }
-  return { status: 200, body: { ok: echecs.length === 0, mode: "commit", modifies, crees, prix_maj: prixMaj, refs_maj: refsMaj, echecs, erreurs } };
+  return { status: 200, body: { ok: echecs.length === 0, mode: "commit", modifies, crees, prix_maj: prixMaj, refs_maj: refsMaj, offres_fermees: offresFermees, echecs, erreurs } };
 }

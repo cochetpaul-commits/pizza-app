@@ -536,6 +536,16 @@ export async function runImport(options: {
       .filter(Boolean) as Array<Record<string, unknown>>;
 
     const offerByIngredient = new Map<string, Record<string, unknown>>();
+    // Fiche désactivée : aucune offre créée ni remplacée (une fiche « Actif = non » ne doit plus porter de prix actif)
+    {
+      const ids = Array.from(new Set(offerCandidates.map((o) => o.ingredient_id as string).filter(Boolean)));
+      const inactifs = new Set<string>();
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data } = await supabase.from("ingredients").select("id").in("id", ids.slice(i, i + 200)).eq("is_active", false);
+        for (const r of data ?? []) inactifs.add(r.id as string);
+      }
+      if (inactifs.size) { const avant = offerCandidates.length; for (let i = offerCandidates.length - 1; i >= 0; i--) if (inactifs.has(offerCandidates[i].ingredient_id as string)) offerCandidates.splice(i, 1); void avant; }
+    }
     for (const o of offerCandidates) {
       offerByIngredient.set(String(o.ingredient_id), o);
     }
