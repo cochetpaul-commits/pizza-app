@@ -14,6 +14,10 @@ export async function GET() {
     vapid_prive: !!process.env.VAPID_PRIVATE_KEY,
     drive_kezia: !!(process.env.GOOGLE_DRIVE_API_KEY && process.env.KEZIA_DRIVE_FOLDER_ID),
     pennylane_piccola: !!(process.env.PENNYLANE_API_KEY_PICCOLA ?? process.env.PENYLANE_API_KEY),
+    pennylane_bello: !!process.env.PENNYLANE_API_KEY,
+    popina: !!process.env.POPINA_API_KEY,
+    combo: !!process.env.COMBO_KEY,
+    supabase_service: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
   return NextResponse.json({ v, config }, { headers: { "Cache-Control": "no-store" } });
 }
