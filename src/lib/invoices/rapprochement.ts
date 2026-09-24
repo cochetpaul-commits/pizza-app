@@ -178,7 +178,19 @@ export async function chargerIndexFiches(supabase: Db, supplierId: string, suppl
 }
 
 /** Fiche correspondant à une ligne (référence puis nom), ou null = « sans fiche ». Mémorise les correspondances trouvées par repli. */
+/** Libellés Winopos (Bar Spirits) : « 0,7L | Cynar » → « Cynar » — la contenance en préfixe empêche le rapprochement par nom */
+function sansPrefixeContenance(nom: string): string {
+  return nom.replace(/^\s*[\d.,]+\s*(?:L|CL|ML)\s*\|\s*/i, "").trim();
+}
+
 export function trouverFiche(idx: IndexFiches, skuBrut: string | null | undefined, nomBrut: string | null | undefined): string | null {
+  const direct0 = trouverFicheBrut(idx, skuBrut, nomBrut);
+  if (direct0) return direct0;
+  const nettoye = sansPrefixeContenance((nomBrut ?? "").trim());
+  return nettoye && nettoye !== (nomBrut ?? "").trim() ? trouverFicheBrut(idx, skuBrut, nettoye) : null;
+}
+
+function trouverFicheBrut(idx: IndexFiches, skuBrut: string | null | undefined, nomBrut: string | null | undefined): string | null {
   const sku = (skuBrut ?? "").trim();
   const nm = (nomBrut ?? "").trim().toUpperCase();
   if (!nm && !sku) return null;
