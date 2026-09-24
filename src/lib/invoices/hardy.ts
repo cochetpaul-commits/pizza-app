@@ -80,11 +80,38 @@ function parseLines(text: string): ParsedLine[] {
 
   // Pattern principal (supports negative quantities for avoirs):
   //   <sku 4-6 digits> <DESIGNATION...> <nombre> P <quantité> Kg <lot> <pu_brut>/Kg <pu_net>/Kg TR <montant>
-  const lineRe = /^(\d{4,6})\s+(.+?)\s+(-?\d+(?:[.,]\d+)?)\s+P\s+(-?\d+(?:[.,]\d+)?)\s+(Kg|kg)\s+\d+\s+(\d+(?:[.,]\d+)?)\s*\/Kg\s+(\d+(?:[.,]\d+)?)\s*\/Kg\s+TR\s+(-?\d+(?:[.,]\d+)?)$/i;
+  // Désignation facultative sur la ligne : « DESSUS DE PALETTE VIANDE » est imprimé sur la rangée précédente,
+  // la ligne devient « 10421 18 P 3,700 Kg 261870804 20,5000 /Kg 20,9514 /Kg TR 75,85 » (vécu 24/09).
+  const lineRe = /^(\d{4,6})(?:\s+(.+?))?\s+(-?\d+(?:[.,]\d+)?)\s+P\s+(-?\d+(?:[.,]\d+)?)\s+(Kg|kg)\s+\d+\s+(\d+(?:[.,]\d+)?)\s*\/Kg\s+(\d+(?:[.,]\d+)?)\s*\/Kg\s+TR\s+(-?\d+(?:[.,]\d+)?)$/i;
+
+  // Article livré en plusieurs lots : « 20111 COTES DE VEAU 8 P 2,800 Kg 261260479 » puis « 8 P 2,950 Kg 261310599 »
+  // puis la ligne de cumul « 16 P 5,750 Kg 23,5000 /Kg 23,9061 /Kg TR 135,13 » (vécu 24/09 : 00110444, 00112820 tronquées).
+  const lotRe = /^(\d{4,6})(?:\s+(.+?))?\s+(-?\d+(?:[.,]\d+)?)\s+P\s+(-?\d+(?:[.,]\d+)?)\s+(Kg|kg)\s+\d+$/i;
+  const lotSuiteRe = /^(-?\d+(?:[.,]\d+)?)\s+P\s+(-?\d+(?:[.,]\d+)?)\s+(Kg|kg)\s+\d+$/i;
+  const cumulRe = /^(-?\d+(?:[.,]\d+)?)\s+P\s+(-?\d+(?:[.,]\d+)?)\s+(Kg|kg)\s+(\d+(?:[.,]\d+)?)\s*\/Kg\s+(\d+(?:[.,]\d+)?)\s*\/Kg\s+TR\s+(-?\d+(?:[.,]\d+)?)$/i;
+  let enLots: { sku: string; name: string } | null = null;
 
   let prevLine = ""; // track previous line for multi-line product names
   for (const r of rows) {
     if (SKIP_LINE_RE.test(r)) { prevLine = ""; continue; }
+
+    if (enLots) {
+      if (lotSuiteRe.test(r)) continue;
+      const c = r.match(cumulRe);
+      if (c) {
+        const qty = parseFrenchNumber(c[2]);
+        const unitPriceNet = parseFrenchNumber(c[5]);
+        const brut = parseFrenchNumber(c[6]);
+        tmp.push({ sku: enLots.sku, name: enLots.name, quantity: qty, unit: "kg", unit_price: unitPriceNet,
+          total_price: qty != null && unitPriceNet != null ? Math.round(qty * unitPriceNet * 100) / 100 : brut,
+          tax_rate: 5.5, notes: `plusieurs lots · montant HT hors contributions ${brut ?? "?"} € · P.U. HT ${c[4]} /Kg`, piece_weight_g: null, piece_volume_ml: null });
+        enLots = null; prevLine = "";
+        continue;
+      }
+      enLots = null; // pas de cumul : on reprend le flux normal
+    }
+    const lot = r.match(lotRe);
+    if (lot) { const nm = (lot[2] ?? "").trim(); enLots = { sku: lot[1], name: (!nm || /^[RGMPCA E]{1,2}$/.test(nm)) && prevLine ? prevLine.trim() : nm }; continue; }
 
     const m = r.match(lineRe);
     if (!m) {
@@ -94,14 +121,15 @@ function parseLines(text: string): ParsedLine[] {
     }
 
     const sku = m[1];
-    let name = m[2].trim();
-    // If name is just a type code (R, G, M, P, C, A, E) and we have a previous line, use that
-    if (/^[RGMPCA E]{1,2}$/.test(name) && prevLine) {
+    let name = (m[2] ?? "").trim();
+    // Désignation absente, ou réduite à un code de type (R, G, M, P, C, A, E) : elle est sur la rangée précédente
+    if ((!name || /^[RGMPCA E]{1,2}$/.test(name)) && prevLine) {
       name = prevLine.trim();
     }
     const qty = parseFrenchNumber(m[4]);
-    const unitPriceNet = parseFrenchNumber(m[7]); // P.U. Net = prix réellement payé
-    const totalPrice = parseFrenchNumber(m[8]);
+    const unitPriceNet = parseFrenchNumber(m[7]); // P.U. Net /Kg = prix réellement payé (contributions au kilo incluses)
+    const brut = parseFrenchNumber(m[8]); // montant imprimé = qté × P.U. HT (hors contributions) → la somme des lignes ne tombait jamais sur le total HT
+    const totalPrice = qty != null && unitPriceNet != null ? Math.round(qty * unitPriceNet * 100) / 100 : brut;
 
     tmp.push({
       sku,
@@ -111,7 +139,7 @@ function parseLines(text: string): ParsedLine[] {
       unit_price: unitPriceNet,
       total_price: totalPrice,
       tax_rate: 5.5,
-      notes: null,
+      notes: `montant HT hors contributions ${brut ?? "?"} € · P.U. HT ${m[6]} /Kg`,
       piece_weight_g: null,
       piece_volume_ml: null,
     });
