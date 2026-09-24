@@ -75,7 +75,6 @@ function parseLines(text: string): ParsedLine[] {
 
   const rows = parseText.split("\n").map(l => l.trim()).filter(Boolean);
   const result: ParsedLine[] = [];
-  const byCode = new Map<string, ParsedLine>();
 
   // Skip headers/footers
   const SKIP = /^(Code art|Désignation|Total|Montant|Remise|Base|Merci|HSBC|IBAN|Agent|Réf|Page|Adresse|Client|Facture|Date|Mode|Cond|Vos|SOCIETE|S\.A\.S|DIRECTION|Tél|E-mail|UE|SIRET|ACCISES|EUR|BL M3|N° cmde|SARL|Liv |57 |35400|FRANCE|escompte|Les éventuels)/i;
@@ -108,35 +107,21 @@ function parseLines(text: string): ParsedLine[] {
     if (!name || totalHt == null) continue;
 
     const r2 = (v: number) => Math.round(v * 100) / 100;
-    const existing = byCode.get(code);
-    if (existing) {
-      // Même article sur plusieurs lignes (dont PROMO) : on cumule, le prix
-      // unitaire devient le prix moyen réellement payé.
-      const q = (existing.quantity ?? 0) + qty;
-      const t = r2((existing.total_price ?? 0) + totalHt);
-      existing.quantity = q;
-      existing.total_price = t;
-      existing.unit_price = q > 0 ? r2(t / q) : existing.unit_price;
-      if (isPromo) {
-        const note = `dont ${qty} offerte${qty > 1 ? "s" : ""} (PROMO : droits + CSS seuls)`;
-        existing.notes = existing.notes ? `${existing.notes} · ${note}` : note;
-      }
-      continue;
-    }
-
+    // Une ligne par ligne de facture : la ligne PROMO (bouteilles offertes, 100 % de remise, seuls droits
+    // et CSS facturés) reste à part et ne porte AUCUN prix d'achat (unit_price null → jamais d'offre).
+    // Vécu 24/09 : le cumul « payées + offertes » donnait un prix moyen faux (Adriatico 57375 : 17,53 au lieu de 20,05).
     const line: ParsedLine = {
       sku: code,
       name,
       quantity: qty,
       unit: "pc",
-      unit_price: puHt ?? (qty > 0 ? r2(totalHt / qty) : null),
+      unit_price: isPromo ? null : (puHt ?? (qty > 0 ? r2(totalHt / qty) : null)),
       total_price: totalHt,
       tax_rate: tvaCode === "02" ? 5.5 : 20.0,
-      notes: isPromo ? `${qty} offerte${qty > 1 ? "s" : ""} (PROMO : droits + CSS seuls)` : null,
+      notes: isPromo ? `${qty} offerte${qty > 1 ? "s" : ""} (PROMO : droits + CSS seuls, ${totalHt.toFixed(2)} €)` : null,
       piece_weight_g: null,
       piece_volume_ml: vol != null ? Math.round(vol * 1000) : null,
     };
-    byCode.set(code, line);
     result.push(line);
   }
 
