@@ -75,6 +75,21 @@ export type PlCategory = { id: number; label: string; direction: string };
 
 type Paged<T> = { items: T[]; has_more: boolean; next_cursor: string | null };
 
+/** Toutes les pièces d'UN fournisseur Pennylane (par son id), sans filtre de date, archivées comprises — diagnostic. */
+export async function getSupplierInvoicesParFournisseur(supplierId: number, dossier: PlDossier = "bello"): Promise<PlSupplierInvoice[]> {
+  const filter = encodeURIComponent(JSON.stringify([{ field: "supplier_id", operator: "eq", value: supplierId }]));
+  const out: PlSupplierInvoice[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 30; page++) {
+    const q = `supplier_invoices?filter=${filter}&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+    const data: Paged<PlSupplierInvoice> = await plGet(q, dossier);
+    out.push(...(data.items ?? []));
+    if (!data.has_more || !data.next_cursor) break;
+    cursor = data.next_cursor;
+  }
+  return out;
+}
+
 /** Toutes les factures fournisseurs d'une période (pagination suivie). */
 /**
  * @param archivees true = garder aussi les pièces archivées, sauf les doublons (même n° qu'une pièce non archivée,

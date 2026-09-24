@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { pennylaneConfigured, type PlDossier } from "@/lib/pennylane/api";
 import { cronOrAdminUnauthorized } from "@/lib/cronAuth";
 import { autoImportFactures, autoImportCandidats } from "@/lib/invoices/autoImport";
-import { getSupplierInvoices, getSuppliers } from "@/lib/pennylane/api";
+import { getSupplierInvoices, getSuppliers, getSupplierInvoicesParFournisseur } from "@/lib/pennylane/api";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -51,7 +51,8 @@ export async function GET(req: NextRequest) {
     try {
       if (brut) {
         const from = new Date(); from.setDate(from.getDate() - days);
-        const [inv, sups] = await Promise.all([getSupplierInvoices(from.toISOString().slice(0, 10), new Date().toISOString().slice(0, 10), dossier, { archivees: true }), getSuppliers(dossier)]);
+        const fournisseurPl = Number(req.nextUrl.searchParams.get("fournisseur_pl") ?? 0) || 0; // ?fournisseur_pl=<id Pennylane> : toutes ses pièces, sans filtre de date
+        const [inv, sups] = await Promise.all([fournisseurPl ? getSupplierInvoicesParFournisseur(fournisseurPl, dossier) : getSupplierInvoices(from.toISOString().slice(0, 10), new Date().toISOString().slice(0, 10), dossier, { archivees: true }), getSuppliers(dossier)]);
         const nom = new Map(sups.map((s) => [s.id, s.name]));
         const rows = inv.map((i) => ({ id: i.id, numero: i.invoice_number ?? null, date: i.date ?? null, ttc: Number(i.currency_amount ?? 0) || 0, fournisseur: i.supplier?.id ? (nom.get(i.supplier.id) ?? String(i.supplier.id)) : null, archivee: !!i.archived_at, fichier: !!i.public_file_url, libelle: i.label ?? null }))
           .filter((r) => !filtre || `${r.fournisseur ?? ""} ${r.libelle ?? ""}`.toLowerCase().includes(filtre));
