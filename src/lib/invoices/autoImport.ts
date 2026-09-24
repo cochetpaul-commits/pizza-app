@@ -46,11 +46,16 @@ function isoDaysAgo(days: number): string {
  * pour chaque fournisseur Pennylane de la mercuriale, fusionnées par id. Vécu 24/09 : le filtre de date
  * de l'API laissait passer des factures Mael/Masse/Armor/Vinoflo de janvier-mars côté Piccola.
  */
+/** Deux noms de fournisseur se correspondent : identiques, ou l'un contient l'autre quand les deux dépassent 3 lettres (« SUM » ne se compare qu'à l'exact). */
+export function nomsCorrespondent(a: string, b: string): boolean {
+  return a === b || (a.length > 3 && b.length > 3 && (a.includes(b) || b.includes(a)));
+}
+
 export async function facturesPeriode(from: string, to: string, dossier: PlDossier, plSuppliers: Array<{ id: number; name: string }>, mercuriale: string[], opts: { archivees?: boolean } = {}): Promise<PlSupplierInvoice[]> {
   const parId = new Map<number, PlSupplierInvoice>();
   for (const i of await getSupplierInvoices(from, to, dossier, opts)) parId.set(i.id, i);
   // Nom Pennylane canonisé d'abord (« CAFE CELTIK » → « Cafés Celtik ») : sinon « cafe celtik » ⊄ « cafes celtik » et le fournisseur passait hors mercuriale
-  const cibles = plSuppliers.filter((s) => { const n = norm(canoniserNomFournisseur(s.name)); return n.length > 3 && mercuriale.some((m) => n.includes(m) || m.includes(n)); });
+  const cibles = plSuppliers.filter((s) => { const n = norm(canoniserNomFournisseur(s.name)); return n.length >= 3 && mercuriale.some((m) => nomsCorrespondent(n, m)); });
   for (const s of cibles) {
     try {
       const lot = await getSupplierInvoicesParFournisseur(s.id, dossier);
@@ -75,7 +80,7 @@ export async function autoImportCandidats(days = 30, dossier: PlDossier = "bello
     supabaseAdmin.from("suppliers").select("name").eq("is_active", true),
   ]);
   const plNameById = new Map(plSuppliers.map((s) => [s.id, s.name]));
-  const mercuriale = (appSuppliers ?? []).filter((s) => !estFournisseurInterne(s.name as string)).map((s) => norm(s.name as string)).filter((n) => n.length > 3);
+  const mercuriale = (appSuppliers ?? []).filter((s) => !estFournisseurInterne(s.name as string)).map((s) => norm(s.name as string)).filter((n) => n.length >= 3);
   const invoices = await facturesPeriode(from, to, dossier, plSuppliers, mercuriale, { archivees: opts.archivees });
   const ids = invoices.map((i) => i.id);
   const traitees = new Set<number>();
@@ -150,7 +155,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
   const mercuriale = (appSuppliers ?? [])
     .filter((s) => !estFournisseurInterne(s.name as string))
     .map((s) => norm(s.name as string))
-    .filter((n) => n.length > 3);
+    .filter((n) => n.length >= 3);
   const invoices = await facturesPeriode(from, to, dossier, plSuppliers, mercuriale, { archivees: opts.archivees });
 
   // Factures déjà passées par ce pipeline — sauf celles en erreur,
@@ -202,12 +207,12 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
 
     const fournisseur = inv.supplier?.id ? (plNameById.get(inv.supplier.id) ?? "?") : "?";
     const nf = norm(canoniserNomFournisseur(fournisseur));
-    const estMercuriale = nf.length > 3 && mercuriale.some((m) => nf.includes(m) || m.includes(nf));
+    const estMercuriale = nf.length >= 3 && mercuriale.some((m) => nomsCorrespondent(nf, m));
     // Nom du fournisseur tel qu'il existe dans l'appli (« Mael »), pas le libellé Pennylane
     // (« SAS MAEL ») : sinon le scan IA créait une ligne fournisseur parallèle sans fiches.
     // Nom du fournisseur côté appli : correspondance exacte d'abord, sinon le nom le plus long qui
     // correspond (« Armor Emballages » avant « Armor » : vécu 23/09, deux lignes créées pour Bello).
-    const candidatsApp = (appSuppliers ?? []).map((s) => s.name as string).filter((n) => { const k = norm(n); return k.length > 3 && (nf.includes(k) || k.includes(nf)); });
+    const candidatsApp = (appSuppliers ?? []).map((s) => s.name as string).filter((n) => { const k = norm(n); return k.length >= 3 && nomsCorrespondent(nf, k); });
     const fournisseurApp = candidatsApp.find((n) => norm(n) === nf) ?? candidatsApp.sort((a, b) => b.length - a.length)[0] ?? fournisseur;
     // Rattrapage par lots : ne traiter que certains fournisseurs, sans marquer les autres
     if (seulement.length && !seulement.some((f) => nf.includes(f) || f.includes(nf))) { res.examinees--; continue; }
@@ -345,7 +350,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
         const htPl = Number(inv.currency_amount_before_tax ?? NaN);
         if (Number.isFinite(htPl) && inv.date) {
           const { data: memes } = await supabaseAdmin.from("supplier_invoices").select("id, invoice_number, total_ht, suppliers!inner(name)")
-            .eq("invoice_date", inv.date).eq("suppliers.name", fournisseurApp.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")).limit(20);
+            .eq("invoice_date", inv.date).eq("etablissement_id", etabId).eq("suppliers.name", fournisseurApp.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")).limit(20);
           const m = (memes ?? []).find((x) => x.total_ht != null && Math.abs(Number(x.total_ht) - htPl) <= 0.05);
           if (m) { await log(inv, fournisseur, "deja_connue", `même date et même HT (${htPl.toFixed(2)} €) que ${m.invoice_number ?? "une facture"} déjà dans l'app`); continue; }
         }
