@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
-import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/DateRangePicker";
+import { DateRangePicker, shiftRange } from "@/components/ui/DateRangePicker";
 import { usePilotageRange } from "@/lib/pilotageRange";
 import { usePilotageTopBar } from "@/components/ui/PilotageRangeBar";
 import { BottomSheet } from "@/components/layout/BottomSheet";
@@ -1090,8 +1090,6 @@ function MargesPage() {
               {filteredTrendProducts.length > 0 && (trendFilter === "category" || trendFilter === "all") && (() => {
                 const catProducts = filteredTrendProducts.slice(0, 15);
                 if (catProducts.length === 0) return null;
-                const maxCA = catProducts[0]?.ca_ht ?? 1;
-                const catColor = getCategoryColor(trendCategory ?? "Autre");
                 return (
                   <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
                     <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: COLORS.muted, fontWeight: 600, marginBottom: 12 }}>

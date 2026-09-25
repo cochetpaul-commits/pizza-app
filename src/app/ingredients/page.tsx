@@ -282,10 +282,6 @@ function IngredientsPageInner() {
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  const selectAll = () => {
-    const allIds = filtered.map(i => i.id);
-    setSelectedIds(prev => prev.size === allIds.length ? new Set() : new Set(allIds));
-  };
   const clearSelection = () => setSelectedIds(new Set());
 
   // Bulk actions

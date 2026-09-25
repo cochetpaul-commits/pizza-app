@@ -81,17 +81,6 @@ export async function POST(req: NextRequest) {
 
         // Match to employee in DB
         const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-        const { data: empMatch } = await supabaseAdmin
-          .from("employes")
-          .select("id")
-          .eq("etablissement_id", etabId)
-          .eq("actif", true);
-
-        const matched = (empMatch ?? []).find(e => {
-          // We need name to match — fetch full data
-          return false; // Will match by employee_number below
-        });
-
         // Try match by employee_number or name
         let employeId: string | null = null;
         if (emp.employee_number) {

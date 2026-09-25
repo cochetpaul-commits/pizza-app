@@ -38,7 +38,7 @@ export function ImportExportModal({ etabSlug, onClose, onDone }: { etabSlug: str
   // Un nom → tous ses identifiants (Bello + Piccola)
   const idsByName = useMemo(() => { const m = new Map<string, string[]>(); for (const s of suppliers) { const k = s.name.trim().toLowerCase(); m.set(k, [...(m.get(k) ?? []), s.id]); } return m; }, [suppliers]);
   const nomsUniques = useMemo(() => { const seen = new Map<string, { name: string; color: string | null }>(); for (const s of suppliers) { const k = s.name.trim().toLowerCase(); if (!seen.has(k)) seen.set(k, { name: s.name, color: s.color }); } return [...seen.entries()].map(([k, v]) => ({ key: k, ...v })); }, [suppliers]);
-  const toggle = (set: Set<string>, v: string, setter: (s: Set<string>) => void) => { const n = new Set(set); n.has(v) ? n.delete(v) : n.add(v); setter(n); };
+  const toggle = (set: Set<string>, v: string, setter: (s: Set<string>) => void) => { const n = new Set(set); if (n.has(v)) n.delete(v); else n.add(v); setter(n); };
   const nbFiltres = cats.size + fourns.size;
 
   async function exporter() {

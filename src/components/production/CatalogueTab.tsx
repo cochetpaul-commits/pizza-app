@@ -1037,7 +1037,7 @@ export function CatalogueContent() {
     keys.splice(result.destination.index, 0, moved);
     setCatOrder(keys);
     try { localStorage.setItem(SORT_KEY, JSON.stringify(keys)); } catch { /* ignore */ }
-  }, [nestedGroups, SORT_KEY]);
+  }, [nestedGroups, SORT_KEY, canWrite]);
 
   const handleDelete = useCallback(async (recipe: Recipe) => {
     if (!window.confirm(`Supprimer "${recipe.name}" ?\nCette action est irréversible.`)) return;

@@ -71,6 +71,8 @@ export default function InstallerPage() {
       display: "flex", flexDirection: "column", alignItems: "center",
       padding: "40px 18px 60px", boxSizing: "border-box",
     }}>
+      {/* Icône statique 84 px de la page d'installation : <img> suffit, pas besoin de next/image */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/icons/icon-192.png" alt="" width={84} height={84}
         style={{ borderRadius: 20, boxShadow: "0 6px 24px rgba(0,0,0,0.12)", marginBottom: 16 }} />
       <h1 style={{

@@ -268,7 +268,6 @@ export default function InventairePage() {
       setIngSupplier(isMap);
       setSuppliers((supData ?? []) as { id: string; name: string }[]);
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etabId, etab?.slug]);
 
   // ── Load inventaires ──────────────────────────────────────

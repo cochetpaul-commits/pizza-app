@@ -28,16 +28,6 @@ export type ParsedInvoice = {
   raw_text_preview: string;
 };
 
-function parseFrenchNumber(s: string): number | null {
-  const cleaned = s
-    .replace(/\s+/g, "")
-    .replace(/[€]/g, "")
-    .replace(/\.(?=\d{3}\b)/g, "") // remove thousand separator dots
-    .replace(",", ".");
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
-
 function parseItalianNumber(s: string): number | null {
   // Italian: 42,500 means 42.5 — comma is decimal separator
   // But 1.221,25 means 1221.25 — dot is thousand separator

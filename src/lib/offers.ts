@@ -196,7 +196,7 @@ export function fmtOfferPriceLine(
 
 export function offerHasPrice(
   o: LatestOffer | undefined,
-  extras?: { piece_volume_ml?: number | null },
+  _extras?: { piece_volume_ml?: number | null },
 ): boolean {
   if (!o) return false;
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 
 export type PeriodMode = "jour" | "semaine" | "mois" | "annee";
 

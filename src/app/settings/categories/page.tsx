@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
@@ -37,7 +37,7 @@ export default function CategoriesPage() {
   const [newNom, setNewNom] = useState("");
   const [newCouleur, setNewCouleur] = useState("#4a6741");
   const [newFamille, setNewFamille] = useState("cuisine");
-  const [newEstabs, setNewEstabs] = useState<string[]>([]);
+  const [newEstabs] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     const { data } = await supabase

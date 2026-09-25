@@ -7,7 +7,7 @@ const CACHE_NAME = "ifratelli-v3";
 // qui n'existent plus → « client-side exception » au chargement).
 const OFFLINE_HTML = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hors ligne</title></head><body style="font-family:-apple-system,'DM Sans',sans-serif;background:#f2ede4;margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center"><div style="text-align:center;padding:24px"><div style="font-size:34px;margin-bottom:10px">📡</div><h1 style="font-size:17px;color:#1a1a1a;margin:0 0 6px">Pas de connexion</h1><p style="color:#8a8378;font-size:13px;margin:0 0 16px">L'application a besoin d'internet.</p><a href="" style="display:inline-block;padding:10px 22px;border-radius:10px;background:#D4775A;color:#fff;text-decoration:none;font-size:14px;font-weight:700">Réessayer</a></div></body></html>`;
 
-self.addEventListener("install", (event) => {
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 

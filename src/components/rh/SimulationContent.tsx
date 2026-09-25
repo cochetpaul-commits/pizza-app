@@ -52,7 +52,6 @@ type SimRow = {
   heures: number;
 };
 
-type Tab = "reel" | "tns" | "simulateur";
 
 /* ── Constants ─────────────────────────────────────────────────── */
 
@@ -268,16 +267,9 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
   const salaries = costs.filter((c) => !c.isTNS);
   const tnsEmployes = costs.filter((c) => c.isTNS);
 
-  const totalBrut = salaries.reduce((acc, c) => acc + c.brut, 0);
-  const totalChargesPatronales = salaries.reduce((acc, c) => acc + c.chargesPatronales, 0);
-  const totalFillon = salaries.reduce((acc, c) => acc + c.fillon, 0);
   const totalMSSalaries = salaries.reduce((acc, c) => acc + c.coutEmployeur, 0);
   const totalTNS = tnsEmployes.reduce((acc, c) => acc + c.coutEmployeur, 0);
   const totalMS = totalMSSalaries + totalTNS;
-  const totalCharges = totalChargesPatronales - totalFillon + tnsEmployes.reduce((acc, c) => acc + c.chargesPatronales, 0);
-  const tauxMoyen = totalBrut > 0 ? (totalCharges / (totalBrut + tnsEmployes.reduce((a, c) => a + c.brut, 0))) * 100 : 0;
-  const ratioMS = caSimule > 0 ? (totalMS / caSimule) * 100 : 0;
-  const caNeeded = totalMS / (OBJECTIF_MS_CA / 100);
 
   // Base MS (without overrides) for comparison
   const baseTotalMS = useMemo(() => baseCosts.reduce((acc, c) => acc + c.coutEmployeur, 0), [baseCosts]);
@@ -1003,25 +995,7 @@ const miniLabel: CSSProperties = {
   textTransform: "uppercase", letterSpacing: 0.5,
 };
 
-const tableStyle: CSSProperties = {
-  width: "100%", borderCollapse: "collapse", fontSize: 13,
-};
 
-const th: CSSProperties = {
-  textAlign: "left", padding: "10px 8px",
-  fontSize: 10, fontWeight: 700, color: "#999",
-  textTransform: "uppercase", letterSpacing: 0.5,
-  borderBottom: "1px solid #ddd6c8",
-};
-
-const thR: CSSProperties = { ...th, textAlign: "right" };
-
-const td: CSSProperties = {
-  padding: "12px 8px", borderBottom: "1px solid #f0ebe3",
-  verticalAlign: "middle",
-};
-
-const tdR: CSSProperties = { ...td, textAlign: "right", fontSize: 13 };
 
 const barBg: CSSProperties = {
   height: 8, borderRadius: 4, background: "#f0ebe3", overflow: "hidden",

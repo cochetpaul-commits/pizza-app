@@ -11,7 +11,7 @@ import { buildRecipeMeta, type RecipeIngredientMeta } from "@/lib/recipeMeta";
 import type { LatestOffer } from "@/types/ingredients";
 import {
   type FicheState, type Categorie, type Famille, type IngredientRef, type LigneIngredient, type Zone, type PrixLigne,
-  UNITS, unitsFor, ALLERGENES_14, PATON_BASE,
+  ALLERGENES_14, PATON_BASE,
   coutLigne, coutRecetteTotal, coutPaton, coutPortion, prixTTC, prixHT,
   foodCostPct, margeBrute, prixConseille, fcColor, allergenesActifs, resumeAuto,
   eur, tmpKey, defaultFiche, ligneWeightG,
@@ -395,7 +395,6 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const draftIdRef = useRef<string>(recipeId ?? `new-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
   const [drafts, setDrafts] = useState<DraftEntry[]>([]);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDrafts(readArchive(etabSlug));
   }, [etabSlug]);
 
@@ -418,7 +417,6 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       if (raw) {
         const d = JSON.parse(raw) as { ts?: number; step?: number; fiche?: FicheState; linkedPopina?: string | null };
         if (d?.fiche && Date.now() - (d.ts ?? 0) < DRAFT_TTL_MS) {
-          // eslint-disable-next-line react-hooks/set-state-in-effect
           setFiche(d.fiche);
           if (typeof d.step === "number") setStep(d.step);
           if (d.linkedPopina !== undefined) setLinkedPopina(d.linkedPopina);
@@ -1542,88 +1540,6 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           {toast}
         </div>
       )}
-    </div>
-  );
-}
-
-// ── Composant ligne ingrédient ──
-function IngredientRow({ ligne, mercuriale, onChange, onDelete }: {
-  ligne: LigneIngredient;
-  mercuriale: IngredientRef[];
-  onChange: (l: LigneIngredient) => void;
-  onDelete: () => void;
-}) {
-  const [search, setSearch] = useState(ligne.ingredient?.nom_court ?? "");
-  const [showList, setShowList] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const filtered = useMemo(() => {
-    const q = norm(search);
-    if (!q) return mercuriale.slice(0, 30);
-    return mercuriale.filter(m => norm(m.nom_court).includes(q) || norm(m.nom_produit).includes(q)).slice(0, 30);
-  }, [search, mercuriale]);
-
-  const cost = coutLigne(ligne);
-  const compatUnits = ligne.ingredient ? unitsFor(ligne.ingredient.unite_base) : ["g"];
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#faf5ea", borderRadius: 12, padding: "8px 10px", marginBottom: 8 }}>
-      {/* Combobox */}
-      <div ref={ref} style={{ position: "relative", flex: 2.4, minWidth: 150 }}>
-        <input type="text" value={search} placeholder="Chercher un ingredient"
-          onChange={e => { setSearch(e.target.value); setShowList(true); }}
-          onFocus={() => { setSearch(ligne.ingredient?.nom_court ?? ""); setShowList(true); }}
-          onBlur={() => setTimeout(() => setShowList(false), 150)}
-          style={{ width: "100%", padding: "9px 12px", fontSize: 13.5, background: "#fff", fontWeight: 600, borderRadius: 10, border: `1.5px solid ${COLORS.line}`, outline: "none", boxSizing: "border-box" }}
-        />
-        {showList && (
-          <div style={{
-            position: "absolute", top: "calc(100% + 4px)", left: 0, right: -80, background: "#fff",
-            border: `1.5px solid ${COLORS.line}`, borderRadius: 12, maxHeight: 230, overflowY: "auto",
-            zIndex: 30, boxShadow: "0 12px 28px #00000020",
-          }}>
-            {filtered.length === 0 ? (
-              <div style={{ padding: 12, fontSize: 12.5, color: COLORS.muted, fontStyle: "italic" }}>Aucun ingredient trouve.</div>
-            ) : filtered.map(m => (
-              <div key={m.id} onMouseDown={e => {
-                e.preventDefault();
-                setSearch(m.nom_court);
-                setShowList(false);
-                onChange({ ...ligne, ingredient_id: m.id, ingredient: m, unite: m.unite_base });
-              }} style={{ padding: "9px 13px", cursor: "pointer" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#faf5ea"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#fff"; }}
-              >
-                <div style={{ fontSize: 13.5, fontWeight: 700 }}>{m.nom_court}</div>
-                <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 1 }}>
-                  {m.nom_produit} · <b style={{ color: COLORS.terraDark }}>{m.prix_base.toLocaleString("fr-FR")} {"\u20AC"} / {m.unite_base === "pc" ? "piece" : m.unite_base}</b>
-                  {m.allergenes.length > 0 && ` · ${m.allergenes.join(", ")}`}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Quantité */}
-      <input type="number" value={ligne.quantite} min={0} step="any"
-        onChange={e => onChange({ ...ligne, quantite: Number(e.target.value) || 0 })}
-        style={{ width: 74, padding: "9px 6px", textAlign: "right", fontWeight: 700, background: "#fff", borderRadius: 10, border: `1.5px solid ${COLORS.line}`, fontSize: 13.5, outline: "none" }} />
-
-      {/* Unité */}
-      <select value={ligne.unite} onChange={e => onChange({ ...ligne, unite: e.target.value })}
-        style={{ width: 74, padding: "9px 6px", fontSize: 13, background: "#fff", fontWeight: 700, color: COLORS.muted, borderRadius: 10, border: `1.5px solid ${COLORS.line}` }}>
-        {compatUnits.map(u => <option key={u} value={u}>{UNITS[u].label}</option>)}
-      </select>
-
-      {/* Coût */}
-      <span style={{ width: 72, textAlign: "right", fontSize: 13.5, fontWeight: 700, color: COLORS.terraDark }}>
-        {eur(cost)}
-      </span>
-
-      {/* Supprimer */}
-      <button onClick={onDelete} style={{ border: "none", background: "#f7e3df", color: COLORS.warn, width: 28, height: 28, borderRadius: "50%", cursor: "pointer", fontWeight: 800, flexShrink: 0 }}>x</button>
     </div>
   );
 }

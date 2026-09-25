@@ -127,7 +127,6 @@ const JOURS_LABELS: Record<number, string> = {
 };
 
 /* ── Helpers ── */
-const HIDDEN = "\u2022\u2022\u2022";
 const _fmt = (v: number) => v.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const fmt = (v: number) => _fmt(v) + "\u20AC";
 const fmtK = (v: number) => Math.round(v).toLocaleString("fr-FR") + "\u20AC";
@@ -189,7 +188,6 @@ function PerformancesPage() {
   const { can, role, displayName } = useProfile();
   const showMoney = can("performances.show_money");
   const isEquipier = role === "equipier";
-  const mc = showMoney ? undefined : "hide-money"; // money class
   const accent = etab?.couleur ?? "#D4775A";
 
   const hasUrlRange = !!(searchParams.get("from") && searchParams.get("to"));
@@ -218,8 +216,7 @@ function PerformancesPage() {
   const [importMsg, setImportMsg] = useState("");
   const [exporting, setExporting] = useState(false);
   const [pdfDrawerOpen, setPdfDrawerOpen] = useState(false);
-  const [briefing, setBriefing] = useState<string[] | null>(null);
-  const [briefingLoading, setBriefingLoading] = useState(false);
+  const [briefing] = useState<string[] | null>(null);
   const [mixDDOpen, setMixDDOpen] = useState<{ label: string; color: string } | null>(null);
   const [placeDetail, setPlaceDetail] = useState<"sur" | "emp" | null>(null);
   const [zoneDetail, setZoneDetail] = useState<string | null>(null);
@@ -252,7 +249,7 @@ function PerformancesPage() {
         setRange({ from: row.date_service, to: row.date_service });
       }
     })();
-  }, [etab]);
+  }, [etab, setRange]);
 
   // Category trend state
   type CatTrendDaily = { date: string; qty: number; ca_ttc: number; ca_ht: number };
@@ -589,19 +586,6 @@ function PerformancesPage() {
   };
 
   // Navigate dates (skip weekends in jour mode)
-  // Generate AI briefing
-  const generateBriefing = async () => {
-    if (!etab || !data) return;
-    setBriefingLoading(true);
-    try {
-      const { from, to } = getRange();
-      const res = await fetchApi(`/api/claude/insights?etablissement_id=${etab.id}&from=${from}&to=${to}&type=briefing`);
-      const json = await res.json();
-      if (json.briefing?.points) setBriefing(json.briefing.points);
-    } catch { /* ignore */ }
-    setBriefingLoading(false);
-  };
-
   const { from, to } = getRange();
   const isSingleDay = from === to;
   const rangeLabel = isSingleDay
@@ -1630,8 +1614,6 @@ function PerformancesPage() {
               const drinkCa = mode === "ttc" ? (W.drink_ttc ?? 0) : (W.drink_ht ?? 0);
               const foodRatio = totalCa > 0 ? foodCa / totalCa : 0;
               const drinkRatio = totalCa > 0 ? drinkCa / totalCa : 0;
-              const covMidiT = midiSvcs.reduce((s, sv) => s + sv.cov, 0) || 1;
-              const covSoirT = soirSvcs.reduce((s, sv) => s + sv.cov, 0) || 1;
               const foodMidiPerCvt = tmMidi * foodRatio;
               const drinkMidiPerCvt = tmMidi * drinkRatio;
               const foodSoirPerCvt = tmSoir * foodRatio;
@@ -2213,7 +2195,6 @@ function UpsellCard({ label, emoji, data, totalTables, totalCov, color, targets,
   onClick?: () => void; active?: boolean;
 }) {
   const pct = totalTables > 0 ? Math.round(data.tables / totalTables * 100) : 0;
-  const pctCov = totalCov > 0 ? Math.round(data.coverts / totalCov * 100) : 0;
   const ca = mode === "ttc" ? data.ca_ttc : data.ca_ht;
   void action;
 
