@@ -209,6 +209,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     // sentinel (visible dès que la liste se réduit) relançait fetchPage(0)
     // et ajoutait toute la base par-dessus les résultats.
     setHasMore(false);
+    setLoadingMore(false);
 
     try {
       void refreshCounts(fetchId);
@@ -226,8 +227,34 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
         setItems(bundle.items);
         setOffers(bundle.offers);
         setAllOffers(bundle.allOffers);
-        setHasMore(bundle.hasMore);
         pageRef.current = 1;
+        // Première page affichée tout de suite, puis toutes les suivantes chargées d'office,
+        // sans attendre le défilement (vécu 25/09 : les 26 fiches après la 1000e, de « Verduno »
+        // à « Zibibbo », n'apparaissaient qu'en faisant défiler). hasMore reste à false : le
+        // sentinel de défilement ne relance donc pas un chargement en double.
+        setLoading(false);
+        loadingRef.current = false;
+        let more = bundle.hasMore;
+        if (more) setLoadingMore(true);
+        try {
+          while (more) {
+            const next = await fetchPage(pageRef.current, etabRef.current, etabSlugRef.current, includeInactiveRef.current);
+            if (fetchIdRef.current !== fetchId) return;
+            setItems((prev) => {
+              const seen = new Set(prev.map((i) => i.id));
+              return [...prev, ...next.items.filter((i) => !seen.has(i.id))];
+            });
+            setOffers((prev) => {
+              const seen = new Set(prev.map((o) => o.ingredient_id));
+              return [...prev, ...next.offers.filter((o) => !seen.has(o.ingredient_id))];
+            });
+            setAllOffers((prev) => [...prev, ...next.allOffers]);
+            pageRef.current += 1;
+            more = next.hasMore;
+          }
+        } finally {
+          if (fetchIdRef.current === fetchId) setLoadingMore(false);
+        }
       }
     } catch (e) {
       if (fetchIdRef.current !== fetchId) return;
