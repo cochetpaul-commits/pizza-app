@@ -3,6 +3,7 @@ import { cronUnauthorized } from "@/lib/cronAuth";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAllOrdersForDay, getParisDate } from "@/lib/popinaClient";
 import { ordersToVentesLignes } from "@/lib/popina/mapper";
+import { postComboRevenue, COMBO_LOCATION } from "@/lib/comboClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +32,9 @@ export async function GET(req: NextRequest) {
   const denied = cronUnauthorized(req);
   if (denied) return denied;
 
+  // Optionnel : si absent, on synchronise Popina→Supabase sans pousser vers Combo.
+  const comboKey = process.env.COMBO_API_KEY;
+
   const url = new URL(req.url);
   const explicitDay = url.searchParams.get("day");
   const nDays = Math.min(parseInt(url.searchParams.get("days") ?? "1", 10) || 1, 14);
@@ -54,6 +58,9 @@ export async function GET(req: NextRequest) {
     .maybeSingle();
   const joursFermeture = new Set<number>((etab?.jours_fermeture as number[] | null) ?? []);
 
+  // Combo ne reçoit que J-1 (journée clôturée), jamais le jour en cours ni les resynchros plus anciennes.
+  const jourCombo = getParisDate(-1);
+
   const results = [];
   for (const day of targetDays) {
     // Sur le cron quotidien, skip les jours de fermeture (pas de log, rien à faire).
@@ -65,13 +72,13 @@ export async function GET(req: NextRequest) {
         continue;
       }
     }
-    results.push(await syncDay(apiKey, day, triggeredBy));
+    results.push(await syncDay(apiKey, day, triggeredBy, day === jourCombo ? comboKey : undefined));
   }
 
   return NextResponse.json({ ok: true, results });
 }
 
-async function syncDay(apiKey: string, day: string, triggeredBy: string) {
+async function syncDay(apiKey: string, day: string, triggeredBy: string, comboKey?: string) {
   const t0 = Date.now();
   try {
     const { reports, orders } = await fetchAllOrdersForDay(apiKey, day);
@@ -99,8 +106,25 @@ async function syncDay(apiKey: string, day: string, triggeredBy: string) {
       if (insErr) throw insErr;
     }
 
+    // Pousse le CA HT réel de J-1 vers Combo (comboKey n'est passé que pour J-1).
+    // Montant absolu recalculé depuis Popina, jamais un incrément : renvoyer le même jour
+    // remplace la valeur côté Combo (POST /revenues crée ou met à jour le CA réel du jour).
+    let combo: string | { amount: number } = "skip";
+    if (comboKey) {
+      const caHt = rows
+        .filter((r) => r.type_ligne === "Produit" && !r.annule && !r.perdu && r.statut !== "Annulé")
+        .reduce((s, r) => s + (r.ht || 0), 0);
+      const amount = Number(caHt.toFixed(2));
+      try {
+        await postComboRevenue(comboKey, COMBO_LOCATION.bello, day, amount);
+        combo = { amount };
+      } catch (e) {
+        combo = `error: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    }
+
     await logSync({ day, status: "ok", nbLignes: rows.length, nbOrders: orders.length, duration: Date.now() - t0, triggeredBy });
-    return { day, status: "ok", nbLignes: rows.length, nbOrders: orders.length };
+    return { day, status: "ok", nbLignes: rows.length, nbOrders: orders.length, combo };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     await logSync({ day, status: "error", nbLignes: 0, nbOrders: 0, duration: Date.now() - t0, triggeredBy, errorMsg: msg });
