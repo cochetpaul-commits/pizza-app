@@ -49,13 +49,15 @@ function pickLatestOffers(all: LatestOffer[]): LatestOffer[] {
 
 type FetchResult = { items: Ingredient[]; offers: LatestOffer[]; allOffers: LatestOffer[]; hasMore: boolean };
 
-async function fetchPage(page: number, etabId?: string | null, etabSlug?: string | null): Promise<FetchResult> {
+async function fetchPage(page: number, etabId?: string | null, etabSlug?: string | null, includeInactive = false): Promise<FetchResult> {
   const from = page * PAGE_SIZE;
   let query = supabase
     .from("ingredients")
     .select(INGREDIENT_COLS)
     .order("name", { ascending: true })
     .range(from, from + PAGE_SIZE - 1);
+  // Fiches désactivées (is_active = false) : masquées sauf « Afficher les désactivées »
+  if (!includeInactive) query = query.eq("is_active", true);
 
   // Filter: ingredient belongs to the current establishment via `establishments` array only
   const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
@@ -73,7 +75,7 @@ async function fetchPage(page: number, etabId?: string | null, etabSlug?: string
   return { items, offers, allOffers, hasMore: items.length === PAGE_SIZE };
 }
 
-async function searchIngredients(q: string, etabId?: string | null, etabSlug?: string | null): Promise<{ items: Ingredient[]; offers: LatestOffer[]; allOffers: LatestOffer[] }> {
+async function searchIngredients(q: string, etabId?: string | null, etabSlug?: string | null, includeInactive = false): Promise<{ items: Ingredient[]; offers: LatestOffer[]; allOffers: LatestOffer[] }> {
   // RPC recherche_ingredients : insensible aux accents/casse/ponctuation
   // et à l'ordre des mots — le ilike brut ratait « CÔTES DE VEAU » pour
   // « cotes veau » et « SU'ENTU » pour « suentu ».
@@ -81,6 +83,7 @@ async function searchIngredients(q: string, etabId?: string | null, etabSlug?: s
     .rpc("recherche_ingredients", { q })
     .select(INGREDIENT_COLS)
     .order("name", { ascending: true });
+  if (!includeInactive) query = query.eq("is_active", true);
 
   const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
   if (myEstab) {
@@ -97,7 +100,7 @@ async function searchIngredients(q: string, etabId?: string | null, etabSlug?: s
   return { items, offers, allOffers };
 }
 
-export function useIngredientsData(searchQuery: string, etablissementId?: string | null, etablissementSlug?: string | null) {
+export function useIngredientsData(searchQuery: string, etablissementId?: string | null, etablissementSlug?: string | null, includeInactive = false) {
   const [items, setItems] = useState<Ingredient[]>([]);
   const [offers, setOffers] = useState<LatestOffer[]>([]);
   const [allOffers, setAllOffers] = useState<LatestOffer[]>([]);
@@ -108,6 +111,8 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState<number | null>(null);
+  const includeInactiveRef = useRef(includeInactive);
+  includeInactiveRef.current = includeInactive;
   const [error, setError] = useState<Error | null>(null);
 
   const pageRef = useRef(0);
@@ -181,6 +186,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     try {
       // Fetch total count (independent of pagination/search)
       const countQuery = supabase.from("ingredients").select("id", { count: "exact", head: true });
+      if (!includeInactiveRef.current) countQuery.eq("is_active", true);
       const countEstab = etabSlugRef.current ? slugToOfferEstab(etabSlugRef.current) : null;
       if (countEstab && etabRef.current) {
         countQuery.or(`establishments.cs.{"${countEstab}"},etablissement_id.eq.${etabRef.current},establishments.is.null`);
@@ -192,14 +198,14 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
       });
 
       if (q) {
-        const bundle = await searchIngredients(q, etabRef.current, etabSlugRef.current);
+        const bundle = await searchIngredients(q, etabRef.current, etabSlugRef.current, includeInactiveRef.current);
         if (fetchIdRef.current !== fetchId) return;
         setItems(bundle.items);
         setOffers(bundle.offers);
         setAllOffers(bundle.allOffers);
         setHasMore(false);
       } else {
-        const bundle = await fetchPage(0, etabRef.current, etabSlugRef.current);
+        const bundle = await fetchPage(0, etabRef.current, etabSlugRef.current, includeInactiveRef.current);
         if (fetchIdRef.current !== fetchId) return;
         setItems(bundle.items);
         setOffers(bundle.offers);
@@ -218,7 +224,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
   useEffect(() => {
     const id = ++fetchIdRef.current;
     doLoad(searchQuery, id);
-  }, [searchQuery, etablissementId, doLoad]);
+  }, [searchQuery, etablissementId, includeInactive, doLoad]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
@@ -229,7 +235,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     const fetchId = fetchIdRef.current;
     setLoadingMore(true);
     try {
-      const bundle = await fetchPage(pageRef.current, etabRef.current, etabSlugRef.current);
+      const bundle = await fetchPage(pageRef.current, etabRef.current, etabSlugRef.current, includeInactiveRef.current);
       if (fetchIdRef.current !== fetchId) return;
       setItems((prev) => {
         const seen = new Set(prev.map((i) => i.id));

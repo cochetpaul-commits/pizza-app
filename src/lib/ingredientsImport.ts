@@ -102,8 +102,11 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
       const raw = cellOf(row, key);
       if (raw === undefined) continue; // colonne absente du fichier
       const s = String(raw ?? "").trim();
+      // Case vide sur une fiche existante = valeur en base conservée, jamais effacée
+      // (vécu 25/09 : poids / volume d'une pièce vidés par un import dont les cases étaient vides).
+      if (!s && !nouveau) { if (key === "name") erreurs.push({ ligne, nom: String(avant?.name ?? ""), message: "Nom vide — conservé" }); continue; }
       switch (key) {
-        case "name": if (s) set("name", s); else if (!nouveau) erreurs.push({ ligne, nom: String(avant?.name ?? ""), message: "Nom vide — conservé" }); break;
+        case "name": if (s) set("name", s); break;
         // Réf. fournisseur : écrite sur la FICHE (création comme modification) dès qu'elle est renseignée,
         // indépendamment du bloc prix ; l'offre active est synchronisée plus bas. Vide = inchangée.
         case "supplier_sku": if (s) set("supplier_sku", s); break;
@@ -131,14 +134,17 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
       else {
         const uniteFiche = (avant?.default_unit ?? patch.default_unit) as string | undefined;
         const base: PrixBase | null = b ?? actuel.base ?? (uniteFiche === "kg" || uniteFiche === "g" ? "kg" : uniteFiche === "l" ? "L" : "pièce");
-        let unitaire = u, condP = cond;
-        const nbU = nb;
+        // Cases vides = prix actuel conservé : nb d'unités repris de l'offre ; si les deux prix sont vides, ceux de l'offre
+        // (prix du conditionnement recalculé plus bas si seul le nb d'unités change)
+        const prixVides = u == null && cond == null;
+        let unitaire = prixVides ? actuel.unitaire : u, condP = prixVides && nb == null ? actuel.cond : cond;
+        const nbU = nb ?? actuel.nb;
         if (unitaire == null && condP != null && nbU != null && nbU > 0) unitaire = Math.round((condP / nbU) * 10000) / 10000;
         if (condP == null && unitaire != null && nbU != null && nbU > 0) condP = Math.round(unitaire * nbU * 100) / 100;
         const diff = (x: number | null, y: number | null) => (x ?? null) !== (y ?? null) && !(x != null && y != null && Math.abs(x - y) < 0.005);
         const change = base !== actuel.base || diff(unitaire, actuel.unitaire) || diff(nbU, actuel.nb) || diff(condP, actuel.cond);
         const skuCell = cellOf(row, "supplier_sku"), dateCell = cellOf(row, "prix_date");
-        const sku = skuCell === undefined ? (actuel.sku ?? null) : (String(skuCell ?? "").trim() || null);
+        const sku = String(skuCell ?? "").trim() || (actuel.sku ?? null); // réf. vide = réf. actuelle conservée
         const dateP = dateCell === undefined ? null : dateIn(dateCell);
         if (dateP === "invalide") erreurs.push({ ligne, nom: nomCell, message: `Date du prix « ${String(dateCell)} » illisible (AAAA-MM-JJ ou JJ/MM/AAAA)` });
         const skuChange = skuCell !== undefined && (sku ?? null) !== (actuel.sku ?? null) && actuel.unitaire != null;

@@ -19,6 +19,7 @@ import {
 import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { openApiFile } from "@/lib/fetchApi";
+import { fermerOffresActives } from "@/lib/offerClosing";
 
 // ── Brouillons non enregistrés ──────────────────────────────────────
 // Le 03/09/2026, des fiches saisies sur un appareil dont la session était
@@ -588,7 +589,10 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       } else if (ingId) {
         // Case décochée : on retire l'ingrédient du choix seulement s'il ne sert nulle part
         const { count } = await withTimeout(supabase.from("kitchen_recipe_lines").select("id", { count: "exact", head: true }).eq("ingredient_id", ingId));
-        if (!count) await withTimeout(supabase.from("ingredients").update({ is_active: false }).eq("id", ingId));
+        if (!count) {
+          await withTimeout(supabase.from("ingredients").update({ is_active: false }).eq("id", ingId));
+          await withTimeout(fermerOffresActives(supabase, ingId));
+        }
         else showToast(`Toujours utilisée comme ingrédient dans ${count} ligne${count > 1 ? "s" : ""} de fiche : elle reste disponible.`);
       }
     }

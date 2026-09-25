@@ -342,6 +342,9 @@ export const IngredientRow = React.memo(function IngredientRow({
     : x.piece_weight_g ? `${x.piece_weight_g} g/${shortUnit}` : "—";
 
   const catAccent = CAT_COLORS[x.category];
+  // Fiche désactivée (visible seulement avec « Afficher les désactivées ») : badge gris, pas d'alerte « prix manquant »
+  const inactive = x.is_active === false;
+  const inactiveBadge = <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 8, background: "rgba(0,0,0,0.06)", color: "#999", flexShrink: 0, textTransform: "uppercase" }}>Désactivée</span>;
 
   return (
     <div style={{
@@ -362,7 +365,8 @@ export const IngredientRow = React.memo(function IngredientRow({
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={28} editable />
-          <span className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: catAccent, flex: "1 1 0", minWidth: 0 }}>{x.name}</span>
+          <span className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: inactive ? "#999" : catAccent, flex: "1 1 0", minWidth: 0 }}>{x.name}</span>
+          {inactive && inactiveBadge}
           {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", flexShrink: 0 }}>DERIVE</span>}
           {alert && <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", flexShrink: 0 }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
           <span className="pastille-ronde" style={{ fontSize: 11, padding: "2px 9px", flexShrink: 0 }}>{price}</span>
@@ -391,7 +395,7 @@ export const IngredientRow = React.memo(function IngredientRow({
           {priceComparison && priceComparison.isCheapest && priceComparison.count > 1 && (
             <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>Meilleur prix ({priceComparison.count})</span>
           )}
-          {!hasPrice && <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", flexShrink: 0 }}>prix manquant</span>}
+          {!hasPrice && !inactive && <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", flexShrink: 0 }}>prix manquant</span>}
           {st !== "validated" && canValidate && (
             <button disabled={!canValidate} onClick={(e) => { e.stopPropagation(); onSetStatus(x.id, "validated"); }} style={{ height: 20, padding: "0 8px", borderRadius: 5, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 10, fontWeight: 600, cursor: "pointer", color: "#4a6741", flexShrink: 0 }}>Valider</button>
           )}
@@ -424,7 +428,8 @@ export const IngredientRow = React.memo(function IngredientRow({
           )}
           {!compactMode && <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={30} editable />}
           <div className="produit-main">
-            <div className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: catAccent }}>{x.name}</div>
+            <div className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: inactive ? "#999" : catAccent }}>{x.name}</div>
+            {inactive && inactiveBadge}
           </div>
           <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} style={{
             width: 24, height: 24, borderRadius: 6, border: "none",
@@ -460,7 +465,7 @@ export const IngredientRow = React.memo(function IngredientRow({
             ) : null}
           </div>
         )}
-        {!compactMode && !hasPrice && <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", marginTop: 4, paddingLeft: onToggleSelect ? 54 : 38 }}>prix manquant</div>}
+        {!compactMode && !hasPrice && !inactive && <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", marginTop: 4, paddingLeft: onToggleSelect ? 54 : 38 }}>prix manquant</div>}
         {/* Prix : pastille ronde en bas à droite (charte) */}
         {hasPrice && (
           <div className="produit-footer">
@@ -954,6 +959,7 @@ export const IngredientRow = React.memo(function IngredientRow({
   if (prev.item.id !== next.item.id) return false;
   if (prev.item.status !== next.item.status) return false;
   if (prev.item.name !== next.item.name) return false;
+  if (prev.item.is_active !== next.item.is_active) return false;
   if (prev.item.category !== next.item.category) return false;
   if (prev.offer?.unit_price !== next.offer?.unit_price) return false;
   if (prev.isEditing !== next.isEditing) return false;

@@ -49,6 +49,7 @@ import DuplicatePanel from "@/components/DuplicatePanel";
 import { detectDuplicates, similarity, type DuplicatePair } from "@/lib/duplicateDetection";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
+import { dateFermeture, fermerOffresActives } from "@/lib/offerClosing";
 
 type OfferPayload = Record<string, unknown>;
 
@@ -63,7 +64,7 @@ async function writeActiveOffer(payload: OfferPayload): Promise<string | null> {
   const ingredientId = payload.ingredient_id as string;
   const supplierId = payload.supplier_id as string;
   const off = await supabase.from("supplier_offers")
-    .update({ is_active: false })
+    .update({ is_active: false, valid_to: dateFermeture() })
     .eq("ingredient_id", ingredientId).eq("is_active", true);
   if (off.error) return off.error.message;
 
@@ -131,7 +132,11 @@ function IngredientsPageInner() {
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebounce(q, 300);
-  const { items, suppliers, supplierAliases, offers, allOffers, alertMap, loading, loadingMore, hasMore, totalCount, loadMore, error: dataError, mutate, mutateOne, removeItem } = useIngredientsData(debouncedQ, etab?.id, etab?.slug);
+  // Fiches désactivées (is_active = false) : hors liste et hors compteurs, sauf case « Afficher les désactivées »
+  const [showInactive, setShowInactive] = useState(false);
+  const { items, suppliers, supplierAliases, offers, allOffers, alertMap, loading, loadingMore, hasMore, totalCount, loadMore, error: dataError, mutate, mutateOne, removeItem } = useIngredientsData(debouncedQ, etab?.id, etab?.slug, showInactive);
+  // Filtre aussi côté client : une fiche passée inactive à l'édition (rechargée seule) disparaît aussitôt
+  const visibleItems = useMemo(() => showInactive ? items : items.filter((x) => x.is_active !== false), [items, showInactive]);
 
   const [session, setSession] = useState<Session | null>(null);
 
@@ -200,19 +205,19 @@ function IngredientsPageInner() {
   }, [offers]);
 
   const counts = useMemo(() => {
-    const c = { to_check: 0, validated: 0, all: items.length };
-    for (const x of items) {
+    const c = { to_check: 0, validated: 0, all: visibleItems.length };
+    for (const x of visibleItems) {
       const s = (x.status ?? "to_check") as IngredientStatus;
       if (s === "validated") c.validated += 1;
       else c.to_check += 1;
     }
     return c;
-  }, [items]);
+  }, [visibleItems]);
 
   const filtered = useMemo(() => {
     // Deduplicate by id (pagination can produce duplicates)
     const seen = new Set<string>();
-    let base = items.filter((x) => { if (seen.has(x.id)) return false; seen.add(x.id); return true; });
+    let base = visibleItems.filter((x) => { if (seen.has(x.id)) return false; seen.add(x.id); return true; });
     if (tab !== "all") base = base.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
     if (filterCategory !== "all") base = base.filter((x) => x.category === filterCategory);
     if (filterSupplier !== "all") {
@@ -224,7 +229,7 @@ function IngredientsPageInner() {
       });
     }
     return base;
-  }, [items, tab, filterCategory, filterSupplier, supplierAliases, offersByIngredientId]);
+  }, [visibleItems, tab, filterCategory, filterSupplier, supplierAliases, offersByIngredientId]);
 
   // Categories sorted alphabetically by label (French locale)
   const CATEGORIES_ALPHA = useMemo(
@@ -268,7 +273,7 @@ function IngredientsPageInner() {
     }
   }, [debouncedQ]);
 
-  const filterActive = filterCategory !== "all" || filterSupplier !== "all";
+  const filterActive = filterCategory !== "all" || filterSupplier !== "all" || showInactive;
 
   // Multi-select
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -916,7 +921,13 @@ function IngredientsPageInner() {
       }
       return;
     }
-    if (edit.useOffer && supplier_id && userId) {
+    // Fiche inactive : ses offres actives sont fermées, et aucune offre n'est réécrite
+    // (sinon l'enregistrement recréait une offre active sur une fiche désactivée)
+    if (!edit.is_active) {
+      const erreur = await fermerOffresActives(supabase, editingId);
+      if (erreur) { alert(erreur); return; }
+    }
+    if (edit.is_active && edit.useOffer && supplier_id && userId) {
       const editedIng = items.find((i) => i.id === editingId);
       const offerPayload = buildOfferFromEdit(editingId, userId, editedIng?.etablissement_id);
       if (offerPayload) {
@@ -936,7 +947,7 @@ function IngredientsPageInner() {
     // Auto-validate: if we just saved an offer OR the ingredient already has a price
     const ing = items.find((i) => i.id === editingId);
     if (ing && ing.status !== "validated" && userId) {
-      const justSavedOffer = edit.useOffer && supplier_id;
+      const justSavedOffer = edit.is_active && edit.useOffer && supplier_id;
       const off = offersByIngredientId.get(editingId);
       const hasP = justSavedOffer || offerHasPrice(off, { piece_volume_ml: ing.piece_volume_ml }) || legacyHasPrice(ing);
       if (hasP) {
@@ -1169,8 +1180,8 @@ function IngredientsPageInner() {
             borderRadius: 16, border: "1px solid #ece4d4",
             display: "flex", flexDirection: "column", gap: 12,
           }}>
-            {/* Row 1 — Tabs : 3 onglets égaux, jamais tronqués sur mobile */}
-            <div style={{ display: "flex", justifyContent: "center" }}>
+            {/* Row 1 — Tabs : 3 onglets égaux, jamais tronqués sur mobile ; case des fiches désactivées à côté */}
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flexWrap: "wrap", gap: "8px 14px" }}>
               <div style={{ display: "flex", gap: 4, padding: 3, background: "#ece4d4", borderRadius: 10, width: "100%", maxWidth: 430 }}>
                 {TABS_MAIN.map(({ t, label, count }) => (
                   <button key={t} onClick={() => setTab(t)} style={{
@@ -1185,6 +1196,10 @@ function IngredientsPageInner() {
                   </button>
                 ))}
               </div>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: showInactive ? "#1a1a1a" : "#999", cursor: "pointer", whiteSpace: "nowrap" }}>
+                <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} style={{ accentColor: "#D4775A", cursor: "pointer" }} />
+                Afficher les désactivées
+              </label>
             </div>
 
             {/* Dropdowns + Search + Add — all on one row */}

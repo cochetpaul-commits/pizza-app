@@ -118,6 +118,7 @@ export async function GET(req: NextRequest) {
     [""],
     ["1. Corrige les cellules directement dans la feuille « Produits ». Tu peux trier et filtrer, ça n'a pas d'importance."],
     ["2. Ne touche pas à la colonne « ID » : c'est elle qui relie la ligne au produit dans l'appli."],
+    ["Une case laissée vide ne change rien : la valeur déjà enregistrée (poids, volume, réf., prix…) est conservée. Pour modifier une valeur, écris la nouvelle."],
     ["Réf. fournisseur et Date du prix : la référence article chez le fournisseur et la date à laquelle ce prix a été relevé. Modifiables : elles sont reprises dans l'offre enregistrée à l'import."],
     ["3. Les colonnes marquées (info) sont indicatives et ne sont pas relues à l'import (fournisseur, prix au kg, libellé facture)."],
     ["Prix : « Base de prix » dit si le produit s'achète au kg, au litre ou à la pièce (bouteille, boîte…). « Prix HT par kg, L ou pièce » est le prix de cette base. Si le produit arrive par carton / colis, indique le nombre d'unités par conditionnement et le prix du conditionnement (l'un des deux prix suffit, l'autre se déduit)."],

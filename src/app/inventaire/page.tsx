@@ -7,6 +7,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { CATEGORIES, CAT_LABELS, CAT_COLORS, type Category, type Ingredient } from "@/types/ingredients";
 import { openApiFile } from "@/lib/fetchApi";
+import { fermerOffresActives } from "@/lib/offerClosing";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -1565,6 +1566,7 @@ export default function InventairePage() {
                                     if (session) await supabase.from("inventaire_lignes").delete().eq("inventaire_id", session.id).eq("ingredient_id", ing.id);
                                     // Deactivate ingredient
                                     await supabase.from("ingredients").update({ is_active: false }).eq("id", ing.id);
+                                    await fermerOffresActives(supabase, ing.id);
                                     setIngredients(prev => prev.filter(p => p.id !== ing.id));
                                   }} style={{
                                     flexShrink: 0, width: 20, height: 20, borderRadius: 5,
