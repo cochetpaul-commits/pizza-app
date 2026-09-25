@@ -1,3 +1,4 @@
+// Ne pas activer tant que la tâche programmée Q1 envoie le CA à Combo.
 // src/lib/comboClient.ts
 // Client API Combo (Partner API) — serveur uniquement, ne pas importer côté client.
 // Doc : https://partner.combohr.com  (Authorization: Bearer <COMBO_API_KEY>)
