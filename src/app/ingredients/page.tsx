@@ -134,7 +134,7 @@ function IngredientsPageInner() {
   const debouncedQ = useDebounce(q, 300);
   // Fiches désactivées (is_active = false) : hors liste et hors compteurs, sauf case « Afficher les désactivées »
   const [showInactive, setShowInactive] = useState(false);
-  const { items, suppliers, supplierAliases, offers, allOffers, alertMap, loading, loadingMore, hasMore, totalCount, loadMore, error: dataError, mutate, mutateOne, removeItem } = useIngredientsData(debouncedQ, etab?.id, etab?.slug, showInactive);
+  const { items, suppliers, supplierAliases, offers, allOffers, alertMap, loading, loadingMore, hasMore, totalCount, validatedCount, loadMore, error: dataError, mutate, mutateOne, removeItem } = useIngredientsData(debouncedQ, etab?.id, etab?.slug, showInactive);
   // Filtre aussi côté client : une fiche passée inactive à l'édition (rechargée seule) disparaît aussitôt
   const visibleItems = useMemo(() => showInactive ? items : items.filter((x) => x.is_active !== false), [items, showInactive]);
 
@@ -1137,9 +1137,10 @@ function IngredientsPageInner() {
   const isVariations = tab === ("variations" as Tab);
 
   const TABS_MAIN = [
+    // Compteurs en base (toute la base, pas seulement les pages chargées) : Tous = Validés + À contrôler
     { t: "all"       as Tab, label: "Tous",         count: totalCount ?? counts.all },
-    { t: "validated" as Tab, label: "Validés",      count: counts.validated },
-    { t: "to_check"  as Tab, label: "À contrôler",  count: counts.to_check },
+    { t: "validated" as Tab, label: "Validés",      count: validatedCount ?? counts.validated },
+    { t: "to_check"  as Tab, label: "À contrôler",  count: totalCount != null && validatedCount != null ? totalCount - validatedCount : counts.to_check },
   ] as const;
 
   // Register contextual actions in the bottom bar

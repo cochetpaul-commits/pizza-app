@@ -7,6 +7,15 @@ import { inChunks } from "@/lib/supabaseChunks";
 const PAGE_SIZE = 1000;
 
 /** Map establishment slugs (DB) → offer establishment keys */
+/**
+ * Filtre établissement de la page Produits (tableau `establishments`), partagé par la liste,
+ * la recherche et les compteurs : une fiche comptée est toujours une fiche affichable.
+ */
+function estabOrFilter(etabSlug?: string | null): string | null {
+  const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
+  return myEstab ? `establishments.cs.{"${myEstab}"},establishments.is.null` : null;
+}
+
 function slugToOfferEstab(slug: string): string | null {
   if (slug.includes("bello")) return "bellomio";
   if (slug.includes("piccola")) return "piccola";
@@ -60,10 +69,8 @@ async function fetchPage(page: number, etabId?: string | null, etabSlug?: string
   if (!includeInactive) query = query.eq("is_active", true);
 
   // Filter: ingredient belongs to the current establishment via `establishments` array only
-  const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
-  if (myEstab) {
-    query = query.or(`establishments.cs.{"${myEstab}"},establishments.is.null`);
-  }
+  const estabFilter = estabOrFilter(etabSlug);
+  if (estabFilter) query = query.or(estabFilter);
 
   const { data, error } = await query;
 
@@ -85,10 +92,8 @@ async function searchIngredients(q: string, etabId?: string | null, etabSlug?: s
     .order("name", { ascending: true });
   if (!includeInactive) query = query.eq("is_active", true);
 
-  const myEstab = etabSlug ? slugToOfferEstab(etabSlug) : null;
-  if (myEstab) {
-    query = query.or(`establishments.cs.{"${myEstab}"},establishments.is.null`);
-  }
+  const estabFilter = estabOrFilter(etabSlug);
+  if (estabFilter) query = query.or(estabFilter);
 
   const { data, error } = await query;
 
@@ -111,6 +116,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [validatedCount, setValidatedCount] = useState<number | null>(null);
   const includeInactiveRef = useRef(includeInactive);
   includeInactiveRef.current = includeInactive;
   const [error, setError] = useState<Error | null>(null);
@@ -172,6 +178,27 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     });
   }, [etablissementId]);
 
+  /**
+   * Compteurs des onglets, calculés en base (indépendants de la pagination et de la recherche),
+   * avec exactement le filtre de la liste : Tous = Validés + À contrôler.
+   * (vécu 25/09 : Validés plafonné à 1000, la taille d'une page, et Tous comptait 2 fiches
+   * rattachées à Bello par etablissement_id mais réservées à Piccola, jamais affichées)
+   */
+  const refreshCounts = useCallback(async (fetchId?: number) => {
+    const base = () => {
+      let cq = supabase.from("ingredients").select("id", { count: "exact", head: true });
+      if (!includeInactiveRef.current) cq = cq.eq("is_active", true);
+      const estabFilter = estabOrFilter(etabSlugRef.current);
+      if (estabFilter) cq = cq.or(estabFilter);
+      return cq;
+    };
+    const [tous, valides] = await Promise.all([base(), base().eq("status", "validated")]);
+    if (fetchId !== undefined && fetchIdRef.current !== fetchId) return;
+    if (tous.error || valides.error) return;
+    setTotalCount(tous.count);
+    setValidatedCount(valides.count);
+  }, []);
+
   const doLoad = useCallback(async (q: string, fetchId: number) => {
     setLoading(true);
     loadingRef.current = true;
@@ -184,18 +211,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     setHasMore(false);
 
     try {
-      // Fetch total count (independent of pagination/search)
-      const countQuery = supabase.from("ingredients").select("id", { count: "exact", head: true });
-      if (!includeInactiveRef.current) countQuery.eq("is_active", true);
-      const countEstab = etabSlugRef.current ? slugToOfferEstab(etabSlugRef.current) : null;
-      if (countEstab && etabRef.current) {
-        countQuery.or(`establishments.cs.{"${countEstab}"},etablissement_id.eq.${etabRef.current},establishments.is.null`);
-      } else if (etabRef.current) {
-        countQuery.eq("etablissement_id", etabRef.current);
-      }
-      countQuery.then(({ count }) => {
-        if (fetchIdRef.current === fetchId) setTotalCount(count);
-      });
+      void refreshCounts(fetchId);
 
       if (q) {
         const bundle = await searchIngredients(q, etabRef.current, etabSlugRef.current, includeInactiveRef.current);
@@ -219,7 +235,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     } finally {
       if (fetchIdRef.current === fetchId) { setLoading(false); loadingRef.current = false; }
     }
-  }, []);
+  }, [refreshCounts]);
 
   useEffect(() => {
     const id = ++fetchIdRef.current;
@@ -287,13 +303,16 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
       const without = prev.filter((o) => o.ingredient_id !== ingredientId);
       return [...without, ...newAllOffers];
     });
-  }, [searchQuery, doLoad]);
+    // Statut, activation ou établissement ont pu changer : compteurs des onglets recalculés
+    void refreshCounts();
+  }, [searchQuery, doLoad, refreshCounts]);
 
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
     setOffers((prev) => prev.filter((o) => o.ingredient_id !== id));
     setAllOffers((prev) => prev.filter((o) => o.ingredient_id !== id));
-  }, []);
+    void refreshCounts();
+  }, [refreshCounts]);
 
   return {
     items,
@@ -306,6 +325,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     loadingMore,
     hasMore,
     totalCount,
+    validatedCount,
     loadMore,
     error,
     mutate,
