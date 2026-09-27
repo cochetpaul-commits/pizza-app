@@ -154,7 +154,7 @@ function PiccolaMiaContent() {
     if (!etab) return;
     (async () => {
       const [commandesRes, eventsRes] = await Promise.all([
-        supabase.from("commande_sessions").select("id").in("status", ["brouillon", "en_attente", "validee"]).eq("etablissement_id", etab.id),
+        supabase.from("commande_sessions").select("id").in("status", ["brouillon", "en_attente", "validee", "envoyee"]).eq("etablissement_id", etab.id),
         supabase.from("events").select("id, name, date, covers, type, status").gte("date", today).order("date").limit(20),
       ]);
       setPendingCommandes(commandesRes.data?.length ?? 0);

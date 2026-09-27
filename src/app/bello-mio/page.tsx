@@ -170,9 +170,9 @@ function BelloMioContent() {
     (async () => {
       const [shiftsRes, commandesRes, deliveriesRes] = await Promise.all([
         supabase.from("shifts").select("id").eq("date", today).eq("etablissement_id", etab.id),
-        supabase.from("commande_sessions").select("id").in("status", ["brouillon", "en_attente", "validee"]).eq("etablissement_id", etab.id),
+        supabase.from("commande_sessions").select("id").in("status", ["brouillon", "en_attente", "validee", "envoyee"]).eq("etablissement_id", etab.id),
         supabase.from("commande_sessions").select("status, created_at, suppliers(name)")
-          .in("status", ["validee", "en_attente"]).eq("etablissement_id", etab.id).order("created_at", { ascending: false }).limit(5),
+          .in("status", ["validee", "envoyee", "en_attente"]).eq("etablissement_id", etab.id).order("created_at", { ascending: false }).limit(5),
       ]);
       setShiftsToday(shiftsRes.data?.length ?? 0);
       setPendingCommandes(commandesRes.data?.length ?? 0);
@@ -303,10 +303,10 @@ function BelloMioContent() {
                       <span style={{ fontSize: 10, color: T.muted }}>{d.created}</span>
                       <span style={{
                         fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
-                        background: d.status === "validee" ? "rgba(22,163,74,0.08)" : "rgba(234,88,12,0.08)",
-                        color: d.status === "validee" ? "#16A34A" : "#EA580C",
+                        background: d.status === "envoyee" ? "rgba(37,99,235,0.08)" : d.status === "validee" ? "rgba(22,163,74,0.08)" : "rgba(234,88,12,0.08)",
+                        color: d.status === "envoyee" ? "#2563EB" : d.status === "validee" ? "#16A34A" : "#EA580C",
                       }}>
-                        {d.status === "validee" ? "Validee" : "En attente"}
+                        {d.status === "envoyee" ? "Envoyée" : d.status === "validee" ? "Validée" : "En attente"}
                       </span>
                     </div>
                   </div>

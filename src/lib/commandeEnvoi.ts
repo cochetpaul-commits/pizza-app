@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { mapToPermRole } from "@/lib/permissions";
-import { libelleColisage, libelleElement, quantiteLisible, type CommandeArticle } from "@/lib/commandeArticles";
+import { libelleColisage, libelleElement, nomUnite, quantiteLisible, taille, type CommandeArticle } from "@/lib/commandeArticles";
 import { prochaineLivraison, type RegleLivraison } from "@/lib/commandeLivraison";
 
 /**
@@ -91,7 +91,11 @@ export async function chargerEnvoi(sessionId: string, etabId: string, quand: Dat
       const auPoids = a.unite_commande === "kg" || a.unite_commande === "litre";
       const mode = unite === libelleElement(a) ? "element" : "uc";
       const lisible = quantiteLisible({ au_poids: auPoids, contenu_nb: a.contenu_nb, element: a.element, unite_commande: a.unite_commande }, q, mode);
-      texte = auPoids ? `${lisible} ${libelleColisage(a)}` : mode === "element" ? lisible : `${lisible} — ${libelleColisage(a)}`;
+      if (auPoids) texte = `${lisible} ${libelleColisage(a)}`;
+      else if (mode === "element") texte = lisible;
+      else if (a.contenu_nb > 1) texte = `${lisible} — ${libelleColisage(a)}`;
+      // Unité simple : « 4 pièces », « 9 pièces de 2,5 kg », « 1 colis de 2 kg »
+      else texte = `${String(q).replace(".", ",")} ${nomUnite(a.unite_commande, q)}${a.element_qte != null && a.element_unite ? ` de ${taille(a.element_qte, a.element_unite)}` : ""}`;
     }
     const rayon = ing?.rayon_commande ? rayonDe.get(ing.rayon_commande) : undefined;
     return {
