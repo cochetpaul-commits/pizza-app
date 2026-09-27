@@ -37,8 +37,12 @@ type Article = {
 };
 type Apport = { user_id: string; nom: string; quantite: number };
 type Ligne = { ingredient_id: string; unite: string | null; quantite: number; apports: Apport[] };
+type Onglet = "jour" | "precommande";
 type Donnees = {
   fournisseur: { id: string; nom: string };
+  type: Onglet;
+  /** Des produits sont cochés « précommande » chez ce fournisseur (Bello Mio) : onglets affichés */
+  a_precommande: boolean;
   moi: string;
   rayons: { code: string; libelle: string; ordre: number }[];
   articles: Article[];
@@ -53,7 +57,18 @@ const euros = (n: number) => n.toFixed(2).replace(".", ",") + " €";
 const qteTexte = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
 
 
-export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: string; onChange?: () => void }) {
+export function CommandeSimplifiee({ supplierId, onChange, onEnvoyer, onOngletChange }: {
+  supplierId: string;
+  onChange?: () => void;
+  /** Envoi de la précommande (écran de confirmation de la page) */
+  onEnvoyer?: (sessionId: string) => void;
+  /** La page masque ses boutons « Valider / Envoyer » (commande du jour) sur l'onglet Précommande */
+  onOngletChange?: (onglet: Onglet) => void;
+}) {
+  // Commande du jour / précommande du mercredi : deux brouillons séparés
+  const [onglet, setOnglet] = useState<Onglet>("jour");
+  const ongletRef = useRef<Onglet>("jour");
+  useEffect(() => { ongletRef.current = onglet; onOngletChange?.(onglet); }, [onglet, onOngletChange]);
   const [data, setData] = useState<Donnees | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [recherche, setRecherche] = useState("");
@@ -72,7 +87,7 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
 
   const charger = useCallback(async (): Promise<Donnees | null> => {
     try {
-      const res = await fetchApi(`/api/commandes/simplifiee?supplier_id=${encodeURIComponent(supplierId)}`);
+      const res = await fetchApi(`/api/commandes/simplifiee?supplier_id=${encodeURIComponent(supplierId)}&type=${onglet}`);
       const json = await res.json();
       if (!res.ok) { setErreur(json.error ?? "Erreur de chargement"); return null; }
       setErreur(null);
@@ -86,7 +101,7 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
       setErreur("Erreur de chargement");
       return null;
     }
-  }, [supplierId]);
+  }, [supplierId, onglet]);
 
   useEffect(() => { void charger(); }, [charger]);
 
@@ -100,7 +115,8 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
 
   const sections = useMemo(() => {
     if (!data) return [];
-    const visibles = duJour.filter((a) => estHabituel(a) || enCommande(a));
+    // Précommande : les produits cochés, tous affichés (à 0 au départ) ; jour : habituels + déjà commandés
+    const visibles = onglet === "precommande" ? duJour : duJour.filter((a) => estHabituel(a) || enCommande(a));
     return data.rayons
       .map((r) => ({
         ...r,
@@ -111,7 +127,7 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
       }))
       .filter((r) => r.articles.length > 0)
       .map((r) => ({ ...r, dansCommande: r.articles.filter(enCommande).length }));
-  }, [data, duJour, enCommande]);
+  }, [data, duJour, enCommande, onglet]);
 
   const resultats = useMemo(() => {
     const q = norm(recherche.trim());
@@ -152,13 +168,14 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
     const v = voulues.current.get(cle);
     if (!v) return;
     const unite = v.m === "element" ? v.a.unite_element ?? v.a.unite_uc : v.a.unite_uc;
+    const ongletAppel = onglet;
     enVol.current.add(cle);
     let ok = false;
     try {
       const res = await fetchApi("/api/commandes/simplifiee", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ supplier_id: supplierId, ingredient_id: v.a.ingredient_id, mode: v.m, quantite: v.qte }),
+        body: JSON.stringify({ supplier_id: supplierId, ingredient_id: v.a.ingredient_id, mode: v.m, quantite: v.qte, type: ongletAppel }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -167,6 +184,7 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
       } else {
         ok = true;
         confirmees.current.set(`${v.a.ingredient_id}|${unite}`, v.qte);
+        if (ongletRef.current !== ongletAppel) return; // l'autre onglet est affiché : rien à mettre à jour
         const encore = voulues.current.get(cle);
         const aJour = !encore || encore.qte === v.qte;
         if (aJour) voulues.current.delete(cle);
@@ -196,7 +214,7 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
     const vide = !d?.session || !(d.lignes ?? []).some((x) => x.quantite > 0);
     if (dernierVide.current !== null && vide !== dernierVide.current) onChange?.();
     dernierVide.current = vide;
-  }, [supplierId, onChange]);
+  }, [supplierId, onChange, onglet]);
 
   /** Appui sur + / − / « + 1 » : affichage immédiat, enregistrement 400 ms après le dernier appui */
   function fixerMaPart(a: Article, m: Mode, nouvelle: number) {
@@ -220,6 +238,15 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
   if (!data) return <div style={{ padding: 24, textAlign: "center", color: "#999", fontSize: 14 }}>Chargement des produits…</div>;
 
   const brouillon = !data.session || data.session.status === "brouillon";
+  const changerOnglet = (o: Onglet) => {
+    if (o === onglet) return;
+    voulues.current.clear();
+    setBascules({});
+    setRecherche("");
+    setData(null);
+    setOnglet(o);
+  };
+  const aEnvoyer = onglet === "precommande" && brouillon && !!data.session && data.lignes.some((l) => l.quantite > 0);
 
   function carte(a: Article) {
     const m = modeDe(a);
@@ -303,6 +330,23 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
 
   return (
     <div style={{ paddingBottom: 110 }}>
+      {data.a_precommande && (
+        <div style={{ display: "flex", gap: 4, padding: 4, background: "#ece4d4", borderRadius: 14, marginBottom: 12 }}>
+          {([["jour", "Commande du jour"], ["precommande", "Précommande du mercredi"]] as [Onglet, string][]).map(([o, libelle]) => (
+            <button key={o} type="button" onClick={() => changerOnglet(o)} aria-pressed={onglet === o}
+              style={{
+                flex: 1, minHeight: 46, borderRadius: 11, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700,
+                background: onglet === o ? "#fff" : "transparent", color: onglet === o ? "#1a1a1a" : "#8a8378",
+                boxShadow: onglet === o ? "0 1px 4px rgba(0,0,0,0.08)" : "none", touchAction: "manipulation",
+              }}>{libelle}</button>
+          ))}
+        </div>
+      )}
+      {onglet === "precommande" && (
+        <div style={{ fontSize: 13, color: "#6f6656", marginBottom: 12 }}>
+          À envoyer le mercredi avant midi : livraison le mercredi de la semaine suivante.
+        </div>
+      )}
       {alerte && (
         <div role="status" style={{
           position: "fixed", left: "50%", bottom: 96, transform: "translateX(-50%)", zIndex: 60,
@@ -315,7 +359,7 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
         display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
       }}>
         <div style={{ fontSize: 14, color: "#1a1a1a" }}>
-          <strong style={{ fontFamily: OSWALD, fontSize: 18 }}>{resume.nb}</strong> produit{resume.nb > 1 ? "s" : ""} dans la commande
+          <strong style={{ fontFamily: OSWALD, fontSize: 18 }}>{resume.nb}</strong> produit{resume.nb > 1 ? "s" : ""} dans la {onglet === "precommande" ? "précommande" : "commande"}
         </div>
         <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>
           {euros(resume.total)} HT{resume.prixInconnu ? " *" : ""}
@@ -327,7 +371,7 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
         </div>
       )}
 
-      <input
+      {onglet === "jour" && <input
         type="search"
         value={recherche}
         onChange={(e) => setRecherche(e.target.value)}
@@ -336,9 +380,9 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
           width: "100%", height: 48, borderRadius: 12, border: "1.5px solid #ddd6c8", padding: "0 14px",
           fontSize: 16, background: "#fff", boxSizing: "border-box", marginBottom: 14, outline: "none",
         }}
-      />
+      />}
 
-      {recherche.trim().length >= 2 ? (
+      {onglet === "jour" && recherche.trim().length >= 2 ? (
         <div>
           {resultats.length === 0 && <div style={{ color: "#999", fontSize: 14, padding: 12 }}>Aucun produit trouvé.</div>}
           {resultats.map(carte)}
@@ -349,7 +393,7 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
         </div>
       ) : (
         sections.map((r) => {
-          const ouvert = bascules[r.code] ?? r.dansCommande > 0;
+          const ouvert = bascules[r.code] ?? (onglet === "precommande" || r.dansCommande > 0);
           return (
             <div key={r.code} style={{ marginBottom: 10 }}>
               {/* Titre de rayon : fond plein, texte blanc ; collé en haut de l'écran tant que le rayon ouvert défile */}
@@ -374,6 +418,12 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
             </div>
           );
         })
+      )}
+      {aEnvoyer && onEnvoyer && (
+        <button type="button" onClick={() => onEnvoyer(data.session!.id)}
+          style={{ width: "100%", minHeight: 56, marginTop: 8, borderRadius: 14, border: "none", background: ACCENT, color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
+          Envoyer la précommande
+        </button>
       )}
       {resume.prixInconnu && <div style={{ fontSize: 11, color: "#999", marginTop: 8 }}>* un ou plusieurs prix inconnus, non comptés dans le total</div>}
     </div>

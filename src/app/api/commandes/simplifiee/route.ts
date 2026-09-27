@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const supplierId = req.nextUrl.searchParams.get("supplier_id");
   if (!supplierId) return NextResponse.json({ error: "supplier_id requis" }, { status: 400 });
-  const r = await ecranCommande(supplierId, auth.etabId, auth.userId);
+  const r = await ecranCommande(supplierId, auth.etabId, auth.userId, req.nextUrl.searchParams.get("type"));
   return NextResponse.json(r.body, { status: r.status });
 }
 

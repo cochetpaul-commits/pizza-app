@@ -754,7 +754,7 @@ function CommandesPage() {
         // Load pending receptions (validated orders)
         const { data: validees } = await supabase
           .from("commande_sessions")
-          .select("id, supplier_id, created_at, total_ht, email_sent_at, commande_lignes(count)")
+          .select("id, supplier_id, type, created_at, total_ht, email_sent_at, commande_lignes(count)")
           .eq("etablissement_id", etab.id)
           .in("status", ["validee", "envoyee"])
           .order("created_at", { ascending: false });
@@ -765,11 +765,11 @@ function CommandesPage() {
           if (name) for (const aid of aliasSet) supplierMap.set(aid, name);
         }
         setPendingReceptions(
-          (validees ?? []).map((v: { id: string; supplier_id: string; created_at: string; total_ht: number; email_sent_at?: string | null; commande_lignes: { count: number }[] }) => ({
+          (validees ?? []).map((v: { id: string; supplier_id: string; type?: string; created_at: string; total_ht: number; email_sent_at?: string | null; commande_lignes: { count: number }[] }) => ({
             id: v.id,
             supplier_id: v.supplier_id,
             email_sent_at: v.email_sent_at ?? null,
-            supplier_name: supplierMap.get(v.supplier_id) ?? "Fournisseur",
+            supplier_name: `${supplierMap.get(v.supplier_id) ?? "Fournisseur"}${v.type === "precommande" ? " — précommande" : ""}`,
             created_at: v.created_at,
             nb_articles: v.commande_lignes?.[0]?.count ?? 0,
             total_ht: v.total_ht ?? 0,
@@ -779,17 +779,17 @@ function CommandesPage() {
         // Load active sessions (brouillon + en_attente) across all suppliers
         const { data: actives } = await supabase
           .from("commande_sessions")
-          .select("id, supplier_id, status, created_at, total_ht, commande_lignes(count)")
+          .select("id, supplier_id, type, status, created_at, total_ht, commande_lignes(count)")
           .eq("etablissement_id", etab.id)
           .in("status", ["brouillon", "en_attente"])
           .order("created_at", { ascending: false });
         setActiveSessions(
           (actives ?? [])
             .filter((a: { commande_lignes: { count: number }[] }) => a.commande_lignes?.[0]?.count > 0)
-            .map((a: { id: string; supplier_id: string; status: string; created_at: string; total_ht: number; commande_lignes: { count: number }[] }) => ({
+            .map((a: { id: string; supplier_id: string; type?: string; status: string; created_at: string; total_ht: number; commande_lignes: { count: number }[] }) => ({
               id: a.id,
               supplier_id: a.supplier_id,
-              supplier_name: supplierMap.get(a.supplier_id) ?? "Fournisseur",
+              supplier_name: `${supplierMap.get(a.supplier_id) ?? "Fournisseur"}${a.type === "precommande" ? " — précommande" : ""}`,
               status: a.status,
               created_at: a.created_at,
               nb_articles: a.commande_lignes?.[0]?.count ?? 0,
@@ -800,15 +800,15 @@ function CommandesPage() {
         // Load recent orders (recue) for dashboard historique
         const { data: recentData } = await supabase
           .from("commande_sessions")
-          .select("id, supplier_id, status, created_at, total_ht")
+          .select("id, supplier_id, type, status, created_at, total_ht")
           .eq("etablissement_id", etab.id)
           .eq("status", "recue")
           .order("created_at", { ascending: false })
           .limit(8);
         setRecentOrders(
-          (recentData ?? []).map((r: { id: string; supplier_id: string; status: string; created_at: string; total_ht: number }) => ({
+          (recentData ?? []).map((r: { id: string; supplier_id: string; type?: string; status: string; created_at: string; total_ht: number }) => ({
             id: r.id,
-            supplier_name: supplierMap.get(r.supplier_id) ?? "Fournisseur",
+            supplier_name: `${supplierMap.get(r.supplier_id) ?? "Fournisseur"}${r.type === "precommande" ? " — précommande" : ""}`,
             status: r.status,
             created_at: r.created_at,
             total_ht: r.total_ht ?? 0,
@@ -1289,10 +1289,11 @@ function CommandesPage() {
 
   /** Aperçu d'envoi (GET /api/commandes/send-email) : rien n'est envoyé avant « Confirmer l'envoi » */
   type ApercuEnvoi = {
-    fournisseur: string; nb_produits: number; total_ht: number;
+    fournisseur: string; type?: "jour" | "precommande"; nb_produits: number; total_ht: number;
     livraison: { date: string; libelle: string } | null; adresse: string;
     destinataires: string[]; deja_envoyee_le: string | null; refus: string | null;
   };
+  const [ongletMael, setOngletMael] = useState<"jour" | "precommande">("jour");
   const [envoiAConfirmer, setEnvoiAConfirmer] = useState<{ sessionId: string; apercu: ApercuEnvoi | null; erreur: string | null } | null>(null);
 
   // Toutes les actions « Envoyer » passent par ici : écran de confirmation avant l'envoi
@@ -2815,7 +2816,7 @@ function CommandesPage() {
           <div style={{ marginTop: 12 }}>
             {session && readOnly ? renderSummary()
               // Commande simplifiée (Maël) : habituels par rayon, qui a ajouté quoi
-              : currentSupplier?.commande_simplifiee ? <CommandeSimplifiee supplierId={currentSupplier.id} onChange={reloadSession} />
+              : currentSupplier?.commande_simplifiee ? <CommandeSimplifiee supplierId={currentSupplier.id} onChange={reloadSession} onEnvoyer={sendEmailOnly} onOngletChange={setOngletMael} />
               : renderCatalog()}
           </div>
         )}
@@ -2915,7 +2916,7 @@ function CommandesPage() {
         )}
 
         {/* Floating actions — draft in progress */}
-        {session && session.status === "brouillon" && (
+        {session && session.status === "brouillon" && !(currentSupplier?.commande_simplifiee && ongletMael === "precommande") && (
           <FloatingActions actions={(() => {
             const acts: FloatingAction[] = [
               { icon: <FAIconTrash size={20} color="#DC2626" />, label: "Supprimer", onClick: () => deleteSession(), disabled: saving },
@@ -2945,7 +2946,7 @@ function CommandesPage() {
               boxShadow: "0 12px 40px rgba(0,0,0,0.25)", padding: "20px 18px",
             }}>
               <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 18, color: "#1a1a1a", marginBottom: 12 }}>
-                {a ? `Envoyer la commande à ${a.fournisseur} ?` : "Préparation de l'envoi…"}
+                {a ? `Envoyer la ${a.type === "precommande" ? "précommande" : "commande"} à ${a.fournisseur} ?` : "Préparation de l'envoi…"}
               </div>
               {a && (
                 <div style={{ display: "grid", gap: 8, fontSize: 15, color: "#1a1a1a", marginBottom: 14 }}>

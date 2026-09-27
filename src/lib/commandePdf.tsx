@@ -34,6 +34,8 @@ export type CommandePdfData = {
   passeePar?: string | null;
   /** Pied de page (« Rupture ou question : groupe WhatsApp Bello Mio – Maël ») */
   pied?: string | null;
+  /** Titre (« BON DE COMMANDE » par défaut, « PRÉCOMMANDE » pour la précommande du mercredi) */
+  titre?: string;
 };
 
 const ACCENT = "#D4775A";
@@ -140,7 +142,7 @@ export function CommandePdfDocument({ data }: { data: CommandePdfData }) {
               : <Text style={s.logoFallback}>iFratelli Group</Text>}
           </View>
           <View style={s.headerRight}>
-            <Text style={s.title}>BON DE COMMANDE</Text>
+            <Text style={s.title}>{data.titre ?? "BON DE COMMANDE"}</Text>
             <Text style={s.subtitle}>Fournisseur : {data.supplierName}</Text>
             {data.numeroClient ? <Text style={s.subtitle}>N° client : {data.numeroClient}</Text> : null}
             <Text style={s.subtitle}>Date : {data.sessionDate}</Text>

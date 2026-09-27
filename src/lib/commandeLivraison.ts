@@ -50,3 +50,14 @@ export function prochaineLivraison(regles: RegleLivraison[] | null | undefined, 
   }
   return null;
 }
+
+/**
+ * Précommande (Maël, crèmerie italienne) : envoyée dans la semaine, livrée le mercredi de la semaine suivante
+ * (semaine du lundi au dimanche, heure de Paris). Envoyée le mercredi 30/09 → livrée le mercredi 07/10.
+ */
+export function livraisonPrecommande(quand: Date = new Date()): { date: string; libelle: string } {
+  const ici = maintenantParis(quand);
+  const depuisLundi = (ici.jour + 6) % 7; // lundi = 0 … dimanche = 6
+  const date = ajouterJours(ici.date, 7 - depuisLundi + 2); // lundi suivant + 2 jours
+  return { date, libelle: libelleDate(date) };
+}

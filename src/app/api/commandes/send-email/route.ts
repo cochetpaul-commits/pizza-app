@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
   const { envoi, refus } = c;
   return NextResponse.json({
     fournisseur: envoi.fournisseur.nom,
+    type: envoi.type,
     nb_produits: envoi.lignes.length,
     total_ht: envoi.totalHt,
     livraison: envoi.livraison,
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
   const remplace = envoi.session.email_sent_at
     ? new Date(envoi.session.email_sent_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })
     : null;
-  const sujet = `${remplace ? "[MISE À JOUR] " : ""}Commande ${envoi.etab.nom} — livraison ${envoi.livraison?.libelle ?? "à convenir"}`;
+  const sujet = `${remplace ? "[MISE À JOUR] " : ""}${envoi.type === "precommande" ? "Précommande" : "Commande"} ${envoi.etab.nom} — livraison ${envoi.livraison?.libelle ?? "à convenir"}`;
   const fichier = `commande-${envoi.fournisseur.nom.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${envoi.livraison?.date ?? new Date().toISOString().slice(0, 10)}.pdf`;
 
   try {

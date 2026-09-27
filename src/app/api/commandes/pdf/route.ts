@@ -183,6 +183,7 @@ export async function GET(req: NextRequest) {
     exportedAt: dateParis(new Date(), { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }),
     showSku: envoi?.fournisseur.simplifiee ? true : showSku,
     etabName: `iFratelli Group — ${etabName}`,
+    titre: envoi?.type === "precommande" ? "PRÉCOMMANDE" : undefined,
     numeroClient: envoi?.fournisseur.numero_client ?? null,
     passeePar: envoi?.envoyeur ?? null,
     pied: envoi?.fournisseur.pied ?? null,

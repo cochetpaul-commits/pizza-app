@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
     .select("*")
     .eq("supplier_id", supplierId)
     .eq("etablissement_id", etabId)
+    .eq("type", "jour") // la précommande du mercredi a son propre brouillon (écran Maël)
     .in("status", ["brouillon", "validee"])
     .order("created_at", { ascending: false })
     .limit(1)

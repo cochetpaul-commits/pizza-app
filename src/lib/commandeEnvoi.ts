@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { mapToPermRole } from "@/lib/permissions";
 import { libelleColisage, libelleElement, nomUnite, quantiteLisible, taille, type CommandeArticle } from "@/lib/commandeArticles";
-import { prochaineLivraison, type RegleLivraison } from "@/lib/commandeLivraison";
+import { livraisonPrecommande, prochaineLivraison, type RegleLivraison } from "@/lib/commandeLivraison";
 
 /**
  * Envoi d'une commande fournisseur : données communes au mail, à l'écran de confirmation et au PDF.
@@ -33,6 +33,8 @@ export async function refusDroit(userId: string, supplierId: string): Promise<st
 export type LigneEnvoi = { rayon: string; rayonOrdre: number; nom: string; quantite: number; unite: string; texte: string; ref: string | null };
 export type Envoi = {
   session: { id: string; status: string; notes: string | null; created_at: string; email_sent_at: string | null; supplier_id: string };
+  /** « jour » ou « precommande » (précommande du mercredi, livrée le mercredi suivant) */
+  type: "jour" | "precommande";
   fournisseur: { id: string; nom: string; simplifiee: boolean; numero_client: string | null; pied: string | null };
   /** Prénom de la personne qui envoie (ou qui a envoyé) la commande */
   envoyeur: string | null;
@@ -55,7 +57,7 @@ export const dateParis = (d: Date, opts: Intl.DateTimeFormatOptions = { day: "nu
 export async function chargerEnvoi(sessionId: string, etabId: string, quand: Date = new Date(), userId?: string): Promise<Envoi | null> {
   const { data: s } = await supabaseAdmin
     .from("commande_sessions")
-    .select("id, status, notes, created_at, email_sent_at, supplier_id, suppliers(id, name, commande_simplifiee, delivery_schedule, client_code, pied_commande)")
+    .select("id, status, notes, created_at, email_sent_at, supplier_id, type, suppliers(id, name, commande_simplifiee, delivery_schedule, client_code, pied_commande)")
     .eq("id", sessionId).eq("etablissement_id", etabId).maybeSingle();
   if (!s) return null;
   const sup = s.suppliers as unknown as { id: string; name: string; commande_simplifiee: boolean; delivery_schedule: RegleLivraison[] | null; client_code: string | null; pied_commande: string | null };
@@ -147,11 +149,12 @@ export async function chargerEnvoi(sessionId: string, etabId: string, quand: Dat
 
   return {
     session: { id: s.id, status: s.status, notes: s.notes, created_at: s.created_at, email_sent_at: s.email_sent_at, supplier_id: s.supplier_id },
+    type: s.type === "precommande" ? "precommande" : "jour",
     fournisseur: { id: sup.id, nom: sup.name, simplifiee: !!sup.commande_simplifiee, numero_client: sup.client_code ?? null, pied: sup.pied_commande ?? null },
     envoyeur,
     dateCommande: dateParis(dateEnvoi),
     etab: { nom: etab?.nom ?? "Restaurant", adresse: etab?.adresse ?? null },
-    livraison: prochaineLivraison(sup.delivery_schedule, quand),
+    livraison: s.type === "precommande" ? livraisonPrecommande(dateEnvoi) : prochaineLivraison(sup.delivery_schedule, dateEnvoi),
     lignes: sortie,
     totalHt,
     destinataires,
@@ -177,11 +180,11 @@ export function corpsMail(e: Envoi, remplace: string | null): string {
     </div>`).join("")}`).join("");
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f2ede4;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif">
   <div style="max-width:560px;margin:0 auto;background:#fff;padding:20px 18px">
-    <div style="font-size:18px;font-weight:700;color:#1a1a1a">Bon de commande — ${esc(e.etab.nom)}</div>
+    <div style="font-size:18px;font-weight:700;color:#1a1a1a">${e.type === "precommande" ? "Précommande" : "Bon de commande"} — ${esc(e.etab.nom)}</div>
     <div style="margin-top:4px;font-size:13px;color:#6f6656">${e.fournisseur.numero_client ? `N° client ${esc(e.fournisseur.numero_client)} · ` : ""}${esc(e.dateCommande)}${e.envoyeur ? ` · Commande passée par ${esc(e.envoyeur)}` : ""}</div>
     ${remplace ? `<div style="margin-top:10px;padding:10px 12px;background:#fbf0dc;border-radius:8px;font-size:13px;color:#7a5a2b">Cette commande remplace celle envoyée le ${esc(remplace)}.</div>` : ""}
     <div style="margin-top:12px;font-size:14px;color:#1a1a1a;line-height:1.5">
-      Bonjour,<br>Voici notre commande (${e.lignes.length} produit${e.lignes.length > 1 ? "s" : ""}). Le bon de commande est aussi en pièce jointe.
+      Bonjour,<br>Voici notre ${e.type === "precommande" ? "précommande" : "commande"} (${e.lignes.length} produit${e.lignes.length > 1 ? "s" : ""}). Le bon de commande est aussi en pièce jointe.
     </div>
     <div style="margin-top:14px;padding:12px;background:#f7f3ec;border-radius:10px;font-size:14px;color:#1a1a1a;line-height:1.5">
       ${e.livraison ? `<strong>Livraison : ${esc(e.livraison.libelle)}</strong><br>` : ""}

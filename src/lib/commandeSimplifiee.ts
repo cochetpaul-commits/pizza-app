@@ -60,12 +60,17 @@ async function chargerOffres(aliasIds: string[]) {
   return { parProduit, produitParRef };
 }
 
-async function sessionEnCours(ficheId: string, etabId: string) {
+/** Commande du jour ou précommande du mercredi : deux brouillons séparés, jamais mélangés */
+export type TypeCommande = "jour" | "precommande";
+const typeDe = (v: unknown): TypeCommande => (v === "precommande" ? "precommande" : "jour");
+
+async function sessionEnCours(ficheId: string, etabId: string, type: TypeCommande) {
   const { data } = await supabaseAdmin
     .from("commande_sessions")
     .select("id, status, created_at")
     .eq("supplier_id", ficheId)
     .eq("etablissement_id", etabId)
+    .eq("type", type)
     .in("status", ["brouillon", "validee"])
     .order("created_at", { ascending: false })
     .limit(1)
@@ -74,7 +79,8 @@ async function sessionEnCours(ficheId: string, etabId: string) {
 }
 
 /** Données de l'écran de commande simplifiée pour la fiche fournisseur de l'établissement */
-export async function ecranCommande(supplierId: string, etabId: string, userId: string): Promise<Reponse> {
+export async function ecranCommande(supplierId: string, etabId: string, userId: string, typeDemande: unknown = "jour"): Promise<Reponse> {
+  const type = typeDe(typeDemande);
 
   const f = await resoudreFiche(supplierId, etabId);
   if (!f) return rep({ error: "Ce fournisseur n'est pas en commande simplifiée pour cet établissement" }, 404);
@@ -88,12 +94,15 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
     chargerOffres(f.aliasIds),
     supabaseAdmin.from("supplier_invoices").select("id, invoice_date")
       .in("supplier_id", f.aliasIds).eq("etablissement_id", etabId).gte("invoice_date", depuis),
-    sessionEnCours(f.ficheId, etabId),
+    sessionEnCours(f.ficheId, etabId, type),
   ]);
   if (errArt) return rep({ error: errArt.message }, 500);
 
   // Fiches désactivées : jamais proposées
-  const articles = ((articlesData ?? []) as unknown as ArticleRow[]).filter((a) => a.ingredient?.is_active);
+  const actifs = ((articlesData ?? []) as unknown as ArticleRow[]).filter((a) => a.ingredient?.is_active);
+  const aPrecommande = actifs.some((a) => a.precommande);
+  // Précommande : seulement les produits cochés « précommande » (tous affichés, à 0 au départ)
+  const articles = type === "precommande" ? actifs.filter((a) => a.precommande) : actifs;
   const regles = new Map<string, RegleArticle>();
   const sortie = articles.map((a) => {
     const offre = choisirOffre(offres.parProduit.get(a.ingredient_id) ?? [], f.ficheId);
@@ -175,6 +184,8 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
 
   return rep({
     fournisseur: { id: f.ficheId, nom: f.nom },
+    type,
+    a_precommande: aPrecommande,
     moi: userId,
     rayons: rayons ?? [],
     articles: sortie.map((s) => ({ ...s, habituel: habituels.get(s.ingredient_id) ?? null })),
@@ -186,6 +197,7 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
 /** Fixe la quantité de l'utilisateur sur un produit du brouillon (0 = retrait) */
 export async function fixerApport(body: unknown, etabId: string, userId: string): Promise<Reponse> {
   const { supplier_id, ingredient_id, mode } = body as { supplier_id?: string; ingredient_id?: string; mode?: string };
+  const type = typeDe((body as { type?: unknown }).type);
   const quantiteBrute = Number((body as { quantite?: unknown }).quantite);
   if (!supplier_id || !ingredient_id || (mode !== "uc" && mode !== "element") || !Number.isFinite(quantiteBrute) || quantiteBrute < 0) {
     return rep({ error: "Paramètres invalides" }, 400);
@@ -199,7 +211,7 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
     supabaseAdmin.from("commande_articles")
       .select("ingredient_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande, ingredient:ingredients!inner(id, name, is_active, rayon_commande)")
       .eq("supplier_id", f.ficheId).eq("ingredient_id", ingredient_id).maybeSingle(),
-    sessionEnCours(f.ficheId, etabId),
+    sessionEnCours(f.ficheId, etabId, type),
     supabaseAdmin.from("supplier_offers")
       .select("ingredient_id, supplier_id, unit, unit_price, pack_price, pack_count, supplier_sku, valid_from, created_at")
       .eq("is_active", true).eq("ingredient_id", ingredient_id).in("supplier_id", f.aliasIds),
@@ -207,6 +219,7 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
   const article = artData as unknown as ArticleRow | null;
   if (!article || !article.ingredient?.is_active) return rep({ error: "Produit introuvable chez ce fournisseur" }, 404);
   if (mode === "element" && !article.commande_element_permise) return rep({ error: "Ce produit se commande uniquement par " + libelleColisage(article) }, 400);
+  if (type === "precommande" && !article.precommande) return rep({ error: "Ce produit ne fait pas partie de la précommande du mercredi" }, 400);
 
   const auPoids = article.unite_commande === "kg" || article.unite_commande === "litre";
   const quantite = mode === "uc" && auPoids ? Math.round(quantiteBrute * 2) / 2 : Math.round(quantiteBrute);
@@ -220,7 +233,7 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
   if (!session) {
     if (quantite === 0) return rep({ ok: true, session_id: null, ligne: null, total_ht: 0 });
     const { data: cree, error } = await supabaseAdmin.from("commande_sessions")
-      .insert({ supplier_id: f.ficheId, etablissement_id: etabId, status: "brouillon", created_by: userId })
+      .insert({ supplier_id: f.ficheId, etablissement_id: etabId, status: "brouillon", created_by: userId, type })
       .select("id, status, created_at").single();
     if (error) return rep({ error: error.message }, 500);
     session = cree as { id: string; status: string; created_at: string };

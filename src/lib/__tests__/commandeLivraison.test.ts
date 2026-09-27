@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { prochaineLivraison, maintenantParis, type RegleLivraison } from "@/lib/commandeLivraison";
+import { prochaineLivraison, maintenantParis, livraisonPrecommande, type RegleLivraison } from "@/lib/commandeLivraison";
 
 const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 const mael: RegleLivraison[] = JOURS.map((j) => ({ day: j, cutoff: "03:00", delivery_day: j }));
@@ -43,5 +43,19 @@ describe("prochaineLivraison", () => {
   it("jour sans heure limite ignoré ; planning vide → null", () => {
     expect(prochaineLivraison(carniato, new Date("2026-10-03T10:00:00+02:00"))?.date).toBe("2026-10-07");
     expect(prochaineLivraison(null)).toBeNull();
+  });
+});
+
+describe("livraisonPrecommande (mercredi de la semaine suivante)", () => {
+  it("envoyée le mercredi 30/09 → livrée le mercredi 07/10", () => {
+    expect(livraisonPrecommande(new Date("2026-09-30T11:00:00+02:00"))).toEqual({ date: "2026-10-07", libelle: "mercredi 7 octobre" });
+  });
+  it("envoyée le lundi 28/09 ou le dimanche 04/10 → même mercredi 07/10", () => {
+    expect(livraisonPrecommande(new Date("2026-09-28T09:00:00+02:00")).date).toBe("2026-10-07");
+    expect(livraisonPrecommande(new Date("2026-10-04T20:00:00+02:00")).date).toBe("2026-10-07");
+  });
+  it("heure de Paris : dimanche 23 h 30 à Paris (21 h 30 UTC) reste dans la semaine du 28/09", () => {
+    expect(livraisonPrecommande(new Date("2026-10-04T21:30:00Z")).date).toBe("2026-10-07");
+    expect(livraisonPrecommande(new Date("2026-10-04T22:30:00Z")).date).toBe("2026-10-14"); // lundi 00 h 30 à Paris
   });
 });
