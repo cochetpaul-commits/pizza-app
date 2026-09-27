@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { chargerEnvoi } from "@/lib/commandeEnvoi";
+import { chargerEnvoi, dateParis } from "@/lib/commandeEnvoi";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import React from "react";
@@ -89,8 +89,9 @@ function getIng(row: LigneRow): { name: string; category: string | null; default
 
 export async function GET(req: NextRequest) {
   let etabId: string;
+  let userId: string;
   try {
-    ({ etabId } = await getEtablissement(req));
+    ({ etabId, userId } = await getEtablissement(req));
   } catch (e) {
     if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -160,7 +161,7 @@ export async function GET(req: NextRequest) {
   const showSku = skuCount > 0 && skuCount >= allItems.length * 0.5;
 
   // Livraison (tous fournisseurs) et, en commande simplifiée (Maël), rayons + quantités lisibles + réf. toujours
-  const envoi = await chargerEnvoi(sessionId, etabId);
+  const envoi = await chargerEnvoi(sessionId, etabId, new Date(), userId);
   if (envoi?.fournisseur.simplifiee) {
     const parRayon = new Map<string, CommandePdfCategory>();
     for (const l of envoi.lignes) {
@@ -173,18 +174,18 @@ export async function GET(req: NextRequest) {
 
   const data: CommandePdfData = {
     supplierName: supplierObj?.name ?? "—",
-    sessionDate: new Date(session.created_at).toLocaleDateString("fr-FR", {
-      day: "numeric", month: "long", year: "numeric",
-    }),
+    // Date de la commande = date d'envoi (pas la création du brouillon), heure de Paris
+    sessionDate: envoi?.dateCommande ?? dateParis(new Date()),
     categories,
     totalArticles: allItems.length,
     notes: session.notes,
     logoBase64: readLogoBase64(),
-    exportedAt: new Date().toLocaleDateString("fr-FR", {
-      day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
-    }),
+    exportedAt: dateParis(new Date(), { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }),
     showSku: envoi?.fournisseur.simplifiee ? true : showSku,
     etabName: `iFratelli Group — ${etabName}`,
+    numeroClient: envoi?.fournisseur.numero_client ?? null,
+    passeePar: envoi?.envoyeur ?? null,
+    pied: envoi?.fournisseur.pied ?? null,
     livraison: envoi ? {
       date: envoi.livraison?.libelle ?? null,
       adresse: envoi.etab.adresse ? `${envoi.etab.nom}, ${envoi.etab.adresse}` : null,
@@ -195,7 +196,7 @@ export async function GET(req: NextRequest) {
   const buffer = await renderToBuffer(docElement);
 
   const supplierSlug = (supplierObj?.name ?? "commande").toLowerCase().replace(/[^a-z0-9]/g, "-");
-  const dateSlug = new Date().toISOString().slice(0, 10);
+  const dateSlug = dateParis(new Date(), { year: "numeric", month: "2-digit", day: "2-digit" }).split("/").reverse().join("-");
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

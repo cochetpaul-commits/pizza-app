@@ -1449,3 +1449,9 @@ button:active { transform: scale(0.98); }
     font-size: 11px !important;
   }
 }
+
+/* Commande Maël : titre du rayon ouvert collé sous l'en-tête pendant le défilement */
+.rayon-collant { position: sticky; top: 0; z-index: 5; }
+@media (max-width: 767px) {
+  .rayon-collant { top: calc(52px + var(--mobile-header-extra, 0px) + env(safe-area-inset-top, 0px)); }
+}

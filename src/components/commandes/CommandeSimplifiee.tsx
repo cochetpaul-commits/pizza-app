@@ -106,7 +106,8 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
         ...r,
         articles: visibles
           .filter((a) => a.rayon === r.code)
-          .sort((x, y) => (y.habituel?.nb_achats ?? 0) - (x.habituel?.nb_achats ?? 0) || x.nom.localeCompare(y.nom, "fr")),
+          // Ordre alphabétique sans accents ni casse (« Crème » / « Creme » ensemble, « Œuf » avec les O), comme le mail et le PDF
+          .sort((x, y) => x.nom.localeCompare(y.nom, "fr", { sensitivity: "base" })),
       }))
       .filter((r) => r.articles.length > 0)
       .map((r) => ({ ...r, dansCommande: r.articles.filter(enCommande).length }));
@@ -351,20 +352,24 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
           const ouvert = bascules[r.code] ?? r.dansCommande > 0;
           return (
             <div key={r.code} style={{ marginBottom: 10 }}>
+              {/* Titre de rayon : fond plein, texte blanc ; collé en haut de l'écran tant que le rayon ouvert défile */}
+              <div className={ouvert ? "rayon-collant" : undefined} style={{ background: "#f2ede4", paddingBottom: ouvert ? 8 : 0 }}>
               <button type="button" onClick={() => setBascules((s) => ({ ...s, [r.code]: !ouvert }))} aria-expanded={ouvert}
                 style={{
                   width: "100%", minHeight: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 14px",
-                  background: "#fff", border: `1.5px solid ${r.dansCommande > 0 ? ACCENT : "#ddd6c8"}`, borderRadius: 14,
-                  cursor: "pointer", textAlign: "left", marginBottom: ouvert ? 8 : 0, touchAction: "manipulation",
+                  background: ouvert ? "#5a3a2a" : ACCENT, border: "none", borderRadius: 14,
+                  cursor: "pointer", textAlign: "left", touchAction: "manipulation",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
                 }}>
-                <span style={{ flex: 1, fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: "0.04em", color: "#1a1a1a" }}>
-                  {r.libelle} <span style={{ color: "#999", fontWeight: 400 }}>({r.articles.length})</span>
+                <span style={{ flex: 1, fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: "0.04em", color: "#fff" }}>
+                  {r.libelle} <span style={{ opacity: 0.75, fontWeight: 400 }}>({r.articles.length})</span>
                 </span>
                 {r.dansCommande > 0 && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", background: ACCENT, borderRadius: 10, padding: "3px 8px" }}>{r.dansCommande}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: ouvert ? "#5a3a2a" : ACCENT, background: "#fff", borderRadius: 10, padding: "3px 8px" }}>{r.dansCommande}</span>
                 )}
-                <span style={{ color: "#999", fontSize: 13, transform: ouvert ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
+                <span style={{ color: "#fff", fontSize: 13, transform: ouvert ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
               </button>
+              </div>
               {ouvert && r.articles.map(carte)}
             </div>
           );

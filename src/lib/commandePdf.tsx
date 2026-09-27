@@ -28,6 +28,12 @@ export type CommandePdfData = {
   showSku?: boolean;
   /** Date et adresse de livraison */
   livraison?: { date: string | null; adresse: string | null };
+  /** Numéro client chez ce fournisseur (Maël : 177 Bello Mio, 265 Piccola Mia) */
+  numeroClient?: string | null;
+  /** Prénom de la personne qui passe la commande */
+  passeePar?: string | null;
+  /** Pied de page (« Rupture ou question : groupe WhatsApp Bello Mio – Maël ») */
+  pied?: string | null;
 };
 
 const ACCENT = "#D4775A";
@@ -136,9 +142,11 @@ export function CommandePdfDocument({ data }: { data: CommandePdfData }) {
           <View style={s.headerRight}>
             <Text style={s.title}>BON DE COMMANDE</Text>
             <Text style={s.subtitle}>Fournisseur : {data.supplierName}</Text>
+            {data.numeroClient ? <Text style={s.subtitle}>N° client : {data.numeroClient}</Text> : null}
             <Text style={s.subtitle}>Date : {data.sessionDate}</Text>
             {data.livraison?.date ? <Text style={[s.subtitle, { color: TEXT, fontWeight: "bold" }]}>Livraison : {data.livraison.date}</Text> : null}
             {data.livraison?.adresse ? <Text style={s.subtitle}>{data.livraison.adresse}</Text> : null}
+            {data.passeePar ? <Text style={s.subtitle}>Commande passée par {data.passeePar}</Text> : null}
           </View>
         </View>
 
@@ -175,6 +183,12 @@ export function CommandePdfDocument({ data }: { data: CommandePdfData }) {
             <Text>{data.notes}</Text>
           </View>
         )}
+
+        {data.pied ? (
+          <View style={[s.notes, { marginTop: 10 }]}>
+            <Text style={{ fontSize: 10, color: TEXT }}>{data.pied}</Text>
+          </View>
+        ) : null}
 
         {/* Footer */}
         <View style={s.footer} fixed>

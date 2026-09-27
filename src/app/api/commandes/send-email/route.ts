@@ -28,7 +28,7 @@ async function contexte(req: NextRequest, sessionId: string | null) {
     throw e;
   }
   if (!sessionId) return { erreur: NextResponse.json({ error: "session_id requis" }, { status: 400 }) };
-  const envoi = await chargerEnvoi(sessionId, auth.etabId);
+  const envoi = await chargerEnvoi(sessionId, auth.etabId, new Date(), auth.userId);
   if (!envoi) return { erreur: NextResponse.json({ error: "Commande introuvable" }, { status: 404 }) };
   const refus = await refusDroit(auth.userId, envoi.fournisseur.id);
   return { ...auth, envoi, refus };
