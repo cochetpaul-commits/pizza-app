@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
+import { destinatairesBloques, DOMAINE_AUTORISE_HORS_PRODUCTION } from "@/lib/envoiGardeFou";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,6 +80,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       error: "Aucun destinataire configuré. Ajoutez un email sur la fiche fournisseur.",
     }, { status: 400 });
+  }
+
+  // Garde-fou : hors production (preview, local), la base est celle de la production ;
+  // aucun envoi vers une adresse extérieure à @bellomio.fr (vécu 27/09 : adresse de Maël attendue le lendemain)
+  const bloques = destinatairesBloques(recipients);
+  if (bloques.length > 0) {
+    return NextResponse.json({
+      error: `Envoi bloqué hors production : ${bloques.join(", ")} n'est pas une adresse @${DOMAINE_AUTORISE_HORS_PRODUCTION}. Rien n'a été envoyé.`,
+      bloque_hors_production: true,
+    }, { status: 403 });
   }
 
   // 3. Etablissement
