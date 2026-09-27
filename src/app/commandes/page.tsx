@@ -2683,7 +2683,8 @@ function CommandesPage() {
         {/* KPI Cards */}
         {!loading && !loadingSupplier && selectedSupplierId && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
-            {/* Articles en commande */}
+            {/* Articles en commande — en commande simplifiée (Maël), l'écran a son propre compteur et total à jour */}
+            {!currentSupplier?.commande_simplifiee && <>
             <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
                 Articles en commande
@@ -2702,6 +2703,7 @@ function CommandesPage() {
                 {orderTotal > 0 ? `${orderTotal.toFixed(2)} €` : "—"}
               </div>
             </div>
+            </>}
 
             {/* Dernière commande */}
             <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>

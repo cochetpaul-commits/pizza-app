@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
+/** Total HT de la commande recalculé après chaque changement de ligne (vécu 28/09 : total figé après une suppression) */
+async function recalculerTotal(sessionId: string) {
+  const { data } = await supabaseAdmin.from("commande_lignes").select("total_ligne_ht").eq("session_id", sessionId);
+  const total = Math.round((data ?? []).reduce((t, l) => t + (Number(l.total_ligne_ht) || 0), 0) * 100) / 100;
+  await supabaseAdmin.from("commande_sessions").update({ total_ht: total, updated_at: new Date().toISOString() }).eq("id", sessionId);
+}
+
 /**
  * POST /api/commandes/ligne
  * Ajoute ou met à jour une ligne de commande.
@@ -62,7 +69,7 @@ export async function POST(req: NextRequest) {
           .from("commande_lignes")
           .delete()
           .eq("id", keepId);
-        return NextResponse.json({ ok: true, deleted: true });
+        { await recalculerTotal(session_id); return NextResponse.json({ ok: true, deleted: true }); }
       }
 
       // Mise à jour
@@ -74,7 +81,7 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ ok: true, ligne });
+      { await recalculerTotal(session_id); return NextResponse.json({ ok: true, ligne }); }
     }
   }
 
@@ -102,7 +109,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, ligne });
+  { await recalculerTotal(session_id); return NextResponse.json({ ok: true, ligne }); }
 }
 
 /**
@@ -139,5 +146,6 @@ export async function DELETE(req: NextRequest) {
     .eq("id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await recalculerTotal(ligne.session_id as string);
   return NextResponse.json({ ok: true });
 }
