@@ -17,11 +17,12 @@ import { BottomSheet } from "@/components/layout/BottomSheet";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { inChunks } from "@/lib/supabaseChunks";
+import { CommandeSimplifiee } from "@/components/commandes/CommandeSimplifiee";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type DeliveryRule = { day: string; cutoff: string; delivery_day: string };
-type Supplier = { id: string; name: string; franco_minimum: number | null; franco_bouteilles?: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null; website: string | null; portal_login: string | null; portal_password: string | null };
+type Supplier = { id: string; name: string; commande_simplifiee?: boolean; franco_minimum: number | null; franco_bouteilles?: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null; website: string | null; portal_login: string | null; portal_password: string | null };
 
 type Ligne = {
   id: string;
@@ -688,7 +689,7 @@ function CommandesPage() {
       const { data, error } = await Promise.race([
         supabase
           .from("suppliers")
-          .select("id, name, etablissement_id, franco_minimum, franco_bouteilles, delivery_schedule, color, website")
+          .select("id, name, etablissement_id, commande_simplifiee, franco_minimum, franco_bouteilles, delivery_schedule, color, website")
           .eq("is_active", true)
           .order("name"),
         timeout,
@@ -2780,7 +2781,10 @@ function CommandesPage() {
         {/* Content */}
         {!loading && !loadingSupplier && selectedSupplierId && (
           <div style={{ marginTop: 12 }}>
-            {session && readOnly ? renderSummary() : renderCatalog()}
+            {session && readOnly ? renderSummary()
+              // Commande simplifiée (Maël) : habituels par rayon, qui a ajouté quoi
+              : currentSupplier?.commande_simplifiee ? <CommandeSimplifiee supplierId={currentSupplier.id} onChange={reloadSession} />
+              : renderCatalog()}
           </div>
         )}
 
