@@ -25,6 +25,14 @@ describe("prochaineLivraison", () => {
   it("Maël : envoyée mardi 1 h 30 (avant 3 h) → livrée le jour même", () => {
     expect(prochaineLivraison(mael, paris("29T01:30:00"))?.date).toBe("2026-09-29");
   });
+  it("Maël, heure de Paris : lundi 2 h 30 → livrée lundi ; lundi 3 h 30 → livrée mardi", () => {
+    // 2 h 30 à Paris = 0 h 30 UTC : en UTC, la limite tomberait à 5 h du matin
+    expect(prochaineLivraison(mael, new Date("2026-09-28T00:30:00Z"))?.date).toBe("2026-09-28");
+    expect(prochaineLivraison(mael, new Date("2026-09-28T01:30:00Z"))?.date).toBe("2026-09-29");
+    // Heure d'hiver (UTC+1) : lundi 2 novembre 2 h 30 à Paris = 1 h 30 UTC
+    expect(prochaineLivraison(mael, new Date("2026-11-02T01:30:00Z"))?.date).toBe("2026-11-02");
+    expect(prochaineLivraison(mael, new Date("2026-11-02T02:30:00Z"))?.date).toBe("2026-11-03");
+  });
   it("Maël : envoyée mardi à 3 h pile → livrée mercredi", () => {
     expect(prochaineLivraison(mael, paris("29T03:00:00"))?.date).toBe("2026-09-30");
   });
