@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import { notifyGroupAdmins } from "@/lib/pushNotify";
+import { refusDroit } from "@/lib/commandeEnvoi";
 
 /**
  * POST /api/commandes/session
@@ -10,8 +11,9 @@ import { notifyGroupAdmins } from "@/lib/pushNotify";
  */
 export async function POST(req: NextRequest) {
   let etabId: string;
+  let userId: string;
   try {
-    ({ etabId } = await getEtablissement(req));
+    ({ etabId, userId } = await getEtablissement(req));
   } catch (e) {
     if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -28,6 +30,7 @@ export async function POST(req: NextRequest) {
       supplier_id,
       etablissement_id: etabId,
       status: "brouillon",
+      created_by: userId,
     })
     .select()
     .single();
@@ -82,8 +85,9 @@ export async function GET(req: NextRequest) {
  */
 export async function PATCH(req: NextRequest) {
   let etabId: string;
+  let userId: string;
   try {
-    ({ etabId } = await getEtablissement(req));
+    ({ etabId, userId } = await getEtablissement(req));
   } catch (e) {
     if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -97,13 +101,23 @@ export async function PATCH(req: NextRequest) {
   // Verify session belongs to this etablissement
   const { data: existing } = await supabaseAdmin
     .from("commande_sessions")
-    .select("id")
+    .select("id, status, supplier_id")
     .eq("id", id)
     .eq("etablissement_id", etabId)
     .maybeSingle();
 
   if (!existing) {
     return NextResponse.json({ error: "session introuvable" }, { status: 404 });
+  }
+
+  // « envoyee » n'est posé que par l'envoi du mail (send-email), jamais à la main
+  if (status === "envoyee") {
+    return NextResponse.json({ error: "Une commande passe en « envoyée » uniquement par l'envoi du mail" }, { status: 400 });
+  }
+  // Valider, ou rouvrir une commande validée / envoyée : contrôlé ici, pas seulement à l'écran
+  if (status === "validee" || (status === "brouillon" && (existing.status === "validee" || existing.status === "envoyee"))) {
+    const refus = await refusDroit(userId, existing.supplier_id as string);
+    if (refus) return NextResponse.json({ error: refus }, { status: 403 });
   }
 
   const update: Record<string, unknown> = { status, updated_at: new Date().toISOString() };

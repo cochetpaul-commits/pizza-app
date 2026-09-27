@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchApi } from "@/lib/fetchApi";
 import { SEUIL_HABITUEL } from "@/lib/commandeHabituels";
-import { nomUnite, type UniteCommande } from "@/lib/commandeArticles";
+import { quantiteLisible, type UniteCommande } from "@/lib/commandeArticles";
 
 /**
  * Écran de commande simplifié (fournisseurs avec suppliers.commande_simplifiee, Maël d'abord).
@@ -52,21 +52,6 @@ const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCa
 const euros = (n: number) => n.toFixed(2).replace(".", ",") + " €";
 const qteTexte = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
 
-/**
- * Quantité lisible en éléments ET en colis dès qu'un colis contient plusieurs éléments :
- * « 12 pots (2 colis) », « 6 bouteilles », « 18 bouteilles (1,5 colis) ». La cuisine compte à la pièce.
- */
-function quantiteLisible(a: Article, q: number, mode: Mode): string {
-  const nb = a.contenu_nb;
-  if (a.au_poids || !(nb > 1)) return qteTexte(q);
-  const el = a.element ?? "piece";
-  if (mode === "element") {
-    const colis = q / nb;
-    const entier = Number.isInteger(colis);
-    return `${qteTexte(q)} ${nomUnite(el, q)}${entier ? ` (${qteTexte(colis)} ${nomUnite(a.unite_commande, colis)})` : ""}`;
-  }
-  return `${qteTexte(q * nb)} ${nomUnite(el, q * nb)} (${qteTexte(q)} ${nomUnite(a.unite_commande, q)})`;
-}
 
 export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: string; onChange?: () => void }) {
   const [data, setData] = useState<Donnees | null>(null);

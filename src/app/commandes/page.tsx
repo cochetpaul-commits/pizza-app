@@ -271,6 +271,7 @@ const statusLabel: Record<string, string> = {
   brouillon: "Brouillon",
   en_attente: "En attente de validation",
   validee: "Validée",
+  envoyee: "Envoyée",
   recue: "Reçue",
   annulee: "Annulée",
 };
@@ -279,6 +280,7 @@ const statusColor: Record<string, string> = {
   brouillon: "#A0845C",
   en_attente: "#2563EB",
   validee: "#4a6741",
+  envoyee: "#2563EB",
   recue: "#16a34a",
   annulee: "#999",
 };
@@ -287,6 +289,7 @@ const statusBannerBg: Record<string, string> = {
   brouillon: "#FFF8F0",
   en_attente: "#EFF6FF",
   validee: "#e8ede6",
+  envoyee: "#EFF6FF",
   recue: "#e8ede6",
 };
 
@@ -549,6 +552,12 @@ function CommandesPage() {
   const { current: etab } = useEtablissement();
   const { can } = useProfile();
   const canValidateOrders = can("commandes.valider");
+  /** Valider / envoyer : manager et admin partout ; équipier seulement chez un fournisseur en commande simplifiée */
+  const peutEnvoyer = (supplierId: string | null | undefined) => {
+    if (canValidateOrders) return true;
+    if (!supplierId) return false;
+    return suppliers.some((s) => s.commande_simplifiee && (s.id === supplierId || supplierAliases.get(s.id)?.has(supplierId)));
+  };
   const searchParams = useSearchParams();
 
   // All suppliers
@@ -747,7 +756,7 @@ function CommandesPage() {
           .from("commande_sessions")
           .select("id, supplier_id, created_at, total_ht, email_sent_at, commande_lignes(count)")
           .eq("etablissement_id", etab.id)
-          .eq("status", "validee")
+          .in("status", ["validee", "envoyee"])
           .order("created_at", { ascending: false });
         const supplierMap = new Map(list.map((s) => [s.id, s.name]));
         // Also map alias IDs to canonical names
@@ -1121,11 +1130,12 @@ function CommandesPage() {
   async function validerSession(sessionId: string) {
     setSaving(true);
     // Save notes before validating
-    await fetchApi("/api/commandes/session", {
+    const res = await fetchApi("/api/commandes/session", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: sessionId, status: "validee", notes: notes.trim() || undefined }),
     });
+    if (!res.ok) { setSaving(false); alert((await res.json().catch(() => ({}))).error ?? "Validation impossible"); return; }
     await reloadSession();
     setSaving(false);
     setDraftSupplierIds((prev) => { const next = new Set(prev); if (selectedSupplierId) next.delete(selectedSupplierId); return next; });
@@ -1191,11 +1201,12 @@ function CommandesPage() {
 
   async function validerActiveSession(sessionId: string) {
     setSaving(true);
-    await fetchApi("/api/commandes/session", {
+    const res = await fetchApi("/api/commandes/session", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: sessionId, status: "validee" }),
     });
+    if (!res.ok) { setSaving(false); alert((await res.json().catch(() => ({}))).error ?? "Validation impossible"); return; }
     // Move from activeSessions to pendingReceptions
     const sess = activeSessions.find((s) => s.id === sessionId);
     if (sess) {
@@ -1276,11 +1287,30 @@ function CommandesPage() {
 
   // ── Envoi mail via Resend (serveur, zero friction) ──────────────────
 
+  /** Aperçu d'envoi (GET /api/commandes/send-email) : rien n'est envoyé avant « Confirmer l'envoi » */
+  type ApercuEnvoi = {
+    fournisseur: string; nb_produits: number; total_ht: number;
+    livraison: { date: string; libelle: string } | null; adresse: string;
+    destinataires: string[]; deja_envoyee_le: string | null; refus: string | null;
+  };
+  const [envoiAConfirmer, setEnvoiAConfirmer] = useState<{ sessionId: string; apercu: ApercuEnvoi | null; erreur: string | null } | null>(null);
+
+  // Toutes les actions « Envoyer » passent par ici : écran de confirmation avant l'envoi
   async function sendEmailOnly(sessionId: string) {
-    if (!canValidateOrders) {
-      alert("Vous n'avez pas la permission d'envoyer les commandes. Demandez a un manager de valider.");
-      return;
+    setEnvoiAConfirmer({ sessionId, apercu: null, erreur: null });
+    try {
+      const res = await fetchApi(`/api/commandes/send-email?session_id=${encodeURIComponent(sessionId)}`);
+      const json = await res.json();
+      if (!res.ok) setEnvoiAConfirmer({ sessionId, apercu: null, erreur: json.error ?? "Aperçu impossible" });
+      else setEnvoiAConfirmer({ sessionId, apercu: json as ApercuEnvoi, erreur: null });
+    } catch {
+      setEnvoiAConfirmer({ sessionId, apercu: null, erreur: "Aperçu impossible, vérifie la connexion" });
     }
+  }
+
+  async function confirmerEnvoi() {
+    if (!envoiAConfirmer) return;
+    const sessionId = envoiAConfirmer.sessionId;
     setSendingEmail(true);
     try {
       const res = await fetchApi("/api/commandes/send-email", {
@@ -1290,18 +1320,18 @@ function CommandesPage() {
       });
       const data = await res.json();
       if (data.ok) {
+        setEnvoiAConfirmer(null);
         // Retour à l'accueil des commandes : le bandeau vert confirme l'envoi
-        // et les autres brouillons sont accessibles tout de suite.
-        setConfirmation(`✓ Commande envoyée à ${data.recipients?.join(", ") || "au fournisseur"}`);
+        setConfirmation(`✓ Commande envoyée à ${data.recipients?.join(", ") || "au fournisseur"}${data.livraison?.libelle ? ` — livraison ${data.livraison.libelle}` : ""}`);
         setSession(null);
         setSelectedSupplierId(null);
         setQuantities({});
       } else {
-        alert(data.error ?? "Erreur envoi mail");
+        setEnvoiAConfirmer((e) => e && { ...e, erreur: data.error ?? "Erreur envoi mail" });
       }
     } catch (err) {
       console.error("[commandes] send email error:", err);
-      alert("Erreur lors de l'envoi du mail");
+      setEnvoiAConfirmer((e) => e && { ...e, erreur: "Erreur lors de l'envoi du mail" });
     }
     setSendingEmail(false);
     setTimeout(() => setConfirmation(null), 6000);
@@ -1432,7 +1462,7 @@ function CommandesPage() {
 
   const activeCount = Object.values(quantities).filter((v) => v !== "" && Number(v) > 0).length;
   const supplierLabel = currentSupplier?.name ?? "";
-  const readOnly = session?.status === "validee" || session?.status === "recue";
+  const readOnly = session?.status === "validee" || session?.status === "envoyee" || session?.status === "recue";
 
   // Franco calculation
   const francoMin = currentSupplier?.franco_minimum ?? null;
@@ -1813,13 +1843,13 @@ function CommandesPage() {
           padding: "12px 16px", borderRadius: 10,
           fontSize: 14, fontWeight: 600, marginBottom: 16, textAlign: "center",
         }}>
-          {session.status === "validee" && (session.email_sent_at
+          {(session.status === "validee" || session.status === "envoyee") && (session.email_sent_at
             ? `Commande envoyée le ${new Date(session.email_sent_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })} à ${new Date(session.email_sent_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}${session.email_sent_to ? ` (${session.email_sent_to})` : ""}`
             : "Commande validee — pas encore envoyée")}
           {session.status === "recue" && "Commande recue"}
           {session.status === "en_attente" && "En attente (legacy)"}
 
-          {session.status === "validee" && (
+          {(session.status === "validee" || session.status === "envoyee") && (
             <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={() => downloadPdf(session.id)}
                 style={{ padding: "8px 20px", borderRadius: 8, border: "1.5px solid #4a6741", background: "#fff", color: "#4a6741", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
@@ -1843,7 +1873,7 @@ function CommandesPage() {
             </div>
           )}
 
-          {session.status === "validee" && (
+          {(session.status === "validee" || session.status === "envoyee") && (
             <button onClick={() => retourBrouillon(session.id)} disabled={saving}
               style={{ marginTop: 8, background: "none", border: "none", color: "#999", fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>
               Modifier la commande
@@ -2077,7 +2107,7 @@ function CommandesPage() {
   // ── Main render ───────────────────────────────────────────────────────
 
   return (
-    <RequireRole allowedRoles={["group_admin", "equipier"]}>
+    <RequireRole allowedRoles={["group_admin", "manager", "equipier"]}>
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px 120px", background: "#f2ede4", minHeight: "100vh" }}>
 
         {confirmation && (
@@ -2483,7 +2513,7 @@ function CommandesPage() {
                 </div>
                 {renderSessionLignes(r.id)}
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-                  {canValidateOrders && (
+                  {peutEnvoyer(r.supplier_id) && (
                     <button type="button" onClick={(e) => { e.stopPropagation(); void modifierCommandeValidee(r); }} disabled={saving}
                       style={{
                         fontSize: 11, fontWeight: 600, color: "#8a5a2b", background: "#fff",
@@ -2493,7 +2523,7 @@ function CommandesPage() {
                       Modifier
                     </button>
                   )}
-                  {canValidateOrders && (
+                  {peutEnvoyer(r.supplier_id) && (
                     <button type="button" onClick={(e) => { e.stopPropagation(); void renvoyerMailCommande(r); }} disabled={sendingEmail || saving}
                       style={{
                         fontSize: 11, fontWeight: 600, color: "#2563EB", background: "#fff",
@@ -2899,6 +2929,54 @@ function CommandesPage() {
         )}
 
       </div>
+
+      {/* Confirmation d'envoi : nombre de produits, total HT, livraison, destinataires */}
+      {envoiAConfirmer && (() => {
+        const a = envoiAConfirmer.apercu;
+        const erreur = envoiAConfirmer.erreur ?? a?.refus ?? null;
+        return (
+          <>
+            <div onClick={() => !sendingEmail && setEnvoiAConfirmer(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 10000 }} />
+            <div role="dialog" aria-modal="true" style={{
+              position: "fixed", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 10001,
+              width: "min(420px, 92vw)", maxHeight: "86vh", overflowY: "auto", background: "#fff", borderRadius: 16,
+              boxShadow: "0 12px 40px rgba(0,0,0,0.25)", padding: "20px 18px",
+            }}>
+              <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 18, color: "#1a1a1a", marginBottom: 12 }}>
+                {a ? `Envoyer la commande à ${a.fournisseur} ?` : "Préparation de l'envoi…"}
+              </div>
+              {a && (
+                <div style={{ display: "grid", gap: 8, fontSize: 15, color: "#1a1a1a", marginBottom: 14 }}>
+                  <div><strong>{a.nb_produits}</strong> produit{a.nb_produits > 1 ? "s" : ""} · <strong>{a.total_ht.toFixed(2).replace(".", ",")} € HT</strong></div>
+                  <div>Livraison : <strong>{a.livraison?.libelle ?? "date non définie"}</strong></div>
+                  <div style={{ fontSize: 13, color: "#6f6656" }}>{a.adresse}</div>
+                  <div style={{ fontSize: 13, color: "#6f6656" }}>À : {a.destinataires.length ? a.destinataires.join(", ") : "aucun contact coché « Commandes »"}</div>
+                  {a.deja_envoyee_le && (
+                    <div style={{ fontSize: 13, background: "#fbf0dc", color: "#7a5a2b", borderRadius: 8, padding: "8px 10px" }}>
+                      Déjà envoyée le {new Date(a.deja_envoyee_le).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} : ce mail la remplacera (mise à jour).
+                    </div>
+                  )}
+                </div>
+              )}
+              {erreur && (
+                <div style={{ fontSize: 14, background: "#fbeaea", color: "#8a2b2b", borderRadius: 8, padding: "10px 12px", marginBottom: 14 }}>{erreur}</div>
+              )}
+              <div style={{ display: "flex", gap: 10 }}>
+                <button type="button" onClick={() => setEnvoiAConfirmer(null)} disabled={sendingEmail}
+                  style={{ flex: 1, height: 50, borderRadius: 12, border: "1.5px solid #ddd6c8", background: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+                  {erreur ? "Fermer" : "Annuler"}
+                </button>
+                {a && !erreur && (
+                  <button type="button" onClick={() => void confirmerEnvoi()} disabled={sendingEmail}
+                    style={{ flex: 1.4, height: 50, borderRadius: 12, border: "none", background: "#D4775A", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: sendingEmail ? 0.6 : 1 }}>
+                    {sendingEmail ? "Envoi…" : "Confirmer l'envoi"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Panneau trousseau — identifiants portail fournisseur */}
       {showCredentials && currentSupplier && portalCreds && (

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { chargerEnvoi } from "@/lib/commandeEnvoi";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import React from "react";
@@ -158,6 +159,18 @@ export async function GET(req: NextRequest) {
   const skuCount = allItems.filter(i => i.sku).length;
   const showSku = skuCount > 0 && skuCount >= allItems.length * 0.5;
 
+  // Livraison (tous fournisseurs) et, en commande simplifiée (Maël), rayons + quantités lisibles + réf. toujours
+  const envoi = await chargerEnvoi(sessionId, etabId);
+  if (envoi?.fournisseur.simplifiee) {
+    const parRayon = new Map<string, CommandePdfCategory>();
+    for (const l of envoi.lignes) {
+      const cat = parRayon.get(l.rayon) ?? { label: l.rayon.toUpperCase(), color: "#D4775A", items: [] };
+      cat.items.push({ name: l.nom, qty: l.quantite, unit: l.unite, sku: l.ref, texte: l.texte });
+      parRayon.set(l.rayon, cat);
+    }
+    categories.splice(0, categories.length, ...parRayon.values());
+  }
+
   const data: CommandePdfData = {
     supplierName: supplierObj?.name ?? "—",
     sessionDate: new Date(session.created_at).toLocaleDateString("fr-FR", {
@@ -170,8 +183,12 @@ export async function GET(req: NextRequest) {
     exportedAt: new Date().toLocaleDateString("fr-FR", {
       day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
     }),
-    showSku,
+    showSku: envoi?.fournisseur.simplifiee ? true : showSku,
     etabName: `iFratelli Group — ${etabName}`,
+    livraison: envoi ? {
+      date: envoi.livraison?.libelle ?? null,
+      adresse: envoi.etab.adresse ? `${envoi.etab.nom}, ${envoi.etab.adresse}` : null,
+    } : undefined,
   };
 
   const docElement = CommandePdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;

@@ -116,3 +116,23 @@ export function prixUniteCommande(a: CommandeArticle, offre: OffrePrix | null, p
 }
 
 const arrondi = (n: number) => Math.round(n * 10000) / 10000;
+
+/** Champs nécessaires pour écrire une quantité lisible */
+export type ArticleQuantite = { au_poids: boolean; contenu_nb: number; element: UniteCommande | null; unite_commande: UniteCommande };
+
+/**
+ * Quantité lisible en éléments ET en colis dès qu'un colis contient plusieurs éléments :
+ * « 12 pots (2 colis) », « 6 bouteilles », « 18 bouteilles (1,5 colis) ». La cuisine compte à la pièce.
+ * mode "uc" : q en unités de commande ; "element" : q en éléments.
+ */
+export function quantiteLisible(a: ArticleQuantite, q: number, mode: "uc" | "element"): string {
+  const txt = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
+  const nb = a.contenu_nb;
+  if (a.au_poids || !(nb > 1)) return txt(q);
+  const el = a.element ?? "piece";
+  if (mode === "element") {
+    const colis = q / nb;
+    return `${txt(q)} ${nomUnite(el, q)}${Number.isInteger(colis) ? ` (${txt(colis)} ${nomUnite(a.unite_commande, colis)})` : ""}`;
+  }
+  return `${txt(q * nb)} ${nomUnite(el, q * nb)} (${txt(q)} ${nomUnite(a.unite_commande, q)})`;
+}

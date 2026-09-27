@@ -6,6 +6,8 @@ export type CommandePdfLine = {
   qty: number;
   unit: string;
   sku: string | null;
+  /** Quantité déjà rédigée (« 12 pots (2 colis) — colis 6 × 500 g ») : remplace qty + unit */
+  texte?: string;
 };
 
 export type CommandePdfCategory = {
@@ -24,6 +26,8 @@ export type CommandePdfData = {
   exportedAt: string;
   etabName?: string;
   showSku?: boolean;
+  /** Date et adresse de livraison */
+  livraison?: { date: string | null; adresse: string | null };
 };
 
 const ACCENT = "#D4775A";
@@ -81,6 +85,7 @@ const s = StyleSheet.create({
   rowName: { flex: 1, fontSize: 11 },
   rowQty: { width: 30, textAlign: "right" as const, fontSize: 11, fontWeight: "bold" },
   rowUnit: { width: 80, textAlign: "left" as const, fontSize: 10, color: MUTED, paddingLeft: 6 },
+  rowTexte: { width: 190, textAlign: "right" as const, fontSize: 10, fontWeight: "bold" },
 
   footer: {
     position: "absolute",
@@ -132,6 +137,8 @@ export function CommandePdfDocument({ data }: { data: CommandePdfData }) {
             <Text style={s.title}>BON DE COMMANDE</Text>
             <Text style={s.subtitle}>Fournisseur : {data.supplierName}</Text>
             <Text style={s.subtitle}>Date : {data.sessionDate}</Text>
+            {data.livraison?.date ? <Text style={[s.subtitle, { color: TEXT, fontWeight: "bold" }]}>Livraison : {data.livraison.date}</Text> : null}
+            {data.livraison?.adresse ? <Text style={s.subtitle}>{data.livraison.adresse}</Text> : null}
           </View>
         </View>
 
@@ -147,8 +154,10 @@ export function CommandePdfDocument({ data }: { data: CommandePdfData }) {
               <View key={i} style={s.row}>
                 {data.showSku ? <Text style={s.rowSku}>{item.sku ?? ""}</Text> : null}
                 <Text style={s.rowName}>{item.name}</Text>
-                <Text style={s.rowQty}>{item.qty}</Text>
-                <Text style={s.rowUnit}>{item.unit}</Text>
+                {item.texte ? <Text style={s.rowTexte}>{item.texte}</Text> : <>
+                  <Text style={s.rowQty}>{item.qty}</Text>
+                  <Text style={s.rowUnit}>{item.unit}</Text>
+                </>}
               </View>
             ))}
           </View>
