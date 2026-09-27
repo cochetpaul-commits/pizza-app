@@ -196,7 +196,6 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
     .eq("supplier_id", f.ficheId).eq("ingredient_id", ingredient_id).maybeSingle();
   const article = artData as unknown as ArticleRow | null;
   if (!article || !article.ingredient?.is_active) return rep({ error: "Produit introuvable chez ce fournisseur" }, 404);
-  if (article.precommande) return rep({ error: "Produit de la précommande du mercredi : pas dans la commande du jour" }, 400);
   if (mode === "element" && !article.commande_element_permise) return rep({ error: "Ce produit se commande uniquement par " + libelleColisage(article) }, 400);
 
   const auPoids = article.unite_commande === "kg" || article.unite_commande === "litre";

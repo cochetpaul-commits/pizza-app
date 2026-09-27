@@ -2,11 +2,15 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchApi } from "@/lib/fetchApi";
+import { SEUIL_HABITUEL } from "@/lib/commandeHabituels";
 
 /**
  * Écran de commande simplifié (fournisseurs avec suppliers.commande_simplifiee, Maël d'abord).
  * Pensé pour le téléphone : les habituels de l'établissement rangés par rayon, un appui
  * propose la quantité habituelle, − / + ajustent la part de la personne connectée.
+ * Habituel = au moins SEUIL_HABITUEL jours d'achat sur 90 jours ; le reste passe par la recherche.
+ * Les produits de précommande restent commandables (réassort en semaine) : le flag ne sert qu'au mercredi.
+ * Rayons repliés, sauf ceux qui ont déjà un produit dans le brouillon ; un appui ouvre ou ferme.
  * Plusieurs personnes remplissent le même brouillon ; le détail par personne est affiché.
  */
 
@@ -48,6 +52,8 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
   const [recherche, setRecherche] = useState("");
   const [modes, setModes] = useState<Record<string, Mode>>({});
   const [enCours, setEnCours] = useState<Set<string>>(new Set());
+  /** Rayons ouverts ou fermés à la main (sinon : ouverts s'ils ont un produit dans le brouillon) */
+  const [bascules, setBascules] = useState<Record<string, boolean>>({});
 
   const charger = useCallback(async (): Promise<Donnees | null> => {
     try {
@@ -69,13 +75,13 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
   const modeDe = (a: Article): Mode => modes[a.ingredient_id] ?? (a.unite_element && a.habituel?.mode === "element" ? "element" : "uc");
   const ligneDe = useCallback((a: Article, m: Mode) => data?.lignes.find((l) => l.ingredient_id === a.ingredient_id && l.unite === (m === "element" ? a.unite_element : a.unite_uc)), [data]);
 
-  // Articles de la commande du jour (jamais la précommande)
-  const duJour = useMemo(() => (data?.articles ?? []).filter((a) => !a.precommande), [data]);
+  const duJour = useMemo(() => data?.articles ?? [], [data]);
+  const estHabituel = (a: Article) => (a.habituel?.nb_achats ?? 0) >= SEUIL_HABITUEL;
   const enCommande = useCallback((a: Article) => (data?.lignes ?? []).some((l) => l.ingredient_id === a.ingredient_id && l.quantite > 0), [data]);
 
   const sections = useMemo(() => {
     if (!data) return [];
-    const visibles = duJour.filter((a) => a.habituel || enCommande(a));
+    const visibles = duJour.filter((a) => estHabituel(a) || enCommande(a));
     return data.rayons
       .map((r) => ({
         ...r,
@@ -83,7 +89,8 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
           .filter((a) => a.rayon === r.code)
           .sort((x, y) => (y.habituel?.nb_achats ?? 0) - (x.habituel?.nb_achats ?? 0) || x.nom.localeCompare(y.nom, "fr")),
       }))
-      .filter((r) => r.articles.length > 0);
+      .filter((r) => r.articles.length > 0)
+      .map((r) => ({ ...r, dansCommande: r.articles.filter(enCommande).length }));
   }, [data, duJour, enCommande]);
 
   const resultats = useMemo(() => {
@@ -177,7 +184,7 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
             <div style={{ fontSize: 12, color: "#8a8378", marginTop: 3 }}>
               {unite}{prix != null ? ` · ${euros(prix)}` : ""}{a.ref ? ` · ${a.ref}` : ""}
             </div>
-            {a.habituel && total === 0 && (
+            {estHabituel(a) && a.habituel && total === 0 && (
               <div style={{ fontSize: 12, color: ACCENT, marginTop: 2 }}>Habituel : {qteTexte(a.habituel.quantite)} × {uniteDe(a, a.habituel.mode)}</div>
             )}
           </div>
@@ -258,17 +265,31 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
         </div>
       ) : sections.length === 0 ? (
         <div style={{ color: "#999", fontSize: 14, padding: 12 }}>
-          Aucun produit habituel ces 90 derniers jours. Utilise la recherche pour ajouter un produit.
+          Aucun produit acheté au moins {SEUIL_HABITUEL} fois ces 90 derniers jours. Utilise la recherche pour ajouter un produit.
         </div>
       ) : (
-        sections.map((r) => (
-          <div key={r.code} style={{ marginBottom: 18 }}>
-            <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 14, textTransform: "uppercase", letterSpacing: "0.04em", color: "#1a1a1a", margin: "4px 2px 8px" }}>
-              {r.libelle} <span style={{ color: "#999", fontWeight: 400 }}>({r.articles.length})</span>
+        sections.map((r) => {
+          const ouvert = bascules[r.code] ?? r.dansCommande > 0;
+          return (
+            <div key={r.code} style={{ marginBottom: 10 }}>
+              <button type="button" onClick={() => setBascules((s) => ({ ...s, [r.code]: !ouvert }))} aria-expanded={ouvert}
+                style={{
+                  width: "100%", minHeight: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 14px",
+                  background: "#fff", border: `1.5px solid ${r.dansCommande > 0 ? ACCENT : "#ddd6c8"}`, borderRadius: 14,
+                  cursor: "pointer", textAlign: "left", marginBottom: ouvert ? 8 : 0, touchAction: "manipulation",
+                }}>
+                <span style={{ flex: 1, fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: "0.04em", color: "#1a1a1a" }}>
+                  {r.libelle} <span style={{ color: "#999", fontWeight: 400 }}>({r.articles.length})</span>
+                </span>
+                {r.dansCommande > 0 && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", background: ACCENT, borderRadius: 10, padding: "3px 8px" }}>{r.dansCommande}</span>
+                )}
+                <span style={{ color: "#999", fontSize: 13, transform: ouvert ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
+              </button>
+              {ouvert && r.articles.map(carte)}
             </div>
-            {r.articles.map(carte)}
-          </div>
-        ))
+          );
+        })
       )}
       {resume.prixInconnu && <div style={{ fontSize: 11, color: "#999", marginTop: 8 }}>* un ou plusieurs prix inconnus, non comptés dans le total</div>}
     </div>

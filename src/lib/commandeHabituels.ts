@@ -31,6 +31,9 @@ export type RegleArticle = {
 
 export type Habituel = { nb_achats: number; quantite: number; mode: "uc" | "element"; derniere: string };
 
+/** Un produit est « habituel » à partir de 3 jours d'achat distincts sur 90 jours (factures et commandes envoyées) */
+export const SEUIL_HABITUEL = 3;
+
 const TOLERANCE = 0.15;
 
 /** Convertit un achat en quantité de commande arrondie, dans l'unité la plus naturelle */
