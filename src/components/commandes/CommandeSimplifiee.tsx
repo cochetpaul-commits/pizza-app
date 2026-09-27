@@ -6,8 +6,9 @@ import { SEUIL_HABITUEL } from "@/lib/commandeHabituels";
 
 /**
  * Écran de commande simplifié (fournisseurs avec suppliers.commande_simplifiee, Maël d'abord).
- * Pensé pour le téléphone : les habituels de l'établissement rangés par rayon, un appui
- * propose la quantité habituelle, − / + ajustent la part de la personne connectée.
+ * Pensé pour le téléphone : les habituels de l'établissement rangés par rayon ; le gros bouton
+ * ajoute 1 unité de commande, − / + ajustent la part de la personne connectée. L'équipe commande
+ * par petits bouts plusieurs fois par jour : la quantité habituelle (médiane par livraison) n'est qu'indiquée.
  * Habituel = au moins SEUIL_HABITUEL jours d'achat sur 90 jours ; le reste passe par la recherche.
  * Les produits de précommande restent commandables (réassort en semaine) : le flag ne sert qu'au mercredi.
  * Rayons repliés, sauf ceux qui ont déjà un produit dans le brouillon ; un appui ouvre ou ferme.
@@ -158,7 +159,6 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
     const total = ligne?.quantite ?? 0;
     const maPart = ligne?.apports.find((p) => p.user_id === data!.moi)?.quantite ?? 0;
     const pas = m === "uc" && a.au_poids ? 0.5 : 1;
-    const habituelIci = a.habituel && a.habituel.mode === m ? a.habituel.quantite : 1;
     const prix = m === "element" ? a.prix_element : a.prix_uc;
     const unite = uniteDe(a, m);
     const autreMode: Mode = m === "uc" ? "element" : "uc";
@@ -185,14 +185,17 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
               {unite}{prix != null ? ` · ${euros(prix)}` : ""}{a.ref ? ` · ${a.ref}` : ""}
             </div>
             {estHabituel(a) && a.habituel && total === 0 && (
-              <div style={{ fontSize: 12, color: ACCENT, marginTop: 2 }}>Habituel : {qteTexte(a.habituel.quantite)} × {uniteDe(a, a.habituel.mode)}</div>
+              <div style={{ fontSize: 12, color: ACCENT, marginTop: 2 }}>
+                {/* Médiane par livraison ; l'unité n'est précisée que pour la commande à l'élément (« 6 bouteilles ») */}
+                D&apos;habitude : {qteTexte(a.habituel.quantite)}{a.habituel.mode === "element" && a.unite_element ? ` ${a.unite_element.split(" ")[0]}${a.habituel.quantite > 1 ? "s" : ""}` : ""} par livraison
+              </div>
             )}
           </div>
           {brouillon && (total === 0 ? (
             <button type="button" aria-label={`Ajouter ${a.nom}`} disabled={occupe}
-              onClick={() => fixerMaPart(a, m, habituelIci)}
+              onClick={() => fixerMaPart(a, m, 1)}
               style={{ ...btn(true), width: "auto", minWidth: 64, padding: "0 16px", fontSize: 18 }}>
-              + {qteTexte(habituelIci)}
+              + 1
             </button>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
