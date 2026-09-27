@@ -56,6 +56,8 @@ type CatalogItem = {
   order_unit_label: string | null;
   order_quantity: number | null;
   prix_commande: number | null;
+  /** prix_commande est le prix du colis entier : la quantité se compte alors en colis, sans bascule unité/carton */
+  prix_par_colis: boolean;
   favori_commande?: boolean;
   pack_count: number | null;
   pack_each_qty: number | null;
@@ -204,6 +206,16 @@ function deriveOrderUnit(offer: OfferRow | null): string | null {
   }
   if (offer.unit) return offer.unit;
   return null;
+}
+
+/** Le prix retenu par computeOrderUnitPrice est-il celui du colis entier ?
+ *  (vécu 27/09 : lait UHT 6×1 L à 7,20 € le pack compté comme prix d'une brique,
+ *  d'où un total ×6 en mode carton et un prix faux en mode unité) */
+function isPackPrice(offer: OfferRow | null, orderQty: number | null): boolean {
+  if (!offer) return false;
+  if (orderQty && orderQty > 0 && offer.unit_price) return false;
+  const kind = offer.price_kind ?? "unit";
+  return kind === "pack_composed" || kind === "pack_simple";
 }
 
 /** Compute the price for one "order unit".
@@ -900,6 +912,7 @@ function CommandesPage() {
           order_quantity: oq,
           order_unit: ing.order_unit_label ?? deriveOrderUnit(offer) ?? ing.default_unit,
           prix_commande: computeOrderUnitPrice(offer, oq),
+          prix_par_colis: isPackPrice(offer, oq),
           pack_count: offer?.pack_count ?? null,
           pack_each_qty: offer?.pack_each_qty ?? null,
           stock_objectif: ing.stock_objectif ?? null,
@@ -1651,6 +1664,8 @@ function CommandesPage() {
   function unitToggle(item: CatalogItem) {
     const packCount = item.pack_count ?? 0;
     if (packCount <= 0) return null;
+    // Prix au colis : on commande déjà des colis, une bascule multiplierait la quantité sans changer le prix
+    if (item.prix_par_colis) return null;
     const indivLabel = individualUnitLabel(item);
     // Don't show toggle when the order unit IS the pack itself
     // e.g. order_unit = "pack" with pack_count = 24 → already ordering packs, no toggle needed
