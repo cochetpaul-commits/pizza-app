@@ -194,9 +194,16 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
   const f = await resoudreFiche(supplier_id, etabId);
   if (!f) return rep({ error: "Ce fournisseur n'est pas en commande simplifiée pour cet établissement" }, 404);
 
-  const { data: artData } = await supabaseAdmin.from("commande_articles")
-    .select("ingredient_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande, ingredient:ingredients!inner(id, name, is_active, rayon_commande)")
-    .eq("supplier_id", f.ficheId).eq("ingredient_id", ingredient_id).maybeSingle();
+  // Lectures indépendantes en parallèle (chaque aller-retour vers la base compte, vécu 28/09 : latence des + / −)
+  const [{ data: artData }, sessionTrouvee, { data: offresProduit }] = await Promise.all([
+    supabaseAdmin.from("commande_articles")
+      .select("ingredient_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande, ingredient:ingredients!inner(id, name, is_active, rayon_commande)")
+      .eq("supplier_id", f.ficheId).eq("ingredient_id", ingredient_id).maybeSingle(),
+    sessionEnCours(f.ficheId, etabId),
+    supabaseAdmin.from("supplier_offers")
+      .select("ingredient_id, supplier_id, unit, unit_price, pack_price, pack_count, supplier_sku, valid_from, created_at")
+      .eq("is_active", true).eq("ingredient_id", ingredient_id).in("supplier_id", f.aliasIds),
+  ]);
   const article = artData as unknown as ArticleRow | null;
   if (!article || !article.ingredient?.is_active) return rep({ error: "Produit introuvable chez ce fournisseur" }, 404);
   if (mode === "element" && !article.commande_element_permise) return rep({ error: "Ce produit se commande uniquement par " + libelleColisage(article) }, 400);
@@ -206,12 +213,12 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
   const unite = mode === "element" ? libelleElement(article)! : libelleColisage({ ...article, contenu_nb: Number(article.contenu_nb) });
 
   // Brouillon de l'établissement (créé à la première saisie)
-  let session = await sessionEnCours(f.ficheId, etabId);
+  let session = sessionTrouvee;
   if (session && session.status !== "brouillon") {
     return rep({ error: "Commande validée : repasse-la en brouillon pour la modifier" }, 409);
   }
   if (!session) {
-    if (quantite === 0) return rep({ ok: true, session_id: null });
+    if (quantite === 0) return rep({ ok: true, session_id: null, ligne: null, total_ht: 0 });
     const { data: cree, error } = await supabaseAdmin.from("commande_sessions")
       .insert({ supplier_id: f.ficheId, etablissement_id: etabId, status: "brouillon", created_by: userId })
       .select("id, status, created_at").single();
@@ -219,8 +226,7 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
     session = cree as { id: string; status: string; created_at: string };
   }
 
-  const { parProduit } = await chargerOffres(f.aliasIds);
-  const offre = choisirOffre(parProduit.get(ingredient_id) ?? [], f.ficheId);
+  const offre = choisirOffre((offresProduit ?? []) as OffreRow[], f.ficheId);
   const prix = prixUniteCommande(article, offre, mode === "element");
 
   const { data: existante } = await supabaseAdmin.from("commande_lignes").select("id")
@@ -228,7 +234,7 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
     .order("created_at", { ascending: true }).limit(1).maybeSingle();
   let ligneId = existante?.id as string | undefined;
   if (!ligneId) {
-    if (quantite === 0) return rep({ ok: true, session_id: session.id });
+    if (quantite === 0) return rep({ ok: true, session_id: session.id, ligne: null, total_ht: null });
     const { data: nouvelle, error } = await supabaseAdmin.from("commande_lignes")
       .insert({ session_id: session.id, ingredient_id, quantite: 0, unite, prix_unitaire_ht: prix, total_ligne_ht: 0 })
       .select("id").single();
@@ -249,9 +255,26 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
     if (!count) await supabaseAdmin.from("commande_lignes").delete().eq("id", ligneId);
   }
 
-  const { data: totaux } = await supabaseAdmin.from("commande_lignes").select("total_ligne_ht").eq("session_id", session.id);
-  const total = (totaux ?? []).reduce((s, l) => s + (Number(l.total_ligne_ht) || 0), 0);
-  await supabaseAdmin.from("commande_sessions").update({ total_ht: Math.round(total * 100) / 100, updated_at: new Date().toISOString() }).eq("id", session.id);
+  // Réponse : la ligne à jour (détail par personne) et le total, pour ne rien recharger côté écran
+  const [{ data: totaux }, { data: ligneMaj }] = await Promise.all([
+    supabaseAdmin.from("commande_lignes").select("total_ligne_ht").eq("session_id", session.id),
+    supabaseAdmin.from("commande_lignes").select("ingredient_id, unite, quantite, commande_ligne_apports(user_id, quantite)").eq("id", ligneId).maybeSingle(),
+  ]);
+  const total = Math.round((totaux ?? []).reduce((s, l) => s + (Number(l.total_ligne_ht) || 0), 0) * 100) / 100;
+  const apports = ((ligneMaj?.commande_ligne_apports ?? []) as { user_id: string; quantite: number }[]).filter((a) => Number(a.quantite) > 0);
+  const [, { data: profils }] = await Promise.all([
+    supabaseAdmin.from("commande_sessions").update({ total_ht: total, updated_at: new Date().toISOString() }).eq("id", session.id),
+    apports.length
+      ? supabaseAdmin.from("profiles").select("id, display_name").in("id", apports.map((a) => a.user_id))
+      : Promise.resolve({ data: [] as { id: string; display_name: string | null }[] }),
+  ]);
+  const nomDe = new Map((profils ?? []).map((x) => [x.id as string, (x.display_name as string | null) ?? "?"]));
+  const ligne = ligneMaj && Number(ligneMaj.quantite) > 0 ? {
+    ingredient_id: ligneMaj.ingredient_id as string,
+    unite: ligneMaj.unite as string | null,
+    quantite: Number(ligneMaj.quantite),
+    apports: apports.map((a) => ({ user_id: a.user_id, nom: nomDe.get(a.user_id) ?? "?", quantite: Number(a.quantite) })),
+  } : null;
 
-  return rep({ ok: true, session_id: session.id });
+  return rep({ ok: true, session_id: session.id, ligne, unite, total_ht: total });
 }

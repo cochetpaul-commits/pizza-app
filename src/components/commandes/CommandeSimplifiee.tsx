@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchApi } from "@/lib/fetchApi";
 import { SEUIL_HABITUEL } from "@/lib/commandeHabituels";
 import { nomUnite, type UniteCommande } from "@/lib/commandeArticles";
@@ -73,7 +73,15 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
   const [erreur, setErreur] = useState<string | null>(null);
   const [recherche, setRecherche] = useState("");
   const [modes, setModes] = useState<Record<string, Mode>>({});
-  const [enCours, setEnCours] = useState<Set<string>>(new Set());
+  /** Message discret en cas d'échec d'enregistrement */
+  const [alerte, setAlerte] = useState<string | null>(null);
+  // Saisie : affichage immédiat, appuis rapides regroupés (400 ms), une requête par produit à la fois
+  const dataRef = useRef<Donnees | null>(null);
+  const voulues = useRef(new Map<string, { a: Article; m: Mode; qte: number }>());
+  const confirmees = useRef(new Map<string, number>());
+  const minuteries = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const enVol = useRef(new Set<string>());
+  const dernierVide = useRef<boolean | null>(null);
   /** Rayons ouverts ou fermés à la main (sinon : ouverts s'ils ont un produit dans le brouillon) */
   const [bascules, setBascules] = useState<Record<string, boolean>>({});
 
@@ -83,8 +91,12 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
       const json = await res.json();
       if (!res.ok) { setErreur(json.error ?? "Erreur de chargement"); return null; }
       setErreur(null);
-      setData(json as Donnees);
-      return json as Donnees;
+      const d = json as Donnees;
+      confirmees.current = new Map();
+      for (const l of d.lignes) for (const p of l.apports) if (p.user_id === d.moi) confirmees.current.set(`${l.ingredient_id}|${l.unite}`, p.quantite);
+      dernierVide.current = !d.session || !d.lignes.some((x) => x.quantite > 0);
+      setData(d);
+      return d;
     } catch {
       setErreur("Erreur de chargement");
       return null;
@@ -134,40 +146,89 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
     return { nb, total, prixInconnu };
   }, [data]);
 
-  /** Fixe la part de la personne connectée (mise à jour immédiate à l'écran, puis enregistrement) */
-  async function fixerMaPart(a: Article, m: Mode, nouvelle: number) {
-    if (!data) return;
-    const cle = `${a.ingredient_id}|${m}`;
-    const unite = uniteDe(a, m);
-    const avant = data;
-    // Optimiste : on recalcule la ligne localement
-    const lignes = data.lignes.map((l) => ({ ...l, apports: [...l.apports] }));
-    let l = lignes.find((x) => x.ingredient_id === a.ingredient_id && x.unite === unite);
-    if (!l) { l = { ingredient_id: a.ingredient_id, unite, quantite: 0, apports: [] }; lignes.push(l); }
-    const autres = l.apports.filter((p) => p.user_id !== data.moi);
-    l.apports = nouvelle > 0 ? [...autres, { user_id: data.moi, nom: "Moi", quantite: nouvelle }] : autres;
-    l.quantite = l.apports.reduce((s, p) => s + p.quantite, 0);
-    setData({ ...data, lignes: lignes.filter((x) => x.quantite > 0) });
-    setEnCours((s) => new Set(s).add(cle));
+  useEffect(() => { dataRef.current = data; }, [data]);
+
+  /** Donnees avec ma part fixée à qte sur la ligne (produit, unité) ; total de la ligne recalculé */
+  const avecMaPart = (d: Donnees, ingredientId: string, unite: string, qte: number): Donnees => {
+    const lignes = d.lignes.map((l) => ({ ...l, apports: [...l.apports] }));
+    let l = lignes.find((x) => x.ingredient_id === ingredientId && x.unite === unite);
+    if (!l) { l = { ingredient_id: ingredientId, unite, quantite: 0, apports: [] }; lignes.push(l); }
+    const moi = l.apports.find((p) => p.user_id === d.moi);
+    const autres = l.apports.filter((p) => p.user_id !== d.moi);
+    l.apports = qte > 0 ? [...autres, { user_id: d.moi, nom: moi?.nom ?? "Moi", quantite: qte }] : autres;
+    l.quantite = l.apports.reduce((t, p) => t + p.quantite, 0);
+    return { ...d, lignes: lignes.filter((x) => x.quantite > 0) };
+  };
+
+  /** Envoie la quantité voulue pour ce produit ; si elle change pendant l'envoi, renvoie la dernière */
+  const envoyer = useCallback(async (cle: string) => {
+    if (enVol.current.has(cle)) return;
+    const v = voulues.current.get(cle);
+    if (!v) return;
+    const unite = v.m === "element" ? v.a.unite_element ?? v.a.unite_uc : v.a.unite_uc;
+    enVol.current.add(cle);
+    let ok = false;
     try {
       const res = await fetchApi("/api/commandes/simplifiee", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ supplier_id: supplierId, ingredient_id: a.ingredient_id, mode: m, quantite: nouvelle }),
+        body: JSON.stringify({ supplier_id: supplierId, ingredient_id: v.a.ingredient_id, mode: v.m, quantite: v.qte }),
       });
-      const json = await res.json();
-      if (!res.ok) { setData(avant); alert(json.error ?? "Enregistrement impossible"); return; }
-      const apres = await charger();
-      // La page parente (boutons Valider / Envoyer) n'est rechargée que quand le brouillon apparaît ou se vide
-      const vide = (d: Donnees | null) => !d?.session || !(d.lignes ?? []).some((x) => x.quantite > 0);
-      if (vide(avant) !== vide(apres)) onChange?.();
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Refus du serveur (commande validée entre-temps…) : on revient à la valeur enregistrée
+        setAlerte(json.error ?? "Pas enregistré, réessaie");
+      } else {
+        ok = true;
+        confirmees.current.set(`${v.a.ingredient_id}|${unite}`, v.qte);
+        const encore = voulues.current.get(cle);
+        const aJour = !encore || encore.qte === v.qte;
+        if (aJour) voulues.current.delete(cle);
+        setData((d) => {
+          if (!d) return d;
+          const session = json.session_id ? { id: json.session_id as string, status: d.session?.status ?? "brouillon" } : d.session;
+          if (!aJour) return { ...d, session }; // un appui plus récent attend : on garde l'affichage
+          const sans = d.lignes.filter((l) => !(l.ingredient_id === v.a.ingredient_id && l.unite === unite));
+          return { ...d, session, lignes: json.ligne ? [...sans, json.ligne as Ligne] : sans };
+        });
+      }
     } catch {
-      setData(avant);
-      alert("Enregistrement impossible, vérifie la connexion");
+      setAlerte("Pas enregistré, réessaie");
     } finally {
-      setEnCours((s) => { const n = new Set(s); n.delete(cle); return n; });
+      enVol.current.delete(cle);
     }
+    if (!ok) {
+      voulues.current.delete(cle);
+      const conf = confirmees.current.get(`${v.a.ingredient_id}|${unite}`) ?? 0;
+      setData((d) => (d ? avecMaPart(d, v.a.ingredient_id, unite, conf) : d));
+      setTimeout(() => setAlerte(null), 4000);
+      return;
+    }
+    if (voulues.current.has(cle)) { void envoyer(cle); return; }
+    // La page parente (boutons Valider / Envoyer) n'est rechargée que quand le brouillon apparaît ou se vide
+    const d = dataRef.current;
+    const vide = !d?.session || !(d.lignes ?? []).some((x) => x.quantite > 0);
+    if (dernierVide.current !== null && vide !== dernierVide.current) onChange?.();
+    dernierVide.current = vide;
+  }, [supplierId, onChange]);
+
+  /** Appui sur + / − / « + 1 » : affichage immédiat, enregistrement 400 ms après le dernier appui */
+  function fixerMaPart(a: Article, m: Mode, nouvelle: number) {
+    if (!data) return;
+    const cle = `${a.ingredient_id}|${m}`;
+    const unite = uniteDe(a, m);
+    voulues.current.set(cle, { a, m, qte: nouvelle });
+    setData((d) => (d ? avecMaPart(d, a.ingredient_id, unite, nouvelle) : d));
+    const t = minuteries.current.get(cle);
+    if (t) clearTimeout(t);
+    minuteries.current.set(cle, setTimeout(() => { minuteries.current.delete(cle); void envoyer(cle); }, 400));
   }
+
+  // En quittant l'écran, les appuis en attente partent tout de suite (jamais perdus)
+  useEffect(() => () => {
+    for (const [cle, t] of minuteries.current) { clearTimeout(t); void envoyer(cle); }
+    minuteries.current.clear();
+  }, [envoyer]);
 
   if (erreur) return <div style={{ padding: 16, color: "#8a2b2b", background: "#fbeaea", borderRadius: 12, fontSize: 14 }}>{erreur}</div>;
   if (!data) return <div style={{ padding: 24, textAlign: "center", color: "#999", fontSize: 14 }}>Chargement des produits…</div>;
@@ -184,7 +245,6 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
     const unite = uniteDe(a, m);
     const autreMode: Mode = m === "uc" ? "element" : "uc";
     const autreLigne = a.unite_element ? ligneDe(a, autreMode) : undefined;
-    const occupe = enCours.has(`${a.ingredient_id}|${m}`);
     const detail = ligne && ligne.apports.length > 0 && (ligne.apports.length > 1 || ligne.apports[0].user_id !== data!.moi)
       ? ligne.apports.map((p) => `${p.user_id === data!.moi ? "moi" : p.nom} ${qteTexte(p.quantite)}`).join(" · ")
       : null;
@@ -197,7 +257,7 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
     return (
       <div key={a.ingredient_id} style={{
         background: "#fff", borderRadius: 14, border: `1.5px solid ${total > 0 ? ACCENT : "#ddd6c8"}`,
-        padding: "12px 12px 12px 14px", marginBottom: 8, opacity: occupe ? 0.7 : 1,
+        padding: "12px 12px 12px 14px", marginBottom: 8,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -216,17 +276,17 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
             )}
           </div>
           {brouillon && (total === 0 ? (
-            <button type="button" aria-label={`Ajouter ${a.nom}`} disabled={occupe}
+            <button type="button" aria-label={`Ajouter ${a.nom}`} 
               onClick={() => fixerMaPart(a, m, 1)}
               style={{ ...btn(true), width: "auto", minWidth: 64, padding: "0 16px", fontSize: 18 }}>
               + 1
             </button>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button type="button" aria-label="Moins" disabled={occupe || maPart <= 0}
+              <button type="button" aria-label="Moins" disabled={maPart <= 0}
                 onClick={() => fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2))} style={btn(maPart > 0)}>−</button>
               <div style={{ minWidth: 34, textAlign: "center", fontSize: 22, fontWeight: 700, fontFamily: OSWALD }}>{qteTexte(total)}</div>
-              <button type="button" aria-label="Plus" disabled={occupe}
+              <button type="button" aria-label="Plus"
                 onClick={() => fixerMaPart(a, m, Math.round((maPart + pas) * 2) / 2)} style={btn(true)}>+</button>
             </div>
           ))}
@@ -257,6 +317,13 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
 
   return (
     <div style={{ paddingBottom: 110 }}>
+      {alerte && (
+        <div role="status" style={{
+          position: "fixed", left: "50%", bottom: 96, transform: "translateX(-50%)", zIndex: 60,
+          background: "#1a1a1a", color: "#fff", fontSize: 13, padding: "8px 14px", borderRadius: 20,
+          boxShadow: "0 4px 14px rgba(0,0,0,0.2)", maxWidth: "90vw", textAlign: "center",
+        }}>{alerte}</div>
+      )}
       <div style={{
         background: "#fff", borderRadius: 14, border: "1px solid #ddd6c8", padding: "12px 14px", marginBottom: 12,
         display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
