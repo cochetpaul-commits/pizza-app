@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchApi } from "@/lib/fetchApi";
 import { SEUIL_HABITUEL } from "@/lib/commandeHabituels";
+import { nomUnite, type UniteCommande } from "@/lib/commandeArticles";
 
 /**
  * Écran de commande simplifié (fournisseurs avec suppliers.commande_simplifiee, Maël d'abord).
@@ -23,6 +24,10 @@ type Article = {
   rayon: string | null;
   precommande: boolean;
   au_poids: boolean;
+  unite_commande: UniteCommande;
+  contenu_nb: number;
+  /** Type d'élément dans le colis (pot, bouteille, barquette…) : la cuisine compte à la pièce */
+  element: UniteCommande | null;
   unite_uc: string;
   unite_element: string | null;
   prix_uc: number | null;
@@ -45,7 +50,23 @@ const ACCENT = "#D4775A";
 const OSWALD = "var(--font-oswald), Oswald, sans-serif";
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const euros = (n: number) => n.toFixed(2).replace(".", ",") + " €";
-const qteTexte = (n: number) => String(n).replace(".", ",");
+const qteTexte = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
+
+/**
+ * Quantité lisible en éléments ET en colis dès qu'un colis contient plusieurs éléments :
+ * « 12 pots (2 colis) », « 6 bouteilles », « 18 bouteilles (1,5 colis) ». La cuisine compte à la pièce.
+ */
+function quantiteLisible(a: Article, q: number, mode: Mode): string {
+  const nb = a.contenu_nb;
+  if (a.au_poids || !(nb > 1)) return qteTexte(q);
+  const el = a.element ?? "piece";
+  if (mode === "element") {
+    const colis = q / nb;
+    const entier = Number.isInteger(colis);
+    return `${qteTexte(q)} ${nomUnite(el, q)}${entier ? ` (${qteTexte(colis)} ${nomUnite(a.unite_commande, colis)})` : ""}`;
+  }
+  return `${qteTexte(q * nb)} ${nomUnite(el, q * nb)} (${qteTexte(q)} ${nomUnite(a.unite_commande, q)})`;
+}
 
 export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: string; onChange?: () => void }) {
   const [data, setData] = useState<Donnees | null>(null);
@@ -184,11 +205,14 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
             <div style={{ fontSize: 12, color: "#8a8378", marginTop: 3 }}>
               {unite}{prix != null ? ` · ${euros(prix)}` : ""}{a.ref ? ` · ${a.ref}` : ""}
             </div>
-            {estHabituel(a) && a.habituel && total === 0 && (
+            {estHabituel(a) && a.habituel && (
               <div style={{ fontSize: 12, color: ACCENT, marginTop: 2 }}>
-                {/* Médiane par livraison ; l'unité n'est précisée que pour la commande à l'élément (« 6 bouteilles ») */}
-                D&apos;habitude : {qteTexte(a.habituel.quantite)}{a.habituel.mode === "element" && a.unite_element ? ` ${a.unite_element.split(" ")[0]}${a.habituel.quantite > 1 ? "s" : ""}` : ""} par livraison
+                {/* Médiane par livraison */}
+                D&apos;habitude : {quantiteLisible(a, a.habituel.quantite, a.habituel.mode)} par livraison
               </div>
+            )}
+            {total > 0 && !a.au_poids && a.contenu_nb > 1 && (
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginTop: 2 }}>En cours : {quantiteLisible(a, total, m)}</div>
             )}
           </div>
           {brouillon && (total === 0 ? (
@@ -224,7 +248,7 @@ export function CommandeSimplifiee({ supplierId, onChange }: { supplierId: strin
         {(detail || (autreLigne && autreLigne.quantite > 0)) && (
           <div style={{ fontSize: 12, color: "#6f6656", marginTop: 8 }}>
             {detail}
-            {autreLigne && autreLigne.quantite > 0 && <>{detail ? " — " : ""}aussi {qteTexte(autreLigne.quantite)} × {uniteDe(a, autreMode)}</>}
+            {autreLigne && autreLigne.quantite > 0 && <>{detail ? " — " : ""}aussi {quantiteLisible(a, autreLigne.quantite, autreMode)}</>}
           </div>
         )}
       </div>
