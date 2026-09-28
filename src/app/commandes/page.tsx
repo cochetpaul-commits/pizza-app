@@ -1121,6 +1121,26 @@ function CommandesPage() {
 
   // ── Status transitions ────────────────────────────────────────────────
 
+  // Commande simplifiée : quand le brouillon apparaît ou se vide, seules la session et les quantités sont
+  // relues, en arrière-plan. Avant, tout l'écran repassait par « Chargement… » (liste démontée, rayons
+  // refermés, recherche vidée, défilement perdu, ~3 s) — vécu 28/09 sur Maël et Terre Azur.
+  const fournisseurAffiche = React.useRef<string | null>(null);
+  useEffect(() => { fournisseurAffiche.current = selectedSupplierId; }, [selectedSupplierId]);
+  const rafraichirSession = useCallback(async () => {
+    const sid = selectedSupplierId;
+    if (!sid) return;
+    const res = await fetchApi(`/api/commandes/active?supplier_id=${sid}`);
+    if (!res.ok || fournisseurAffiche.current !== sid) return;
+    const sess = (await res.json()).session as Session | null;
+    if (fournisseurAffiche.current !== sid) return;
+    setSession(sess);
+    const q: Record<string, number | ""> = {};
+    for (const l of sess?.lignes ?? []) if (l.ingredient_id) q[l.ingredient_id] = l.quantite;
+    setQuantities(q);
+  }, [selectedSupplierId]);
+  // Nombre de produits du brouillon simplifié (barre du bas), tenu à jour par l'écran à chaque saisie
+  const [nbSimplifiee, setNbSimplifiee] = useState(0);
+
   async function reloadSession() {
     if (!selectedSupplierId) return;
     await loadForSupplier(selectedSupplierId);
@@ -1462,6 +1482,7 @@ function CommandesPage() {
 
   const activeCount = Object.values(quantities).filter((v) => v !== "" && Number(v) > 0).length;
   // Brouillon en cours (hors onglet Précommande, qui a son propre bouton d'envoi)
+  const nbArticlesBarre = currentSupplier?.commande_simplifiee ? nbSimplifiee : activeCount;
   const barreVisible = !!session && session.status === "brouillon" && !(currentSupplier?.commande_simplifiee && ongletMael === "precommande");
   // Pendant une commande : barre Menu / Achats masquée, place réservée pour la barre du bas
   useEffect(() => {
@@ -2200,7 +2221,7 @@ function CommandesPage() {
             <MenuCommande actions={[
               { label: "Aperçu PDF", onClick: () => downloadPdf(session.id) },
               { label: "Mettre en pause", onClick: () => pauseSession() },
-              ...(activeCount > 0 ? [{ label: "Valider sans envoyer", onClick: () => validerSession(session.id), disabled: saving }] : []),
+              ...(nbArticlesBarre > 0 ? [{ label: "Valider sans envoyer", onClick: () => validerSession(session.id), disabled: saving }] : []),
               { label: "Supprimer le brouillon", onClick: () => deleteSession(), danger: true, disabled: saving },
             ]} />
           )}
@@ -2833,7 +2854,7 @@ function CommandesPage() {
           <div style={{ marginTop: 12 }}>
             {session && readOnly ? renderSummary()
               // Commande simplifiée (Maël) : habituels par rayon, qui a ajouté quoi
-              : currentSupplier?.commande_simplifiee ? <CommandeSimplifiee supplierId={currentSupplier.id} onChange={reloadSession} onEnvoyer={sendEmailOnly} onOngletChange={setOngletMael} />
+              : currentSupplier?.commande_simplifiee ? <CommandeSimplifiee supplierId={currentSupplier.id} onChange={rafraichirSession} onNbArticles={setNbSimplifiee} onEnvoyer={sendEmailOnly} onOngletChange={setOngletMael} />
               : renderCatalog()}
           </div>
         )}
@@ -2934,7 +2955,7 @@ function CommandesPage() {
 
         {/* Commande en cours : une seule barre fixe en bas (les autres actions : menu « … » en haut) */}
         {barreVisible && session && (
-          <BarreCommande nbArticles={activeCount} desactive={sendingEmail || saving} onEnvoyer={() => sendEmailOnly(session.id)} />
+          <BarreCommande nbArticles={nbArticlesBarre} desactive={sendingEmail || saving} onEnvoyer={() => sendEmailOnly(session.id)} />
         )}
 
       </div>

@@ -8,7 +8,7 @@
 
 export const UNITES_COMMANDE = [
   "piece", "colis", "carton", "seau", "pochette", "barquette", "bouteille",
-  "sachet", "boite", "bac", "pot", "plateau", "kg", "litre",
+  "sachet", "boite", "bac", "pot", "plateau", "filet", "botte", "fut", "kg", "litre",
 ] as const;
 export type UniteCommande = (typeof UNITES_COMMANDE)[number];
 
@@ -47,6 +47,9 @@ const LIBELLE: Record<UniteCommande, { un: string; plusieurs: string }> = {
   bac: { un: "bac", plusieurs: "bacs" },
   pot: { un: "pot", plusieurs: "pots" },
   plateau: { un: "plateau", plusieurs: "plateaux" },
+  filet: { un: "filet", plusieurs: "filets" },
+  botte: { un: "botte", plusieurs: "bottes" },
+  fut: { un: "fût", plusieurs: "fûts" },
   kg: { un: "kg", plusieurs: "kg" },
   litre: { un: "litre", plusieurs: "litres" },
 };
@@ -135,4 +138,20 @@ export function quantiteLisible(a: ArticleQuantite, q: number, mode: "uc" | "ele
     return `${txt(q)} ${nomUnite(el, q)}${Number.isInteger(colis) ? ` (${txt(colis)} ${nomUnite(a.unite_commande, colis)})` : ""}`;
   }
   return `${txt(q * nb)} ${nomUnite(el, q * nb)} (${txt(q)} ${nomUnite(a.unite_commande, q)})`;
+}
+
+/**
+ * Quantité affichée sur l'écran de commande, toujours avec son unité :
+ * « 1 colis (5 kg) », « 3 filets », « 2 kg », « 12 pots (2 colis) ».
+ * (Le mail et le PDF composent leur propre texte à partir de quantiteLisible.)
+ */
+export function quantiteAffichee(
+  a: ArticleQuantite & { element_qte?: number | null; element_unite?: UniteTaille | null },
+  q: number, mode: "uc" | "element",
+): string {
+  const txt = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
+  if (a.au_poids) return `${txt(q)} ${nomUnite(a.unite_commande, q)}`;
+  if (a.contenu_nb > 1) return quantiteLisible(a, q, mode);
+  const t = a.element_qte != null && a.element_unite ? ` (${taille(q * a.element_qte, a.element_unite)})` : "";
+  return `${txt(q)} ${nomUnite(a.unite_commande, q)}${t}`;
 }

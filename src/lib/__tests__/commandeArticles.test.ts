@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { libelleColisage, libelleElement, prixUniteCommande, type CommandeArticle } from "@/lib/commandeArticles";
+import { libelleColisage, libelleElement, prixUniteCommande, quantiteAffichee, type CommandeArticle } from "@/lib/commandeArticles";
 
 const art = (p: Partial<CommandeArticle>): CommandeArticle => ({
   unite_commande: "piece", contenu_nb: 1, element: null, element_qte: null, element_unite: null,
@@ -55,5 +55,23 @@ describe("prixUniteCommande", () => {
   });
   it("vendu au kg", () => {
     expect(prixUniteCommande(art({ unite_commande: "kg" }), { unit: "kg", unit_price: 9.9, pack_price: null, pack_count: null })).toBe(9.9);
+  });
+});
+
+describe("quantiteAffichee (écran)", () => {
+  const colisPese = { au_poids: false, contenu_nb: 1, element: null, unite_commande: "colis" as const, element_qte: 5, element_unite: "kg" as const };
+  it("colis pesé sans élément : « 1 colis (5 kg) »", () => {
+    expect(quantiteAffichee(colisPese, 1, "uc")).toBe("1 colis (5 kg)");
+    expect(quantiteAffichee(colisPese, 2, "uc")).toBe("2 colis (10 kg)");
+  });
+  it("unité simple avec son nom", () => {
+    expect(quantiteAffichee({ au_poids: false, contenu_nb: 1, element: null, unite_commande: "botte" }, 2, "uc")).toBe("2 bottes");
+    expect(quantiteAffichee({ au_poids: false, contenu_nb: 1, element: null, unite_commande: "fut" }, 1, "uc")).toBe("1 fût");
+  });
+  it("au poids : « 2 kg »", () => {
+    expect(quantiteAffichee({ au_poids: true, contenu_nb: 1, element: null, unite_commande: "kg" }, 2, "uc")).toBe("2 kg");
+  });
+  it("colis de plusieurs éléments : inchangé", () => {
+    expect(quantiteAffichee({ au_poids: false, contenu_nb: 6, element: "filet", unite_commande: "colis" }, 12, "element")).toBe("12 filets (2 colis)");
   });
 });

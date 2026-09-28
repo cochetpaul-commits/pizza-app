@@ -18,21 +18,31 @@ import { calculerHabituels, type AchatBrut, type RegleArticle } from "@/lib/comm
 const JOURS_HABITUELS = 90;
 const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
 
-type ArticleRow = CommandeArticle & { ingredient_id: string; ingredient: { id: string; name: string; is_active: boolean; rayon_commande: string | null } };
+type ArticleRow = CommandeArticle & { ingredient_id: string; ingredient: { id: string; name: string; is_active: boolean; rayon_commande: string | null; stock_objectif?: number | null } };
 type OffreRow = OffrePrix & { ingredient_id: string; supplier_id: string; supplier_sku: string | null; valid_from: string | null; created_at: string | null };
 
 export type Reponse = { status: number; body: unknown };
 const rep = (body: unknown, status = 200): Reponse => ({ status, body });
 
+/** Indication sous chaque produit : médiane par livraison (habitude) ou quantité de la dernière commande envoyée */
+export type Indication = "habitude" | "derniere_commande";
+
+/** Mode d'une ligne enregistrée : colis (libellé de l'unité de commande) ou élément (tout autre libellé, même ancien) */
+export const modeDeLigne = (unite: string | null, uniteUc: string, uniteElement: string | null): "uc" | "element" =>
+  unite && uniteElement && unite !== uniteUc ? "element" : "uc";
+
 /** Fiche du fournisseur pour l'établissement courant + toutes ses fiches homonymes (repli des prix) */
 async function resoudreFiche(supplierId: string, etabId: string) {
   const { data: choisi } = await supabaseAdmin.from("suppliers").select("id, name").eq("id", supplierId).maybeSingle();
   if (!choisi) return null;
-  const { data: memes } = await supabaseAdmin.from("suppliers").select("id, name, etablissement_id, commande_simplifiee, is_active");
+  const { data: memes } = await supabaseAdmin.from("suppliers").select("id, name, etablissement_id, commande_simplifiee, is_active, indication_quantite");
   const homonymes = (memes ?? []).filter((s) => norm(s.name) === norm(choisi.name));
   const fiche = homonymes.find((s) => s.etablissement_id === etabId && s.commande_simplifiee && s.is_active);
   if (!fiche) return null;
-  return { ficheId: fiche.id as string, nom: fiche.name as string, aliasIds: homonymes.map((s) => s.id as string) };
+  return {
+    ficheId: fiche.id as string, nom: fiche.name as string, aliasIds: homonymes.map((s) => s.id as string),
+    indication: (fiche.indication_quantite === "derniere_commande" ? "derniere_commande" : "habitude") as Indication,
+  };
 }
 
 /** Offre active : celle de la fiche de l'établissement, sinon la plus récente d'une fiche homonyme */
@@ -44,11 +54,15 @@ function choisirOffre(offres: OffreRow[], ficheId: string): OffreRow | null {
 }
 
 async function chargerOffres(aliasIds: string[]) {
-  const { data } = await supabaseAdmin
-    .from("supplier_offers")
-    .select("ingredient_id, supplier_id, unit, unit_price, pack_price, pack_count, supplier_sku, valid_from, created_at")
-    .eq("is_active", true)
-    .in("supplier_id", aliasIds);
+  const [{ data }, { data: refs }] = await Promise.all([
+    supabaseAdmin
+      .from("supplier_offers")
+      .select("ingredient_id, supplier_id, unit, unit_price, pack_price, pack_count, supplier_sku, valid_from, created_at")
+      .eq("is_active", true)
+      .in("supplier_id", aliasIds),
+    // Références fournisseur rattachées à la main (lignes de facture sans offre active)
+    supabaseAdmin.from("ingredient_supplier_refs").select("ingredient_id, sku").in("supplier_id", aliasIds),
+  ]);
   const parProduit = new Map<string, OffreRow[]>();
   const produitParRef = new Map<string, string>();
   for (const o of (data ?? []) as OffreRow[]) {
@@ -56,6 +70,10 @@ async function chargerOffres(aliasIds: string[]) {
     l.push(o);
     parProduit.set(o.ingredient_id, l);
     if (o.supplier_sku && !produitParRef.has(o.supplier_sku)) produitParRef.set(o.supplier_sku, o.ingredient_id);
+  }
+  for (const r of refs ?? []) {
+    const sku = String(r.sku ?? "").trim();
+    if (sku && r.ingredient_id && !produitParRef.has(sku)) produitParRef.set(sku, r.ingredient_id as string);
   }
   return { parProduit, produitParRef };
 }
@@ -88,7 +106,7 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
   const depuis = new Date(Date.now() - JOURS_HABITUELS * 86400000).toISOString().slice(0, 10);
   const [{ data: articlesData, error: errArt }, { data: rayons }, offres, { data: factures }, session] = await Promise.all([
     supabaseAdmin.from("commande_articles")
-      .select("ingredient_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande, ingredient:ingredients!inner(id, name, is_active, rayon_commande)")
+      .select("ingredient_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande, ingredient:ingredients!inner(id, name, is_active, rayon_commande, stock_objectif)")
       .eq("supplier_id", f.ficheId),
     supabaseAdmin.from("rayons_commande").select("code, libelle, ordre").order("ordre"),
     chargerOffres(f.aliasIds),
@@ -118,6 +136,10 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
       unite_commande: a.unite_commande,
       contenu_nb: Number(a.contenu_nb),
       element: a.element,
+      element_qte: a.element_qte != null ? Number(a.element_qte) : null,
+      element_unite: a.element_unite,
+      // Stock idéal (inventaire), compté en éléments (bouteilles…) ; null si vide
+      stock_objectif: a.ingredient.stock_objectif != null && Number(a.ingredient.stock_objectif) > 0 ? Number(a.ingredient.stock_objectif) : null,
       unite_uc: libelleColisage({ ...a, contenu_nb: Number(a.contenu_nb) }),
       unite_element: libelleElement(a),
       prix_uc,
@@ -148,17 +170,36 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
     .map((s) => [s.id as string, String(s.created_at).slice(0, 10)] as const)
     .filter(([, d]) => d > derniereFacture));
   if (dateCommande.size) {
-    const elementParProduit = new Map(sortie.map((s) => [s.ingredient_id, s.unite_element]));
+    const libellesParProduit = new Map(sortie.map((s) => [s.ingredient_id, s]));
     const { data: lignesCmd } = await supabaseAdmin.from("commande_lignes")
       .select("session_id, ingredient_id, quantite, unite").in("session_id", [...dateCommande.keys()]);
     for (const l of lignesCmd ?? []) {
       const date = dateCommande.get(l.session_id as string);
       if (!date) continue;
-      const mode = l.unite && l.unite === elementParProduit.get(l.ingredient_id as string) ? "element" : "uc";
+      const lib = libellesParProduit.get(l.ingredient_id as string);
+      const mode = lib ? modeDeLigne(l.unite as string | null, lib.unite_uc, lib.unite_element) : "uc";
       achats.push({ ingredient_id: l.ingredient_id as string, date, quantite: Number(l.quantite), mode });
     }
   }
   const habituels = calculerHabituels(achats, regles);
+
+  // Dernière commande envoyée à ce fournisseur (réglage « derniere_commande ») : quantité par produit
+  const derniere = new Map<string, { quantite: number; mode: "uc" | "element" }>();
+  if (f.indication === "derniere_commande") {
+    const { data: der } = await supabaseAdmin.from("commande_sessions").select("id")
+      .eq("supplier_id", f.ficheId).eq("etablissement_id", etabId).eq("type", "jour")
+      .or("email_sent_at.not.is.null,status.in.(envoyee,recue)")
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (der) {
+      const libelles = new Map(sortie.map((s) => [s.ingredient_id, s]));
+      const { data: ls } = await supabaseAdmin.from("commande_lignes").select("ingredient_id, quantite, unite").eq("session_id", der.id);
+      for (const l of ls ?? []) {
+        const lib = libelles.get(l.ingredient_id as string);
+        if (!lib || !(Number(l.quantite) > 0) || derniere.has(lib.ingredient_id)) continue;
+        derniere.set(lib.ingredient_id, { quantite: Number(l.quantite), mode: modeDeLigne(l.unite as string | null, lib.unite_uc, lib.unite_element) });
+      }
+    }
+  }
 
   // Brouillon en cours : lignes et détail par personne
   let lignes: { ingredient_id: string; unite: string | null; quantite: number; apports: { user_id: string; nom: string; quantite: number }[] }[] = [];
@@ -188,7 +229,8 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
     a_precommande: aPrecommande,
     moi: userId,
     rayons: rayons ?? [],
-    articles: sortie.map((s) => ({ ...s, habituel: habituels.get(s.ingredient_id) ?? null })),
+    indication: f.indication,
+    articles: sortie.map((s) => ({ ...s, habituel: habituels.get(s.ingredient_id) ?? null, derniere: derniere.get(s.ingredient_id) ?? null })),
     session: session ? { id: session.id, status: session.status } : null,
     lignes,
   });

@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchApi } from "@/lib/fetchApi";
 import { SEUIL_HABITUEL } from "@/lib/commandeHabituels";
-import { quantiteLisible, type UniteCommande } from "@/lib/commandeArticles";
+import { nomUnite, quantiteAffichee, type UniteCommande, type UniteTaille } from "@/lib/commandeArticles";
+import { CAT_COLORS, type Category } from "@/types/ingredients";
 
 /**
  * Écran de commande simplifié (fournisseurs avec suppliers.commande_simplifiee, Maël d'abord).
@@ -28,12 +29,18 @@ type Article = {
   contenu_nb: number;
   /** Type d'élément dans le colis (pot, bouteille, barquette…) : la cuisine compte à la pièce */
   element: UniteCommande | null;
+  element_qte: number | null;
+  element_unite: UniteTaille | null;
+  /** Stock idéal (inventaire), en éléments ; null si non renseigné */
+  stock_objectif: number | null;
   unite_uc: string;
   unite_element: string | null;
   prix_uc: number | null;
   prix_element: number | null;
   ref: string | null;
   habituel: Habituel | null;
+  /** Quantité dans la dernière commande envoyée (fournisseurs réglés sur « derniere_commande ») */
+  derniere: { quantite: number; mode: Mode } | null;
 };
 type Apport = { user_id: string; nom: string; quantite: number };
 type Ligne = { ingredient_id: string; unite: string | null; quantite: number; apports: Apport[] };
@@ -43,6 +50,7 @@ type Donnees = {
   type: Onglet;
   /** Des produits sont cochés « précommande » chez ce fournisseur (Bello Mio) : onglets affichés */
   a_precommande: boolean;
+  indication: "habitude" | "derniere_commande";
   moi: string;
   rayons: { code: string; libelle: string; ordre: number }[];
   articles: Article[];
@@ -56,10 +64,23 @@ const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCa
 const euros = (n: number) => n.toFixed(2).replace(".", ",") + " €";
 const qteTexte = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
 
+/** Couleur du titre de rayon : celle de sa catégorie dans les listes de produits (même couleur chez tous les fournisseurs) */
+const CATEGORIE_DU_RAYON: Record<string, Category> = {
+  cremerie: "cremerie_fromage", charcuterie: "charcuterie_viande", fruits_legumes: "legumes_herbes",
+  base_pizza: "epicerie_salee", epicerie_cuisine: "epicerie_salee", epicerie_sucree: "epicerie_sucree",
+  maree_surgeles: "maree", hygiene: "emballage",
+  bar_softs: "soft", bar_sirops: "sirops", bar_bieres: "biere", bar_vins: "vins",
+  bar_liqueurs: "liqueurs", bar_spiritueux: "spiritueux", bar_cafe: "cafeteria",
+};
+const couleurRayon = (code: string) => CAT_COLORS[CATEGORIE_DU_RAYON[code] ?? "autre"];
 
-export function CommandeSimplifiee({ supplierId, onChange, onEnvoyer, onOngletChange }: {
+
+export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoyer, onOngletChange }: {
   supplierId: string;
+  /** Le brouillon apparaît ou se vide : la page met à jour sa session en arrière-plan (sans recharger l'écran) */
   onChange?: () => void;
+  /** Nombre de produits dans le brouillon affiché (barre du bas de la page) */
+  onNbArticles?: (nb: number) => void;
   /** Envoi de la précommande (écran de confirmation de la page) */
   onEnvoyer?: (sessionId: string) => void;
   /** La page masque ses boutons « Valider / Envoyer » (commande du jour) sur l'onglet Précommande */
@@ -122,8 +143,10 @@ export function CommandeSimplifiee({ supplierId, onChange, onEnvoyer, onOngletCh
         ...r,
         articles: visibles
           .filter((a) => a.rayon === r.code)
-          // Ordre alphabétique sans accents ni casse (« Crème » / « Creme » ensemble, « Œuf » avec les O), comme le mail et le PDF
-          .sort((x, y) => x.nom.localeCompare(y.nom, "fr", { sensitivity: "base" })),
+          // D'abord les produits achetés ces 90 derniers jours, puis les autres ; chaque groupe par ordre
+          // alphabétique sans accents ni casse (« Crème » / « Creme » ensemble, « Œuf » avec les O), comme le mail et le PDF
+          .sort((x, y) => (Number((y.habituel?.nb_achats ?? 0) > 0) - Number((x.habituel?.nb_achats ?? 0) > 0))
+            || x.nom.localeCompare(y.nom, "fr", { sensitivity: "base" })),
       }))
       .filter((r) => r.articles.length > 0)
       .map((r) => ({ ...r, dansCommande: r.articles.filter(enCommande).length }));
@@ -149,6 +172,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onEnvoyer, onOngletCh
   }, [data]);
 
   useEffect(() => { dataRef.current = data; }, [data]);
+  useEffect(() => { if (data) onNbArticles?.(resume.nb); }, [data, resume.nb, onNbArticles]);
 
   /** Donnees avec ma part fixée à qte sur la ligne (produit, unité) ; total de la ligne recalculé */
   const avecMaPart = (d: Donnees, ingredientId: string, unite: string, qte: number): Donnees => {
@@ -267,6 +291,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onEnvoyer, onOngletCh
       display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, touchAction: "manipulation",
     });
 
+    const texteIndication: React.CSSProperties = { fontSize: 12.5, color: ACCENT, marginTop: 6, whiteSpace: "normal", overflowWrap: "anywhere" };
     return (
       <div key={a.ingredient_id} style={{
         background: "#fff", borderRadius: 14, border: `1.5px solid ${total > 0 ? ACCENT : "#ddd6c8"}`,
@@ -296,25 +321,31 @@ export function CommandeSimplifiee({ supplierId, onChange, onEnvoyer, onOngletCh
           ))}
         </div>
         {/* Sous la ligne, sur toute la largeur de la carte : jamais coupé, passe à la ligne (iPhone) */}
-        {estHabituel(a) && a.habituel && (
-          <div style={{ fontSize: 12.5, color: ACCENT, marginTop: 6, whiteSpace: "normal", overflowWrap: "anywhere" }}>
-            {/* Médiane par livraison */}
-            D&apos;habitude : {quantiteLisible(a, a.habituel.quantite, a.habituel.mode)} par livraison
+        {data!.indication === "derniere_commande" ? (a.derniere && (
+          <div style={texteIndication}>Dernière commande : {quantiteAffichee(a, a.derniere.quantite, a.derniere.mode)}</div>
+        )) : (estHabituel(a) && a.habituel && (
+          // Médiane par livraison
+          <div style={texteIndication}>D&apos;habitude : {quantiteAffichee(a, a.habituel.quantite, a.habituel.mode)} par livraison</div>
+        ))}
+        {a.stock_objectif != null && (
+          <div style={{ ...texteIndication, color: "#6f6656", marginTop: 2 }}>
+            Stock idéal : {quantiteAffichee(a, a.stock_objectif, a.contenu_nb > 1 ? "element" : "uc")}
           </div>
         )}
         {total > 0 && !a.au_poids && a.contenu_nb > 1 && (
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginTop: 2, whiteSpace: "normal", overflowWrap: "anywhere" }}>En cours : {quantiteLisible(a, total, m)}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginTop: 2, whiteSpace: "normal", overflowWrap: "anywhere" }}>En cours : {quantiteAffichee(a, total, m)}</div>
         )}
         {a.unite_element && brouillon && (
           <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
             {(["uc", "element"] as Mode[]).map((x) => (
               <button key={x} type="button" onClick={() => setModes((s) => ({ ...s, [a.ingredient_id]: x }))}
                 style={{
-                  flex: 1, height: 36, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  flex: 1, minHeight: 36, padding: "4px 8px", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", lineHeight: 1.2,
                   border: m === x ? `1.5px solid ${ACCENT}` : "1px solid #ddd6c8",
                   background: m === x ? "#FFF0EB" : "#f7f3ec", color: m === x ? ACCENT : "#8a8378",
                 }}>
-                Par {x === "uc" ? a.unite_uc : a.unite_element}
+                {/* « Par carton de 6 » / « Par bouteille » : l'autre bouton dit déjà ce qu'il y a dans le carton */}
+                Par {x === "element" ? a.unite_element : a.contenu_nb > 1 && a.element ? `${nomUnite(a.unite_commande)} de ${qteTexte(a.contenu_nb)}` : a.unite_uc}
               </button>
             ))}
           </div>
@@ -322,7 +353,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onEnvoyer, onOngletCh
         {(detail || (autreLigne && autreLigne.quantite > 0)) && (
           <div style={{ fontSize: 12, color: "#6f6656", marginTop: 8 }}>
             {detail}
-            {autreLigne && autreLigne.quantite > 0 && <>{detail ? " — " : ""}aussi {quantiteLisible(a, autreLigne.quantite, autreMode)}</>}
+            {autreLigne && autreLigne.quantite > 0 && <>{detail ? " — " : ""}aussi {quantiteAffichee(a, autreLigne.quantite, autreMode)}</>}
           </div>
         )}
       </div>
@@ -330,7 +361,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onEnvoyer, onOngletCh
   }
 
   return (
-    <div style={{ paddingBottom: 110 }}>
+    <div>
       {data.a_precommande && (
         <div style={{ display: "flex", gap: 4, padding: 4, background: "#ece4d4", borderRadius: 14, marginBottom: 12 }}>
           {([["jour", "Commande du jour"], ["precommande", "Précommande du mercredi"]] as [Onglet, string][]).map(([o, libelle]) => (
@@ -402,7 +433,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onEnvoyer, onOngletCh
               <button type="button" onClick={() => setBascules((s) => ({ ...s, [r.code]: !ouvert }))} aria-expanded={ouvert}
                 style={{
                   width: "100%", minHeight: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 14px",
-                  background: ouvert ? "#5a3a2a" : ACCENT, border: "none", borderRadius: 14,
+                  background: couleurRayon(r.code), border: "none", borderRadius: 14,
                   cursor: "pointer", textAlign: "left", touchAction: "manipulation",
                   boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
                 }}>
@@ -410,7 +441,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onEnvoyer, onOngletCh
                   {r.libelle} <span style={{ opacity: 0.75, fontWeight: 400 }}>({r.articles.length})</span>
                 </span>
                 {r.dansCommande > 0 && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: ouvert ? "#5a3a2a" : ACCENT, background: "#fff", borderRadius: 10, padding: "3px 8px" }}>{r.dansCommande}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: couleurRayon(r.code), background: "#fff", borderRadius: 10, padding: "3px 8px" }}>{r.dansCommande}</span>
                 )}
                 <span style={{ color: "#fff", fontSize: 13, transform: ouvert ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
               </button>
