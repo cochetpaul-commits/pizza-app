@@ -120,10 +120,9 @@ export async function inviter(entree: { email?: unknown; nom?: unknown; role?: u
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AccesErreur("Adresse e-mail invalide");
   const { role, etablissements } = verifierRoleEtablissements(entree.role, entree.etablissements, await etablissementsExistants());
   const nom = String(entree.nom ?? "").trim() || email;
-  verifierHorsProduction(email);
-
   const existant = (await tousLesUtilisateurs()).find((u) => (u.email ?? "").toLowerCase() === email);
   if (existant) throw new AccesErreur("Un compte existe déjà pour cette adresse : modifiez-le dans la liste", 409);
+  verifierHorsProduction(email);
 
   const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
     data: { display_name: nom, role },
