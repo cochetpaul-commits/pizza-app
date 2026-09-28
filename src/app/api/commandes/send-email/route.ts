@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import { destinatairesBloques, DOMAINE_AUTORISE_HORS_PRODUCTION } from "@/lib/envoiGardeFou";
 import { chargerEnvoi, corpsMail, refusDroit, type Envoi } from "@/lib/commandeEnvoi";
+import { precommandeEnRetard } from "@/lib/commandeLivraison";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     fournisseur: envoi.fournisseur.nom,
     type: envoi.type,
+    // Limite Maël : précommande le mercredi avant 12 h. Au-delà, avertissement seulement (jamais bloqué)
+    avertissement: envoi.type === "precommande" && precommandeEnRetard() ? "Attention : la limite Maël pour la précommande est mercredi 12 h." : null,
     nb_produits: envoi.lignes.length,
     total_ht: envoi.totalHt,
     livraison: envoi.livraison,

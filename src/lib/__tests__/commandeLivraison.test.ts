@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { prochaineLivraison, maintenantParis, livraisonPrecommande, type RegleLivraison } from "@/lib/commandeLivraison";
+import { prochaineLivraison, maintenantParis, livraisonPrecommande, precommandeEnRetard, type RegleLivraison } from "@/lib/commandeLivraison";
 
 const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 const mael: RegleLivraison[] = JOURS.map((j) => ({ day: j, cutoff: "03:00", delivery_day: j }));
@@ -57,5 +57,22 @@ describe("livraisonPrecommande (mercredi de la semaine suivante)", () => {
   it("heure de Paris : dimanche 23 h 30 à Paris (21 h 30 UTC) reste dans la semaine du 28/09", () => {
     expect(livraisonPrecommande(new Date("2026-10-04T21:30:00Z")).date).toBe("2026-10-07");
     expect(livraisonPrecommande(new Date("2026-10-04T22:30:00Z")).date).toBe("2026-10-14"); // lundi 00 h 30 à Paris
+  });
+});
+
+describe("precommandeEnRetard (limite mercredi 12 h, heure de Paris)", () => {
+  it("lundi, mardi, mercredi 11 h 59 : dans les temps", () => {
+    expect(precommandeEnRetard(new Date("2026-09-28T09:00:00+02:00"))).toBe(false);
+    expect(precommandeEnRetard(new Date("2026-09-29T22:00:00+02:00"))).toBe(false);
+    expect(precommandeEnRetard(new Date("2026-09-30T11:59:00+02:00"))).toBe(false);
+  });
+  it("mercredi 12 h, jeudi, dimanche soir : en retard", () => {
+    expect(precommandeEnRetard(new Date("2026-09-30T12:00:00+02:00"))).toBe(true);
+    expect(precommandeEnRetard(new Date("2026-10-01T08:00:00+02:00"))).toBe(true);
+    expect(precommandeEnRetard(new Date("2026-10-04T23:30:00+02:00"))).toBe(true);
+  });
+  it("heure de Paris et non UTC : mercredi 11 h 30 à Paris = 9 h 30 UTC", () => {
+    expect(precommandeEnRetard(new Date("2026-09-30T09:30:00Z"))).toBe(false);
+    expect(precommandeEnRetard(new Date("2026-09-30T10:30:00Z"))).toBe(true);
   });
 });

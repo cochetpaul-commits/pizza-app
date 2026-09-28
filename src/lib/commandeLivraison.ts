@@ -61,3 +61,13 @@ export function livraisonPrecommande(quand: Date = new Date()): { date: string; 
   const date = ajouterJours(ici.date, 7 - depuisLundi + 2); // lundi suivant + 2 jours
   return { date, libelle: libelleDate(date) };
 }
+
+/**
+ * Limite Maël pour la précommande : le mercredi avant 12 h (heure de Paris).
+ * Envoyée du mercredi 12 h au dimanche soir → en retard (avertissement, jamais bloqué).
+ */
+export function precommandeEnRetard(quand: Date = new Date()): boolean {
+  const ici = maintenantParis(quand);
+  const depuisLundi = (ici.jour + 6) % 7; // lundi = 0 … mercredi = 2 … dimanche = 6
+  return depuisLundi > 2 || (depuisLundi === 2 && ici.heure >= "12:00");
+}

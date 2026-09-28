@@ -1289,7 +1289,7 @@ function CommandesPage() {
 
   /** Aperçu d'envoi (GET /api/commandes/send-email) : rien n'est envoyé avant « Confirmer l'envoi » */
   type ApercuEnvoi = {
-    fournisseur: string; type?: "jour" | "precommande"; nb_produits: number; total_ht: number;
+    fournisseur: string; type?: "jour" | "precommande"; avertissement?: string | null; nb_produits: number; total_ht: number;
     livraison: { date: string; libelle: string } | null; adresse: string;
     destinataires: string[]; deja_envoyee_le: string | null; refus: string | null;
   };
@@ -2954,6 +2954,11 @@ function CommandesPage() {
                   <div>Livraison : <strong>{a.livraison?.libelle ?? "date non définie"}</strong></div>
                   <div style={{ fontSize: 13, color: "#6f6656" }}>{a.adresse}</div>
                   <div style={{ fontSize: 13, color: "#6f6656" }}>À : {a.destinataires.length ? a.destinataires.join(", ") : "aucun contact coché « Commandes »"}</div>
+                  {a.avertissement && (
+                    <div style={{ fontSize: 14, fontWeight: 600, background: "#fbf0dc", color: "#7a5a2b", border: "1px solid #f0d49c", borderRadius: 8, padding: "10px 12px" }}>
+                      {a.avertissement}
+                    </div>
+                  )}
                   {a.deja_envoyee_le && (
                     <div style={{ fontSize: 13, background: "#fbf0dc", color: "#7a5a2b", borderRadius: 8, padding: "8px 10px" }}>
                       Déjà envoyée le {new Date(a.deja_envoyee_le).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} : ce mail la remplacera (mise à jour).
