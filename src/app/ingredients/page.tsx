@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef, Suspense } from "react";
-import { BlocCommandeFournisseur } from "@/components/commandes/BlocCommandeFournisseur";
+import { BlocCommandeFournisseur, type EnregistreurBloc } from "@/components/commandes/BlocCommandeFournisseur";
 import { RecoverProductsModal } from "@/components/RecoverProductsModal";
 import { DuplicatesModal } from "@/components/DuplicatesModal";
 import { ImportExportModal } from "@/components/ImportExportModal";
@@ -161,6 +161,8 @@ function IngredientsPageInner() {
   const editParam = searchParams.get("edit");
   /** Ouverte depuis l'écran de commande : fournisseur dont on peut corriger le conditionnement de commande */
   const fournisseurParam = searchParams.get("fournisseur");
+  /** Enregistrement du bloc « Commande chez … », fait par le même bouton « Enregistrer » que la fiche */
+  const enregistreurBloc = useRef<EnregistreurBloc | null>(null);
   const supplierParam = searchParams.get("supplier");
 
   const [tab, setTab] = useState<Tab>("all");
@@ -972,7 +974,12 @@ function IngredientsPageInner() {
   const saveEdit = useCallback(async () => {
     if (savingRef.current) return;
     savingRef.current = true;
-    try { await runSaveEdit(); } finally { savingRef.current = false; }
+    try {
+      // D'abord le conditionnement de commande (s'il a été modifié) : en cas d'erreur, on reste sur la fiche, rien n'est perdu
+      const erreurBloc = enregistreurBloc.current ? await enregistreurBloc.current() : null;
+      if (erreurBloc) { alert(`Conditionnement de commande : ${erreurBloc}`); return; }
+      await runSaveEdit();
+    } finally { savingRef.current = false; }
   }, [runSaveEdit]);
 
   const del = useCallback(async (id: string, name: string) => {
@@ -1515,8 +1522,8 @@ function IngredientsPageInner() {
                             }}
                             subCategorySuggestions={subCategorySuggestions}
                           />
-                          {fournisseurParam && x.id === editParam && (
-                            <BlocCommandeFournisseur supplierId={fournisseurParam} ingredientId={x.id} />
+                          {fournisseurParam && x.id === editParam && editingId === x.id && (
+                            <BlocCommandeFournisseur supplierId={fournisseurParam} ingredientId={x.id} enregistreur={enregistreurBloc} />
                           )}
                         </div>
                       );

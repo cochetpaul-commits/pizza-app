@@ -11,7 +11,8 @@ import {
 /**
  * Fiche produit ouverte depuis l'écran de commande : conditionnement de commande chez ce fournisseur
  * (commande_articles : unité de commande, contenu, élément, taille, commande à l'élément).
- * Modifiable par les admins et les managers ; enregistré à part de la fiche (bouton du bloc).
+ * Modifiable par les admins et les managers ; enregistré par le bouton « Enregistrer » de la fiche
+ * (la fiche appelle l'enregistreur fourni par ce bloc avant d'enregistrer le produit : un seul bouton, rien de perdu).
  */
 
 type Form = { unite_commande: string; contenu_nb: string; element: string; element_qte: string; element_unite: string; commande_element_permise: boolean };
@@ -28,7 +29,14 @@ const versForm = (a: CommandeArticle): Form => ({
 });
 const nombre = (s: string) => (s.trim() === "" ? null : Number(s.replace(",", ".")));
 
-export function BlocCommandeFournisseur({ supplierId, ingredientId }: { supplierId: string; ingredientId: string }) {
+/** Enregistre le bloc s'il a été modifié ; renvoie un message d'erreur, ou null si tout va bien (ou rien à enregistrer) */
+export type EnregistreurBloc = () => Promise<string | null>;
+
+export function BlocCommandeFournisseur({ supplierId, ingredientId, enregistreur }: {
+  supplierId: string; ingredientId: string;
+  /** Rempli par le bloc : la fiche l'appelle quand on appuie sur « Enregistrer » */
+  enregistreur: React.MutableRefObject<EnregistreurBloc | null>;
+}) {
   const { canWrite } = useProfile();
   const [donnees, setDonnees] = useState<Reponse | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -57,6 +65,31 @@ export function BlocCommandeFournisseur({ supplierId, ingredientId }: { supplier
   const apercu = verif?.ok ? { ...verif.valeur, precommande: false } : null;
   const modifie = !!(donnees?.article && form && JSON.stringify(versForm(donnees.article)) !== JSON.stringify(form));
 
+  // Enregistreur appelé par le bouton « Enregistrer » de la fiche (toujours avec la saisie la plus récente)
+  useEffect(() => {
+    enregistreur.current = async () => {
+      if (!canWrite || !modifie || !saisie) return null;
+      if (!verif?.ok) return verif?.erreur ?? "Conditionnement invalide";
+      setEnvoi(true); setMessage(null);
+      try {
+        const res = await fetchApi("/api/commandes/articles", {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ supplier_id: supplierId, ingredient_id: ingredientId, ...saisie }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) { const e = json.error ?? "Enregistrement impossible"; setMessage(e); return e; }
+        setDonnees((d) => (d && d.article ? { ...d, article: { ...d.article, ...verif.valeur } } : d));
+        setMessage(`Enregistré : ${json.libelle}`);
+        return null;
+      } catch {
+        const e = "Enregistrement impossible, vérifie la connexion";
+        setMessage(e);
+        return e;
+      } finally { setEnvoi(false); }
+    };
+    return () => { enregistreur.current = null; };
+  }, [enregistreur, canWrite, modifie, saisie, verif, supplierId, ingredientId]);
+
   if (!canWrite) return null;
   const cadre: React.CSSProperties = { background: "#fff8ee", border: `1.5px solid ${ACCENT}55`, borderRadius: 14, padding: 14, margin: "8px 0 14px" };
   if (erreur) return <div style={cadre}><div style={{ fontSize: 13, color: "#8a2b2b" }}>{erreur}</div></div>;
@@ -67,21 +100,6 @@ export function BlocCommandeFournisseur({ supplierId, ingredientId }: { supplier
 
   const auPoids = form.unite_commande === "kg" || form.unite_commande === "litre";
   const maj = (p: Partial<Form>) => { setForm((f) => (f ? { ...f, ...p } : f)); setMessage(null); };
-
-  const enregistrer = async () => {
-    if (!saisie || !verif?.ok) return;
-    setEnvoi(true); setMessage(null);
-    try {
-      const res = await fetchApi("/api/commandes/articles", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ supplier_id: supplierId, ingredient_id: ingredientId, ...saisie }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) { setMessage(json.error ?? "Enregistrement impossible"); return; }
-      setDonnees((d) => (d && d.article ? { ...d, article: { ...d.article, ...verif.valeur } } : d));
-      setMessage(`Enregistré : ${json.libelle}${json.libelle_element ? ` · à l'élément : ${json.libelle_element}` : ""}`);
-    } finally { setEnvoi(false); }
-  };
 
   return (
     <div style={cadre}>
@@ -132,17 +150,11 @@ export function BlocCommandeFournisseur({ supplierId, ingredientId }: { supplier
           : <span style={{ color: "#8a2b2b" }}>{verif && !verif.ok ? verif.erreur : ""}</span>}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-        <button type="button" onClick={enregistrer} disabled={!modifie || !verif?.ok || envoi}
-          style={{
-            height: 44, padding: "0 18px", borderRadius: 12, border: "none", fontSize: 14, fontWeight: 700, fontFamily: "inherit",
-            background: !modifie || !verif?.ok ? "#e3dccf" : ACCENT, color: !modifie || !verif?.ok ? "#9a917f" : "#fff",
-            cursor: !modifie || !verif?.ok ? "default" : "pointer",
-          }}>
-          {envoi ? "Enregistrement…" : "Enregistrer le conditionnement"}
-        </button>
-        {modifie && !message && <span style={{ fontSize: 12, color: "#b45309" }}>Modifié, pas encore enregistré</span>}
-        {message && <span style={{ fontSize: 12.5, color: message.startsWith("Enregistré") ? "#2D6A4F" : "#8a2b2b" }}>{message}</span>}
+      <div style={{ marginTop: 10, fontSize: 12.5, minHeight: 18 }}>
+        {envoi ? <span style={{ color: "#6f6656" }}>Enregistrement…</span>
+          : message ? <span style={{ color: message.startsWith("Enregistré") ? "#2D6A4F" : "#8a2b2b" }}>{message}</span>
+          : modifie ? <span style={{ color: "#b45309" }}>Modifié : sera enregistré avec la fiche (bouton « Enregistrer »)</span>
+          : null}
       </div>
     </div>
   );
