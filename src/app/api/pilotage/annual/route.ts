@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const etabId = req.nextUrl.searchParams.get("etablissement_id");
   const year = parseInt(req.nextUrl.searchParams.get("year") ?? String(new Date().getFullYear()));
   if (!etabId) return NextResponse.json({ error: "etablissement_id required" }, { status: 400 });
-  const denied = await etabAccessDenied(req, etabId);
+  const denied = await etabAccessDenied(req, etabId, ["group_admin"]);
   if (denied) return denied;
 
 

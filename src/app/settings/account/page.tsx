@@ -12,6 +12,8 @@ import { compressImage } from "@/lib/compressImage";
  * Le rôle et le poste sont affichés en lecture seule (gérés par la fiche).
  */
 
+const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+
 type Me = {
   userId: string;
   email: string | null;
@@ -19,7 +21,8 @@ type Me = {
   prenom: string;
   nom: string;
   telMobile: string;
-  adresse: string;
+  emailFiche: string;
+  dispos: Record<string, string>;
   avatarUrl: string | null;
   poste: string | null;
   equipe: string | null;
@@ -66,7 +69,7 @@ export default function MonComptePage() {
       const [{ data: profile }, { data: emps }] = await Promise.all([
         supabase.from("profiles").select("role").eq("id", user.id).maybeSingle(),
         supabase.from("employes")
-          .select("prenom, nom, tel_mobile, adresse, avatar_url, role, etablissement_id, postes(nom, equipe), etablissements(nom)")
+          .select("prenom, nom, tel_mobile, email, disponibilites, avatar_url, role, etablissement_id, postes(nom, equipe), etablissements(nom)")
           .eq("auth_user_id", user.id)
           .eq("actif", true),
       ]);
@@ -84,7 +87,8 @@ export default function MonComptePage() {
         prenom: (first?.prenom as string) ?? "",
         nom: (first?.nom as string) ?? "",
         telMobile: (first?.tel_mobile as string) ?? "",
-        adresse: (first?.adresse as string) ?? "",
+        emailFiche: (first?.email as string) ?? "",
+        dispos: (first?.disponibilites as Record<string, string> | null) ?? {},
         avatarUrl: (first?.avatar_url as string) ?? null,
         poste: poste?.nom ?? null,
         equipe: poste?.equipe ?? null,
@@ -99,7 +103,8 @@ export default function MonComptePage() {
     setSaving(true); setMsg("");
     const { error } = await supabase
       .from("employes")
-      .update({ tel_mobile: me.telMobile || null, adresse: me.adresse || null })
+      // Seuls champs modifiables par l'employé lui-même : téléphone, e-mail de contact, disponibilités
+      .update({ tel_mobile: me.telMobile || null, email: me.emailFiche.trim() || null, disponibilites: me.dispos })
       .eq("auth_user_id", me.userId);
     setMsg(error ? `Erreur : ${error.message}` : "Coordonnées enregistrées");
     setSaving(false);
@@ -228,8 +233,27 @@ export default function MonComptePage() {
           <input style={inputSt} value={me?.telMobile ?? ""} onChange={(e) => setMe(p => p ? { ...p, telMobile: e.target.value } : p)} />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={labelSt}>Adresse</label>
-          <input style={inputSt} value={me?.adresse ?? ""} onChange={(e) => setMe(p => p ? { ...p, adresse: e.target.value } : p)} />
+          <label style={labelSt}>E-mail de contact</label>
+          <input type="email" style={inputSt} value={me?.emailFiche ?? ""} onChange={(e) => setMe(p => p ? { ...p, emailFiche: e.target.value } : p)} />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelSt}>Mes disponibilités</label>
+          {JOURS.map((j, idx) => {
+            const v = String(me?.dispos?.[String(idx)] ?? "journee");
+            const val = v === "false" || v === "indisponible" ? "indisponible" : v === "matin" || v === "soir" ? v : "journee";
+            return (
+              <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 80, fontSize: 13, color: "#1a1a1a" }}>{j}</span>
+                <select style={{ ...inputSt, flex: 1 }} value={val}
+                  onChange={(e) => setMe(p => p ? { ...p, dispos: { ...p.dispos, [String(idx)]: e.target.value } } : p)}>
+                  <option value="journee">Journée</option>
+                  <option value="matin">Matin</option>
+                  <option value="soir">Soir</option>
+                  <option value="indisponible">Indisponible</option>
+                </select>
+              </div>
+            );
+          })}
         </div>
         <button type="button" onClick={saveCoords} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>
           Enregistrer

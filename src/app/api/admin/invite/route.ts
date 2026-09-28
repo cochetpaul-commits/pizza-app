@@ -1,150 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { adminAppelant } from "@/lib/getEtablissement";
+import { AccesErreur, inviter } from "@/lib/accesEquipe";
+import { origineSite } from "@/lib/origineSite";
 
-async function getCallerRole(req: NextRequest): Promise<string | null> {
-  // Try Authorization header first
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    const token = authHeader.replace("Bearer ", "");
-    try {
-      // Use admin client to verify token (avoids JWT kid issues)
-      const { data } = await supabaseAdmin.auth.getUser(token);
-      if (data.user) {
-        const { data: profile } = await supabaseAdmin
-          .from("profiles")
-          .select("role")
-          .eq("id", data.user.id)
-          .maybeSingle();
-        return profile?.role ?? null;
-      }
-    } catch { /* token invalid */ }
-  }
+export const runtime = "nodejs";
 
-  // Try cookie-based auth
-  const cookieHeader = req.headers.get("cookie") ?? "";
-  const sbAccessToken = cookieHeader
-    .split(";")
-    .map(c => c.trim())
-    .find(c => c.startsWith("sb-") && c.includes("-auth-token"))
-    ?.split("=")[1];
-
-  if (sbAccessToken) {
-    try {
-      const decoded = JSON.parse(decodeURIComponent(sbAccessToken));
-      const token = decoded?.[0] ?? decoded?.access_token ?? sbAccessToken;
-      const { data } = await supabaseAdmin.auth.getUser(token);
-      if (data.user) {
-        const { data: profile } = await supabaseAdmin
-          .from("profiles")
-          .select("role")
-          .eq("id", data.user.id)
-          .maybeSingle();
-        return profile?.role ?? null;
-      }
-    } catch { /* ignore parse errors */ }
-  }
-
-  return null;
-}
-
-/** POST — invite a new user by email */
+/** POST — ancienne adresse de l'invitation : mêmes règles que /api/admin/acces (admins, compte existant refusé). */
 export async function POST(req: NextRequest) {
-  const callerRole = await getCallerRole(req);
-  if (callerRole !== "admin" && callerRole !== "group_admin" && callerRole !== "manager") {
-    return NextResponse.json({ error: `Acces refuse (role: ${callerRole ?? "inconnu"})` }, { status: 403 });
+  const a = await adminAppelant(req);
+  if (a instanceof NextResponse) return a;
+  try {
+    const { email, role, displayName, etablissementsAccess } = await req.json();
+    const r = await inviter({ email, nom: displayName, role, etablissements: etablissementsAccess }, a.userId, origineSite(req));
+    return NextResponse.json({ ok: true, userId: r.id });
+  } catch (e) {
+    if (e instanceof AccesErreur) return NextResponse.json({ error: e.message }, { status: e.status });
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Erreur" }, { status: 500 });
   }
-
-  const body = await req.json();
-  const { email, role, displayName, etablissementsAccess } = body as {
-    email?: string; role?: string; displayName?: string; etablissementsAccess?: string[];
-  };
-
-  if (!email) {
-    return NextResponse.json({ error: "Email requis" }, { status: 400 });
-  }
-
-  // Normalize role for Supabase profile
-  const profileRole = role ?? "equipier";
-
-  // Invite user — use production URL, never localhost
-  const reqOrigin = new URL(req.url).origin;
-  const origin = process.env.NEXT_PUBLIC_SITE_URL
-    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
-    || (reqOrigin.includes("localhost") ? "https://pizza-app-olive-five.vercel.app" : reqOrigin);
-  let inviteData: { user: { id: string } | null } = { user: null };
-
-  const { data: firstTry, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-    data: { display_name: displayName || email, role: profileRole },
-    redirectTo: `${origin}/auth/setup-password`,
-  });
-
-  if (inviteErr) {
-    // If user already exists, delete the unconfirmed auth user and re-invite
-    const isAlreadyRegistered = inviteErr.message.toLowerCase().includes("already");
-    if (isAlreadyRegistered) {
-      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-      const existingUser = existingUsers?.users?.find(u => u.email === email);
-      if (existingUser) {
-        // Only delete if user never confirmed (never completed invitation)
-        if (!existingUser.email_confirmed_at) {
-          await supabaseAdmin.auth.admin.deleteUser(existingUser.id);
-          // Re-invite
-          const { data: retryData, error: retryErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-            data: { display_name: displayName || email, role: profileRole },
-            redirectTo: `${origin}/auth/setup-password`,
-          });
-          if (retryErr) return NextResponse.json({ error: retryErr.message }, { status: 500 });
-          inviteData = retryData as { user: { id: string } | null };
-        } else {
-          // User already confirmed — send a password reset instead
-          const { error: resetErr } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-            redirectTo: `${origin}/auth/setup-password`,
-          });
-          if (resetErr) return NextResponse.json({ error: resetErr.message }, { status: 500 });
-          inviteData = { user: { id: existingUser.id } };
-        }
-      } else {
-        return NextResponse.json({ error: inviteErr.message }, { status: 500 });
-      }
-    } else {
-      return NextResponse.json({ error: inviteErr.message }, { status: 500 });
-    }
-  } else {
-    inviteData = firstTry as { user: { id: string } | null };
-  }
-
-  // Update profile role + establishment access
-  if (inviteData.user) {
-    // Lier TOUTES les fiches employés à cet email (un employé peut exister
-    // dans les deux établissements) et en déduire les accès.
-    let etabAccess = etablissementsAccess ?? [];
-    const { data: emps } = await supabaseAdmin
-      .from("employes")
-      .select("id, etablissement_id")
-      .ilike("email", email)
-      .eq("actif", true);
-    if (emps && emps.length > 0) {
-      await supabaseAdmin.from("employes")
-        .update({ auth_user_id: inviteData.user.id })
-        .in("id", emps.map(e => e.id));
-      if (etabAccess.length === 0) {
-        etabAccess = [...new Set(emps.map(e => e.etablissement_id).filter(Boolean))] as string[];
-      }
-    }
-
-    const profileUpdate: Record<string, unknown> = {
-      role: profileRole,
-      display_name: displayName || email,
-      updated_at: new Date().toISOString(),
-    };
-    if (etabAccess.length > 0) {
-      profileUpdate.etablissements_access = etabAccess;
-    }
-    await supabaseAdmin
-      .from("profiles")
-      .update(profileUpdate)
-      .eq("id", inviteData.user.id);
-  }
-
-  return NextResponse.json({ ok: true, userId: inviteData.user?.id });
 }

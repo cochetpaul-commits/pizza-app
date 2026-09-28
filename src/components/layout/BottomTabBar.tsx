@@ -384,6 +384,7 @@ const SECTION_SETTINGS: TabSection = {
   tabs: [
     { label: "Categories", href: "/settings/categories", match: ["/settings/categories"], icon: () => <IconTag /> },
     { label: "Etablissement", href: "/settings/etablissements", match: ["/settings/etablissements"], icon: () => <IconStore /> },
+    { label: "Accès équipe", href: "/settings/acces", match: ["/settings/acces"], icon: () => <IconUsers /> },
     { label: "Fournisseurs", href: "/fournisseurs", match: ["/fournisseurs"], icon: () => <IconTruck /> },
     { label: "Mon compte", href: "/settings/account", match: ["/settings/account"], icon: () => <IconUsers /> },
   ],

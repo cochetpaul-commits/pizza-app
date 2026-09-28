@@ -40,7 +40,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     async function fetchProfile(userId: string) {
       const { data, error } = await supabase
         .from("profiles")
-        .select("role, display_name")
+        .select("role, display_name, desactive_le")
         .eq("id", userId)
         .maybeSingle();
       if (cancelled) return;
@@ -56,6 +56,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           setDisplayName(null);
         }
         setLoading(false);
+        return;
+      }
+      // Compte désactivé : déconnexion immédiate
+      if (data?.desactive_le) {
+        await supabase.auth.signOut();
+        if (cancelled) return;
+        setRole(null); setCustomPerms({}); setLoading(false);
         return;
       }
       const profileRole = data ? normalizeRole(data.role as string) : "equipier";
@@ -97,20 +104,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       }
 
       const mergedPerms: Record<string, boolean> = {};
-      let bestEmpRole: Role = "equipier";
-      const ROLE_RANK: Record<Role, number> = { group_admin: 3, manager: 2, equipier: 1 };
       for (const emp of empRows ?? []) {
         const perms = (emp.custom_permissions ?? {}) as Record<string, boolean>;
         // En cas de conflit entre fiches, l'accès accordé l'emporte
         for (const [k, v] of Object.entries(perms)) mergedPerms[k] = mergedPerms[k] === true ? true : v;
-        const r = emp.role ? normalizeRole(emp.role as string) : "equipier";
-        if (ROLE_RANK[r] > ROLE_RANK[bestEmpRole]) bestEmpRole = r;
       }
       setCustomPerms(mergedPerms);
 
-      // Use the highest role between profiles and employes
-      const effectiveRole = ROLE_RANK[bestEmpRole] > ROLE_RANK[profileRole] ? bestEmpRole : profileRole;
-      setRole(effectiveRole);
+      // Le rôle vient du compte (profiles) uniquement — c'est lui que la base et le serveur contrôlent
+      setRole(profileRole);
 
       setLoading(false);
     }

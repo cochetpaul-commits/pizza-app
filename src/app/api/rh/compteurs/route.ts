@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getEtablissement, EtabError } from "@/lib/getEtablissement";
+import { getEtablissement, EtabError, roleDenied } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +12,8 @@ export const dynamic = "force-dynamic";
  * Le solde_rc est le cumul : solde_rc du mois précédent + rc_acquis du mois.
  */
 export async function GET(req: NextRequest) {
+  const refus = await roleDenied(req, ["group_admin", "manager"]);
+  if (refus) return refus;
   let etabId: string;
   try {
     ({ etabId } = await getEtablissement(req));
@@ -47,6 +49,8 @@ export async function GET(req: NextRequest) {
  * Calcule automatiquement solde_rc = solde_rc du mois précédent + rc_acquis.
  */
 export async function POST(req: NextRequest) {
+  const refus = await roleDenied(req, ["group_admin", "manager"]);
+  if (refus) return refus;
   let etabId: string;
   try {
     ({ etabId } = await getEtablissement(req));

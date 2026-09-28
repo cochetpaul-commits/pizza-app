@@ -241,6 +241,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         items: [
           { label: "Etablissement", href: "/settings/etablissements", icon: "building" },
           { label: "Categories", href: "/settings/categories", icon: "tag" },
+          { label: "Accès de l'équipe", href: "/settings/acces", icon: "users" },
           { label: "Fournisseurs", href: "/fournisseurs", icon: "truck" },
         ],
       },

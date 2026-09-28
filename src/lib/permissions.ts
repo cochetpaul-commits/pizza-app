@@ -80,7 +80,7 @@ export const PERM_SECTIONS: PermSection[] = [
 /** Matrice des permissions par defaut de chaque role */
 export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
   equipier: {
-    "performances.view": true, "performances.pilotage": false, "performances.show_money": false,
+    "performances.view": false, "performances.pilotage": false, "performances.show_money": false,
     "operations.recettes": true, "operations.edit_recettes": false,
     "achats.view": false, "achats.edit": true, "commandes.valider": false, "achats.inventaire": true,
     "profil.view_team": false, "heures.edit_team": false,

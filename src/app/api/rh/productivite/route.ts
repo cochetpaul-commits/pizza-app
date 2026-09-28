@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getEtablissement, EtabError } from "@/lib/getEtablissement";
+import { getEtablissement, EtabError, roleDenied } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +10,8 @@ export const dynamic = "force-dynamic";
  * Retourne par jour : nb_shifts, heures_planifiees, ca, couverts
  */
 export async function GET(req: NextRequest) {
+  const refus = await roleDenied(req, ["group_admin", "manager"]);
+  if (refus) return refus;
   let etabId: string;
   try {
     ({ etabId } = await getEtablissement(req));

@@ -1,5 +1,6 @@
 "use client";
 
+import { EMPLOYE_COLONNES } from "@/lib/employeColonnes";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
@@ -251,7 +252,7 @@ export default function PointagePage() {
 
     const empRes = await supabase
       .from("employes")
-      .select("*")
+      .select(EMPLOYE_COLONNES)
       .contains("etablissements_ids", [etab.id])
       .eq("actif", true)
       .order("nom");

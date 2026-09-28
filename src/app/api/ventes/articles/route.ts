@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { etabAccessDenied } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
@@ -29,6 +30,8 @@ export async function GET(req: NextRequest) {
   if (!etabId) {
     return NextResponse.json({ error: "etablissement_id requis" }, { status: 400 });
   }
+  const refus = await etabAccessDenied(req, etabId);
+  if (refus) return refus;
 
   /* 1. Fetch existing articles_vente */
   const { data: articles, error: artErr } = await supabaseAdmin
@@ -143,6 +146,8 @@ export async function POST(req: NextRequest) {
     if (!etablissement_id || !nom_vente) {
       return NextResponse.json({ error: "etablissement_id et nom_vente requis" }, { status: 400 });
     }
+    const refus = await etabAccessDenied(req, etablissement_id, ["group_admin", "manager"]);
+    if (refus) return refus;
 
     /* Calculate cout_unitaire */
     let cout_unitaire: number | null = null;
@@ -274,6 +279,10 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "id requis" }, { status: 400 });
   }
 
+  const { data: article } = await supabaseAdmin.from("articles_vente").select("etablissement_id").eq("id", id).maybeSingle();
+  if (!article) return NextResponse.json({ error: "Article introuvable" }, { status: 404 });
+  const refus = await etabAccessDenied(req, article.etablissement_id as string, ["group_admin", "manager"]);
+  if (refus) return refus;
   const { error } = await supabaseAdmin.from("articles_vente").delete().eq("id", id);
 
   if (error) {

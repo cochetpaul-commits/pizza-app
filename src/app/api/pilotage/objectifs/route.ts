@@ -13,7 +13,7 @@ const supabase = createClient(
 export async function GET(req: NextRequest) {
   const etabId = req.nextUrl.searchParams.get("etablissement_id");
   if (!etabId) return NextResponse.json({ error: "etablissement_id requis" }, { status: 400 });
-  const denied = await etabAccessDenied(req, etabId);
+  const denied = await etabAccessDenied(req, etabId, ["group_admin", "manager"]);
   if (denied) return denied;
 
 

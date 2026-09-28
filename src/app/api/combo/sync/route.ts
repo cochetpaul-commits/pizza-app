@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { roleDenied } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getContracts, getLocations, COMBO_LOCATIONS, type ComboContract } from "@/lib/combo/api";
 
@@ -10,7 +11,9 @@ import { getContracts, getLocations, COMBO_LOCATIONS, type ComboContract } from 
  * - Match par combo_id, puis par email, puis par nom
  * - Met a jour ou cree les employes
  */
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const refus = await roleDenied(req, ["group_admin"]);
+  if (refus) return refus;
   try {
     const locations = await getLocations();
     const results: { location: string; created: number; updated: number; total: number }[] = [];

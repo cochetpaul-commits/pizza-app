@@ -1,5 +1,12 @@
 "use client";
 
+import { EMPLOYE_COLONNES } from "@/lib/employeColonnes";
+
+/** Contrats actifs avec rémunération : admins uniquement (fonction contrats_admin) */
+async function lireContratsActifs(empIds: string[]) {
+  const { data } = await supabase.rpc("contrats_admin", { p_employe_ids: empIds });
+  return { data: ((data ?? []) as { actif: boolean }[]).filter((c) => c.actif) };
+}
 import { useEffect, useState, useMemo, type CSSProperties } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
@@ -167,11 +174,11 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
   /* ── Load ── */
   const loadEmployes = async (etabId: string): Promise<Employe[]> => {
     const empRes = await supabase
-      .from("employes").select("*")
+      .from("employes").select(EMPLOYE_COLONNES)
       .contains("etablissements_ids", [etabId]).eq("actif", true).order("nom");
     const empIds = (empRes.data ?? []).map((e: Record<string, unknown>) => e.id as string);
     const contratRes = empIds.length > 0
-      ? await supabase.from("contrats").select("*").eq("actif", true).in("employe_id", empIds)
+      ? await lireContratsActifs(empIds)
       : { data: [] };
     const contrats = (contratRes.data ?? []) as Contrat[];
     return (empRes.data ?? []).map((e: Record<string, unknown>) => ({
@@ -190,13 +197,13 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
       if (cancelled) return;
       setSalaryOverrides(savedOverrides && typeof savedOverrides === "object" ? savedOverrides : {});
       const empRes = await supabase
-        .from("employes").select("*")
+        .from("employes").select(EMPLOYE_COLONNES)
         .contains("etablissements_ids", [etab.id]).eq("actif", true).order("nom");
       if (cancelled) return;
 
       const empIds = (empRes.data ?? []).map((e: Record<string, unknown>) => e.id as string);
       const contratRes = empIds.length > 0
-        ? await supabase.from("contrats").select("*").eq("actif", true).in("employe_id", empIds)
+        ? await lireContratsActifs(empIds)
         : { data: [] };
       if (cancelled) return;
 

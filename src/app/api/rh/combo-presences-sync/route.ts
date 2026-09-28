@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { roleDenied } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getContracts, getPlannings, getLocations, COMBO_LOCATIONS } from "@/lib/combo/api";
 
@@ -10,6 +11,8 @@ import { getContracts, getPlannings, getLocations, COMBO_LOCATIONS } from "@/lib
  * and upserts into combo_presences.
  */
 export async function POST(req: NextRequest) {
+  const refus = await roleDenied(req, ["group_admin"]);
+  if (refus) return refus;
   try {
     const { from, to } = await req.json();
     if (!from || !to) return NextResponse.json({ error: "from et to requis" }, { status: 400 });

@@ -1,5 +1,7 @@
 "use client";
 
+import { EMPLOYE_COLONNES } from "@/lib/employeColonnes";
+import { useProfile } from "@/lib/ProfileContext";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -20,12 +22,7 @@ type Employe = {
   equipes_access: string[];
   email: string | null;
   tel_mobile: string | null;
-  date_naissance: string | null;
-  adresse: string | null;
-  code_postal: string | null;
-  ville: string | null;
   role: string | null;
-  code_pin: string | null;
   auth_user_id: string | null;
   postes?: { nom: string; equipe: string | null } | null;
 };
@@ -52,6 +49,7 @@ function getEtabColor(etabSlug?: string): string {
 export default function EquipePage() {
   const router = useRouter();
   const { current: etab } = useEtablissement();
+  const { isGroupAdmin } = useProfile();
 
   const [employes, setEmployes] = useState<Employe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,12 +68,12 @@ export default function EquipePage() {
       setLoading(true);
       const empRes = await supabase
         .from("employes")
-        .select("*, postes(nom, equipe)")
+        .select(`${EMPLOYE_COLONNES}, postes(nom, equipe)` as const)
         .contains("etablissements_ids", [etab.id])
         .order("nom", { ascending: true });
       if (cancelled) return;
       const emps = empRes.data ?? [];
-      setEmployes(emps);
+      setEmployes(emps as unknown as Employe[]);
 
       setLoading(false);
     })();
@@ -101,6 +99,7 @@ export default function EquipePage() {
             padding: "8px 16px", borderRadius: 10, border: "none",
             background: "#2D6A4F", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
           }}>+ Ajouter un employe</button>
+          {isGroupAdmin && (
           <button type="button" disabled={syncing} onClick={async () => {
             setSyncing(true); setSyncResult("");
             try {
@@ -121,6 +120,7 @@ export default function EquipePage() {
             border: "1.5px solid #2563EB", background: "#fff", color: "#2563EB",
             opacity: syncing ? 0.5 : 1,
           }}>{syncing ? "Synchronisation..." : "Sync Combo"}</button>
+          )}
           {syncResult && <span style={{ fontSize: 11, color: syncResult.startsWith("Erreur") ? "#DC2626" : "#2D6A4F", fontWeight: 600 }}>{syncResult}</span>}
         </div>
 
@@ -212,7 +212,7 @@ export default function EquipePage() {
                       <td style={{ ...tdStyle, textAlign: "center" }}>
                         {emp.auth_user_id ? (
                           <span style={{ fontSize: 10, fontWeight: 700, color: "#2D6A4F", padding: "3px 8px", borderRadius: 6, background: "#2D6A4F10", border: "1px solid #2D6A4F30" }}>Connecte</span>
-                        ) : emp.email ? (
+                        ) : emp.email && isGroupAdmin ? (
                           <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
                             {inviteStatus[emp.id] === "sending" ? (
                               <span style={{ fontSize: 10, color: "#999", fontWeight: 600 }}>Envoi...</span>
@@ -235,7 +235,7 @@ export default function EquipePage() {
                                   const res = await fetchApi("/api/admin/invite", {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-                                    body: JSON.stringify({ email: emp.email, displayName: `${emp.prenom} ${emp.nom}`, role: emp.role ?? "equipier", etablissementsAccess: emp.etablissement_id ? [emp.etablissement_id] : [] }),
+                                    body: JSON.stringify({ email: emp.email, displayName: `${emp.prenom} ${emp.nom}`, role: emp.role === "manager" || emp.role === "group_admin" ? emp.role : "equipier", etablissementsAccess: emp.etablissement_id ? [emp.etablissement_id] : [] }),
                                   });
                                   if (res.ok) {
                                     setInviteStatus(prev => ({ ...prev, [emp.id]: "sent" }));
@@ -253,6 +253,8 @@ export default function EquipePage() {
                               }}>Inviter</button>
                             )}
                           </div>
+                        ) : !isGroupAdmin ? (
+                          <span style={{ fontSize: 10, color: "#ccc" }}>—</span>
                         ) : (
                           <span style={{ fontSize: 10, color: "#ccc" }}>Pas d&apos;email</span>
                         )}

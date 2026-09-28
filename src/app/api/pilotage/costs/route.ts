@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   getParisDate, dateToISOWeek, isoWeekToMonday, fmtDateUTC,
 } from "@/lib/dateHelpers";
-import { getEtablissement, EtabError } from "@/lib/getEtablissement";
+import { getEtablissement, EtabError, roleDenied } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +38,8 @@ type RecipeCost = {
 };
 
 export async function GET(request: NextRequest) {
+  const refus = await roleDenied(request, ["group_admin", "manager"]);
+  if (refus) return refus;
   let etabId: string;
   try {
     ({ etabId } = await getEtablissement(request));

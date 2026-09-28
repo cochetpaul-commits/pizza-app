@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { etabAccessDenied } from "@/lib/getEtablissement";
 import { createClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
 
@@ -351,6 +352,8 @@ export async function POST(req: NextRequest) {
 
     if (!file) return NextResponse.json({ error: "Fichier manquant" }, { status: 400 });
     if (!etablissementId) return NextResponse.json({ error: "etablissement_id manquant" }, { status: 400 });
+    const refus = await etabAccessDenied(req, etablissementId, ["group_admin", "manager"]);
+    if (refus) return refus;
 
     const buffer = Buffer.from(await file.arrayBuffer());
     let rows: unknown[][];

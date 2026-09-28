@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
   if (!etabId || !from || !to) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
-  const denied = await etabAccessDenied(req, etabId);
+  const denied = await etabAccessDenied(req, etabId, ["group_admin", "manager"]);
   if (denied) return denied;
 
 

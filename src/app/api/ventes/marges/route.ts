@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       { status: 400 },
     );
   }
-  const denied = await etabAccessDenied(req, etabId);
+  const denied = await etabAccessDenied(req, etabId, ["group_admin", "manager"]);
   if (denied) return denied;
 
 

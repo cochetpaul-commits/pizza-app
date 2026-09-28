@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { pdfToText } from "@/lib/pdfToText";
 import { parseComboDocument } from "@/lib/combo/comboParser";
 import { matchEmployes } from "@/lib/combo/matchEmployes";
-import { resolveEtabId, EtabError } from "@/lib/getEtablissement";
+import { resolveEtabId, EtabError, roleDenied } from "@/lib/getEtablissement";
 
 export const runtime = "nodejs";
 
@@ -14,6 +14,8 @@ function getEnv(name: string): string {
 }
 
 export async function POST(req: Request) {
+  const refus = await roleDenied(req, ["group_admin"]);
+  if (refus) return refus;
   try {
     const form = await req.formData();
     const file = form.get("file");

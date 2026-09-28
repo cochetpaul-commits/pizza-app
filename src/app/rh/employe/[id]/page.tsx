@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
+import { EMPLOYE_COLONNES, EMPLOYE_CONFIDENTIEL, CONTRAT_COLONNES } from "@/lib/employeColonnes";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import Image from "next/image";
 import { PERM_SECTIONS, DEFAULT_PERMS, ROLE_INFO, mapToPermRole, type PermRole } from "@/lib/permissions";
@@ -64,6 +65,16 @@ const ABSENCE_LABELS: Record<string, string> = {
 };
 
 /* ── Component ─────────────────────────────────────────────────── */
+
+/** Contrats d'un employé : complets (rémunération) pour les admins, sans rémunération pour les managers */
+async function lireContrats(employeId: string, admin: boolean): Promise<Contrat[]> {
+  if (admin) {
+    const { data } = await supabase.rpc("contrats_admin", { p_employe_ids: [employeId] });
+    return ((data ?? []) as Contrat[]).sort((a, b) => (b.date_debut ?? "").localeCompare(a.date_debut ?? ""));
+  }
+  const { data } = await supabase.from("contrats").select(CONTRAT_COLONNES).eq("employe_id", employeId).order("date_debut", { ascending: false });
+  return ((data ?? []) as unknown as Omit<Contrat, "remuneration">[]).map((c) => ({ ...c, remuneration: 0 }));
+}
 
 export default function EmployeDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -209,13 +220,20 @@ export default function EmployeDetailPage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data: empData } = await supabase
+      const { data: empBase } = await supabase
         .from("employes")
-        .select("*")
+        .select(EMPLOYE_COLONNES)
         .eq("id", id)
         .single();
 
-      if (cancelled || !empData) { setLoading(false); return; }
+      if (cancelled || !empBase) { setLoading(false); return; }
+      // Données confidentielles (n° sécu, adresse, naissance…) : admins uniquement, par la fonction dédiée
+      let empData: Record<string, any> = empBase; // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (isGroupAdmin) {
+        const { data: conf } = await supabase.rpc("employe_confidentiel", { p_id: id });
+        if (conf) empData = { ...empBase, ...(conf as Record<string, unknown>) };
+      }
+      if (cancelled) return;
       setEmp(empData);
 
       // Load employee's establishment for correct color
@@ -292,12 +310,12 @@ export default function EmployeDetailPage() {
 
       // Load related
       const [contratsRes, absRes] = await Promise.all([
-        supabase.from("contrats").select("*").eq("employe_id", id).order("date_debut", { ascending: false }),
+        lireContrats(id, isGroupAdmin),
         supabase.from("absences").select("*").eq("employe_id", id).order("date_debut", { ascending: false }),
       ]);
 
       if (cancelled) return;
-      const cList = contratsRes.data ?? [];
+      const cList = contratsRes;
       setContrats(cList);
       setAbsences(absRes.data ?? []);
 
@@ -315,7 +333,7 @@ export default function EmployeDetailPage() {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, isGroupAdmin]);
 
   /* ── Save employee ── */
   const handleSave = async () => {
@@ -350,6 +368,8 @@ export default function EmployeDetailPage() {
     try {
       payload.note = note || null;
     } catch { /* ignore */ }
+    // Champs confidentiels : écrits par les admins seulement (ils ne sont pas chargés pour les autres)
+    if (!isGroupAdmin) for (const champ of EMPLOYE_CONFIDENTIEL) delete payload[champ];
 
     // Also update equipe from the hidden select
     const newEquipe = (document.getElementById("contrat-equipe") as HTMLSelectElement)?.value;
@@ -375,15 +395,14 @@ export default function EmployeDetailPage() {
     }
 
     // Also update active contrat fields (type, remuneration) if there is one
-    if (editContratId) {
+    if (editContratId && isGroupAdmin) {
       const { error: cErr } = await supabase
         .from("contrats")
         .update({ type: cType, remuneration: cRemuneration })
         .eq("id", editContratId);
       if (cErr) { setSaving(false); alert("Erreur contrat : " + cErr.message); return; }
       // Reload contrats
-      const { data } = await supabase.from("contrats").select("*").eq("employe_id", id).order("date_debut", { ascending: false });
-      setContrats(data ?? []);
+      setContrats(await lireContrats(id, isGroupAdmin));
     }
 
     setSaving(false);
@@ -442,8 +461,7 @@ export default function EmployeDetailPage() {
     }
 
     // Reload contrats
-    const { data } = await supabase.from("contrats").select("*").eq("employe_id", id).order("date_debut", { ascending: false });
-    setContrats(data ?? []);
+    setContrats(await lireContrats(id, isGroupAdmin));
     setShowContratModal(false);
     setEditContratId(null);
     setSaving(false);
@@ -1731,16 +1749,22 @@ function CompteAcces({ emp, setEmp, isGroupAdmin, etabIds, prenom, nom, email }:
     if (!isGroupAdmin || busy) return;
     setBusy(true); setMsg("");
     const { data: sess } = await supabase.auth.getSession();
-    const res = await fetchApi("/api/admin/set-role", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
-      body: JSON.stringify({ employeId: emp.id, role: appRole }),
-    });
-    const json = await res.json();
-    if (!res.ok) setMsg(json.error ?? "Erreur");
-    else {
-      setEmp(prev => ({ ...prev, role: appRole }));
-      setMsg(json.compteLie ? "Role mis a jour (fiche + compte)" : "Role mis a jour (fiche — pas encore de compte)");
+    const token = sess?.session?.access_token ?? "";
+    const compte = emp.auth_user_id ? String(emp.auth_user_id) : null;
+    if (compte) {
+      // Compte lié : même route et mêmes règles que l'écran « Accès de l'équipe » (journalisé)
+      const res = await fetchApi(`/api/admin/acces/${compte}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ role: appRole }),
+      });
+      const json = await res.json();
+      if (!res.ok) setMsg(json.error ?? "Erreur");
+      else { setEmp(prev => ({ ...prev, role: appRole })); setMsg("Role mis a jour (fiche + compte)"); }
+    } else {
+      const { error } = await supabase.from("employes").update({ role: appRole }).eq("id", emp.id);
+      if (error) setMsg(`Erreur : ${error.message}`);
+      else { setEmp(prev => ({ ...prev, role: appRole })); setMsg("Role mis a jour (fiche — pas encore de compte)"); }
     }
     setBusy(false);
     setTimeout(() => setMsg(""), 4000);
@@ -1754,7 +1778,7 @@ function CompteAcces({ emp, setEmp, isGroupAdmin, etabIds, prenom, nom, email }:
     const res = await fetchApi("/api/admin/invite", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token ?? ""}` },
-      body: JSON.stringify({ email, role, displayName: `${prenom} ${nom}`.trim(), etablissementsAccess: etabIds }),
+      body: JSON.stringify({ email, role: role === "manager" || role === "group_admin" ? role : "equipier", displayName: `${prenom} ${nom}`.trim(), etablissementsAccess: etabIds }),
     });
     const json = await res.json();
     setMsg(res.ok ? `Invitation envoyee a ${email}` : (json.error ?? "Erreur d'envoi"));

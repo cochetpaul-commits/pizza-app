@@ -139,9 +139,16 @@ export default function MasseSalarialePage() {
         supabase.from("combo_presences")
           .select("id, combo_nom, equipe, employe_id, matched, heures_planifiees, heures_travaillees, heures_contrat, nb_repas, nb_jours_travailles, ecart_total, periode_debut, periode_fin")
           .eq("etablissement_id", eId).gte("periode_debut", from).lte("periode_fin", to).order("combo_nom"),
-        supabase.from("contrats")
-          .select("employe_id, type, heures_semaine, remuneration, emploi, employes!inner(prenom, nom, equipes_access, actif, etablissement_id)")
-          .eq("actif", true).eq("employes.actif", true).eq("employes.etablissement_id", eId),
+        // Rémunérations : admins uniquement, par la fonction contrats_admin
+        supabase.rpc("contrats_admin", { p_etab: eId }).then(async (r) => {
+          if (r.error) return r;
+          const actifs = ((r.data ?? []) as Record<string, unknown>[]).filter((c) => c.actif);
+          const ids = [...new Set(actifs.map((c) => c.employe_id as string))];
+          const emps = ids.length ? await supabase.from("employes").select("id, prenom, nom, equipes_access, actif").in("id", ids).eq("actif", true) : { data: [], error: null };
+          if (emps.error) return { data: null, error: emps.error };
+          const parId = new Map((emps.data ?? []).map((e) => [e.id as string, e]));
+          return { data: actifs.filter((c) => parId.has(c.employe_id as string)).map((c) => ({ ...c, employes: parId.get(c.employe_id as string) })), error: null };
+        }),
         fetchApi(`/api/ventes/stats?etablissement_id=${eId}&from=${from}&to=${to}`)
           .then(r => r.json()).then(json => {
             const s = json.stats;
@@ -341,11 +348,11 @@ export default function MasseSalarialePage() {
   const navRange = { from: selected?.from ?? "", to: selected?.to ?? "" };
 
   if (!etab) {
-    return <RequireRole permission="performances.pilotage"><div style={{ maxWidth: 900, margin: "0 auto", padding: "40px 16px", textAlign: "center", color: "#999" }}>Selectionnez un etablissement.</div></RequireRole>;
+    return <RequireRole allowedRoles={["group_admin"]}><div style={{ maxWidth: 900, margin: "0 auto", padding: "40px 16px", textAlign: "center", color: "#999" }}>Selectionnez un etablissement.</div></RequireRole>;
   }
 
   return (
-    <RequireRole permission="performances.pilotage">
+    <RequireRole allowedRoles={["group_admin"]}>
       <PilotageSwipeWrapper accent={etabColor} dateFrom={navRange.from} dateTo={navRange.to}>
       <div className={showMoney ? undefined : "no-money"} style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 100px" }}>
         {!showMoney && <style>{`.no-money [data-money] { filter: blur(8px); pointer-events: none; user-select: none; }`}</style>}

@@ -44,10 +44,12 @@ export async function getEtablissement(req: NextRequest | Request): Promise<Etab
   // 3. Fetch profile to check access
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("role, etablissements_access")
+    .select("role, etablissements_access, desactive_le")
     .eq("id", userId)
     .single();
 
+  // Compte désactivé : aucun droit, même avec une session encore valide
+  if (profile?.desactive_le) throw new EtabError("Compte désactivé", 403);
   const isGroupAdmin = profile?.role === "group_admin";
   const accessIds: string[] = profile?.etablissements_access ?? [];
 
@@ -96,10 +98,12 @@ export async function resolveEtabId(
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("role, etablissements_access")
+    .select("role, etablissements_access, desactive_le")
     .eq("id", userId)
     .single();
 
+  // Compte désactivé : aucun droit, même avec une session encore valide
+  if (profile?.desactive_le) throw new EtabError("Compte désactivé", 403);
   const isGroupAdmin = profile?.role === "group_admin";
   const accessIds: string[] = profile?.etablissements_access ?? [];
 
@@ -143,10 +147,12 @@ async function callerProfile(req: NextRequest | Request): Promise<{ userId: stri
   if (!auth?.user?.id) return null;
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("role, etablissements_access")
+    .select("role, etablissements_access, desactive_le")
     .eq("id", auth.user.id)
     .single();
-  return { userId: auth.user.id, role: profile?.role ?? null, accessIds: profile?.etablissements_access ?? [] };
+  // Compte désactivé : aucun rôle, aucun établissement
+  if (!profile || profile.desactive_le) return { userId: auth.user.id, role: null, accessIds: [] };
+  return { userId: auth.user.id, role: profile.role ?? null, accessIds: profile.etablissements_access ?? [] };
 }
 
 /**
@@ -176,4 +182,12 @@ export async function roleDenied(req: NextRequest | Request, roles: string[]): P
   if (!p) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   if (!roles.includes(p.role ?? "")) return NextResponse.json({ error: "Accès réservé" }, { status: 403 });
   return null;
+}
+
+/** Appelant admin (actif) : renvoie son id, ou la réponse de refus (401/403). */
+export async function adminAppelant(req: NextRequest | Request): Promise<{ userId: string } | NextResponse> {
+  const p = await callerProfile(req);
+  if (!p) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  if (p.role !== "group_admin") return NextResponse.json({ error: "Réservé aux administrateurs" }, { status: 403 });
+  return { userId: p.userId };
 }

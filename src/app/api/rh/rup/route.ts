@@ -50,7 +50,7 @@ export async function GET(req: Request) {
   // Registre du personnel : administrateurs (tout le groupe) ou managers
   // de l'établissement demandé — jamais sans identification.
   const denied = etabId
-    ? await etabAccessDenied(req, etabId, ["group_admin", "manager"])
+    ? await etabAccessDenied(req, etabId, ["group_admin"])
     : await roleDenied(req, ["group_admin"]);
   if (denied) return denied;
 
