@@ -11,8 +11,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { IngredientAvatar } from "@/components/IngredientAvatar";
 import type { Category } from "@/types/ingredients";
-import { FloatingActions, FAIconPdf, FAIconMail, FAIconTrash, FAIconCheck, FAIconPause } from "@/components/layout/FloatingActions";
-import type { FloatingAction } from "@/components/layout/FloatingActions";
+import { BarreCommande, MenuCommande } from "@/components/commandes/BarreCommande";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
@@ -1462,6 +1461,14 @@ function CommandesPage() {
   }
 
   const activeCount = Object.values(quantities).filter((v) => v !== "" && Number(v) > 0).length;
+  // Brouillon en cours (hors onglet Précommande, qui a son propre bouton d'envoi)
+  const barreVisible = !!session && session.status === "brouillon" && !(currentSupplier?.commande_simplifiee && ongletMael === "precommande");
+  // Pendant une commande : barre Menu / Achats masquée, place réservée pour la barre du bas
+  useEffect(() => {
+    if (!selectedSupplierId) return;
+    document.body.classList.add("commande-en-cours");
+    return () => document.body.classList.remove("commande-en-cours");
+  }, [selectedSupplierId]);
   const supplierLabel = currentSupplier?.name ?? "";
   const readOnly = session?.status === "validee" || session?.status === "envoyee" || session?.status === "recue";
 
@@ -2161,6 +2168,7 @@ function CommandesPage() {
 
         {/* Current supplier indicator (when selected) */}
         {!loading && selectedSupplierId && currentSupplier && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button
             type="button"
             onClick={() => setDropdownOpen(true)}
@@ -2188,6 +2196,15 @@ function CommandesPage() {
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
+          {barreVisible && session && (
+            <MenuCommande actions={[
+              { label: "Aperçu PDF", onClick: () => downloadPdf(session.id) },
+              { label: "Mettre en pause", onClick: () => pauseSession() },
+              ...(activeCount > 0 ? [{ label: "Valider sans envoyer", onClick: () => validerSession(session.id), disabled: saving }] : []),
+              { label: "Supprimer le brouillon", onClick: () => deleteSession(), danger: true, disabled: saving },
+            ]} />
+          )}
+          </div>
         )}
 
         {/* Échéance de commande — en haut : en bas elle recouvrait la barre d'actions */}
@@ -2915,20 +2932,9 @@ function CommandesPage() {
           </div>
         )}
 
-        {/* Floating actions — draft in progress */}
-        {session && session.status === "brouillon" && !(currentSupplier?.commande_simplifiee && ongletMael === "precommande") && (
-          <FloatingActions actions={(() => {
-            const acts: FloatingAction[] = [
-              { icon: <FAIconTrash size={20} color="#DC2626" />, label: "Supprimer", onClick: () => deleteSession(), disabled: saving },
-              { icon: <FAIconPdf size={20} color="#666" />, label: "PDF", onClick: () => downloadPdf(session.id) },
-              { icon: <FAIconMail size={20} color="#666" />, label: "Envoyer", onClick: () => sendEmailOnly(session.id), disabled: sendingEmail },
-              { icon: <FAIconPause size={20} color="#666" />, label: "Pause", onClick: () => pauseSession() },
-            ];
-            if (activeCount > 0) {
-              acts.push({ icon: <FAIconCheck size={22} color="#fff" />, label: "Valider", onClick: () => validerSession(session.id), primary: true, disabled: saving });
-            }
-            return acts;
-          })()} />
+        {/* Commande en cours : une seule barre fixe en bas (les autres actions : menu « … » en haut) */}
+        {barreVisible && session && (
+          <BarreCommande nbArticles={activeCount} desactive={sendingEmail || saving} onEnvoyer={() => sendEmailOnly(session.id)} />
         )}
 
       </div>

@@ -278,15 +278,6 @@ export function CommandeSimplifiee({ supplierId, onChange, onEnvoyer, onOngletCh
             <div style={{ fontSize: 12, color: "#8a8378", marginTop: 3 }}>
               {unite}{prix != null ? ` · ${euros(prix)}` : ""}{a.ref ? ` · ${a.ref}` : ""}
             </div>
-            {estHabituel(a) && a.habituel && (
-              <div style={{ fontSize: 12, color: ACCENT, marginTop: 2 }}>
-                {/* Médiane par livraison */}
-                D&apos;habitude : {quantiteLisible(a, a.habituel.quantite, a.habituel.mode)} par livraison
-              </div>
-            )}
-            {total > 0 && !a.au_poids && a.contenu_nb > 1 && (
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginTop: 2 }}>En cours : {quantiteLisible(a, total, m)}</div>
-            )}
           </div>
           {brouillon && (total === 0 ? (
             <button type="button" aria-label={`Ajouter ${a.nom}`} 
@@ -304,6 +295,16 @@ export function CommandeSimplifiee({ supplierId, onChange, onEnvoyer, onOngletCh
             </div>
           ))}
         </div>
+        {/* Sous la ligne, sur toute la largeur de la carte : jamais coupé, passe à la ligne (iPhone) */}
+        {estHabituel(a) && a.habituel && (
+          <div style={{ fontSize: 12.5, color: ACCENT, marginTop: 6, whiteSpace: "normal", overflowWrap: "anywhere" }}>
+            {/* Médiane par livraison */}
+            D&apos;habitude : {quantiteLisible(a, a.habituel.quantite, a.habituel.mode)} par livraison
+          </div>
+        )}
+        {total > 0 && !a.au_poids && a.contenu_nb > 1 && (
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginTop: 2, whiteSpace: "normal", overflowWrap: "anywhere" }}>En cours : {quantiteLisible(a, total, m)}</div>
+        )}
         {a.unite_element && brouillon && (
           <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
             {(["uc", "element"] as Mode[]).map((x) => (

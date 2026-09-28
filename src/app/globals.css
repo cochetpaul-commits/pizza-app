@@ -378,6 +378,34 @@ html.sidebar-collapsed .sidebar-toggle-btn { left: 12px; }
 .no-money [data-money] { filter: blur(8px); pointer-events: none; user-select: none; }
 .no-money .money-hide { display: none !important; }
 
+/* Écran de commande : barre Menu / Achats masquée, une seule barre fixe en bas (BarreCommande) */
+body.commande-en-cours .bottom-tab-bar,
+body.commande-en-cours .bottom-bar-fab {
+  display: none !important;
+}
+body.commande-en-cours .app-main {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+}
+.barre-commande {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 105;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: rgba(255, 255, 255, 0.97);
+  border-top: 1px solid #e6dfd2;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.06);
+}
+@media (min-width: 768px) {
+  .barre-commande { left: calc(var(--sidebar-width) + 16px); justify-content: flex-end; }
+  html.sidebar-collapsed .barre-commande { left: 16px; }
+}
+
 /* Hide bottom tab bar pill when a bottom sheet drawer is open */
 body.bottom-sheet-open .bottom-tab-bar,
 body.bottom-sheet-open .bottom-bar-fab {
