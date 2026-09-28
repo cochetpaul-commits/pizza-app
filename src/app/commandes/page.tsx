@@ -21,7 +21,7 @@ import { CommandeSimplifiee } from "@/components/commandes/CommandeSimplifiee";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type DeliveryRule = { day: string; cutoff: string; delivery_day: string };
-type Supplier = { id: string; name: string; commande_simplifiee?: boolean; franco_minimum: number | null; franco_bouteilles?: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null; website: string | null; portal_login: string | null; portal_password: string | null };
+type Supplier = { id: string; name: string; commande_simplifiee?: boolean; envoi_equipier?: boolean; franco_minimum: number | null; franco_bouteilles?: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null; website: string | null; portal_login: string | null; portal_password: string | null };
 
 type Ligne = {
   id: string;
@@ -551,11 +551,11 @@ function CommandesPage() {
   const { current: etab } = useEtablissement();
   const { can } = useProfile();
   const canValidateOrders = can("commandes.valider");
-  /** Valider / envoyer : manager et admin partout ; équipier seulement chez un fournisseur en commande simplifiée */
+  /** Valider / envoyer : manager et admin partout ; équipier seulement chez un fournisseur réglé « envoi_equipier » */
   const peutEnvoyer = (supplierId: string | null | undefined) => {
     if (canValidateOrders) return true;
     if (!supplierId) return false;
-    return suppliers.some((s) => s.commande_simplifiee && (s.id === supplierId || supplierAliases.get(s.id)?.has(supplierId)));
+    return suppliers.some((s) => s.envoi_equipier && (s.id === supplierId || supplierAliases.get(s.id)?.has(supplierId)));
   };
   const searchParams = useSearchParams();
 
@@ -697,7 +697,7 @@ function CommandesPage() {
       const { data, error } = await Promise.race([
         supabase
           .from("suppliers")
-          .select("id, name, etablissement_id, commande_simplifiee, franco_minimum, franco_bouteilles, delivery_schedule, color, website")
+          .select("id, name, etablissement_id, commande_simplifiee, envoi_equipier, franco_minimum, franco_bouteilles, delivery_schedule, color, website")
           .eq("is_active", true)
           .order("name"),
         timeout,
@@ -2221,7 +2221,7 @@ function CommandesPage() {
             <MenuCommande actions={[
               { label: "Aperçu PDF", onClick: () => downloadPdf(session.id) },
               { label: "Mettre en pause", onClick: () => pauseSession() },
-              ...(nbArticlesBarre > 0 ? [{ label: "Valider sans envoyer", onClick: () => validerSession(session.id), disabled: saving }] : []),
+              ...(nbArticlesBarre > 0 && peutEnvoyer(session.supplier_id ?? currentSupplier?.id) ? [{ label: "Valider sans envoyer", onClick: () => validerSession(session.id), disabled: saving }] : []),
               { label: "Supprimer le brouillon", onClick: () => deleteSession(), danger: true, disabled: saving },
             ]} />
           )}
@@ -2955,7 +2955,8 @@ function CommandesPage() {
 
         {/* Commande en cours : une seule barre fixe en bas (les autres actions : menu « … » en haut) */}
         {barreVisible && session && (
-          <BarreCommande nbArticles={nbArticlesBarre} desactive={sendingEmail || saving} onEnvoyer={() => sendEmailOnly(session.id)} />
+          <BarreCommande nbArticles={nbArticlesBarre} desactive={sendingEmail || saving} onEnvoyer={() => sendEmailOnly(session.id)}
+            envoiAdmin={!peutEnvoyer(session.supplier_id ?? currentSupplier?.id)} />
         )}
 
       </div>

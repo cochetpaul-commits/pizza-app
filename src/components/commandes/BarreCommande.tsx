@@ -10,12 +10,14 @@ import React, { useEffect, useRef, useState } from "react";
  * et la page réserve en bas la hauteur de cette barre (globals.css).
  */
 
-export function BarreCommande({ nbArticles, onEnvoyer, desactive }: {
+export function BarreCommande({ nbArticles, onEnvoyer, desactive, envoiAdmin }: {
   nbArticles: number;
   onEnvoyer: () => void;
   desactive?: boolean;
+  /** Fournisseur sans envoi par un équipier : la commande est préparée, un admin ou un manager l'envoie */
+  envoiAdmin?: boolean;
 }) {
-  const inactif = desactive || nbArticles === 0;
+  const inactif = desactive || nbArticles === 0 || envoiAdmin;
   return (
     <div className="barre-commande">
       <div style={{ minWidth: 0 }}>
@@ -31,7 +33,7 @@ export function BarreCommande({ nbArticles, onEnvoyer, desactive }: {
           fontSize: 16, fontWeight: 700, fontFamily: "inherit", cursor: inactif ? "default" : "pointer",
           boxShadow: inactif ? "none" : "0 4px 14px rgba(212,119,90,0.30)", touchAction: "manipulation",
         }}>
-        Vérifier et envoyer
+        {envoiAdmin ? "Envoyée par un admin" : "Vérifier et envoyer"}
       </button>
     </div>
   );

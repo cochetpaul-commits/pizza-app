@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { libelleColisage, libelleElement, prixUniteCommande, type CommandeArticle, type OffrePrix } from "@/lib/commandeArticles";
+import { libelleColisage, libelleElement, nomUnite, prixUniteCommande, type CommandeArticle, type OffrePrix, type UniteCommande } from "@/lib/commandeArticles";
 import { calculerHabituels, type AchatBrut, type RegleArticle } from "@/lib/commandeHabituels";
 
 /**
@@ -27,9 +27,16 @@ const rep = (body: unknown, status = 200): Reponse => ({ status, body });
 /** Indication sous chaque produit : médiane par livraison (habitude) ou quantité de la dernière commande envoyée */
 export type Indication = "habitude" | "derniere_commande";
 
-/** Mode d'une ligne enregistrée : colis (libellé de l'unité de commande) ou élément (tout autre libellé, même ancien) */
-export const modeDeLigne = (unite: string | null, uniteUc: string, uniteElement: string | null): "uc" | "element" =>
-  unite && uniteElement && unite !== uniteUc ? "element" : "uc";
+/**
+ * Mode d'une ligne enregistrée. Les libellés ont changé avec le temps (ancien écran : « carton », « bouteille », « fut » ;
+ * « sachet 500 g » devenu « filet 500 g ») : on compare le premier mot à l'unité de commande, sans accents ni casse.
+ * Premier mot = unité de commande → colis ; sinon, si la commande à l'élément existe → élément ; sinon → colis.
+ */
+export function modeDeLigne(unite: string | null, a: { unite_commande: UniteCommande; unite_element: string | null }): "uc" | "element" {
+  if (!unite || !a.unite_element) return "uc";
+  const premier = norm(unite).split(/\s+/)[0];
+  return premier === norm(nomUnite(a.unite_commande)) || premier === norm(a.unite_commande) ? "uc" : "element";
+}
 
 /** Fiche du fournisseur pour l'établissement courant + toutes ses fiches homonymes (repli des prix) */
 async function resoudreFiche(supplierId: string, etabId: string) {
@@ -177,7 +184,7 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
       const date = dateCommande.get(l.session_id as string);
       if (!date) continue;
       const lib = libellesParProduit.get(l.ingredient_id as string);
-      const mode = lib ? modeDeLigne(l.unite as string | null, lib.unite_uc, lib.unite_element) : "uc";
+      const mode = lib ? modeDeLigne(l.unite as string | null, lib) : "uc";
       achats.push({ ingredient_id: l.ingredient_id as string, date, quantite: Number(l.quantite), mode });
     }
   }
@@ -196,7 +203,7 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
       for (const l of ls ?? []) {
         const lib = libelles.get(l.ingredient_id as string);
         if (!lib || !(Number(l.quantite) > 0) || derniere.has(lib.ingredient_id)) continue;
-        derniere.set(lib.ingredient_id, { quantite: Number(l.quantite), mode: modeDeLigne(l.unite as string | null, lib.unite_uc, lib.unite_element) });
+        derniere.set(lib.ingredient_id, { quantite: Number(l.quantite), mode: modeDeLigne(l.unite as string | null, lib) });
       }
     }
   }
@@ -213,9 +220,15 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
       ? await supabaseAdmin.from("profiles").select("id, display_name").in("id", [...userIds])
       : { data: [] as { id: string; display_name: string | null }[] };
     const nomDe = new Map((profils ?? []).map((p) => [p.id as string, (p.display_name as string | null) ?? "?"]));
+    const libs = new Map(sortie.map((x) => [x.ingredient_id, x]));
+    const libelleActuel = (ing: string, unite: string | null) => {
+      const lib = libs.get(ing);
+      if (!lib || unite === lib.unite_uc || unite === lib.unite_element) return unite;
+      return modeDeLigne(unite, lib) === "element" ? lib.unite_element : lib.unite_uc;
+    };
     lignes = (ls ?? []).map((l) => ({
       ingredient_id: l.ingredient_id as string,
-      unite: l.unite as string | null,
+      unite: libelleActuel(l.ingredient_id as string, l.unite as string | null),
       quantite: Number(l.quantite),
       apports: ((l.commande_ligne_apports ?? []) as { user_id: string; quantite: number }[])
         .filter((a) => Number(a.quantite) > 0)

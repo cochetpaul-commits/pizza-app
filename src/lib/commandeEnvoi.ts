@@ -12,21 +12,25 @@ import { livraisonPrecommande, prochaineLivraison, type RegleLivraison } from "@
 
 const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
 
-/** Équipier : seulement les fournisseurs en commande simplifiée ; manager et admin : tous */
-export function peutValiderEnvoyer(role: string | null | undefined, commandeSimplifiee: boolean): boolean {
+/**
+ * Équipier : seulement les fournisseurs réglés « envoi_equipier » (Maël, Terre Azur) ; sinon il prépare
+ * la commande et un admin ou un manager l'envoie. Manager et admin : tous les fournisseurs.
+ * (commande_simplifiee ne décide plus que de l'écran utilisé.)
+ */
+export function peutValiderEnvoyer(role: string | null | undefined, envoiEquipier: boolean): boolean {
   if (!role) return false;
   const r = mapToPermRole(role);
   if (r === "admin" || r === "manager") return true;
-  return commandeSimplifiee;
+  return envoiEquipier;
 }
 
 /** Message d'erreur si l'utilisateur ne peut pas valider ni envoyer pour ce fournisseur, sinon null */
 export async function refusDroit(userId: string, supplierId: string): Promise<string | null> {
   const [{ data: profil }, { data: fournisseur }] = await Promise.all([
     supabaseAdmin.from("profiles").select("role").eq("id", userId).maybeSingle(),
-    supabaseAdmin.from("suppliers").select("commande_simplifiee").eq("id", supplierId).maybeSingle(),
+    supabaseAdmin.from("suppliers").select("envoi_equipier").eq("id", supplierId).maybeSingle(),
   ]);
-  if (peutValiderEnvoyer(profil?.role as string | null, !!fournisseur?.commande_simplifiee)) return null;
+  if (peutValiderEnvoyer(profil?.role as string | null, !!fournisseur?.envoi_equipier)) return null;
   return "Seuls un manager ou un admin peuvent valider et envoyer les commandes de ce fournisseur.";
 }
 
