@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { fetchApi } from "@/lib/fetchApi";
 import { SEUIL_HABITUEL } from "@/lib/commandeHabituels";
-import { nomUnite, quantiteAffichee, type UniteCommande, type UniteTaille } from "@/lib/commandeArticles";
+import { libelleZone, nomUnite, quantiteAffichee, type UniteCommande, type UniteTaille } from "@/lib/commandeArticles";
 import { CAT_COLORS, type Category } from "@/types/ingredients";
 
 /**
@@ -83,6 +83,7 @@ const couleurRayon = (code: string) => CAT_COLORS[CATEGORIE_DU_RAYON[code] ?? "a
  * la fiche (onglet, rayons ouverts, recherche, défilement), puis restauré au retour sur ce fournisseur.
  */
 const CLE_RETOUR = "commande-simplifiee:retour";
+
 type EtatRetour = { supplierId: string; onglet: Onglet; bascules: Record<string, boolean>; recherche: string; y: number; t: number };
 function lireRetour(supplierId: string): EtatRetour | null {
   try {
@@ -292,7 +293,8 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     try {
       sessionStorage.setItem(CLE_RETOUR, JSON.stringify({ supplierId, onglet, bascules, recherche, y: window.scrollY, t: Date.now() } satisfies EtatRetour));
     } catch { /* navigation privée : retour en haut de la liste */ }
-    router.push(`/ingredients?edit=${a.ingredient_id}&back=${encodeURIComponent(`/commandes?supplier_id=${supplierId}`)}`);
+    // fournisseur : la fiche affiche aussi le conditionnement de commande chez lui (bloc « Commande chez … »)
+    router.push(`/ingredients?edit=${a.ingredient_id}&fournisseur=${supplierId}&back=${encodeURIComponent(`/commandes?supplier_id=${supplierId}`)}`);
   }
 
   // En quittant l'écran, les appuis en attente partent tout de suite (jamais perdus)
@@ -363,7 +365,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
                   <span key={z.nom} style={{
                     fontSize: 11, fontWeight: 600, lineHeight: 1.2, padding: "2px 7px", borderRadius: 8,
                     color: z.couleur ?? "#8a8378", background: `${z.couleur ?? "#8a8378"}14`, border: `1px solid ${z.couleur ?? "#8a8378"}33`,
-                  }}>{z.nom}</span>
+                  }}>{libelleZone(z.nom)}</span>
                 ))}
               </div>
             )}

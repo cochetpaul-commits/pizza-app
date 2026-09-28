@@ -155,3 +155,50 @@ export function quantiteAffichee(
   const t = a.element_qte != null && a.element_unite ? ` (${taille(q * a.element_qte, a.element_unite)})` : "";
   return `${txt(q)} ${nomUnite(a.unite_commande, q)}${t}`;
 }
+
+/** Nom de zone de stockage à l'affichage : « CAVE A VIN » → « Cave à vin » (la base garde ses majuscules) */
+export function libelleZone(nom: string): string {
+  const t = nom.trim().toLocaleLowerCase("fr").replace(/(^|\s)a(?=\s)/g, "$1à");
+  return t.charAt(0).toLocaleUpperCase("fr") + t.slice(1);
+}
+
+export const UNITES_TAILLE: UniteTaille[] = ["pc", "g", "kg", "ml", "l"];
+
+/**
+ * Conditionnement saisi sur la fiche produit (bloc « Commande chez … ») : contrôlé avant écriture,
+ * avec les mêmes règles que la base (commande_articles) et quelques règles de bon sens :
+ * au poids (kg, litre) → contenu 1, sans élément ; commande à l'élément seulement s'il y a un élément
+ * et plusieurs éléments par unité de commande.
+ */
+export function validerConditionnement(x: {
+  unite_commande?: unknown; contenu_nb?: unknown; element?: unknown;
+  element_qte?: unknown; element_unite?: unknown; commande_element_permise?: unknown;
+}): { ok: true; valeur: Omit<CommandeArticle, "precommande"> } | { ok: false; erreur: string } {
+  const unite = String(x.unite_commande ?? "");
+  if (!(UNITES_COMMANDE as readonly string[]).includes(unite)) return { ok: false, erreur: "Unité de commande inconnue" };
+  const auPoids = unite === "kg" || unite === "litre";
+  const contenu = auPoids ? 1 : Number(x.contenu_nb);
+  if (!Number.isFinite(contenu) || contenu <= 0) return { ok: false, erreur: "Le contenu doit être un nombre positif" };
+  const elementBrut = x.element == null || x.element === "" ? null : String(x.element);
+  if (elementBrut && (!(UNITES_COMMANDE as readonly string[]).includes(elementBrut) || elementBrut === "kg" || elementBrut === "litre")) {
+    return { ok: false, erreur: "Élément inconnu" };
+  }
+  const element = auPoids ? null : (elementBrut as ElementCommande | null);
+  const qteBrute = x.element_qte == null || x.element_qte === "" ? null : Number(x.element_qte);
+  const uniteTaille = x.element_unite == null || x.element_unite === "" ? null : String(x.element_unite);
+  if ((qteBrute == null) !== (uniteTaille == null)) return { ok: false, erreur: "Taille : indiquer la quantité et l'unité, ou aucune des deux" };
+  if (qteBrute != null && (!Number.isFinite(qteBrute) || qteBrute <= 0)) return { ok: false, erreur: "Taille : quantité positive" };
+  if (uniteTaille != null && !(UNITES_TAILLE as string[]).includes(uniteTaille)) return { ok: false, erreur: "Taille : unité inconnue" };
+  const permise = !!x.commande_element_permise;
+  if (permise && (!element || contenu <= 1)) {
+    return { ok: false, erreur: "Commande à l'élément : il faut un élément et plusieurs éléments par unité de commande" };
+  }
+  return {
+    ok: true,
+    valeur: {
+      unite_commande: unite as UniteCommande, contenu_nb: contenu, element,
+      element_qte: auPoids ? null : qteBrute, element_unite: auPoids ? null : (uniteTaille as UniteTaille | null),
+      commande_element_permise: permise,
+    },
+  };
+}

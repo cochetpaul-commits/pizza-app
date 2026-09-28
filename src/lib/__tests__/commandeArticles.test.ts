@@ -75,3 +75,29 @@ describe("quantiteAffichee (écran)", () => {
     expect(quantiteAffichee({ au_poids: false, contenu_nb: 6, element: "filet", unite_commande: "colis" }, 12, "element")).toBe("12 filets (2 colis)");
   });
 });
+
+describe("libelleZone et validerConditionnement", () => {
+  it("zones : minuscules, majuscule au début, « à »", async () => {
+    const { libelleZone } = await import("@/lib/commandeArticles");
+    expect(libelleZone("CAVE A VIN")).toBe("Cave à vin");
+    expect(libelleZone("CHAMBRE FROIDE")).toBe("Chambre froide");
+    expect(libelleZone("CONGÉLATEUR")).toBe("Congélateur");
+  });
+  it("conditionnement valide : carton de 6 bouteilles de 75 cL, commandable à la bouteille", async () => {
+    const { validerConditionnement } = await import("@/lib/commandeArticles");
+    const r = validerConditionnement({ unite_commande: "carton", contenu_nb: "6", element: "bouteille", element_qte: "75", element_unite: "ml", commande_element_permise: true });
+    expect(r.ok).toBe(true);
+  });
+  it("refus : unité inconnue, contenu nul, taille à moitié, élément permis sans élément", async () => {
+    const { validerConditionnement } = await import("@/lib/commandeArticles");
+    expect(validerConditionnement({ unite_commande: "caisse", contenu_nb: 1 }).ok).toBe(false);
+    expect(validerConditionnement({ unite_commande: "colis", contenu_nb: 0 }).ok).toBe(false);
+    expect(validerConditionnement({ unite_commande: "colis", contenu_nb: 1, element_qte: 5 }).ok).toBe(false);
+    expect(validerConditionnement({ unite_commande: "colis", contenu_nb: 6, commande_element_permise: true }).ok).toBe(false);
+  });
+  it("au poids : contenu 1, sans élément", async () => {
+    const { validerConditionnement } = await import("@/lib/commandeArticles");
+    const r = validerConditionnement({ unite_commande: "kg", contenu_nb: 5, element: "sachet" });
+    expect(r).toEqual({ ok: true, valeur: { unite_commande: "kg", contenu_nb: 1, element: null, element_qte: null, element_unite: null, commande_element_permise: false } });
+  });
+});

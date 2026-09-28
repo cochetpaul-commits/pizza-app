@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef, Suspense } from "react";
+import { BlocCommandeFournisseur } from "@/components/commandes/BlocCommandeFournisseur";
 import { RecoverProductsModal } from "@/components/RecoverProductsModal";
 import { DuplicatesModal } from "@/components/DuplicatesModal";
 import { ImportExportModal } from "@/components/ImportExportModal";
@@ -158,6 +159,8 @@ function IngredientsPageInner() {
   const searchParams = useSearchParams();
   const backUrl = searchParams.get("back") ?? null;
   const editParam = searchParams.get("edit");
+  /** Ouverte depuis l'écran de commande : fournisseur dont on peut corriger le conditionnement de commande */
+  const fournisseurParam = searchParams.get("fournisseur");
   const supplierParam = searchParams.get("supplier");
 
   const [tab, setTab] = useState<Tab>("all");
@@ -1512,6 +1515,9 @@ function IngredientsPageInner() {
                             }}
                             subCategorySuggestions={subCategorySuggestions}
                           />
+                          {fournisseurParam && x.id === editParam && (
+                            <BlocCommandeFournisseur supplierId={fournisseurParam} ingredientId={x.id} />
+                          )}
                         </div>
                       );
                     });

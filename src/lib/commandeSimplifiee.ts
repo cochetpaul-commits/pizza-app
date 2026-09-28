@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { libelleColisage, libelleElement, nomUnite, prixUniteCommande, type CommandeArticle, type OffrePrix, type UniteCommande } from "@/lib/commandeArticles";
+import { libelleColisage, libelleElement, nomUnite, prixUniteCommande, validerConditionnement, UNITES_COMMANDE, UNITES_TAILLE, type CommandeArticle, type OffrePrix, type UniteCommande } from "@/lib/commandeArticles";
 import { calculerHabituels, type AchatBrut, type RegleArticle } from "@/lib/commandeHabituels";
 
 /**
@@ -364,4 +364,58 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
   } : null;
 
   return rep({ ok: true, session_id: session.id, ligne, unite, total_ht: total });
+}
+
+const CHAMPS_CONDITIONNEMENT = "ingredient_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande";
+
+/** Conditionnement de commande d'un produit chez le fournisseur (fiche de l'établissement), pour la fiche produit */
+export async function lireConditionnement(supplierId: string, etabId: string, ingredientId: string): Promise<Reponse> {
+  const f = await resoudreFiche(supplierId, etabId);
+  if (!f) return rep({ error: "Ce fournisseur n'est pas en commande simplifiée pour cet établissement" }, 404);
+  const { data } = await supabaseAdmin.from("commande_articles").select(CHAMPS_CONDITIONNEMENT)
+    .eq("supplier_id", f.ficheId).eq("ingredient_id", ingredientId).maybeSingle();
+  return rep({ fournisseur: { id: f.ficheId, nom: f.nom }, article: data ?? null, unites: UNITES_COMMANDE, unites_taille: UNITES_TAILLE });
+}
+
+/**
+ * Corrige le conditionnement (unité de commande, contenu, élément, taille, commande à l'élément).
+ * Les lignes des brouillons en cours suivent les nouveaux libellés (sinon leurs quantités n'apparaîtraient plus).
+ */
+export async function corrigerConditionnement(body: unknown, etabId: string): Promise<Reponse> {
+  const { supplier_id, ingredient_id } = body as { supplier_id?: string; ingredient_id?: string };
+  if (!supplier_id || !ingredient_id) return rep({ error: "Paramètres invalides" }, 400);
+  const v = validerConditionnement(body as Record<string, unknown>);
+  if (!v.ok) return rep({ error: v.erreur }, 400);
+  const f = await resoudreFiche(supplier_id, etabId);
+  if (!f) return rep({ error: "Ce fournisseur n'est pas en commande simplifiée pour cet établissement" }, 404);
+  const { data: avant } = await supabaseAdmin.from("commande_articles").select(CHAMPS_CONDITIONNEMENT)
+    .eq("supplier_id", f.ficheId).eq("ingredient_id", ingredient_id).maybeSingle();
+  if (!avant) return rep({ error: "Ce produit n'a pas de conditionnement chez ce fournisseur" }, 404);
+  const ancien = avant as unknown as CommandeArticle;
+  const nouveau: CommandeArticle = { ...v.valeur, precommande: ancien.precommande };
+
+  const { error } = await supabaseAdmin.from("commande_articles").update(v.valeur)
+    .eq("supplier_id", f.ficheId).eq("ingredient_id", ingredient_id);
+  if (error) return rep({ error: error.message }, 500);
+
+  // Brouillons en cours : libellé de chaque ligne recalculé (colis ou élément), ligne élément retirée si plus permise
+  const ancienUc = libelleColisage({ ...ancien, contenu_nb: Number(ancien.contenu_nb) });
+  const ancienEl = libelleElement(ancien);
+  const nouveauUc = libelleColisage(nouveau);
+  const nouveauEl = libelleElement(nouveau);
+  const { data: sessions } = await supabaseAdmin.from("commande_sessions").select("id")
+    .eq("supplier_id", f.ficheId).eq("etablissement_id", etabId).eq("status", "brouillon");
+  const ids = (sessions ?? []).map((x) => x.id as string);
+  let lignesMaj = 0;
+  if (ids.length) {
+    const { data: lignes } = await supabaseAdmin.from("commande_lignes").select("id, unite").in("session_id", ids).eq("ingredient_id", ingredient_id);
+    for (const l of lignes ?? []) {
+      const mode = modeDeLigne(l.unite as string | null, { unite_commande: ancien.unite_commande, unite_element: ancienEl });
+      const cible = mode === "element" ? nouveauEl : nouveauUc;
+      if (!cible || cible === l.unite) continue;
+      await supabaseAdmin.from("commande_lignes").update({ unite: cible }).eq("id", l.id);
+      lignesMaj++;
+    }
+  }
+  return rep({ ok: true, libelle: nouveauUc, libelle_element: nouveauEl, avant: ancienUc, lignes_mises_a_jour: lignesMaj });
 }
