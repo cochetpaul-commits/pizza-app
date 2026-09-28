@@ -80,11 +80,18 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
      (colocalisés dans `src/app/ventes/marges/`), chargés via
      `next/dynamic({ ssr: false })`. Au passage, l'import mort `AiInsightCard`
      a été retiré.
-   - [ ] **Reste à faire** : sur `ventes/marges`, le graphique « Tendances »
-     (plus bas sur la page) utilise encore le `loadChart()` inline — ses
-     dépendances (trendData, trendMode, trendMetric, filteredTrendProducts…)
-     sont plus nombreuses, à extraire dans un futur passage avec plus de
-     marge. Page `ventes` (~2700 lignes) pas commencée : mêmes 2 patterns
+   - [x] *(28/09/2026)* `ventes/marges` : le 3e graphique (« Tendances »)
+     extrait dans `TrendChart.tsx` (même dossier), chargé via
+     `next/dynamic({ ssr: false })`, sur le modèle des deux précédents — la
+     page calcule juste `{ labels, values, color }` dans un `useMemo` et le
+     composant dédié possède son propre `useRef`/`useEffect`/`new Chart(...)`.
+     `chart.js/auto` (import statique, dans le composant lazy) et
+     `import type { Chart } from "chart.js"` ont disparu de `page.tsx`, ainsi
+     que le `loadChart()` et le petit registre `charts{}` /
+     `destroyChart()` qui ne servaient plus qu'à ce graphique — plus aucune
+     trace de chart.js dans le bundle initial de la page. Les 3 graphiques de
+     `ventes/marges` suivent maintenant exactement le même patron.
+     Page `ventes` (~2700 lignes) toujours pas commencée : mêmes 2 patterns
      (`catTrendChartRef` en haut de page + un composant `MiniChart` interne
      réutilisé plusieurs fois en bas, lignes ~2576-2702) — prévoir une
      exécution dédiée pour cette page vu sa taille.

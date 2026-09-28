@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, useMemo, Suspense, type CSSProperties } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import { useEtabAuto } from "@/lib/useEtabAuto";
 import { useSearchParams } from "next/navigation";
@@ -13,17 +13,14 @@ import { usePilotageTopBar } from "@/components/ui/PilotageRangeBar";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 
-import type { Chart } from "chart.js";
-// Chart.js chargé à la demande : ~65 Ko gzip en moins au premier rendu
-const loadChart = () => import("chart.js/auto").then((m) => m.default);
 import { getCategoryColor, getCategoryColors } from "@/lib/categoryColors";
 import { fetchApi } from "@/lib/fetchApi";
 
 // Composants dédiés : chart.js n'est plus dans le bundle initial de la page
-// pour ces deux graphiques (le hook loadChart() ci-dessus reste utilisé pour
-// le graphique de tendances, encore inline).
+// pour ces trois graphiques.
 const TopProductsMargeChart = dynamic(() => import("./TopProductsMargeChart"), { ssr: false });
 const FoodCostCategoryChart = dynamic(() => import("./FoodCostCategoryChart"), { ssr: false });
+const TrendChart = dynamic(() => import("./TrendChart"), { ssr: false });
 
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
@@ -111,15 +108,6 @@ function foodCostColor(fc: number | null): string {
   if (fc < 30) return COLORS.green;
   if (fc <= 35) return COLORS.orange;
   return COLORS.red;
-}
-
-/* ── Chart management ── */
-const charts: Record<string, Chart> = {};
-function destroyChart(id: string) {
-  if (charts[id]) {
-    charts[id].destroy();
-    delete charts[id];
-  }
 }
 
 /* ── Styles ── */
@@ -296,7 +284,6 @@ function MargesPage() {
   }, [range.from, range.to]);
   const [trendData, setTrendData] = useState<TrendDaily[] | null>(null);
   const [trendLoading, setTrendLoading] = useState(false);
-  const trendChartRef = useRef<HTMLCanvasElement>(null);
 
   // Compute date range
   const getRange = useCallback(() => {
@@ -624,14 +611,9 @@ function MargesPage() {
     return { labels: [], values: [] };
   }, []);
 
-  // Render trend chart
-  useEffect(() => {
-    if (!trendChartRef.current) return;
-    destroyChart("trendBar");
-    loadChart().then((ChartJS) => {
-    if (!trendChartRef.current) return;
-    destroyChart("trendBar");
-
+  // Trend chart data (labels/values/color) — chart.js lui-même est chargé à la
+  // demande par le composant TrendChart (dynamic import, ssr: false)
+  const trendChartData = useMemo(() => {
     let labels: string[];
     let values: number[];
 
@@ -645,35 +627,16 @@ function MargesPage() {
       labels = agg.labels;
       values = agg.values;
     } else {
-      return;
+      return null;
     }
 
-    if (labels.length === 0) return;
-    charts["trendBar"] = new ChartJS(trendChartRef.current, {
-      type: "bar",
-      data: {
-        labels,
-        datasets: [{
-          data: values,
-          backgroundColor: (trendFilter === "category" && trendCategory ? getCategoryColor(trendCategory) : accent) + "CC",
-          borderRadius: 4,
-          borderSkipped: false,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => trendMetric === "qty" ? `${ctx.parsed.y}` : fmtDec(ctx.parsed.y ?? 0) } } },
-        scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-          y: { beginAtZero: true, grid: { color: COLORS.border }, ticks: { font: { size: 10 }, callback: (v) => trendMetric === "qty" ? v : fmt(v as number) } },
-        },
-      },
-    });
-    });
-    return () => destroyChart("trendBar");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trendData, trendMode, trendMetric, accent, trendFilter, trendCategory, trendSubCat, filteredTrendProducts]);
+    if (labels.length === 0) return null;
+    return {
+      labels,
+      values,
+      color: (trendFilter === "category" && trendCategory ? getCategoryColor(trendCategory) : accent) + "CC",
+    };
+  }, [trendData, trendMode, trendMetric, accent, trendFilter, trendCategory, trendSubCat, filteredTrendProducts, aggregateTrend]);
 
   const K = data?.kpis;
   const filtered = getFilteredProducts();
@@ -1071,9 +1034,14 @@ function MargesPage() {
               {!trendLoading && trendData && trendData.length === 0 && (
                 <div style={{ textAlign: "center", padding: 40, color: COLORS.muted, fontSize: 13 }}>Aucune donnee sur cette periode</div>
               )}
-              {!trendLoading && trendData && trendData.length > 0 && (
+              {!trendLoading && trendData && trendData.length > 0 && trendChartData && (
                 <div style={{ height: 300 }}>
-                  <canvas ref={trendChartRef} />
+                  <TrendChart
+                    labels={trendChartData.labels}
+                    values={trendChartData.values}
+                    metric={trendMetric}
+                    color={trendChartData.color}
+                  />
                 </div>
               )}
 
