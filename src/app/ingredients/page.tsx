@@ -1166,9 +1166,11 @@ function IngredientsPageInner() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", background: "#fff6e0", borderBottom: "1px solid #e8d9b8" }}>
             <button type="button" onClick={() => router.push(backUrl)}
               style={{ border: "1.5px solid #8a4b2f", background: "#fff", color: "#8a4b2f", borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-              ← Retour à la fiche
+              {backUrl.startsWith("/commandes") ? "← Retour à la commande" : "← Retour à la fiche"}
             </button>
-            <span style={{ fontSize: 12.5, color: "#7a6a52" }}>La fiche en cours est conservée : modifie le produit, enregistre, et tu y reviens.</span>
+            <span style={{ fontSize: 12.5, color: "#7a6a52" }}>{backUrl.startsWith("/commandes")
+              ? "La commande en cours est conservée : corrige le produit, enregistre, et tu y reviens."
+              : "La fiche en cours est conservée : modifie le produit, enregistre, et tu y reviens."}</span>
           </div>
         )}
         {!isVariations ? (

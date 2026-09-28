@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useProfile } from "@/lib/ProfileContext";
 import { fetchApi } from "@/lib/fetchApi";
 import { SEUIL_HABITUEL } from "@/lib/commandeHabituels";
 import { nomUnite, quantiteAffichee, type UniteCommande, type UniteTaille } from "@/lib/commandeArticles";
@@ -31,6 +33,8 @@ type Article = {
   element: UniteCommande | null;
   element_qte: number | null;
   element_unite: UniteTaille | null;
+  /** Emplacements de stockage (principal d'abord), avec la couleur de la zone */
+  zones: { nom: string; couleur: string | null }[];
   /** Stock idéal (inventaire), en éléments ; null si non renseigné */
   stock_objectif: number | null;
   unite_uc: string;
@@ -74,6 +78,19 @@ const CATEGORIE_DU_RAYON: Record<string, Category> = {
 };
 const couleurRayon = (code: string) => CAT_COLORS[CATEGORIE_DU_RAYON[code] ?? "autre"];
 
+/**
+ * Aller-retour vers la fiche produit (admins, managers) : l'état de l'écran est gardé le temps de corriger
+ * la fiche (onglet, rayons ouverts, recherche, défilement), puis restauré au retour sur ce fournisseur.
+ */
+const CLE_RETOUR = "commande-simplifiee:retour";
+type EtatRetour = { supplierId: string; onglet: Onglet; bascules: Record<string, boolean>; recherche: string; y: number; t: number };
+function lireRetour(supplierId: string): EtatRetour | null {
+  try {
+    const e = JSON.parse(sessionStorage.getItem(CLE_RETOUR) ?? "null") as EtatRetour | null;
+    return e && e.supplierId === supplierId && Date.now() - e.t < 30 * 60 * 1000 ? e : null;
+  } catch { return null; }
+}
+
 
 export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoyer, onOngletChange }: {
   supplierId: string;
@@ -87,12 +104,16 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   onOngletChange?: (onglet: Onglet) => void;
 }) {
   // Commande du jour / précommande du mercredi : deux brouillons séparés
-  const [onglet, setOnglet] = useState<Onglet>("jour");
-  const ongletRef = useRef<Onglet>("jour");
+  const router = useRouter();
+  const { canWrite: peutCorrigerFiche } = useProfile();
+  /** État à restaurer en revenant de la fiche produit (lu une fois, au montage) */
+  const [retour] = useState<EtatRetour | null>(() => (typeof window === "undefined" ? null : lireRetour(supplierId)));
+  const [onglet, setOnglet] = useState<Onglet>(retour?.onglet ?? "jour");
+  const ongletRef = useRef<Onglet>(retour?.onglet ?? "jour");
   useEffect(() => { ongletRef.current = onglet; onOngletChange?.(onglet); }, [onglet, onOngletChange]);
   const [data, setData] = useState<Donnees | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [recherche, setRecherche] = useState("");
+  const [recherche, setRecherche] = useState(retour?.recherche ?? "");
   const [modes, setModes] = useState<Record<string, Mode>>({});
   /** Message discret en cas d'échec d'enregistrement */
   const [alerte, setAlerte] = useState<string | null>(null);
@@ -104,7 +125,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   const enVol = useRef(new Set<string>());
   const dernierVide = useRef<boolean | null>(null);
   /** Rayons ouverts ou fermés à la main (sinon : ouverts s'ils ont un produit dans le brouillon) */
-  const [bascules, setBascules] = useState<Record<string, boolean>>({});
+  const [bascules, setBascules] = useState<Record<string, boolean>>(retour?.bascules ?? {});
 
   const charger = useCallback(async (): Promise<Donnees | null> => {
     try {
@@ -125,6 +146,16 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   }, [supplierId, onglet]);
 
   useEffect(() => { void charger(); }, [charger]);
+
+  // Retour de la fiche produit : même position de défilement, une fois la liste affichée
+  const yARestaurer = useRef<number | null>(retour?.y ?? null);
+  useEffect(() => {
+    if (!data || yARestaurer.current == null) return;
+    const y = yARestaurer.current;
+    yARestaurer.current = null;
+    try { sessionStorage.removeItem(CLE_RETOUR); } catch { /* navigation privée */ }
+    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+  }, [data]);
 
   const uniteDe = (a: Article, m: Mode) => (m === "element" ? a.unite_element ?? a.unite_uc : a.unite_uc);
   const modeDe = (a: Article): Mode => modes[a.ingredient_id] ?? (a.unite_element && a.habituel?.mode === "element" ? "element" : "uc");
@@ -252,6 +283,18 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     minuteries.current.set(cle, setTimeout(() => { minuteries.current.delete(cle); void envoyer(cle); }, 400));
   }
 
+  /** Fiche produit : les appuis en attente sont enregistrés d'abord, l'état de l'écran est gardé pour le retour */
+  async function ouvrirFiche(a: Article) {
+    const cles = [...minuteries.current.keys()];
+    for (const cle of cles) { clearTimeout(minuteries.current.get(cle)); minuteries.current.delete(cle); }
+    await Promise.all(cles.map((cle) => envoyer(cle)));
+    for (let i = 0; i < 30 && (enVol.current.size > 0 || voulues.current.size > 0); i++) await new Promise((r) => setTimeout(r, 100));
+    try {
+      sessionStorage.setItem(CLE_RETOUR, JSON.stringify({ supplierId, onglet, bascules, recherche, y: window.scrollY, t: Date.now() } satisfies EtatRetour));
+    } catch { /* navigation privée : retour en haut de la liste */ }
+    router.push(`/ingredients?edit=${a.ingredient_id}&back=${encodeURIComponent(`/commandes?supplier_id=${supplierId}`)}`);
+  }
+
   // En quittant l'écran, les appuis en attente partent tout de suite (jamais perdus)
   useEffect(() => () => {
     for (const [cle, t] of minuteries.current) { clearTimeout(t); void envoyer(cle); }
@@ -299,7 +342,31 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a", lineHeight: 1.25 }}>{a.nom}</div>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a", lineHeight: 1.25, minWidth: 0 }}>{a.nom}</div>
+              {peutCorrigerFiche && (
+                <button type="button" aria-label={`Ouvrir la fiche produit ${a.nom}`} title="Ouvrir la fiche produit"
+                  onClick={() => void ouvrirFiche(a)}
+                  style={{
+                    flexShrink: 0, width: 28, height: 24, marginTop: -2, border: "none", background: "transparent", padding: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#b0a894",
+                  }}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {a.zones.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                {a.zones.map((z) => (
+                  <span key={z.nom} style={{
+                    fontSize: 11, fontWeight: 600, lineHeight: 1.2, padding: "2px 7px", borderRadius: 8,
+                    color: z.couleur ?? "#8a8378", background: `${z.couleur ?? "#8a8378"}14`, border: `1px solid ${z.couleur ?? "#8a8378"}33`,
+                  }}>{z.nom}</span>
+                ))}
+              </div>
+            )}
             <div style={{ fontSize: 12, color: "#8a8378", marginTop: 3 }}>
               {unite}{prix != null ? ` · ${euros(prix)}` : ""}{a.ref ? ` · ${a.ref}` : ""}
             </div>

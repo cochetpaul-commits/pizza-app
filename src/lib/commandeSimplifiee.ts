@@ -18,7 +18,7 @@ import { calculerHabituels, type AchatBrut, type RegleArticle } from "@/lib/comm
 const JOURS_HABITUELS = 90;
 const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
 
-type ArticleRow = CommandeArticle & { ingredient_id: string; ingredient: { id: string; name: string; is_active: boolean; rayon_commande: string | null; stock_objectif?: number | null } };
+type ArticleRow = CommandeArticle & { ingredient_id: string; ingredient: { id: string; name: string; is_active: boolean; rayon_commande: string | null; stock_objectif?: number | null; storage_zone?: string | null } };
 type OffreRow = OffrePrix & { ingredient_id: string; supplier_id: string; supplier_sku: string | null; valid_from: string | null; created_at: string | null };
 
 export type Reponse = { status: number; body: unknown };
@@ -111,17 +111,35 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
   if (!f) return rep({ error: "Ce fournisseur n'est pas en commande simplifiée pour cet établissement" }, 404);
 
   const depuis = new Date(Date.now() - JOURS_HABITUELS * 86400000).toISOString().slice(0, 10);
-  const [{ data: articlesData, error: errArt }, { data: rayons }, offres, { data: factures }, session] = await Promise.all([
+  const [{ data: articlesData, error: errArt }, { data: rayons }, offres, { data: factures }, session, { data: zonesEtab }, { data: zonesEnPlus }] = await Promise.all([
     supabaseAdmin.from("commande_articles")
-      .select("ingredient_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande, ingredient:ingredients!inner(id, name, is_active, rayon_commande, stock_objectif)")
+      .select("ingredient_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande, ingredient:ingredients!inner(id, name, is_active, rayon_commande, stock_objectif, storage_zone)")
       .eq("supplier_id", f.ficheId),
     supabaseAdmin.from("rayons_commande").select("code, libelle, ordre").order("ordre"),
     chargerOffres(f.aliasIds),
     supabaseAdmin.from("supplier_invoices").select("id, invoice_date")
       .in("supplier_id", f.aliasIds).eq("etablissement_id", etabId).gte("invoice_date", depuis),
     sessionEnCours(f.ficheId, etabId, type),
+    // Emplacements de stockage de l'établissement (couleur) et emplacements supplémentaires par produit
+    supabaseAdmin.from("storage_zones").select("name, couleur, display_order").eq("etablissement_id", etabId),
+    supabaseAdmin.from("ingredient_zones").select("ingredient_id, zone").eq("etablissement_id", etabId),
   ]);
   if (errArt) return rep({ error: errArt.message }, 500);
+  const couleurZone = new Map((zonesEtab ?? []).map((z) => [z.name as string, (z.couleur as string | null) ?? null]));
+  const ordreZone = new Map((zonesEtab ?? []).map((z) => [z.name as string, Number(z.display_order ?? 99)]));
+  const zonesEnPlusDe = new Map<string, string[]>();
+  for (const z of zonesEnPlus ?? []) {
+    const l = zonesEnPlusDe.get(z.ingredient_id as string) ?? [];
+    l.push(z.zone as string);
+    zonesEnPlusDe.set(z.ingredient_id as string, l);
+  }
+  /** Emplacement principal d'abord (ingredients.storage_zone), puis les autres (ingredient_zones), sans doublon */
+  const zonesDe = (a: ArticleRow) => {
+    const principal = (a.ingredient.storage_zone ?? "").trim();
+    const autres = [...new Set((zonesEnPlusDe.get(a.ingredient_id) ?? []).map((z) => z.trim()).filter((z) => z && z !== principal))]
+      .sort((x, y) => (ordreZone.get(x) ?? 99) - (ordreZone.get(y) ?? 99));
+    return [...(principal ? [principal] : []), ...autres].map((nom) => ({ nom, couleur: couleurZone.get(nom) ?? null }));
+  };
 
   // Fiches désactivées : jamais proposées
   const actifs = ((articlesData ?? []) as unknown as ArticleRow[]).filter((a) => a.ingredient?.is_active);
@@ -146,6 +164,7 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
       element_qte: a.element_qte != null ? Number(a.element_qte) : null,
       element_unite: a.element_unite,
       // Stock idéal (inventaire), compté en éléments (bouteilles…) ; null si vide
+      zones: zonesDe(a),
       stock_objectif: a.ingredient.stock_objectif != null && Number(a.ingredient.stock_objectif) > 0 ? Number(a.ingredient.stock_objectif) : null,
       unite_uc: libelleColisage({ ...a, contenu_nb: Number(a.contenu_nb) }),
       unite_element: libelleElement(a),
