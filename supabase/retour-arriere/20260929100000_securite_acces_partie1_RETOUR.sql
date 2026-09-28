@@ -1,4 +1,4 @@
--- RETOUR ARRIÈRE de la migration 20260929100000_securite_acces_partie1.sql
+-- RETOUR ARRIÈRE des migrations 20260929100000_securite_acces_partie1.sql et 20260929100002_securite_acces_performance.sql
 -- Restaure à l'identique les règles d'accès et la fonction en place le 28/09/2026 à 22 h (relevé en base).
 -- À exécuter d'un bloc (transaction) uniquement en cas de problème.
 begin;
@@ -81,6 +81,10 @@ create policy primes_update on public.primes as PERMISSIVE for UPDATE to public 
 create policy ventes_lignes_all on public.ventes_lignes as PERMISSIVE for ALL to public using (true) with check (true);
 
 -- 4. Fonctions ajoutées (sans effet une fois les règles restaurées)
+drop function if exists public.etabs_manager();
+drop function if exists public.etabs_acces();
+drop function if exists public.employes_geres();
+drop function if exists public.mes_employes();
 drop function if exists public.est_mon_employe(uuid);
 drop function if exists public.etab_de_employe(uuid);
 drop function if exists public.est_manager_etab(uuid);
