@@ -1,3 +1,62 @@
+# Audit de l'application — 29 septembre 2026 (soir)
+
+Audit de contrôle, sans modification de code : build, tests, base, déploiement.
+Fait par Claude sur le commit `86a62a3` (dernier de main, déployé en production).
+
+## Verdict : sain
+
+| Contrôle | Résultat |
+|---|---|
+| ESLint (`--max-warnings 0`) | 0 erreur, 0 avertissement |
+| Tests Vitest | 9 fichiers, 133 tests, tous verts |
+| `next build` | OK en 62 s, aucun avertissement |
+| Production Vercel | 8 derniers déploiements READY, aucune erreur runtime sur 7 jours |
+| Erreurs client (`client_errors`) | 1 sur 7 jours (React #418 sur `/mon-tableau`, 24/09, isolée) |
+| Migrations | les 3 d'inventaire du 29/09 sont appliquées en base |
+| Crons | 8 crons Vercel + 3 pg_cron actifs ; dernière synchro Popina à 20 h 20 (heure de Paris) |
+| TODO / FIXME dans le code | 1 |
+
+## Écarts trouvés (aucun bloquant)
+
+1. **Deux migrations en base sans fichier dans le dépôt** : `add_ingredients_destination`
+   et `add_destination_source_and_non_alimentaire` (appliquées le 29/09 à 20 h 37 et 20 h 39,
+   colonnes `ingredients.destination` et `destination_source` présentes). Vraisemblablement
+   un chantier en cours dans une autre session — à committer avec le code qui va avec, sinon
+   un `supabase db reset` ou un clone ne reproduira pas le schéma.
+2. **Factures Metro absentes de l'appli** (contrôle du lundi 28/09) : 4 factures de
+   septembre (2 Bello Mio, 2 Piccola Mia), 1 383,38 € TTC au total. Visibles dans
+   « Lignes en attente ».
+3. **Base produits** : 89 fiches encore « à contrôler » (toutes sans zone ni prix), et
+   29 fiches validées sans aucun prix (ni offre active ni prix d'achat). Les 227 fiches
+   validées sans zone de stockage sont surtout des produits non stockés (à confirmer).
+4. **Sécurité Supabase** (inchangé depuis le 3/09, à traiter au fil de l'eau) : 25 vues
+   `SECURITY DEFINER`, 20 fonctions `SECURITY DEFINER` exécutables par `anon`
+   (dont `contrats_admin`, `employe_confidentiel`, `apply_costs_from_offers_v3` — à révoquer
+   pour `anon` en priorité), protection « mots de passe compromis » toujours désactivée,
+   `pg_net` dans le schéma `public`, `daily_sales_normaliser` sans `search_path`.
+5. **Performance Supabase** : 22 tables avec `auth.uid()` non encapsulé dans les policies
+   (`auth_rls_initplan`), 29 tables avec policies permissives multiples, 114 index jamais
+   utilisés (à laisser vivre quelques semaines de plus avant de supprimer), 5 clés étrangères
+   sans index (tables récentes `acces_journal`, `commande_articles`, `commande_envois`,
+   `supplier_offers_a_valider`).
+6. **Pages géantes** toujours à découper : `commandes/page.tsx` 3 105 l., `ventes/page.tsx`
+   2 684 l., `CatalogueTab.tsx` 2 378 l., `rh/employe/[id]` 2 170 l., `rh/conges` 2 169 l.
+   Chart.js n'est plus importé statiquement que dans les 7 composants lazy — le chantier
+   graphiques est terminé, sauf `ventes/page.tsx` (voir 28/09 ci-dessous).
+7. **Dépendances** : Next 15.5.19 (CLAUDE.md annonce Next 16 — le dépôt est en fait resté
+   en 15 ; 16.3 disponible), supabase-js 2.94 → 2.117, @react-pdf 4.3 → 4.9, pdfjs 5 → 6.
+   Rien d'urgent ; à faire branche par branche avec `build:check`.
+
+## Chantiers livrés depuis le 15/08 (pour mémoire)
+
+Commandes Maël étapes 1 à 4 (écran téléphone, précommande du mercredi, envoi avec journal),
+sécurité des accès partie 1 (RLS personnel / paie / ventes, écran « Accès de l'équipe »),
+inventaires étape 1 (saisie feuille, import, clôture avec mouvements), import auto des factures
+depuis Pennylane + contrôle hebdo des factures manquantes, parsers Cafés Celtik, Maison Hardy,
+Cozigou, LMDW, base produits (catégories, zones, doublons, import Excel), page Croisière.
+
+---
+
 # Audit de l'application — 15 août 2026 (nuit)
 
 Audit complet : build de production, code mort, performance, fiabilité.
