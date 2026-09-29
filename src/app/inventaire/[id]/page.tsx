@@ -82,7 +82,14 @@ function Feuille() {
     // Zones de la feuille d'abord (ordre des zones de l'établissement), puis les zones sans ligne
     setZones(nomsZones);
     setLignes(liste);
-    setSaisies(Object.fromEntries(liste.map((l) => [l.id, { colis: txt(l.colis), unites: txt(l.unites ?? (l.colis == null && l.quantite > 0 ? l.quantite : null)) }])));
+    // Colis unique (contenu 1) : un seul champ, « colis » ; sans conditionnement : un seul champ, « unités ».
+    // Une quantité déjà enregistrée ailleurs (ancien inventaire) est reportée dans le champ affiché.
+    setSaisies(Object.fromEntries(liste.map((l) => {
+      const ancienne = l.colis == null && l.unites == null && l.quantite > 0 ? l.quantite : null;
+      if (l.cond_contenu != null && l.cond_contenu <= 1) return [l.id, { colis: txt(l.colis ?? l.unites ?? ancienne), unites: "" }];
+      if (l.cond_contenu == null) return [l.id, { colis: "", unites: txt(l.unites ?? l.colis ?? ancienne) }];
+      return [l.id, { colis: txt(l.colis), unites: txt(l.unites ?? ancienne) }];
+    })));
     setZone((cur) => cur ?? nomsZones.find((n) => liste.some((l) => l.zone === n)) ?? nomsZones[0] ?? null);
   }, [id]);
 
@@ -228,7 +235,7 @@ function Feuille() {
       ) : null}
 
       {/* Zones, dans l'ordre des feuilles */}
-      <div className="inventaire-zones" style={{ display: "flex", gap: 6, overflowX: "auto", margin: "14px 0 10px", paddingBottom: 4, position: "sticky", top: 0, zIndex: 5, background: "#f2ede4" }}>
+      <div className="inventaire-zones" style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none", margin: "14px 0 10px", padding: "6px 0", position: "sticky", top: 0, zIndex: 5, background: "#f2ede4" }}>
         {zones.map((z) => {
           const ls = parZone.get(z) ?? [];
           const n = ls.filter(compte).length;
