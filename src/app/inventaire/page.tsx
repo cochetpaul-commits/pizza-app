@@ -7,6 +7,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { CATEGORIES, CAT_LABELS, CAT_COLORS, type Category, type Ingredient } from "@/types/ingredients";
 import { openApiFile } from "@/lib/fetchApi";
+import { useRouter } from "next/navigation";
 import { fermerOffresActives } from "@/lib/offerClosing";
 
 // ── Types ────────────────────────────────────────────────────
@@ -15,6 +16,9 @@ type Inventaire = {
   id: string;
   date: string;
   statut: "en_cours" | "en_pause" | "cloture";
+  /** « feuille » : saisie dans l'ordre de la feuille papier (écran /inventaire/[id]) ; « zones » : cet écran */
+  saisie?: "zones" | "feuille";
+  type?: "fin_exercice" | "mensuel";
   total_valeur: number | null;
   created_at: string;
   notes: string | null;
@@ -138,6 +142,7 @@ export default function InventairePage() {
 
   const [session, setSession] = useState<Inventaire | null>(null);
   const [historique, setHistorique] = useState<Inventaire[]>([]);
+  const [feuilles, setFeuilles] = useState<Inventaire[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [prevQuantities, setPrevQuantities] = useState<Record<string, number>>({});
   const [theoreticalStock, setTheoreticalStock] = useState<Record<string, number>>({});
@@ -281,14 +286,17 @@ export default function InventairePage() {
       setLoading(true);
       const { data, error: invErr } = await supabase
         .from("inventaires")
-        .select("id, date, statut, total_valeur, created_at, notes")
+        .select("id, date, statut, total_valeur, created_at, notes, saisie, type")
         .eq("etablissement_id", reloadKey)
         .order("created_at", { ascending: false })
         .limit(20);
 
       if (invErr) { console.error("inventaires query:", invErr); }
       if (cancelled) return;
-      const list = (data ?? []) as Inventaire[];
+      const tous = (data ?? []) as Inventaire[];
+      // Inventaires « feuille » : leur propre écran ; ici seulement listés
+      setFeuilles(tous.filter((i) => i.saisie === "feuille"));
+      const list = tous.filter((i) => i.saisie !== "feuille");
       const active = list.find((i) => i.statut === "en_cours" || i.statut === "en_pause") ?? null;
       setSession(active);
       setHistorique(list.filter((i) => i.statut === "cloture"));
@@ -848,6 +856,8 @@ export default function InventairePage() {
               {saving ? "Creation..." : "Nouvel inventaire"}
             </button>
           </div>
+
+          {etab?.id && userId && <BlocFeuilles etabId={etab.id} userId={userId} feuilles={feuilles} />}
 
           {historique.length > 0 && (
             <div>
@@ -1781,3 +1791,55 @@ const summaryValue: React.CSSProperties = {
   color: "#1a1a1a",
   fontFamily: "Oswald, sans-serif",
 };
+
+/**
+ * Inventaires « feuille » (fin d'exercice, mensuel) : création (date, type) et liste ;
+ * la saisie se fait dans l'ordre de la feuille papier, sur /inventaire/[id].
+ */
+function BlocFeuilles({ etabId, userId, feuilles }: { etabId: string; userId: string; feuilles: Inventaire[] }) {
+  const router = useRouter();
+  const [date, setDate] = useState(() => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" }));
+  const [type, setType] = useState<"fin_exercice" | "mensuel">("fin_exercice");
+  const [envoi, setEnvoi] = useState(false);
+  const creer = async () => {
+    setEnvoi(true);
+    const { data, error } = await supabase.from("inventaires")
+      .insert({ etablissement_id: etabId, created_by: userId, date, type, saisie: "feuille" }).select("id").single();
+    setEnvoi(false);
+    if (error || !data) { alert(error?.message ?? "Création impossible"); return; }
+    router.push(`/inventaire/${data.id}`);
+  };
+  const champ: React.CSSProperties = { height: 42, borderRadius: 10, border: "1px solid #ddd6c8", padding: "0 10px", fontSize: 14, background: "#fff", fontFamily: "inherit" };
+  return (
+    <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #ddd6c8", padding: 16, marginBottom: 24 }}>
+      <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>Inventaire sur feuille</div>
+      <p style={{ fontSize: 12.5, color: "#8a8378", margin: "0 0 10px" }}>Saisie zone par zone, dans l&apos;ordre de la feuille papier, en colis et unités.</p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={champ} />
+        <select value={type} onChange={(e) => setType(e.target.value as "fin_exercice" | "mensuel")} style={champ}>
+          <option value="fin_exercice">Fin d&apos;exercice</option>
+          <option value="mensuel">Mensuel</option>
+        </select>
+        <button type="button" onClick={creer} disabled={envoi || !date}
+          style={{ ...champ, border: "none", background: "#D4775A", color: "#fff", fontWeight: 700, padding: "0 16px", cursor: "pointer" }}>
+          {envoi ? "Création…" : "Créer l'inventaire"}
+        </button>
+      </div>
+      {feuilles.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          {feuilles.map((f) => (
+            <button key={f.id} type="button" onClick={() => router.push(`/inventaire/${f.id}`)} style={{
+              width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, textAlign: "left",
+              background: "#faf7f2", border: "1px solid #ece6db", borderRadius: 10, padding: "10px 12px", marginTop: 6, cursor: "pointer", fontFamily: "inherit",
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>
+                {new Date(f.date + "T12:00:00").toLocaleDateString("fr-FR")} · {f.type === "fin_exercice" ? "Fin d'exercice" : "Mensuel"}
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: f.statut === "cloture" ? "#2D6A4F" : "#D4775A" }}>{f.statut === "cloture" ? "Clôturé" : "En cours"} ›</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
