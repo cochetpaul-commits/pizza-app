@@ -168,7 +168,11 @@ function CataloguePage() {
       const res = await fetchApi("/api/popina-catalogue/sync", { method: "POST" });
       const data = await res.json();
       if (data.ok) {
-        setSyncResult(`${data.upserted} produits synchronisés, ${data.deactivated} désactivés`);
+        setSyncResult(
+          `${data.upserted} produits synchronisés (${data.inserted ?? 0} nouveaux` +
+            (data.matchedByName ? `, ${data.matchedByName} retrouvés par le nom` : "") +
+            `), ${data.deactivated} désactivés`,
+        );
         refreshSilent();
       } else {
         setSyncResult(`Erreur : ${data.error}`);
