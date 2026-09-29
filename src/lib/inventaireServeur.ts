@@ -54,12 +54,12 @@ const colonnesCond = (c: Conditionnement | null, uniteFiche: string) => ({
 
 const normNom = (x: unknown) => String(x ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 
-type FicheCourte = { id: string; name: string; is_active: boolean; etablissement_id: string; updated_at: string };
+type FicheCourte = { id: string; name: string; is_active: boolean; etablissement_id: string; updated_at: string; status_note: string | null };
 
 async function toutesLesFiches(): Promise<FicheCourte[]> {
   const toutes: FicheCourte[] = [];
   for (let p = 0; p < 50; p++) {
-    const { data } = await supabaseAdmin.from("ingredients").select("id, name, is_active, etablissement_id, updated_at").range(p * 1000, p * 1000 + 999);
+    const { data } = await supabaseAdmin.from("ingredients").select("id, name, is_active, etablissement_id, updated_at, status_note").range(p * 1000, p * 1000 + 999);
     toutes.push(...((data ?? []) as FicheCourte[]));
     if (!data || data.length < 1000) break;
   }
@@ -74,7 +74,13 @@ async function toutesLesFiches(): Promise<FicheCourte[]> {
  * sans unité dans le fichier : conditionnement de commande. Doublons dans une zone gardés (additionnés à la valorisation).
  * Refusé si des quantités ont déjà été saisies ; les lignes pré-remplies non comptées sont remplacées.
  */
-export async function importerFeuille(inv: Inv, tableau: unknown[][], userId: string): Promise<Reponse> {
+export async function importerFeuille(
+  inv: Inv, tableau: unknown[][], userId: string,
+  /** Correspondances données à la main : nom (tel qu'imprimé ou nom de fiche) → identifiant de fiche */
+  correspondances: Record<string, string> = {},
+  /** Simulation : rien n'est écrit (ni fiche, ni ligne), seulement le bilan */
+  simulation = false,
+): Promise<Reponse> {
   if (inv.statut === "cloture") return rep({ error: "Inventaire clôturé" }, 409);
   const { count: dejaSaisies } = await supabaseAdmin.from("inventaire_lignes").select("id", { count: "exact", head: true })
     .eq("inventaire_id", inv.id).or("colis.not.is.null,unites.not.is.null");
@@ -99,7 +105,20 @@ export async function importerFeuille(inv: Inv, tableau: unknown[][], userId: st
     return recente(c.filter((f) => f.is_active && f.etablissement_id === inv.etablissement_id))
       ?? recente(c.filter((f) => f.is_active)) ?? recente(c.filter((f) => f.etablissement_id === inv.etablissement_id)) ?? recente(c);
   };
-  const stats = { par_identifiant: 0, par_nom: 0, fiche_desactivee: 0, creees: 0 };
+  /** Fiche fusionnée dans une autre (status_note « … fusionné … -> <id> ») : on suit jusqu'à une fiche active */
+  const suivreFusion = (f: FicheCourte): FicheCourte => {
+    let cur = f;
+    for (let i = 0; i < 5 && !cur.is_active; i++) {
+      const note = cur.status_note ?? "";
+      const cible = /fusionn/i.test(note) ? /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.exec(note)?.[0] : undefined;
+      const suivante = cible ? parId.get(cible.toLowerCase()) : undefined;
+      if (!suivante || suivante.id === cur.id) break;
+      cur = suivante;
+    }
+    return cur;
+  };
+  const manuelles = new Map(Object.entries(correspondances).map(([k, v]) => [normNom(k), v.toLowerCase()]));
+  const stats = { par_identifiant: 0, par_nom: 0, correspondance: 0, a_creer_deja_existante: 0, via_fusion: 0, fiche_desactivee: 0, creees: 0 };
   const desactivees: string[] = [];
   const fournisseurDe = (nom: string | null) => (fournisseurs ?? []).find((f) => normNom(f.name) === normNom(nom))?.id as string | undefined;
   const creees = new Map<string, string>(); // nom → id
@@ -107,8 +126,16 @@ export async function importerFeuille(inv: Inv, tableau: unknown[][], userId: st
   const erreurs = [...lecture.erreurs];
   for (const l of lecture.lignes) {
     let fiche: FicheCourte | null = null;
-    if (l.ref && UUID.test(l.ref)) { fiche = parId.get(l.ref.toLowerCase()) ?? null; if (fiche) stats.par_identifiant++; }
+    const manuelle = manuelles.get(normNom(l.nom)) ?? (l.ref ? manuelles.get(normNom(l.ref)) : undefined);
+    if (manuelle) { fiche = parId.get(manuelle) ?? null; if (fiche) stats.correspondance++; }
+    else if (l.ref && UUID.test(l.ref)) { fiche = parId.get(l.ref.toLowerCase()) ?? null; if (fiche) stats.par_identifiant++; }
     else if (l.ref) { fiche = choisir(l.ref); if (fiche) stats.par_nom++; }
+    // Fiche « à créer » dont le nom existe déjà (souvent désactivée) : on la reprend, une fiche du même nom ne peut pas être recréée
+    else if (!creees.has(normNom(l.nom))) { fiche = choisir(l.nom); if (fiche) stats.a_creer_deja_existante++; }
+    if (fiche && !fiche.is_active) {
+      const active = suivreFusion(fiche);
+      if (active.id !== fiche.id && active.is_active) { fiche = active; stats.via_fusion++; }
+    }
     if (fiche) {
       if (!fiche.is_active) { stats.fiche_desactivee++; desactivees.push(`${l.ordre}. ${l.nom}`); }
       resolues.push({ l, id: fiche.id });
@@ -116,7 +143,8 @@ export async function importerFeuille(inv: Inv, tableau: unknown[][], userId: st
     }
     // Fiche à créer (« À CRÉER », nom introuvable) : une seule fois par nom
     const cle = normNom(l.nom);
-    let id = creees.get(cle) ?? choisir(l.nom)?.id;
+    let id = creees.get(cle);
+    if (!id && simulation) { id = `simulation-${cle}`; stats.creees++; }
     if (!id) {
       const four = fournisseurDe(l.fournisseur);
       const { data: cree, error } = await supabaseAdmin.from("ingredients").insert({
@@ -149,6 +177,7 @@ export async function importerFeuille(inv: Inv, tableau: unknown[][], userId: st
     return { ...base, ...colonnesCond(c?.cond ?? null, c?.uniteFiche ?? "pc") };
   });
 
+  if (simulation) return rep({ simulation: true, lignes: aInserer.length, ...stats, doublons: lecture.doublons, desactivees, erreurs });
   const { error: errSup } = await supabaseAdmin.from("inventaire_lignes").delete().eq("inventaire_id", inv.id).is("colis", null).is("unites", null);
   if (errSup) return rep({ error: errSup.message }, 500);
   for (let i = 0; i < aInserer.length; i += 500) {
