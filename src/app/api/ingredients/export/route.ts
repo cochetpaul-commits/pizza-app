@@ -50,8 +50,10 @@ export async function GET(req: NextRequest) {
   const fournNoms = new Set(fournisseurs.map((id) => (supName.get(id) ?? "").trim().toLowerCase()).filter(Boolean));
   const rowsFiltrees = fournNoms.size
     ? rows.filter((r) => { const o = offerBy.get(r.id as string) as Record<string, unknown> | undefined; const sid = (o?.supplier_id as string) ?? (r.supplier_id as string) ?? null; return sid ? fournNoms.has((supName.get(sid) ?? "").trim().toLowerCase()) : false; })
-    : rows;
-  rows.length = 0; rows.push(...rowsFiltrees);
+    : null;
+  // Sans filtre fournisseur, on garde `rows` tel quel. (Vécu 29/09 : « rows.length = 0 » vidait aussi
+  // rowsFiltrees quand c'était le même tableau → export sans aucun produit.)
+  if (rowsFiltrees) { rows.length = 0; rows.push(...rowsFiltrees); }
 
   const prixKg = (r: Record<string, unknown>, o?: Record<string, unknown>): number | null => {
     if (r.cost_per_kg) return Math.round(Number(r.cost_per_kg) * 100) / 100;
