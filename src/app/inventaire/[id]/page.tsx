@@ -21,6 +21,8 @@ type Ligne = {
   id: string; ingredient_id: string; zone: string; ordre: number | null; famille: string | null;
   colis: number | null; unites: number | null; quantite: number; unite: string | null;
   cond_contenu: number | null; cond_libelle: string | null; nom: string;
+  /** Nom tel qu'imprimé sur la feuille, fournisseur et rattachement du fichier */
+  nom_feuille: string | null; rattachement: string | null; aVerifier: boolean;
 };
 type Saisie = { colis: string; unites: string };
 
@@ -28,6 +30,7 @@ const ACCENT = "#D4775A";
 const OSWALD = "var(--font-oswald), Oswald, sans-serif";
 const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(",", ".")));
 const txt = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
+const normNom = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 const fmtDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const pluriel = (u: string | null, n: number) => {
   const m = u ?? "";
@@ -69,13 +72,15 @@ function Feuille() {
     const [{ data: z }, { data: e }, { data: ls }] = await Promise.all([
       supabase.from("storage_zones").select("name, display_order").eq("etablissement_id", invRow.etablissement_id).order("display_order"),
       supabase.from("etablissements").select("nom").eq("id", invRow.etablissement_id).maybeSingle(),
-      supabase.from("inventaire_lignes").select("id, ingredient_id, zone, ordre, famille, colis, unites, quantite, unite, cond_contenu, cond_libelle")
+      supabase.from("inventaire_lignes").select("id, ingredient_id, zone, ordre, famille, colis, unites, quantite, unite, cond_contenu, cond_libelle, nom_feuille, rattachement")
         .eq("inventaire_id", id).order("ordre", { ascending: true, nullsFirst: false }).limit(5000),
     ]);
     const ids = [...new Set((ls ?? []).map((l) => l.ingredient_id as string))];
-    const { data: ings } = await inChunks<{ id: string; name: string }>(ids, (b) => supabase.from("ingredients").select("id, name").in("id", b));
-    const nomDe = new Map(ings.map((x) => [x.id, x.name]));
-    const liste = ((ls ?? []) as Omit<Ligne, "nom">[]).map((l) => ({ ...l, nom: nomDe.get(l.ingredient_id) ?? "?" }));
+    const { data: ings } = await inChunks<{ id: string; name: string; status: string }>(ids, (b) => supabase.from("ingredients").select("id, name, status").in("id", b));
+    const ficheDe = new Map(ings.map((x) => [x.id, x]));
+    const liste = ((ls ?? []) as Omit<Ligne, "nom" | "aVerifier">[]).map((l) => ({
+      ...l, nom: ficheDe.get(l.ingredient_id)?.name ?? "?", aVerifier: ficheDe.get(l.ingredient_id)?.status === "to_check" && l.rattachement === "À CRÉER",
+    }));
     setInv(invRow);
     setEtabNom((e?.nom as string | undefined) ?? "");
     const nomsZones = (z ?? []).map((x) => x.name as string);
@@ -273,10 +278,19 @@ function Feuille() {
                 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.25 }}>
-                      <span style={{ color: "#b0a894", fontWeight: 500, marginRight: 6, fontSize: 12 }}>{l.ordre ?? ""}</span>{l.nom}
+                      <span style={{ color: "#b0a894", fontWeight: 500, marginRight: 6, fontSize: 12 }}>{l.ordre ?? ""}</span>{l.nom_feuille ?? l.nom}
                     </div>
+                    {l.nom_feuille && normNom(l.nom_feuille) !== normNom(l.nom) && (
+                      <div style={{ fontSize: 11.5, color: "#a79f90", marginTop: 1 }}>fiche : {l.nom}</div>
+                    )}
+                    {(l.rattachement === "approché" || l.aVerifier) && (
+                      <span style={{
+                        display: "inline-block", marginTop: 3, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8,
+                        background: l.aVerifier ? "#fde7ef" : "#fdf3d4", color: l.aVerifier ? "#b0306a" : "#8a6a12",
+                      }}>{l.aVerifier ? "fiche à vérifier" : "rattaché par ressemblance"}</span>
+                    )}
                     <div style={{ fontSize: 12, color: "#8a8378", marginTop: 2 }}>
-                      {l.cond_libelle ?? `en ${l.unite ?? "unités"}`}
+                      {contenu != null && contenu > 1 ? l.cond_libelle : `compté en ${l.cond_libelle ?? l.unite ?? "unités"}`}
                       {total != null && <> · <strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong></>}
                     </div>
                   </div>

@@ -25,7 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let r;
   if (body.action === "importer") {
     if (!Array.isArray(body.tableau)) return NextResponse.json({ error: "Fichier illisible" }, { status: 400 });
-    r = await importerFeuille(inv, body.tableau as unknown[][]);
+    r = await importerFeuille(inv, body.tableau as unknown[][], userId);
   } else if (body.action === "ajouter") {
     if (!body.ingredient_id || !body.zone) return NextResponse.json({ error: "Produit et zone requis" }, { status: 400 });
     r = await ajouterLigne(inv, body.ingredient_id, body.zone);

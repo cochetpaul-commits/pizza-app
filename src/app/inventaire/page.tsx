@@ -419,14 +419,13 @@ export default function InventairePage() {
         .eq("zone", zoneDb);
       return;
     }
-    await supabase.from("inventaire_lignes").upsert({
-      inventaire_id: sessionId,
-      ingredient_id: ingredientId,
-      zone: zoneDb,
-      quantite: qty,
-      unite: ing.default_unit ?? null,
-      cout_unitaire: ing.cost_per_unit ?? null,
-    }, { onConflict: "inventaire_id,ingredient_id,zone" });
+    // Plus d'unicité produit × zone en base (feuilles papier : un produit peut y être deux fois) : mise à jour, sinon création
+    const valeurs = { quantite: qty, unite: ing.default_unit ?? null, cout_unitaire: ing.cost_per_unit ?? null, updated_at: new Date().toISOString() };
+    const { data: maj } = await supabase.from("inventaire_lignes").update(valeurs)
+      .eq("inventaire_id", sessionId).eq("ingredient_id", ingredientId).eq("zone", zoneDb).select("id");
+    if (!maj?.length) {
+      await supabase.from("inventaire_lignes").insert({ inventaire_id: sessionId, ingredient_id: ingredientId, zone: zoneDb, ...valeurs });
+    }
   }, []);
 
   function handleQtyChange(id: string, val: string) {

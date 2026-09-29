@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { CAT_LABELS, type Category } from "@/types/ingredients";
-import { choisirConditionnement, lireFeuille, totalLigne, type ArticleFournisseur, type Conditionnement, type OffreActive } from "@/lib/inventaire";
+import { categorieDeFamille, choisirConditionnement, comptageFeuille, lireFeuille, totalLigne, uniteFicheDe, UUID, type ArticleFournisseur, type Conditionnement, type OffreActive } from "@/lib/inventaire";
 
 /**
  * Inventaires, saisie « feuille » (côté serveur, clé service) : import de la feuille papier, ajout d'un produit
@@ -52,31 +52,103 @@ const colonnesCond = (c: Conditionnement | null, uniteFiche: string) => ({
   unite: c?.unite ?? uniteFiche,
 });
 
+const normNom = (x: unknown) => String(x ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+
+type FicheCourte = { id: string; name: string; is_active: boolean; etablissement_id: string; updated_at: string };
+
+async function toutesLesFiches(): Promise<FicheCourte[]> {
+  const toutes: FicheCourte[] = [];
+  for (let p = 0; p < 50; p++) {
+    const { data } = await supabaseAdmin.from("ingredients").select("id, name, is_active, etablissement_id, updated_at").range(p * 1000, p * 1000 + 999);
+    toutes.push(...((data ?? []) as FicheCourte[]));
+    if (!data || data.length < 1000) break;
+  }
+  return toutes;
+}
+
 /**
- * Pré-remplit l'inventaire avec les lignes de la feuille papier (zone, famille, nom, identifiant), dans l'ordre.
+ * Pré-remplit l'inventaire avec les lignes de la feuille papier, dans l'ordre, avec le nom tel qu'imprimé.
+ * Fiche : identifiant, sinon nom exact (fiche active de l'établissement d'abord, puis active ailleurs, puis désactivée) ;
+ * sinon fiche créée « à vérifier » (famille et fournisseur du fichier), une seule fois par nom.
+ * Saisie dans l'unité de comptage de la feuille (« colis de 20 » : colis + unités ; « kg » : un champ) ;
+ * sans unité dans le fichier : conditionnement de commande. Doublons dans une zone gardés (additionnés à la valorisation).
  * Refusé si des quantités ont déjà été saisies ; les lignes pré-remplies non comptées sont remplacées.
  */
-export async function importerFeuille(inv: Inv, tableau: unknown[][]): Promise<Reponse> {
+export async function importerFeuille(inv: Inv, tableau: unknown[][], userId: string): Promise<Reponse> {
   if (inv.statut === "cloture") return rep({ error: "Inventaire clôturé" }, 409);
   const { count: dejaSaisies } = await supabaseAdmin.from("inventaire_lignes").select("id", { count: "exact", head: true })
     .eq("inventaire_id", inv.id).or("colis.not.is.null,unites.not.is.null");
   if ((dejaSaisies ?? 0) > 0) return rep({ error: "Des quantités sont déjà saisies : import refusé pour ne rien écraser" }, 409);
 
-  const { data: zones } = await supabaseAdmin.from("storage_zones").select("name").eq("etablissement_id", inv.etablissement_id);
+  const [{ data: zones }, { data: etab }, { data: fournisseurs }, fiches] = await Promise.all([
+    supabaseAdmin.from("storage_zones").select("name").eq("etablissement_id", inv.etablissement_id),
+    supabaseAdmin.from("etablissements").select("slug").eq("id", inv.etablissement_id).maybeSingle(),
+    supabaseAdmin.from("suppliers").select("id, name").eq("etablissement_id", inv.etablissement_id),
+    toutesLesFiches(),
+  ]);
   const lecture = lireFeuille(tableau, (zones ?? []).map((z) => z.name as string));
   if (!lecture.lignes.length) return rep({ error: lecture.erreurs[0] ?? "Aucune ligne lue", erreurs: lecture.erreurs }, 400);
 
-  const conds = await conditionnements([...new Set(lecture.lignes.map((l) => l.ingredient_id))]);
+  // Rattachement des fiches
+  const parId = new Map(fiches.map((f) => [f.id, f]));
+  const parNom = new Map<string, FicheCourte[]>();
+  for (const f of fiches) parNom.set(normNom(f.name), [...(parNom.get(normNom(f.name)) ?? []), f]);
+  const choisir = (nom: string): FicheCourte | null => {
+    const c = parNom.get(normNom(nom)) ?? [];
+    const recente = (l: FicheCourte[]) => [...l].sort((x, y) => y.updated_at.localeCompare(x.updated_at))[0] ?? null;
+    return recente(c.filter((f) => f.is_active && f.etablissement_id === inv.etablissement_id))
+      ?? recente(c.filter((f) => f.is_active)) ?? recente(c.filter((f) => f.etablissement_id === inv.etablissement_id)) ?? recente(c);
+  };
+  const stats = { par_identifiant: 0, par_nom: 0, fiche_desactivee: 0, creees: 0 };
+  const desactivees: string[] = [];
+  const fournisseurDe = (nom: string | null) => (fournisseurs ?? []).find((f) => normNom(f.name) === normNom(nom))?.id as string | undefined;
+  const creees = new Map<string, string>(); // nom → id
+  const resolues: { l: (typeof lecture.lignes)[number]; id: string }[] = [];
   const erreurs = [...lecture.erreurs];
-  const aInserer = [];
   for (const l of lecture.lignes) {
-    const c = conds.get(l.ingredient_id);
-    if (!c) { erreurs.push(`${l.nom || l.ingredient_id} : fiche introuvable, ligne ignorée`); continue; }
-    aInserer.push({
-      inventaire_id: inv.id, ingredient_id: l.ingredient_id, zone: l.zone, ordre: l.ordre,
-      famille: l.famille ?? c.famille, quantite: 0, colis: null, unites: null, ...colonnesCond(c.cond, c.uniteFiche),
-    });
+    let fiche: FicheCourte | null = null;
+    if (l.ref && UUID.test(l.ref)) { fiche = parId.get(l.ref.toLowerCase()) ?? null; if (fiche) stats.par_identifiant++; }
+    else if (l.ref) { fiche = choisir(l.ref); if (fiche) stats.par_nom++; }
+    if (fiche) {
+      if (!fiche.is_active) { stats.fiche_desactivee++; desactivees.push(`${l.ordre}. ${l.nom}`); }
+      resolues.push({ l, id: fiche.id });
+      continue;
+    }
+    // Fiche à créer (« À CRÉER », nom introuvable) : une seule fois par nom
+    const cle = normNom(l.nom);
+    let id = creees.get(cle) ?? choisir(l.nom)?.id;
+    if (!id) {
+      const four = fournisseurDe(l.fournisseur);
+      const { data: cree, error } = await supabaseAdmin.from("ingredients").insert({
+        name: l.nom, category: categorieDeFamille(l.famille), default_unit: uniteFicheDe(l.uniteFeuille), status: "to_check",
+        status_note: `Créée à l'import de l'inventaire du ${inv.date} (${l.famille ?? "sans famille"}, ${l.fournisseur ?? "sans fournisseur"}) : à vérifier`,
+        etablissement_id: inv.etablissement_id, establishments: [etab?.slug === "piccola" ? "piccola" : "bellomio"],
+        user_id: userId, supplier_id: four ?? null, default_supplier_id: four ?? null, purchase_unit_label: l.uniteFeuille,
+      }).select("id").single();
+      if (error || !cree) { erreurs.push(`${l.ordre}. ${l.nom} : fiche non créée (${error?.message ?? "erreur"})`); continue; }
+      id = cree.id as string;
+      stats.creees++;
+    }
+    creees.set(cle, id);
+    resolues.push({ l, id });
   }
+
+  // Conditionnement de commande, seulement pour les lignes sans unité de comptage dans le fichier
+  const sansUnite = [...new Set(resolues.filter((r) => !r.l.uniteFeuille).map((r) => r.id))];
+  const conds = sansUnite.length ? await conditionnements(sansUnite) : new Map();
+  const aInserer = resolues.map(({ l, id }) => {
+    const base = {
+      inventaire_id: inv.id, ingredient_id: id, zone: l.zone, ordre: l.ordre, famille: l.famille, quantite: 0, colis: null, unites: null,
+      nom_feuille: l.nom, fournisseur_feuille: l.fournisseur, rattachement: l.rattachement,
+    };
+    if (l.uniteFeuille) {
+      const c = comptageFeuille(l.uniteFeuille);
+      return { ...base, cond_supplier_id: null, cond_contenu: c.contenu, cond_libelle: c.libelle, unite: c.unite };
+    }
+    const c = conds.get(id);
+    return { ...base, ...colonnesCond(c?.cond ?? null, c?.uniteFiche ?? "pc") };
+  });
+
   const { error: errSup } = await supabaseAdmin.from("inventaire_lignes").delete().eq("inventaire_id", inv.id).is("colis", null).is("unites", null);
   if (errSup) return rep({ error: errSup.message }, 500);
   for (let i = 0; i < aInserer.length; i += 500) {
@@ -84,7 +156,7 @@ export async function importerFeuille(inv: Inv, tableau: unknown[][]): Promise<R
     if (error) return rep({ error: error.message, erreurs }, 500);
   }
   await supabaseAdmin.from("inventaires").update({ saisie: "feuille" }).eq("id", inv.id);
-  return rep({ ok: true, lignes: aInserer.length, sans_conditionnement: aInserer.filter((x) => x.cond_contenu == null).length, erreurs });
+  return rep({ ok: true, lignes: aInserer.length, ...stats, doublons: lecture.doublons, desactivees, erreurs });
 }
 
 /** Produit hors liste ajouté dans une zone (en fin de zone) */
