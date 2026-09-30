@@ -33,7 +33,7 @@ type Ligne = {
   nom_feuille: string | null; rattachement: string | null; aVerifier: boolean; inactive: boolean;
 };
 type Fiche = {
-  id: string; name: string; status: string | null; is_active: boolean; category: string | null; default_unit: string | null; default_supplier_id: string | null;
+  id: string; name: string; status: string | null; is_active: boolean; category: string | null; sub_category: string | null; default_unit: string | null; default_supplier_id: string | null;
   purchase_price: number | null; purchase_unit: number | null; purchase_unit_label: string | null; piece_weight_g: number | null; piece_volume_ml: number | null; density_g_per_ml: number | null;
 };
 type Saisie = { colis: string; unites: string };
@@ -98,7 +98,7 @@ function Feuille() {
     ]);
     const ids = [...new Set((ls ?? []).map((l) => l.ingredient_id as string))];
     const [{ data: ings }, { data: arts }, { data: offs }] = await Promise.all([
-      inChunks<Fiche>(ids, (b) => supabase.from("ingredients").select("id, name, status, is_active, category, default_unit, default_supplier_id, purchase_price, purchase_unit, purchase_unit_label, piece_weight_g, piece_volume_ml, density_g_per_ml").in("id", b)),
+      inChunks<Fiche>(ids, (b) => supabase.from("ingredients").select("id, name, status, is_active, category, sub_category, default_unit, default_supplier_id, purchase_price, purchase_unit, purchase_unit_label, piece_weight_g, piece_volume_ml, density_g_per_ml").in("id", b)),
       inChunks<ArticleFournisseur & { ingredient_id: string }>(ids, (b) => supabase.from("commande_articles").select("ingredient_id, supplier_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande").in("ingredient_id", b)),
       inChunks<OffreValo & OffreActive & { ingredient_id: string }>(ids, (b) => supabase.from("supplier_offers").select("ingredient_id, supplier_id, is_active, valid_from, valid_to, created_at, unit, unit_price, pack_price, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, pack_unit, price_kind, piece_weight_g, density_kg_per_l").in("ingredient_id", b)),
     ]);
@@ -279,6 +279,87 @@ function Feuille() {
     setMessage(`Zone « ${libelleZone(nom)} » ajoutée.`);
   }
 
+  /** Carte d'une ligne : nom, détail du conditionnement et du prix, champs de saisie */
+  const carte = (l: Ligne) => {
+    const s = saisies[l.id] ?? { colis: "", unites: "" };
+    const contenu = l.cond_contenu;
+    const deuxChamps = contenu != null && contenu > 1;
+    const total = totalLigne(num(s.colis), num(s.unites), contenu);
+    const etat = etatLigne[l.id];
+    const c = condProduit(l);
+    const peutColis = !!c && c.contenu > 1;
+    const valo = coutDe(l);
+    const f = fiches[l.ingredient_id];
+    const detailPiece = f?.piece_weight_g ? `${f.piece_weight_g >= 1000 ? `${txt(f.piece_weight_g / 1000)} kg` : `${txt(f.piece_weight_g)} g`} la pièce` : f?.piece_volume_ml ? `${f.piece_volume_ml >= 1000 ? `${txt(f.piece_volume_ml / 1000)} L` : `${txt(f.piece_volume_ml)} mL`} la pièce` : null;
+    return (
+      <React.Fragment key={l.id}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 4, borderRadius: 10,
+                  background: "#fff", border: `1px solid ${compte(l) ? "#cfe3d6" : "#ece6db"}`,
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.25, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: "#b0a894", fontWeight: 500, fontSize: 12 }}>{l.ordre ?? ""}</span>
+                      <span style={{ minWidth: 0 }}>{l.nom_feuille ?? l.nom}</span>
+                      {f && (
+                        <a href={`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(`/inventaire/${id}`)}`} title="Modifier la fiche produit (prix, conditionnement, zone)"
+                          onClick={(e) => e.stopPropagation()} style={{ fontSize: 12, color: "#8a8378", textDecoration: "none", border: "1px solid #ddd6c8", borderRadius: 6, padding: "0 5px", lineHeight: "18px", flexShrink: 0 }}>✎</a>
+                      )}
+                    </div>
+                    {l.nom_feuille && normNom(l.nom_feuille) !== normNom(l.nom) && (
+                      <div style={{ fontSize: 11.5, color: "#a79f90", marginTop: 1 }}>fiche : {l.nom}</div>
+                    )}
+                    {(l.rattachement === "approché" || l.rattachement === "rattaché par ressemblance" || l.aVerifier || l.inactive) && (
+                      <span style={{
+                        display: "inline-block", marginTop: 3, marginRight: 4, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8,
+                        background: l.inactive ? "#fde7e7" : l.aVerifier ? "#fde7ef" : "#fdf3d4", color: l.inactive ? "#a12b2b" : l.aVerifier ? "#b0306a" : "#8a6a12",
+                      }}>{l.inactive ? (f ? "fiche désactivée" : "fiche supprimée") : l.aVerifier ? "fiche à vérifier" : "rattaché par ressemblance"}</span>
+                    )}
+                    <div style={{ fontSize: 12, color: "#8a8378", marginTop: 2 }}>
+                      {deuxChamps ? l.cond_libelle : `compté en ${l.cond_libelle ?? l.unite ?? "unités"}`}
+                      {total != null && <> · <strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong></>}
+                      {total != null && valo.cout != null && <span style={{ color: "#6f6656" }}> · {eur(total * valo.cout)}</span>}
+                    </div>
+                    {/* Détail du conditionnement et du prix : pour ne pas se tromper de comptage */}
+                    <div style={{ fontSize: 11, color: "#8a8378", marginTop: 2, display: "flex", flexWrap: "wrap", gap: "2px 8px", alignItems: "center" }}>
+                      {c && <span>fiche : <strong style={{ color: "#6f6656" }}>{c.libelle}</strong></span>}
+                      {detailPiece && <span>{detailPiece}</span>}
+                      <span style={{ color: valo.cout == null ? "#b45309" : "#6f6656" }}>
+                        {valo.cout == null ? `sans prix${valo.raison ? ` (${valo.raison})` : ""}` : `${eur(valo.cout)} / ${l.unite ?? "unité"}${valo.source === "ancienne_offre" ? " (ancien prix)" : ""}`}
+                      </span>
+                      {!lectureSeule && (
+                        <>
+                          {peutColis && (
+                            <button type="button" onClick={() => void basculerComptage(l)} style={lien}>
+                              {deuxChamps ? "compter à l'unité" : `compter par ${c!.libelle.split(" ")[0]}`}
+                            </button>
+                          )}
+                          <select value={l.zone} onChange={(e) => void changerZone(l, e.target.value)} title="Déplacer vers une autre zone"
+                            style={{ fontSize: 11, border: "none", background: "transparent", color: "#8a8378", cursor: "pointer", padding: 0 }}>
+                            {zones.map((z) => <option key={z} value={z}>→ {libelleZone(z)}</option>)}
+                          </select>
+                          <button type="button" onClick={() => void retirer(l)} title="Retirer de la liste (la fiche n'est pas touchée)" style={{ ...lien, color: "#a12b2b" }}>retirer</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {contenu != null && (
+                    <Champ etiquette={deuxChamps ? "colis" : l.unite ?? "colis"} valeur={s.colis} desactive={lectureSeule}
+                      onChange={(v) => saisir(l, "colis", v)} />
+                  )}
+                  {(deuxChamps || contenu == null) && (
+                    <Champ etiquette={contenu == null ? l.unite ?? "unités" : "unités"} valeur={s.unites} desactive={lectureSeule}
+                      onChange={(v) => saisir(l, "unites", v)} />
+                  )}
+                  <span title={etat === "erreur" ? "Pas enregistré" : etat === "attente" ? "Enregistrement…" : "Enregistré"} style={{
+                    width: 8, height: 8, borderRadius: 4, flexShrink: 0,
+                    background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent",
+                  }} />
+                </div>
+      </React.Fragment>
+    );
+  };
+
   if (erreur) return <div style={{ maxWidth: 900, margin: "0 auto", padding: 24, color: "#8a2b2b" }}>{erreur}</div>;
   if (!inv) return <div style={{ maxWidth: 900, margin: "0 auto", padding: 24, color: "#999" }}>Chargement…</div>;
 
@@ -388,116 +469,76 @@ function Feuille() {
             </div>
           </div>
 
-          {lignesZone.map((l, i) => {
-            const nouvelleFamille = i === 0 || lignesZone[i - 1].famille !== l.famille;
-            const lignesFamille = lignesZone.filter((x) => (x.famille ?? null) === (l.famille ?? null));
-            const compteesFamille = lignesFamille.filter(compte).length;
-            const ouverte = bascules[cleFamille(zone, l.famille)] ?? compteesFamille > 0;
-            const repliee = !ouverte;
-            if (repliee && !nouvelleFamille) return null;
-            const s = saisies[l.id] ?? { colis: "", unites: "" };
-            const contenu = l.cond_contenu;
-            const deuxChamps = contenu != null && contenu > 1;
-            const total = totalLigne(num(s.colis), num(s.unites), contenu);
-            const etat = etatLigne[l.id];
-            const c = condProduit(l);
-            const peutColis = !!c && c.contenu > 1;
-            const valo = coutDe(l);
-            const f = fiches[l.ingredient_id];
-            const detailPiece = f?.piece_weight_g ? `${f.piece_weight_g >= 1000 ? `${txt(f.piece_weight_g / 1000)} kg` : `${txt(f.piece_weight_g)} g`} la pièce` : f?.piece_volume_ml ? `${f.piece_volume_ml >= 1000 ? `${txt(f.piece_volume_ml / 1000)} L` : `${txt(f.piece_volume_ml)} mL`} la pièce` : null;
-            return (
-              <React.Fragment key={l.id}>
-                {nouvelleFamille && (
-                  <div style={{ margin: `${i === 0 ? 4 : 10}px 0 6px` }}>
-                    {/* Titre de famille : fond plein, texte blanc, même charte que les rayons de l'écran de commande */}
-                    <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleFamille(zone, l.famille)]: !ouverte }))} aria-expanded={ouverte} style={{
-                      width: "100%", minHeight: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 14px",
-                      background: couleurFamille(l.famille), border: "none", borderRadius: 14, cursor: "pointer", textAlign: "left", touchAction: "manipulation",
-                      boxShadow: "0 2px 6px rgba(0,0,0,0.12)", fontFamily: "inherit",
-                    }}>
-                      <span style={{ flex: 1, fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: "0.04em", color: "#fff" }}>
-                        {l.famille ?? "Sans famille"} <span style={{ opacity: 0.75, fontWeight: 400 }}>({lignesFamille.length})</span>
-                      </span>
-                      {compteesFamille > 0 && (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: couleurFamille(l.famille), background: "#fff", borderRadius: 10, padding: "3px 8px" }}>{compteesFamille}{compteesFamille === lignesFamille.length ? " ✓" : ""}</span>
-                      )}
-                      <span style={{ color: "#fff", fontSize: 13, transform: ouverte ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
-                    </button>
-                    {ouverte && !lectureSeule && (
-                      <div style={{ textAlign: "right", margin: "4px 6px 2px" }}>
-                        <button type="button" onClick={() => void retirerFamille(zone, l.famille)} title="Retirer toute la famille de cette zone" style={{ ...lien, color: "#a12b2b" }}>retirer la famille de cette zone</button>
+          {(() => {
+            // Famille (ordre de la feuille) → sous-catégorie de la fiche (ordre de première apparition) → lignes
+            const familles: { famille: string | null; sous: { nom: string | null; lignes: Ligne[] }[]; lignes: Ligne[] }[] = [];
+            for (const l of lignesZone) {
+              let fam = familles.find((x) => (x.famille ?? null) === (l.famille ?? null));
+              if (!fam) { fam = { famille: l.famille ?? null, sous: [], lignes: [] }; familles.push(fam); }
+              fam.lignes.push(l);
+              const sc = fiches[l.ingredient_id]?.sub_category ?? null;
+              let g = fam.sous.find((x) => (x.nom ?? null) === sc);
+              if (!g) { g = { nom: sc, lignes: [] }; fam.sous.push(g); }
+              g.lignes.push(l);
+            }
+            return familles.map((fam, i) => {
+              const compteesFamille = fam.lignes.filter(compte).length;
+              const ouverte = bascules[cleFamille(zone, fam.famille)] ?? compteesFamille > 0;
+              const plusieursSous = fam.sous.length > 1 || (fam.sous.length === 1 && fam.sous[0].nom != null);
+              return (
+                <div key={fam.famille ?? "∅"} style={{ margin: `${i === 0 ? 4 : 10}px 0 6px` }}>
+                  {/* Titre de famille : fond plein, texte blanc, même charte que les rayons de l'écran de commande */}
+                  <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleFamille(zone, fam.famille)]: !ouverte }))} aria-expanded={ouverte} style={{
+                    width: "100%", minHeight: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 14px",
+                    background: couleurFamille(fam.famille), border: "none", borderRadius: 14, cursor: "pointer", textAlign: "left", touchAction: "manipulation",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.12)", fontFamily: "inherit",
+                  }}>
+                    <span style={{ flex: 1, fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: "0.04em", color: "#fff" }}>
+                      {fam.famille ?? "Sans famille"} <span style={{ opacity: 0.75, fontWeight: 400 }}>({fam.lignes.length})</span>
+                    </span>
+                    {compteesFamille > 0 && (
+                      <span style={{ fontSize: 12, fontWeight: 700, color: couleurFamille(fam.famille), background: "#fff", borderRadius: 10, padding: "3px 8px" }}>{compteesFamille}{compteesFamille === fam.lignes.length ? " ✓" : ""}</span>
+                    )}
+                    <span style={{ color: "#fff", fontSize: 13, transform: ouverte ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
+                  </button>
+                  {ouverte && !lectureSeule && (
+                    <div style={{ textAlign: "right", margin: "4px 6px 2px" }}>
+                      <button type="button" onClick={() => void retirerFamille(zone, fam.famille)} title="Retirer toute la famille de cette zone" style={{ ...lien, color: "#a12b2b" }}>retirer la famille de cette zone</button>
+                    </div>
+                  )}
+                  {ouverte && fam.sous.map((g) => {
+                    const cleSous = `${cleFamille(zone, fam.famille)}|${g.nom ?? ""}`;
+                    const sousOuverte = bascules[cleSous] ?? true;
+                    const compteesSous = g.lignes.filter(compte).length;
+                    return (
+                      <div key={g.nom ?? "∅"} style={{ marginTop: 6 }}>
+                        {plusieursSous && (
+                          /* Sous-catégorie : accordéon clair, comme dans le menu produits */
+                          <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleSous]: !sousOuverte }))} aria-expanded={sousOuverte} style={{
+                            width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                            padding: "9px 12px", background: sousOuverte ? "#f0ebe3" : "#fff", border: "1.5px solid #e5ddd0",
+                            borderRadius: sousOuverte ? "8px 8px 0 0" : 8, cursor: "pointer", marginBottom: sousOuverte ? 0 : 4,
+                            fontSize: 11, fontWeight: 700, color: "#8a7e6b", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "inherit",
+                          }}>
+                            <span>{g.nom ?? "Autre"} <span style={{ fontWeight: 500, opacity: 0.8 }}>({g.lignes.length})</span></span>
+                            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              {compteesSous > 0 && <span style={{ fontSize: 10.5, color: compteesSous === g.lignes.length ? "#2D6A4F" : "#8a7e6b" }}>{compteesSous}/{g.lignes.length}</span>}
+                              <span style={{ fontSize: 10, transition: "transform 0.2s", transform: sousOuverte ? "rotate(0)" : "rotate(-90deg)" }}>▼</span>
+                            </span>
+                          </button>
+                        )}
+                        {sousOuverte && (
+                          <div style={plusieursSous ? { padding: "6px 6px 2px", background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 8px 8px", marginBottom: 4 } : undefined}>
+                            {g.lignes.map((l) => carte(l))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )}
-                {repliee ? null : (
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 4, borderRadius: 10,
-                  background: "#fff", border: `1px solid ${compte(l) ? "#cfe3d6" : "#ece6db"}`,
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.25, display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ color: "#b0a894", fontWeight: 500, fontSize: 12 }}>{l.ordre ?? ""}</span>
-                      <span style={{ minWidth: 0 }}>{l.nom_feuille ?? l.nom}</span>
-                      {f && (
-                        <a href={`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(`/inventaire/${id}`)}`} title="Modifier la fiche produit (prix, conditionnement, zone)"
-                          onClick={(e) => e.stopPropagation()} style={{ fontSize: 12, color: "#8a8378", textDecoration: "none", border: "1px solid #ddd6c8", borderRadius: 6, padding: "0 5px", lineHeight: "18px", flexShrink: 0 }}>✎</a>
-                      )}
-                    </div>
-                    {l.nom_feuille && normNom(l.nom_feuille) !== normNom(l.nom) && (
-                      <div style={{ fontSize: 11.5, color: "#a79f90", marginTop: 1 }}>fiche : {l.nom}</div>
-                    )}
-                    {(l.rattachement === "approché" || l.rattachement === "rattaché par ressemblance" || l.aVerifier || l.inactive) && (
-                      <span style={{
-                        display: "inline-block", marginTop: 3, marginRight: 4, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8,
-                        background: l.inactive ? "#fde7e7" : l.aVerifier ? "#fde7ef" : "#fdf3d4", color: l.inactive ? "#a12b2b" : l.aVerifier ? "#b0306a" : "#8a6a12",
-                      }}>{l.inactive ? (f ? "fiche désactivée" : "fiche supprimée") : l.aVerifier ? "fiche à vérifier" : "rattaché par ressemblance"}</span>
-                    )}
-                    <div style={{ fontSize: 12, color: "#8a8378", marginTop: 2 }}>
-                      {deuxChamps ? l.cond_libelle : `compté en ${l.cond_libelle ?? l.unite ?? "unités"}`}
-                      {total != null && <> · <strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong></>}
-                      {total != null && valo.cout != null && <span style={{ color: "#6f6656" }}> · {eur(total * valo.cout)}</span>}
-                    </div>
-                    {/* Détail du conditionnement et du prix : pour ne pas se tromper de comptage */}
-                    <div style={{ fontSize: 11, color: "#8a8378", marginTop: 2, display: "flex", flexWrap: "wrap", gap: "2px 8px", alignItems: "center" }}>
-                      {c && <span>fiche : <strong style={{ color: "#6f6656" }}>{c.libelle}</strong></span>}
-                      {detailPiece && <span>{detailPiece}</span>}
-                      <span style={{ color: valo.cout == null ? "#b45309" : "#6f6656" }}>
-                        {valo.cout == null ? `sans prix${valo.raison ? ` (${valo.raison})` : ""}` : `${eur(valo.cout)} / ${l.unite ?? "unité"}${valo.source === "ancienne_offre" ? " (ancien prix)" : ""}`}
-                      </span>
-                      {!lectureSeule && (
-                        <>
-                          {peutColis && (
-                            <button type="button" onClick={() => void basculerComptage(l)} style={lien}>
-                              {deuxChamps ? "compter à l'unité" : `compter par ${c!.libelle.split(" ")[0]}`}
-                            </button>
-                          )}
-                          <select value={l.zone} onChange={(e) => void changerZone(l, e.target.value)} title="Déplacer vers une autre zone"
-                            style={{ fontSize: 11, border: "none", background: "transparent", color: "#8a8378", cursor: "pointer", padding: 0 }}>
-                            {zones.map((z) => <option key={z} value={z}>→ {libelleZone(z)}</option>)}
-                          </select>
-                          <button type="button" onClick={() => void retirer(l)} title="Retirer de la liste (la fiche n'est pas touchée)" style={{ ...lien, color: "#a12b2b" }}>retirer</button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {contenu != null && (
-                    <Champ etiquette={deuxChamps ? "colis" : l.unite ?? "colis"} valeur={s.colis} desactive={lectureSeule}
-                      onChange={(v) => saisir(l, "colis", v)} />
-                  )}
-                  {(deuxChamps || contenu == null) && (
-                    <Champ etiquette={contenu == null ? l.unite ?? "unités" : "unités"} valeur={s.unites} desactive={lectureSeule}
-                      onChange={(v) => saisir(l, "unites", v)} />
-                  )}
-                  <span title={etat === "erreur" ? "Pas enregistré" : etat === "attente" ? "Enregistrement…" : "Enregistré"} style={{
-                    width: 8, height: 8, borderRadius: 4, flexShrink: 0,
-                    background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent",
-                  }} />
+                    );
+                  })}
                 </div>
-                )}
-              </React.Fragment>
-            );
-          })}
+              );
+            });
+          })()}
 
           {retireesZone.length > 0 && (
             <div style={{ marginTop: 12 }}>
