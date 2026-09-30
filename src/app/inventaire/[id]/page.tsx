@@ -134,6 +134,35 @@ function Feuille() {
 
   useEffect(() => { void charger(); }, [charger]);
 
+  // Multi-comptes : plusieurs personnes comptent en même temps, chaque ligne enregistrée apparaît chez les autres
+  // (Realtime sur inventaire_lignes). Une ligne en cours de frappe ici n'est pas écrasée : elle part 500 ms après la dernière touche.
+  const [direct, setDirect] = useState(false);
+  useEffect(() => {
+    if (!inv?.id) return;
+    const canal = supabase.channel(`inventaire-feuille-${inv.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "inventaire_lignes", filter: `inventaire_id=eq.${inv.id}` }, (payload) => {
+        if (payload.eventType === "DELETE") {
+          const old = payload.old as { id?: string };
+          if (old?.id) setLignes((prev) => prev.filter((l) => l.id !== old.id));
+          return;
+        }
+        const r = payload.new as Partial<Ligne> & { id: string };
+        if (payload.eventType === "INSERT" || !lignesRef.current.some((l) => l.id === r.id)) { void charger(); return; }
+        if (minuteries.current.has(r.id)) return; // je suis en train de taper cette ligne
+        setLignes((prev) => prev.map((l) => (l.id === r.id ? { ...l, ...r, nom: l.nom, aVerifier: l.aVerifier, inactive: l.inactive } : l)));
+        const contenu = r.cond_contenu ?? null;
+        const colis = r.colis ?? null, unites = r.unites ?? null;
+        setSaisies((prev) => ({
+          ...prev,
+          [r.id]: contenu != null && contenu <= 1 ? { colis: txt(colis ?? unites), unites: "" }
+            : contenu == null ? { colis: "", unites: txt(unites ?? colis) }
+            : { colis: txt(colis), unites: txt(unites) },
+        }));
+      })
+      .subscribe((etat) => setDirect(etat === "SUBSCRIBED"));
+    return () => { void supabase.removeChannel(canal); };
+  }, [inv?.id, charger]);
+
   const lectureSeule = !inv || inv.statut === "cloture";
 
   const parZone = useMemo(() => {
@@ -293,11 +322,12 @@ function Feuille() {
     const valo = coutDe(l);
     const f = fiches[l.ingredient_id];
     const detailPiece = f?.piece_weight_g ? `${f.piece_weight_g >= 1000 ? `${txt(f.piece_weight_g / 1000)} kg` : `${txt(f.piece_weight_g)} g`} la pièce` : f?.piece_volume_ml ? `${f.piece_volume_ml >= 1000 ? `${txt(f.piece_volume_ml / 1000)} L` : `${txt(f.piece_volume_ml)} mL`} la pièce` : null;
+    const couleur = couleurFamille(l.famille);
     return (
       <React.Fragment key={l.id}>
                 <div style={{
                   display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 4, borderRadius: 10,
-                  background: "#fff", border: `1px solid ${compte(l) ? "#cfe3d6" : "#ece6db"}`,
+                  background: "#fff", border: `1px solid ${compte(l) ? "#cfe3d6" : "#ece6db"}`, borderLeft: `3px solid ${couleur}`,
                 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.25, display: "flex", alignItems: "center", gap: 6 }}>
@@ -392,6 +422,7 @@ function Feuille() {
             {etabNom} · {inv.type === "fin_exercice" ? "Fin d'exercice" : "Mensuel"} ·{" "}
             <span style={{ fontWeight: 700, color: inv.statut === "cloture" ? "#2D6A4F" : ACCENT }}>{inv.statut === "cloture" ? "Clôturé" : "En cours"}</span>
             {" "}· {totalComptees} / {actives.length} lignes comptées
+            {direct && <span title="Les comptages des autres personnes apparaissent ici en direct" style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 700, color: "#2D6A4F" }}>● en direct</span>}
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -463,7 +494,7 @@ function Feuille() {
           {enRecherche && lignesZone.length === 0 && (
             <div style={{ fontSize: 13, color: "#8a8378", margin: "0 4px 8px" }}>
               Aucun produit ne correspond dans {libelleZone(zone)}.
-              {lignes.some((l) => !l.retiree && l.zone !== zone && correspond(l)) && <> Trouvé dans : {[...new Set(lignes.filter((l) => !l.retiree && l.zone !== zone && correspond(l)).map((l) => libelleZone(l.zone)))].join(", ")}.</>}
+              {lignes.some((l) => !l.retiree && l.zone !== zone && correspond(l)) && <> Déjà dans : {[...new Set(lignes.filter((l) => !l.retiree && l.zone !== zone && correspond(l)).map((l) => libelleZone(l.zone)))].join(", ")}. Tu peux l&apos;ajouter ici aussi (« + Ajouter ») : les zones s&apos;additionnent.</>}
             </div>
           )}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "0 4px 6px" }}>
@@ -534,9 +565,9 @@ function Feuille() {
                           /* Sous-catégorie : accordéon clair, comme dans le menu produits */
                           <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleSous]: !sousOuverte }))} aria-expanded={sousOuverte} style={{
                             width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-                            padding: "9px 12px", background: sousOuverte ? "#f0ebe3" : "#fff", border: "1.5px solid #e5ddd0",
+                            padding: "9px 12px", background: sousOuverte ? "#f0ebe3" : "#fff", border: "1.5px solid #e5ddd0", borderLeft: `3px solid ${couleurFamille(fam.famille)}`,
                             borderRadius: sousOuverte ? "8px 8px 0 0" : 8, cursor: "pointer", marginBottom: sousOuverte ? 0 : 4,
-                            fontSize: 11, fontWeight: 700, color: "#8a7e6b", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "inherit",
+                            fontSize: 11, fontWeight: 700, color: couleurFamille(fam.famille), textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "inherit",
                           }}>
                             <span>{g.nom ?? "Autre"} <span style={{ fontWeight: 500, opacity: 0.8 }}>({g.lignes.length})</span></span>
                             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>

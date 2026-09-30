@@ -317,7 +317,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   };
   const aEnvoyer = onglet === "precommande" && brouillon && !!data.session && data.lignes.some((l) => l.quantite > 0);
 
-  function carte(a: Article) {
+  function carte(a: Article, couleur: string = ACCENT) {
     const m = modeDe(a);
     const ligne = ligneDe(a, m);
     const total = ligne?.quantite ?? 0;
@@ -339,7 +339,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     const texteIndication: React.CSSProperties = { fontSize: 12.5, color: ACCENT, marginTop: 6, whiteSpace: "normal", overflowWrap: "anywhere" };
     return (
       <div key={a.ingredient_id} style={{
-        background: "#fff", borderRadius: 14, border: `1.5px solid ${total > 0 ? ACCENT : "#ddd6c8"}`,
+        background: "#fff", borderRadius: 14, border: `1.5px solid ${total > 0 ? ACCENT : "#ddd6c8"}`, borderLeft: `4px solid ${couleur}`,
         padding: "12px 12px 12px 14px", marginBottom: 8,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -486,7 +486,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
       {onglet === "jour" && recherche.trim().length >= 2 ? (
         <div>
           {resultats.length === 0 && <div style={{ color: "#999", fontSize: 14, padding: 12 }}>Aucun produit trouvé.</div>}
-          {resultats.map(carte)}
+          {resultats.map((a) => carte(a))}
         </div>
       ) : sections.length === 0 ? (
         <div style={{ color: "#999", fontSize: 14, padding: 12 }}>
@@ -515,7 +515,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
                 <span style={{ color: "#fff", fontSize: 13, transform: ouvert ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
               </button>
               </div>
-              {ouvert && r.articles.map(carte)}
+              {ouvert && r.articles.map((a) => carte(a, couleurRayon(r.code)))}
             </div>
           );
         })

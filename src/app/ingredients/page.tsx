@@ -264,6 +264,8 @@ function IngredientsPageInner() {
 
   // Collapsed by default; open all when searching
   const [collapsedCats, setCollapsedCats] = useState<Set<Category>>(() => new Set(CATEGORIES));
+  /** Sous-catégories repliées (clé « catégorie|sous-catégorie »), même accordéon que l'inventaire */
+  const [collapsedSubs, setCollapsedSubs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (debouncedQ.trim()) {
@@ -1514,13 +1516,24 @@ function IngredientsPageInner() {
                       const supplierName = supplierIdForDisplay ? suppliersMap.get(supplierIdForDisplay)?.name ?? null : null;
                       const showSubHeader = hasSubCats && x.sub_category !== lastSubCat;
                       lastSubCat = x.sub_category;
+                      const subKey = `${cat}|${x.sub_category ?? ""}`;
+                      const subCollapsed = hasSubCats && collapsedSubs.has(subKey) && !debouncedQ;
+                      if (subCollapsed && !showSubHeader) return null;
+                      const nbSub = hasSubCats ? catItems.filter((y) => (y.sub_category ?? null) === (x.sub_category ?? null)).length : 0;
                       return (
                         <div key={x.id} id={`ing-${x.id}`}>
                           {showSubHeader && (
-                            <div style={{ padding: "8px 16px 4px", fontSize: 10, fontWeight: 700, color: CAT_COLORS[cat] ?? "#999", textTransform: "uppercase", letterSpacing: "0.06em", borderTop: lastSubCat !== undefined ? "1px solid rgba(0,0,0,0.04)" : "none" }}>
-                              {x.sub_category ?? "Autre"}
-                            </div>
+                            <button type="button" onClick={() => setCollapsedSubs((prev) => { const n = new Set(prev); if (n.has(subKey)) n.delete(subKey); else n.add(subKey); return n; })}
+                              aria-expanded={!subCollapsed} style={{
+                                width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: "6px 0 4px",
+                                padding: "8px 12px", background: subCollapsed ? "#fff" : "#f0ebe3", border: "1.5px solid #e5ddd0", borderLeft: `3px solid ${CAT_COLORS[cat] ?? "#999"}`,
+                                borderRadius: 8, cursor: "pointer", fontSize: 10.5, fontWeight: 700, color: CAT_COLORS[cat] ?? "#999", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "inherit", textAlign: "left",
+                              }}>
+                              <span>{x.sub_category ?? "Autre"} <span style={{ fontWeight: 500, opacity: 0.8 }}>({nbSub})</span></span>
+                              <span style={{ fontSize: 10, transition: "transform 0.2s", transform: subCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
+                            </button>
                           )}
+                          {subCollapsed ? null : (
                           <IngredientRow
                             item={x}
                             offer={offer}
@@ -1559,6 +1572,7 @@ function IngredientsPageInner() {
                             }}
                             subCategorySuggestions={subCategorySuggestions}
                           />
+                          )}
                         </div>
                       );
                     });
