@@ -352,6 +352,16 @@ export const IngredientRow = React.memo(function IngredientRow({
         style={{ padding: "8px 16px", background: "white", transition: "background 0.1s", cursor: "pointer" }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {onToggleSelect && (
+            <input
+              type="checkbox"
+              checked={selected ?? false}
+              title="Sélectionner (actions groupées : catégorie, suppression)"
+              onChange={(e) => { e.stopPropagation(); onToggleSelect(x.id); }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: 15, height: 15, accentColor: catAccent, cursor: "pointer", flexShrink: 0 }}
+            />
+          )}
           <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={28} editable />
           <span className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: inactive ? "#999" : catAccent, flex: "1 1 0", minWidth: 0 }}>{x.name}</span>
           {inactive && inactiveBadge}

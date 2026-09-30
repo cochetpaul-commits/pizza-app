@@ -335,6 +335,29 @@ function IngredientsPageInner() {
     setBulkActing(false);
   };
 
+  // Désactivation groupée : même effet que « Actif = non » dans l'import Excel
+  // (fiche inactive, offres actives fermées à la date du jour, historique conservé).
+  const bulkDeactivate = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Désactiver ${selectedIds.size} produit(s) ? Ils disparaissent des listes et des commandes, leur historique de prix est conservé. Case « Afficher les désactivées » pour les revoir.`)) return;
+    setBulkActing(true);
+    const ids = [...selectedIds];
+    for (let i = 0; i < ids.length; i += 100) {
+      const lot = ids.slice(i, i + 100);
+      const off = await supabase.from("supplier_offers")
+        .update({ is_active: false, valid_to: dateFermeture() })
+        .in("ingredient_id", lot).eq("is_active", true);
+      if (off.error) { alert(`Fermeture des offres : ${off.error.message}`); setBulkActing(false); return; }
+      const { error } = await supabase.from("ingredients").update({ is_active: false }).in("id", lot);
+      if (error) { alert(error.message); setBulkActing(false); return; }
+    }
+    mutate();
+    clearSelection();
+    setBulkActing(false);
+  };
+
+  const selectAllFiltered = () => setSelectedIds(new Set(filtered.map((x) => x.id)));
+
   const [compactMode, setCompactMode] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("ingredients:compactMode") === "1";
@@ -1209,6 +1232,16 @@ function IngredientsPageInner() {
                 <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} style={{ accentColor: "#D4775A", cursor: "pointer" }} />
                 Afficher les désactivées
               </label>
+              {userCanWrite && filtered.length > 0 && (
+                <button
+                  type="button"
+                  onClick={selectedIds.size === filtered.length ? clearSelection : selectAllFiltered}
+                  title="Coche toutes les fiches affichées (filtres et recherche compris) pour une action groupée"
+                  style={{ fontSize: 12, fontWeight: 600, color: "#D4775A", background: "transparent", border: "1px solid #D4775A", borderRadius: 20, padding: "3px 10px", cursor: "pointer", whiteSpace: "nowrap" }}
+                >
+                  {selectedIds.size === filtered.length ? "Tout décocher" : `Tout sélectionner (${filtered.length})`}
+                </button>
+              )}
             </div>
 
             {/* Dropdowns + Search + Add — all on one row */}
@@ -1949,8 +1982,17 @@ function IngredientsPageInner() {
 
           <div style={{ flex: 1 }} />
 
+          {/* Désactiver (réversible, historique conservé) */}
+          <button onClick={bulkDeactivate} disabled={bulkActing} title="Fiche inactive, offres fermées, historique conservé" style={{
+            padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.25)",
+            background: "rgba(255,255,255,0.12)", color: "#fff", fontSize: 12, fontWeight: 700,
+            cursor: "pointer", opacity: bulkActing ? 0.5 : 1,
+          }}>
+            Désactiver
+          </button>
+
           {/* Delete */}
-          <button onClick={bulkDelete} disabled={bulkActing} style={{
+          <button onClick={bulkDelete} disabled={bulkActing} title="Définitif : efface aussi les offres et lignes de facture du produit" style={{
             padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(220,38,38,0.4)",
             background: "rgba(220,38,38,0.15)", color: "#fca5a5", fontSize: 12, fontWeight: 700,
             cursor: "pointer", opacity: bulkActing ? 0.5 : 1,
