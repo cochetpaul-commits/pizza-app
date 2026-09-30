@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
-import { fetchApi } from "@/lib/fetchApi";
+import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { inChunks } from "@/lib/supabaseChunks";
 import { useProfile } from "@/lib/ProfileContext";
 import { libelleZone } from "@/lib/commandeArticles";
@@ -169,7 +169,8 @@ function Feuille() {
     const restant = lignes.filter((l) => !compte(l)).length;
     for (const [lid, t] of minuteries.current) { clearTimeout(t); await enregistrer(lid); }
     if (!confirm(`Clôturer l'inventaire ?${restant ? `\n${restant} ligne(s) non comptée(s) : elles resteront vides.` : ""}\nIl ne sera plus modifiable (sauf réouverture par un admin).`)) return;
-    await action("cloture", { action: "cloturer" }, (j) => j.avertissement ? String(j.avertissement) : `Inventaire clôturé (${j.mouvements} produits dans les mouvements de stock).`);
+    await action("cloture", { action: "cloturer" }, (j) => j.avertissement ? String(j.avertissement)
+      : `Inventaire clôturé : ${Number(j.total ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € HT${Number(j.sans_prix) ? `, ${j.sans_prix} ligne(s) sans prix` : ""} (${j.mouvements} produits dans les mouvements de stock).`);
   }
 
   useEffect(() => {
@@ -218,6 +219,11 @@ function Feuille() {
                 {enCours === "import" ? "Import…" : lignes.length ? "Remplacer par la feuille (fichier)" : "Importer la feuille (fichier)"}
               </button>
             </>
+          )}
+          {lignes.length > 0 && (
+            <button type="button" onClick={() => openApiFile(`/api/inventaire/pdf?id=${id}`)} style={bouton("#fff", "#1a1a1a")} title="Export comptable : valorisation HT par zone, famille et catégorie">
+              PDF comptable
+            </button>
           )}
           {!lectureSeule && lignes.length > 0 && (
             <button type="button" disabled={!!enCours} onClick={() => void cloturer()} style={bouton(ACCENT, "#fff")}>

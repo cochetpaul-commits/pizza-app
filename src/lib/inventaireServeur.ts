@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { CAT_LABELS, type Category } from "@/types/ingredients";
 import { categorieDeFamille, choisirConditionnement, comptageFeuille, lireFeuille, totalLigne, uniteFicheDe, UUID, type ArticleFournisseur, type Conditionnement, type OffreActive } from "@/lib/inventaire";
+import { figerValorisation } from "@/lib/inventaireValoServeur";
 
 /**
  * Inventaires, saisie « feuille » (côté serveur, clé service) : import de la feuille papier, ajout d'un produit
@@ -223,13 +224,15 @@ export async function cloturer(inv: Inv, userId: string): Promise<Reponse> {
   }
   const { error } = await supabaseAdmin.from("inventaires").update({ statut: "cloture", cloture_par: userId, cloture_at: new Date().toISOString() }).eq("id", inv.id);
   if (error) return rep({ error: error.message }, 500);
+  // Valorisation figée : coût HT de chaque ligne au dernier prix connu, total HT sur l'inventaire (export comptable)
+  const valo = await figerValorisation(inv.id, inv.etablissement_id);
   const note = `Inventaire du ${new Date(inv.date + "T12:00:00").toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}`;
   const mouvements = [...parProduit.entries()].map(([cle, p]) => ({
     etablissement_id: inv.etablissement_id, ingredient_id: cle.split("|")[0], type: "inventaire", quantity: Math.round(p.quantite * 1000) / 1000, unit: p.unite, note,
   }));
   const { error: errMv } = await supabaseAdmin.rpc("inventaire_replace_movements", { p_reference: `inventaire_${inv.id}`, p_movements: mouvements });
-  if (errMv) return rep({ ok: true, avertissement: `Clôturé, mais mouvements de stock non enregistrés : ${errMv.message}` });
-  return rep({ ok: true, mouvements: mouvements.length, non_comptees: nonComptees });
+  if (errMv) return rep({ ok: true, total: valo.total, sans_prix: valo.sans_prix, avertissement: `Clôturé, mais mouvements de stock non enregistrés : ${errMv.message}` });
+  return rep({ ok: true, mouvements: mouvements.length, non_comptees: nonComptees, total: valo.total, sans_prix: valo.sans_prix });
 }
 
 /** Réouverture (admins) : l'inventaire redevient modifiable ; les mouvements de stock seront refaits à la prochaine clôture */
