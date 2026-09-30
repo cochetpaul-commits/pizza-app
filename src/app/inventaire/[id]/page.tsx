@@ -8,10 +8,13 @@ import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { inChunks } from "@/lib/supabaseChunks";
 import { useProfile } from "@/lib/ProfileContext";
 import { libelleZone } from "@/lib/commandeArticles";
-import { choisirConditionnement, totalLigne, type ArticleFournisseur, type Conditionnement, type OffreActive } from "@/lib/inventaire";
+import { categorieDeFamille, choisirConditionnement, totalLigne, type ArticleFournisseur, type Conditionnement, type OffreActive } from "@/lib/inventaire";
 import { coutUniteComptee, type OffreValo } from "@/lib/inventaireValorisation";
 import { cleEtab } from "@/lib/zonesEtablissement";
-import { CATEGORIES, CAT_LABELS, type Category } from "@/types/ingredients";
+import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
+
+/** Couleur du titre de famille : celle de sa catégorie (même charte que les rayons de l'écran de commande) */
+const couleurFamille = (famille: string | null) => CAT_COLORS[categorieDeFamille(famille) as Category] ?? CAT_COLORS.autre ?? "#8a8378";
 
 /**
  * Inventaire « feuille » : saisie zone par zone, dans l'ordre de la feuille papier (famille, puis produit).
@@ -77,10 +80,9 @@ function Feuille() {
   const [etatLigne, setEtatLigne] = useState<Record<string, "attente" | "ok" | "erreur">>({});
   const [voirRetirees, setVoirRetirees] = useState(false);
   const [modaleAjout, setModaleAjout] = useState(false);
-  /** Familles repliées, clé « zone|famille » (comme les rayons de l'écran de commande) */
-  const [repliees, setRepliees] = useState<Set<string>>(new Set());
+  /** Familles ouvertes ou fermées à la main, clé « zone|famille » (sinon : ouvertes si elles ont déjà des lignes comptées, comme les rayons de la commande) */
+  const [bascules, setBascules] = useState<Record<string, boolean>>({});
   const cleFamille = (z: string, fam: string | null) => `${z}|${fam ?? ""}`;
-  const basculerFamille = (z: string, fam: string | null) => setRepliees((r) => { const n = new Set(r); const k = cleFamille(z, fam); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const minuteries = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const fichierRef = useRef<HTMLInputElement | null>(null);
 
@@ -370,11 +372,16 @@ function Feuille() {
               {lignesZone.length} produit{lignesZone.length > 1 ? "s" : ""}{valeurZone > 0 ? <> · valeur comptée <strong style={{ color: "#1a1a1a" }}>{eur(valeurZone)}</strong> HT</> : null}
             </span>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button type="button" onClick={() => {
+              {(() => {
                 const familles = [...new Set(lignesZone.map((l) => l.famille ?? null))];
-                const toutesRepliees = familles.every((f) => repliees.has(cleFamille(zone, f)));
-                setRepliees((r) => { const n = new Set(r); for (const f of familles) { if (toutesRepliees) n.delete(cleFamille(zone, f)); else n.add(cleFamille(zone, f)); } return n; });
-              }} style={lien}>{[...new Set(lignesZone.map((l) => l.famille ?? null))].every((f) => repliees.has(cleFamille(zone, f))) && lignesZone.length ? "tout déplier" : "tout replier"}</button>
+                const estOuverte = (f: string | null) => bascules[cleFamille(zone, f)] ?? lignesZone.some((l) => (l.famille ?? null) === f && compte(l));
+                const toutesFermees = familles.length > 0 && familles.every((f) => !estOuverte(f));
+                return (
+                  <button type="button" onClick={() => setBascules((b) => { const n = { ...b }; for (const f of familles) n[cleFamille(zone, f)] = toutesFermees; return n; })} style={lien}>
+                    {toutesFermees ? "tout déplier" : "tout replier"}
+                  </button>
+                );
+              })()}
               {!lectureSeule && (
                 <button type="button" onClick={() => setModaleAjout(true)} style={{ ...bouton("#fff", ACCENT), height: 34, fontSize: 12.5 }}>+ Ajouter</button>
               )}
@@ -383,10 +390,11 @@ function Feuille() {
 
           {lignesZone.map((l, i) => {
             const nouvelleFamille = i === 0 || lignesZone[i - 1].famille !== l.famille;
-            const repliee = repliees.has(cleFamille(zone, l.famille));
-            if (repliee && !nouvelleFamille) return null;
             const lignesFamille = lignesZone.filter((x) => (x.famille ?? null) === (l.famille ?? null));
             const compteesFamille = lignesFamille.filter(compte).length;
+            const ouverte = bascules[cleFamille(zone, l.famille)] ?? compteesFamille > 0;
+            const repliee = !ouverte;
+            if (repliee && !nouvelleFamille) return null;
             const s = saisies[l.id] ?? { colis: "", unites: "" };
             const contenu = l.cond_contenu;
             const deuxChamps = contenu != null && contenu > 1;
@@ -400,16 +408,25 @@ function Feuille() {
             return (
               <React.Fragment key={l.id}>
                 {nouvelleFamille && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 4px 6px" }}>
-                    <button type="button" onClick={() => basculerFamille(zone, l.famille)} title={repliee ? "Déplier" : "Replier"} style={{
-                      flex: 1, display: "flex", alignItems: "center", gap: 8, border: "none", background: repliee ? "#ece6db" : "transparent", borderRadius: 8, padding: repliee ? "6px 8px" : "0 4px", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                  <div style={{ margin: `${i === 0 ? 4 : 10}px 0 6px` }}>
+                    {/* Titre de famille : fond plein, texte blanc, même charte que les rayons de l'écran de commande */}
+                    <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleFamille(zone, l.famille)]: !ouverte }))} aria-expanded={ouverte} style={{
+                      width: "100%", minHeight: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 14px",
+                      background: couleurFamille(l.famille), border: "none", borderRadius: 14, cursor: "pointer", textAlign: "left", touchAction: "manipulation",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.12)", fontFamily: "inherit",
                     }}>
-                      <span style={{ fontSize: 11, color: "#8a8378" }}>{repliee ? "▸" : "▾"}</span>
-                      <span style={{ fontFamily: OSWALD, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "#1a1a1a" }}>{l.famille ?? "Sans famille"}</span>
-                      <span style={{ fontSize: 11.5, fontWeight: 600, color: compteesFamille === lignesFamille.length ? "#2D6A4F" : "#999" }}>{compteesFamille}/{lignesFamille.length}</span>
+                      <span style={{ flex: 1, fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: "0.04em", color: "#fff" }}>
+                        {l.famille ?? "Sans famille"} <span style={{ opacity: 0.75, fontWeight: 400 }}>({lignesFamille.length})</span>
+                      </span>
+                      {compteesFamille > 0 && (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: couleurFamille(l.famille), background: "#fff", borderRadius: 10, padding: "3px 8px" }}>{compteesFamille}{compteesFamille === lignesFamille.length ? " ✓" : ""}</span>
+                      )}
+                      <span style={{ color: "#fff", fontSize: 13, transform: ouverte ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
                     </button>
-                    {!lectureSeule && (
-                      <button type="button" onClick={() => void retirerFamille(zone, l.famille)} title="Retirer toute la famille de cette zone" style={{ ...lien, color: "#a12b2b" }}>retirer la famille</button>
+                    {ouverte && !lectureSeule && (
+                      <div style={{ textAlign: "right", margin: "4px 6px 2px" }}>
+                        <button type="button" onClick={() => void retirerFamille(zone, l.famille)} title="Retirer toute la famille de cette zone" style={{ ...lien, color: "#a12b2b" }}>retirer la famille de cette zone</button>
+                      </div>
                     )}
                   </div>
                 )}
