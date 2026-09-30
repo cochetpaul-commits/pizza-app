@@ -739,7 +739,10 @@ export const IngredientRow = React.memo(function IngredientRow({
             {edit.orderUnitLabel && !["kg", "litre", "piece", "pièce"].includes(edit.orderUnitLabel) && (
               <div>
                 <div style={fieldLabel}>Qté</div>
-                <input style={{ ...inputStyle, width: 55 }} value={edit.orderQuantity} onChange={(e) => onEditChange({ ...edit, orderQuantity: numVal(e.target.value) })} placeholder="6" />
+                {edit.hasConditionnement && edit.qtyPerConditionnement
+                  /* Une seule source : la quantité par conditionnement du bloc prix (sinon deux chiffres contradictoires) */
+                  ? <div style={{ ...inputStyle, width: 55, display: "flex", alignItems: "center", background: "#f5f0e8", color: "#6f6656" }} title="Reprise du bloc « Conditionnement »">{edit.qtyPerConditionnement}</div>
+                  : <input style={{ ...inputStyle, width: 55 }} value={edit.orderQuantity} onChange={(e) => onEditChange({ ...edit, orderQuantity: numVal(e.target.value) })} placeholder="6" />}
               </div>
             )}
             <div style={{ flex: 1, minWidth: 100 }}>
@@ -752,7 +755,7 @@ export const IngredientRow = React.memo(function IngredientRow({
           </div>
           {/* Contenu de l'unité de commande : élément + commande à l'élément (l'écran de commande en est dérivé) */}
           {(() => {
-            const contenu = parseFloat(edit.orderQuantity.replace(",", "."));
+            const contenu = parseFloat((edit.hasConditionnement && edit.qtyPerConditionnement ? edit.qtyPerConditionnement : edit.orderQuantity).replace(",", "."));
             const uc = edit.orderUnitLabel;
             const plusieurs = !!uc && !["kg", "litre", "piece", "pièce"].includes(uc) && Number.isFinite(contenu) && contenu > 1;
             const typePiece = edit.baseUnit === "piece" ? edit.baseUnitLabel : "";

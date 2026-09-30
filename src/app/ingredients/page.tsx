@@ -885,7 +885,8 @@ function IngredientsPageInner() {
     const name = edit.name.trim();
     if (!name) { alert("Nom obligatoire."); return; }
     const supplier_id = normalizeSupplierId(edit.supplierId);
-    const orderQuantity = parseNum(edit.orderQuantity) ?? null;
+    // Quantité par unité de commande : celle du bloc « Conditionnement » quand il est actif (une seule source, pas deux chiffres)
+    const orderQuantity = (edit.hasConditionnement ? parseNum(edit.qtyPerConditionnement) : null) ?? parseNum(edit.orderQuantity) ?? null;
     // When conditionnement is active, persist its label in order_unit_label (used to reload it)
     const orderLabel = edit.hasConditionnement
       ? (edit.conditionnementLabel || edit.orderUnitLabel.trim())

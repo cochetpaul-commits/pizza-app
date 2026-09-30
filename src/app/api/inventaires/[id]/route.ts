@@ -53,3 +53,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   return NextResponse.json(r.body, { status: r.status });
 }
+
+/**
+ * DELETE /api/inventaires/[id] : supprime l'inventaire et toutes ses lignes.
+ * Admins et managers de l'établissement ; un inventaire clôturé ne se supprime que par un admin.
+ */
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const inv = await chargerInventaire(id);
+  if (!inv) return NextResponse.json({ error: "Inventaire introuvable" }, { status: 404 });
+  const refus = await etabAccessDenied(req, inv.etablissement_id, ["group_admin", "manager"]);
+  if (refus) return refus;
+  if (inv.statut === "cloture") {
+    const refusAdmin = await roleDenied(req, ["group_admin"]);
+    if (refusAdmin) return NextResponse.json({ error: "Inventaire clôturé : seul un admin peut le supprimer" }, { status: 403 });
+  }
+  const { count } = await supabaseAdmin.from("inventaire_lignes").select("id", { count: "exact", head: true }).eq("inventaire_id", id);
+  const { error } = await supabaseAdmin.from("inventaires").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true, lignes: count ?? 0 });
+}

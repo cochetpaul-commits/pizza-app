@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { CATEGORIES, CAT_LABELS, CAT_COLORS, type Category, type Ingredient } from "@/types/ingredients";
-import { openApiFile } from "@/lib/fetchApi";
+import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { useRouter } from "next/navigation";
 import { fermerOffresActives } from "@/lib/offerClosing";
 import { ZONES_EMBED, appliquerZonesEtab, type ZoneEtabRow } from "@/lib/zonesEtablissement";
@@ -1808,6 +1808,21 @@ function BlocFeuilles({ etabId, userId, feuilles }: { etabId: string; userId: st
   const [date, setDate] = useState(() => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" }));
   const [type, setType] = useState<"fin_exercice" | "mensuel">("fin_exercice");
   const [envoi, setEnvoi] = useState(false);
+  /** Inventaires supprimés depuis cette page (retirés de la liste sans recharger) */
+  const [supprimes, setSupprimes] = useState<Set<string>>(new Set());
+  const [suppression, setSuppression] = useState<string | null>(null);
+  const supprimer = async (f: Inventaire) => {
+    if (!confirm(`Supprimer l'inventaire du ${new Date(f.date + "T12:00:00").toLocaleDateString("fr-FR")} et toutes ses lignes ?`)) return;
+    setSuppression(f.id);
+    try {
+      const res = await fetchApi(`/api/inventaires/${f.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(json.error ?? `Erreur ${res.status}`); return; }
+      setSupprimes((s) => new Set(s).add(f.id));
+    } catch (e) {
+      alert(`Pas supprimé : ${e instanceof Error ? e.message : "réseau indisponible"}`);
+    } finally { setSuppression(null); }
+  };
   const creer = async () => {
     setEnvoi(true);
     const { data, error } = await supabase.from("inventaires")
@@ -1834,16 +1849,24 @@ function BlocFeuilles({ etabId, userId, feuilles }: { etabId: string; userId: st
       </div>
       {feuilles.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          {feuilles.map((f) => (
-            <button key={f.id} type="button" onClick={() => router.push(`/inventaire/${f.id}`)} style={{
-              width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, textAlign: "left",
-              background: "#faf7f2", border: "1px solid #ece6db", borderRadius: 10, padding: "10px 12px", marginTop: 6, cursor: "pointer", fontFamily: "inherit",
-            }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>
-                {new Date(f.date + "T12:00:00").toLocaleDateString("fr-FR")} · {f.type === "fin_exercice" ? "Fin d'exercice" : "Mensuel"}
-              </span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: f.statut === "cloture" ? "#2D6A4F" : "#D4775A" }}>{f.statut === "cloture" ? "Clôturé" : "En cours"} ›</span>
-            </button>
+          {feuilles.filter((f) => !supprimes.has(f.id)).map((f) => (
+            <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+              <button type="button" onClick={() => router.push(`/inventaire/${f.id}`)} style={{
+                flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, textAlign: "left",
+                background: "#faf7f2", border: "1px solid #ece6db", borderRadius: 10, padding: "10px 12px", cursor: "pointer", fontFamily: "inherit",
+              }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>
+                  {new Date(f.date + "T12:00:00").toLocaleDateString("fr-FR")} · {f.type === "fin_exercice" ? "Fin d'exercice" : "Mensuel"}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: f.statut === "cloture" ? "#2D6A4F" : "#D4775A" }}>{f.statut === "cloture" ? "Clôturé" : "En cours"} ›</span>
+              </button>
+              {f.statut !== "cloture" && (
+                <button type="button" onClick={() => void supprimer(f)} disabled={suppression === f.id} title="Supprimer cet inventaire et ses lignes"
+                  style={{ flexShrink: 0, height: 40, padding: "0 10px", borderRadius: 10, border: "1px solid #ece6db", background: "#fff", color: "#a12b2b", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  {suppression === f.id ? "…" : "Supprimer"}
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

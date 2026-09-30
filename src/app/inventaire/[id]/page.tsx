@@ -37,7 +37,17 @@ type Ligne = {
 type Fiche = {
   id: string; name: string; status: string | null; is_active: boolean; category: string | null; sub_category: string | null; rayon_commande: string | null; default_unit: string | null; default_supplier_id: string | null; supplier_id: string | null;
   purchase_price: number | null; purchase_unit: number | null; purchase_unit_label: string | null; piece_weight_g: number | null; piece_volume_ml: number | null; density_g_per_ml: number | null;
+  order_unit_label: string | null; order_quantity: number | null; order_element: string | null; order_element_permis: boolean | null;
 };
+
+/** Conditionnement compté d'un produit : article de commande (fournisseur principal, sinon dernière offre), sinon la fiche seule */
+function conditionnementFiche(f: Fiche | undefined, articles: ArticleFournisseur[], offres: OffreActive[]): Conditionnement | null {
+  if (!f) return null;
+  const c = choisirConditionnement(f.default_supplier_id, articles, offres);
+  if (c) return c;
+  const a = articleDeFiche(f);
+  return a ? conditionnementDArticle(a, f.default_supplier_id ?? f.supplier_id) : null;
+}
 type Saisie = { colis: string; unites: string };
 
 const ACCENT = "#D4775A";
@@ -110,7 +120,7 @@ function Feuille() {
     ]);
     const ids = [...new Set((ls ?? []).map((l) => l.ingredient_id as string))];
     const [{ data: ings }, { data: arts }, { data: offs }] = await Promise.all([
-      inChunks<Fiche>(ids, (b) => supabase.from("ingredients").select("id, name, status, is_active, category, sub_category, rayon_commande, default_unit, default_supplier_id, supplier_id, purchase_price, purchase_unit, purchase_unit_label, piece_weight_g, piece_volume_ml, density_g_per_ml").in("id", b)),
+      inChunks<Fiche>(ids, (b) => supabase.from("ingredients").select("id, name, status, is_active, category, sub_category, rayon_commande, default_unit, default_supplier_id, supplier_id, purchase_price, purchase_unit, purchase_unit_label, piece_weight_g, piece_volume_ml, density_g_per_ml, order_unit_label, order_quantity, order_element, order_element_permis").in("id", b)),
       inChunks<ArticleFournisseur & { ingredient_id: string }>(ids, (b) => supabase.from("commande_articles").select("ingredient_id, supplier_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande").in("ingredient_id", b)),
       inChunks<OffreValo & OffreActive & { ingredient_id: string }>(ids, (b) => supabase.from("supplier_offers").select("ingredient_id, supplier_id, is_active, valid_from, valid_to, created_at, unit, unit_price, pack_price, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, pack_unit, price_kind, piece_weight_g, density_kg_per_l").in("ingredient_id", b)),
     ]);
@@ -131,6 +141,19 @@ function Feuille() {
       const f = ficheDe[l.ingredient_id];
       return { ...l, nom: f?.name ?? l.nom_feuille ?? "?", aVerifier: f?.status === "to_check", inactive: !f || f.is_active === false };
     });
+    // Fiche avec un conditionnement à plusieurs pièces mais ligne comptée à l'unité seule : la ligne passe en deux champs
+    // (colis + unités) d'office, le comptage déjà saisi reste en unités. Ainsi « quand la fiche est renseignée, ça marche ».
+    if (invRow.statut !== "cloture") {
+      for (const l of liste) {
+        if (l.retiree || (l.cond_contenu != null && l.cond_contenu > 1)) continue;
+        const c = conditionnementFiche(ficheDe[l.ingredient_id], artDe[l.ingredient_id] ?? [], offDe[l.ingredient_id] ?? []);
+        if (!c || c.contenu <= 1) continue;
+        const unites = l.unites ?? l.colis ?? (l.quantite > 0 ? l.quantite : null);
+        const maj = { cond_contenu: c.contenu, cond_libelle: c.libelle, unite: c.unite, cond_supplier_id: c.supplier_id, colis: null, unites };
+        const { error } = await supabase.from("inventaire_lignes").update({ ...maj, updated_at: new Date().toISOString() }).eq("id", l.id);
+        if (!error) Object.assign(l, maj);
+      }
+    }
     setInv(invRow);
     setEtabNom((e?.nom as string | undefined) ?? "");
     setEtabSlug((e?.slug as string | undefined) ?? "");
@@ -201,11 +224,8 @@ function Feuille() {
   const rayonDe = useCallback((l: Ligne) => { const f = fiches[l.ingredient_id]; return rayonDuProduit(f?.rayon_commande, f?.category); }, [fiches]);
 
   /** Conditionnement de commande de la fiche (pour compter par colis) et coût d'une unité comptée */
-  const condProduit = useCallback((l: Ligne): Conditionnement | null => {
-    const f = fiches[l.ingredient_id];
-    if (!f) return null;
-    return choisirConditionnement(f.default_supplier_id, articles[l.ingredient_id] ?? [], offres[l.ingredient_id] ?? []);
-  }, [fiches, articles, offres]);
+  const condProduit = useCallback((l: Ligne): Conditionnement | null =>
+    conditionnementFiche(fiches[l.ingredient_id], articles[l.ingredient_id] ?? [], offres[l.ingredient_id] ?? []), [fiches, articles, offres]);
   /** Fournisseur affiché sous le nom : celui du conditionnement retenu, sinon de la dernière offre active, sinon celui de la fiche */
   const fournisseurDe = useCallback((l: Ligne, c: Conditionnement | null) => {
     const f = fiches[l.ingredient_id];
@@ -269,6 +289,24 @@ function Feuille() {
       setMessage(`Pas enregistré : ${e instanceof Error ? e.message : "réseau indisponible"}`);
       return {};
     } finally { setEnCours(null); actionEnCours.current = false; }
+  }
+
+  /** Suppression de l'inventaire entier (lignes comprises) : confirmation avec le nombre de lignes comptées */
+  async function supprimerInventaire() {
+    if (!inv) return;
+    const comptees = lignes.filter((l) => !l.retiree && compte(l)).length;
+    const texte = `Supprimer cet inventaire du ${fmtDate(inv.date)} ?\n${lignes.length} ligne(s)${comptees ? `, dont ${comptees} comptée(s)` : ""} seront effacées définitivement.`;
+    if (!confirm(texte)) return;
+    if (comptees > 0 && !confirm("Il y a des comptages saisis. Confirmer la suppression définitive ?")) return;
+    setEnCours("suppression"); setMessage(null);
+    try {
+      const res = await fetchApi(`/api/inventaires/${id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setMessage(json.error ?? `Erreur ${res.status}`); return; }
+      router.push("/inventaire");
+    } catch (e) {
+      setMessage(`Pas supprimé : ${e instanceof Error ? e.message : "réseau indisponible"}`);
+    } finally { setEnCours(null); }
   }
 
   async function importer(f: File) {
@@ -406,9 +444,9 @@ function Feuille() {
                       </span>
                       {!lectureSeule && (
                         <>
-                          {peutColis && (
+                          {peutColis && !deuxChamps && (
                             <button type="button" onClick={() => void basculerComptage(l)} style={lien}>
-                              {deuxChamps ? "compter à l'unité" : `compter par ${c!.libelle.split(" ")[0]}`}
+                              compter par {c!.libelle.split(" ")[0]}
                             </button>
                           )}
                           <select value={l.zone} onChange={(e) => void changerZone(l, e.target.value)} title="Déplacer vers une autre zone"
@@ -453,11 +491,15 @@ function Feuille() {
   const actives = lignes.filter((l) => !l.retiree);
   const totalComptees = actives.filter(compte).length;
   const aDesSaisies = totalComptees > 0;
-  const valeurZone = lignesZone.reduce((t, l) => {
+  const valeurDe = (ls: Ligne[]) => ls.reduce((t, l) => {
     const s = saisies[l.id]; const q = s ? totalLigne(num(s.colis), num(s.unites), l.cond_contenu) : null;
     const c = coutDe(l).cout;
     return t + (q != null && c != null ? q * c : 0);
   }, 0);
+  const valeurZone = valeurDe(lignesZone);
+  /** Total en cours, toutes zones (lignes comptées et valorisées) */
+  const valeurTotale = valeurDe(actives);
+  const sansPrixComptees = actives.filter((l) => compte(l) && coutDe(l).cout == null).length;
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "16px 12px 80px" }}>
@@ -473,6 +515,13 @@ function Feuille() {
             {" "}· {totalComptees} / {actives.length} lignes comptées
             {direct && <span title="Les comptages des autres personnes apparaissent ici en direct" style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 700, color: "#2D6A4F" }}>● en direct</span>}
           </div>
+          {totalComptees > 0 && (
+            <div style={{ marginTop: 6, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#8a7e6b", textTransform: "uppercase", letterSpacing: "0.06em" }}>Total en cours</span>
+              <span style={{ fontFamily: OSWALD, fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{eur(valeurTotale)}</span>
+              <span style={{ fontSize: 12, color: "#8a8378" }}>HT, toutes zones{sansPrixComptees > 0 ? ` · ${sansPrixComptees} ligne${sansPrixComptees > 1 ? "s" : ""} comptée${sansPrixComptees > 1 ? "s" : ""} sans prix` : ""}</span>
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {!lectureSeule && !aDesSaisies && (
@@ -497,6 +546,11 @@ function Feuille() {
           {inv.statut === "cloture" && isGroupAdmin && (
             <button type="button" disabled={!!enCours} onClick={() => { if (confirm("Rouvrir cet inventaire ? Il redevient modifiable ; les mouvements de stock seront refaits à la prochaine clôture.")) void action("rouvrir", { action: "rouvrir" }, () => "Inventaire rouvert."); }}
               style={bouton("#fff", "#b45309")}>Rouvrir (admin)</button>
+          )}
+          {(!lectureSeule || isGroupAdmin) && (
+            <button type="button" disabled={!!enCours} onClick={() => void supprimerInventaire()} title="Supprimer cet inventaire et toutes ses lignes" style={bouton("#fff", "#a12b2b")}>
+              {enCours === "suppression" ? "Suppression…" : "Supprimer"}
+            </button>
           )}
         </div>
       </div>
@@ -613,7 +667,8 @@ function Feuille() {
                   )}
                   {ouverte && r.sous.map((g) => {
                     const cleSous = `${cleFamille(zone, r.code)}|${g.nom ?? ""}`;
-                    const sousOuverte = enRecherche || (bascules[cleSous] ?? false);
+                    // Sans en-tête de sous-catégorie (rayon sans sous-catégories), les cartes sont toujours visibles
+                    const sousOuverte = enRecherche || !plusieursSous || (bascules[cleSous] ?? false);
                     const compteesSous = g.lignes.filter(compte).length;
                     return (
                       <div key={g.nom ?? "∅"} style={{ marginTop: 6 }}>
