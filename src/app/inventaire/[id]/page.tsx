@@ -568,19 +568,22 @@ function Feuille() {
         {zones.map((z) => {
           const ls = (parZone.get(z) ?? []).filter((l) => !l.retiree);
           const n = ls.filter(compte).length;
+          const valeur = n > 0 ? valeurDe(ls) : 0;
           const actif = z === zone;
           return (
             <button key={z} type="button" onClick={() => setZone(z)} style={{
-              flexShrink: 0, padding: "8px 12px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
-              border: actif ? `1.5px solid ${ACCENT}` : "1px solid #ddd6c8", background: actif ? "#FFF0EB" : "#fff", color: actif ? ACCENT : "#1a1a1a",
+              flexShrink: 0, padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", fontFamily: "inherit",
+              border: actif ? `1.5px solid ${ACCENT}` : "1px solid #ddd6c8", background: actif ? "#FFF0EB" : "#fff", color: actif ? ACCENT : "#1a1a1a", textAlign: "center",
             }}>
               {libelleZone(z)} <span style={{ fontWeight: 500, color: n === ls.length && ls.length ? "#2D6A4F" : "#999" }}>{n}/{ls.length}</span>
+              {/* Valeur comptée de la zone, sous le nom */}
+              <div style={{ fontSize: 11, fontWeight: 600, color: valeur > 0 ? "#6f6656" : "#c4bcae", marginTop: 1 }}>{valeur > 0 ? eur(valeur) : "—"}</div>
             </button>
           );
         })}
         {!lectureSeule && (
           <button type="button" onClick={() => void ajouterZone()} title="Ajouter une zone de stockage" style={{
-            flexShrink: 0, padding: "8px 12px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 700, border: "1px dashed #b0a894", background: "#fff", color: "#6f6656",
+            flexShrink: 0, padding: "8px 12px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 700, border: "1px dashed #b0a894", background: "#fff", color: "#6f6656", alignSelf: "stretch", fontFamily: "inherit",
           }}>+ zone</button>
         )}
       </div>
