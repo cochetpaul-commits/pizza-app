@@ -11,10 +11,9 @@ import { libelleZone } from "@/lib/commandeArticles";
 import { categorieDeFamille, choisirConditionnement, totalLigne, type ArticleFournisseur, type Conditionnement, type OffreActive } from "@/lib/inventaire";
 import { coutUniteComptee, type OffreValo } from "@/lib/inventaireValorisation";
 import { cleEtab } from "@/lib/zonesEtablissement";
-import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
-
-/** Couleur du titre de famille : celle de sa catégorie (même charte que les rayons de l'écran de commande) */
-const couleurFamille = (famille: string | null) => CAT_COLORS[categorieDeFamille(famille) as Category] ?? CAT_COLORS.autre ?? "#8a8378";
+import { CATEGORIES, CAT_LABELS, type Category } from "@/types/ingredients";
+import { couleurRayon, rayonDuProduit, RAYON_AUTRES } from "@/lib/rayons";
+void categorieDeFamille;
 
 /**
  * Inventaire « feuille » : saisie zone par zone, dans l'ordre de la feuille papier (famille, puis produit).
@@ -33,7 +32,7 @@ type Ligne = {
   nom_feuille: string | null; rattachement: string | null; aVerifier: boolean; inactive: boolean;
 };
 type Fiche = {
-  id: string; name: string; status: string | null; is_active: boolean; category: string | null; sub_category: string | null; default_unit: string | null; default_supplier_id: string | null;
+  id: string; name: string; status: string | null; is_active: boolean; category: string | null; sub_category: string | null; rayon_commande: string | null; default_unit: string | null; default_supplier_id: string | null;
   purchase_price: number | null; purchase_unit: number | null; purchase_unit_label: string | null; piece_weight_g: number | null; piece_volume_ml: number | null; density_g_per_ml: number | null;
 };
 type Saisie = { colis: string; unites: string };
@@ -70,6 +69,8 @@ function Feuille() {
   const [zones, setZones] = useState<string[]>([]);
   const [lignes, setLignes] = useState<Ligne[]>([]);
   const [fiches, setFiches] = useState<Record<string, Fiche>>({});
+  /** Rayons de l'écran de commande (rayons_commande), dans l'ordre : les catégories de l'inventaire */
+  const [rayons, setRayons] = useState<{ code: string; libelle: string; ordre: number }[]>([]);
   const [articles, setArticles] = useState<Record<string, ArticleFournisseur[]>>({});
   const [offres, setOffres] = useState<Record<string, (OffreValo & OffreActive)[]>>({});
   const [saisies, setSaisies] = useState<Record<string, Saisie>>({});
@@ -92,15 +93,16 @@ function Feuille() {
     const { data: i, error } = await supabase.from("inventaires").select("id, etablissement_id, date, type, statut, saisie").eq("id", id).maybeSingle();
     if (error || !i) { setErreur("Inventaire introuvable ou accès refusé"); return; }
     const invRow = i as Inventaire;
-    const [{ data: z }, { data: e }, { data: ls }] = await Promise.all([
+    const [{ data: z }, { data: e }, { data: ls }, { data: ry }] = await Promise.all([
       supabase.from("storage_zones").select("name, display_order").eq("etablissement_id", invRow.etablissement_id).order("display_order"),
       supabase.from("etablissements").select("nom, slug").eq("id", invRow.etablissement_id).maybeSingle(),
       supabase.from("inventaire_lignes").select("id, ingredient_id, zone, ordre, famille, colis, unites, quantite, unite, cond_contenu, cond_libelle, retiree, nom_feuille, rattachement")
         .eq("inventaire_id", id).order("ordre", { ascending: true, nullsFirst: false }).limit(5000),
+      supabase.from("rayons_commande").select("code, libelle, ordre").order("ordre"),
     ]);
     const ids = [...new Set((ls ?? []).map((l) => l.ingredient_id as string))];
     const [{ data: ings }, { data: arts }, { data: offs }] = await Promise.all([
-      inChunks<Fiche>(ids, (b) => supabase.from("ingredients").select("id, name, status, is_active, category, sub_category, default_unit, default_supplier_id, purchase_price, purchase_unit, purchase_unit_label, piece_weight_g, piece_volume_ml, density_g_per_ml").in("id", b)),
+      inChunks<Fiche>(ids, (b) => supabase.from("ingredients").select("id, name, status, is_active, category, sub_category, rayon_commande, default_unit, default_supplier_id, purchase_price, purchase_unit, purchase_unit_label, piece_weight_g, piece_volume_ml, density_g_per_ml").in("id", b)),
       inChunks<ArticleFournisseur & { ingredient_id: string }>(ids, (b) => supabase.from("commande_articles").select("ingredient_id, supplier_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande").in("ingredient_id", b)),
       inChunks<OffreValo & OffreActive & { ingredient_id: string }>(ids, (b) => supabase.from("supplier_offers").select("ingredient_id, supplier_id, is_active, valid_from, valid_to, created_at, unit, unit_price, pack_price, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, pack_unit, price_kind, piece_weight_g, density_kg_per_l").in("ingredient_id", b)),
     ]);
@@ -121,6 +123,7 @@ function Feuille() {
     setZones(nomsZones);
     setLignes(liste);
     setFiches(ficheDe); setArticles(artDe); setOffres(offDe);
+    setRayons([...((ry ?? []) as { code: string; libelle: string; ordre: number }[]), RAYON_AUTRES]);
     // Colis unique (contenu 1) : un seul champ, « colis » ; sans conditionnement : un seul champ, « unités ».
     // Une quantité déjà enregistrée ailleurs (ancien inventaire) est reportée dans le champ affiché.
     setSaisies(Object.fromEntries(liste.map((l) => {
@@ -171,6 +174,9 @@ function Feuille() {
     return m;
   }, [lignes]);
   const compte = (l: Ligne) => { const s = saisies[l.id]; return !!s && (s.colis.trim() !== "" || s.unites.trim() !== ""); };
+
+  /** Rayon (catégorie de commande) d'une ligne : celui de la fiche, sinon d'après sa catégorie */
+  const rayonDe = useCallback((l: Ligne) => { const f = fiches[l.ingredient_id]; return rayonDuProduit(f?.rayon_commande, f?.category); }, [fiches]);
 
   /** Conditionnement de commande de la fiche (pour compter par colis) et coût d'une unité comptée */
   const condProduit = useCallback((l: Ligne): Conditionnement | null => {
@@ -278,17 +284,15 @@ function Feuille() {
     setLignes((prev) => prev.map((x) => (x.id === l.id ? { ...x, retiree: !remettre } : x)));
   }
 
-  /** Retire (ou remet) toutes les lignes d'une famille dans la zone, sans toucher aux fiches */
-  async function retirerFamille(z: string, fam: string | null, remettre = false) {
-    if (lectureSeule) return;
-    const cibles = lignes.filter((l) => l.zone === z && (l.famille ?? null) === fam && l.retiree === remettre);
-    if (!cibles.length) return;
-    if (!remettre && !confirm(`Retirer les ${cibles.length} produits de « ${fam ?? "Sans famille"} » de la zone ${libelleZone(z)} ?\nIls restent dans « retirés » et peuvent être remis.`)) return;
+  /** Retire (ou remet) un lot de lignes (un rayon entier dans la zone), sans toucher aux fiches */
+  async function retirerLot(cibles: Ligne[], libelle: string, remettre = false) {
+    if (lectureSeule || !cibles.length) return;
+    if (!remettre && !confirm(`Retirer les ${cibles.length} produits de « ${libelle} » de cette zone ?\nIls restent dans « retirés » et peuvent être remis.`)) return;
     const ids = cibles.map((l) => l.id);
     const { error } = await supabase.from("inventaire_lignes").update({ retiree: !remettre, updated_at: new Date().toISOString() }).in("id", ids);
     if (error) { setMessage(`Pas enregistré : ${error.message}`); return; }
     setLignes((prev) => prev.map((x) => (ids.includes(x.id) ? { ...x, retiree: !remettre } : x)));
-    setMessage(`${cibles.length} produit(s) ${remettre ? "remis" : "retiré(s)"} (${fam ?? "Sans famille"}).`);
+    setMessage(`${cibles.length} produit(s) ${remettre ? "remis" : "retiré(s)"} (${libelle}).`);
   }
 
   async function changerZone(l: Ligne, nouvelle: string) {
@@ -311,7 +315,7 @@ function Feuille() {
   }
 
   /** Carte d'une ligne : nom, détail du conditionnement et du prix, champs de saisie */
-  const carte = (l: Ligne) => {
+  const carte = (l: Ligne, couleur: string) => {
     const s = saisies[l.id] ?? { colis: "", unites: "" };
     const contenu = l.cond_contenu;
     const deuxChamps = contenu != null && contenu > 1;
@@ -322,7 +326,6 @@ function Feuille() {
     const valo = coutDe(l);
     const f = fiches[l.ingredient_id];
     const detailPiece = f?.piece_weight_g ? `${f.piece_weight_g >= 1000 ? `${txt(f.piece_weight_g / 1000)} kg` : `${txt(f.piece_weight_g)} g`} la pièce` : f?.piece_volume_ml ? `${f.piece_volume_ml >= 1000 ? `${txt(f.piece_volume_ml / 1000)} L` : `${txt(f.piece_volume_ml)} mL`} la pièce` : null;
-    const couleur = couleurFamille(l.famille);
     return (
       <React.Fragment key={l.id}>
                 <div style={{
@@ -507,11 +510,11 @@ function Feuille() {
             </span>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {(() => {
-                const familles = [...new Set(lignesZone.map((l) => l.famille ?? null))];
-                const estOuverte = (f: string | null) => bascules[cleFamille(zone, f)] ?? lignesZone.some((l) => (l.famille ?? null) === f && compte(l));
-                const toutesFermees = familles.length > 0 && familles.every((f) => !estOuverte(f));
+                const codes = [...new Set(lignesZone.map(rayonDe))];
+                const estOuverte = (c: string) => bascules[cleFamille(zone, c)] ?? lignesZone.some((l) => rayonDe(l) === c && compte(l));
+                const toutesFermees = codes.length > 0 && codes.every((c) => !estOuverte(c));
                 return (
-                  <button type="button" onClick={() => setBascules((b) => { const n = { ...b }; for (const f of familles) n[cleFamille(zone, f)] = toutesFermees; return n; })} style={lien}>
+                  <button type="button" onClick={() => setBascules((b) => { const n = { ...b }; for (const c of codes) n[cleFamille(zone, c)] = toutesFermees; return n; })} style={lien}>
                     {toutesFermees ? "tout déplier" : "tout replier"}
                   </button>
                 );
@@ -523,55 +526,60 @@ function Feuille() {
           </div>
 
           {(() => {
-            // Famille (ordre de la feuille) → sous-catégorie de la fiche (ordre de première apparition) → lignes
-            const familles: { famille: string | null; sous: { nom: string | null; lignes: Ligne[] }[]; lignes: Ligne[] }[] = [];
-            for (const l of lignesZone) {
-              let fam = familles.find((x) => (x.famille ?? null) === (l.famille ?? null));
-              if (!fam) { fam = { famille: l.famille ?? null, sous: [], lignes: [] }; familles.push(fam); }
-              fam.lignes.push(l);
-              const sc = fiches[l.ingredient_id]?.sub_category ?? null;
-              let g = fam.sous.find((x) => (x.nom ?? null) === sc);
-              if (!g) { g = { nom: sc, lignes: [] }; fam.sous.push(g); }
-              g.lignes.push(l);
-            }
-            return familles.map((fam, i) => {
-              const compteesFamille = fam.lignes.filter(compte).length;
-              const ouverte = enRecherche || (bascules[cleFamille(zone, fam.famille)] ?? compteesFamille > 0);
-              const plusieursSous = fam.sous.length > 1 || (fam.sous.length === 1 && fam.sous[0].nom != null);
+            // Rayon (catégorie de l'écran de commande, même ordre) → sous-catégorie de la fiche → lignes dans l'ordre de la feuille
+            const groupes = rayons
+              .map((r) => ({ ...r, lignes: lignesZone.filter((l) => rayonDe(l) === r.code) }))
+              .filter((r) => r.lignes.length > 0)
+              .map((r) => {
+                const sous: { nom: string | null; lignes: Ligne[] }[] = [];
+                for (const l of r.lignes) {
+                  const sc = fiches[l.ingredient_id]?.sub_category ?? null;
+                  let g = sous.find((x) => (x.nom ?? null) === sc);
+                  if (!g) { g = { nom: sc, lignes: [] }; sous.push(g); }
+                  g.lignes.push(l);
+                }
+                sous.sort((a, b) => (a.nom ?? "zzz").localeCompare(b.nom ?? "zzz", "fr"));
+                return { ...r, sous };
+              });
+            return groupes.map((r, i) => {
+              const couleur = couleurRayon(r.code);
+              const comptees = r.lignes.filter(compte).length;
+              const ouverte = enRecherche || (bascules[cleFamille(zone, r.code)] ?? comptees > 0);
+              const plusieursSous = r.sous.length > 1 || (r.sous.length === 1 && r.sous[0].nom != null);
               return (
-                <div key={fam.famille ?? "∅"} style={{ margin: `${i === 0 ? 4 : 10}px 0 6px` }}>
-                  {/* Titre de famille : fond plein, texte blanc, même charte que les rayons de l'écran de commande */}
-                  <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleFamille(zone, fam.famille)]: !ouverte }))} aria-expanded={ouverte} style={{
+                <div key={r.code} style={{ margin: `${i === 0 ? 4 : 10}px 0 6px` }}>
+                  {/* Titre de rayon : fond plein, texte blanc, exactement comme l'écran de commande */}
+                  <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleFamille(zone, r.code)]: !ouverte }))} aria-expanded={ouverte} style={{
                     width: "100%", minHeight: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 14px",
-                    background: couleurFamille(fam.famille), border: "none", borderRadius: 14, cursor: "pointer", textAlign: "left", touchAction: "manipulation",
+                    background: couleur, border: "none", borderRadius: 14, cursor: "pointer", textAlign: "left", touchAction: "manipulation",
                     boxShadow: "0 2px 6px rgba(0,0,0,0.12)", fontFamily: "inherit",
                   }}>
                     <span style={{ flex: 1, fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: "0.04em", color: "#fff" }}>
-                      {fam.famille ?? "Sans famille"} <span style={{ opacity: 0.75, fontWeight: 400 }}>({fam.lignes.length})</span>
+                      {r.libelle} <span style={{ opacity: 0.75, fontWeight: 400 }}>({r.lignes.length})</span>
                     </span>
-                    {compteesFamille > 0 && (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: couleurFamille(fam.famille), background: "#fff", borderRadius: 10, padding: "3px 8px" }}>{compteesFamille}{compteesFamille === fam.lignes.length ? " ✓" : ""}</span>
+                    {comptees > 0 && (
+                      <span style={{ fontSize: 12, fontWeight: 700, color: couleur, background: "#fff", borderRadius: 10, padding: "3px 8px" }}>{comptees}{comptees === r.lignes.length ? " ✓" : ""}</span>
                     )}
                     <span style={{ color: "#fff", fontSize: 13, transform: ouverte ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
                   </button>
                   {ouverte && !lectureSeule && (
                     <div style={{ textAlign: "right", margin: "4px 6px 2px" }}>
-                      <button type="button" onClick={() => void retirerFamille(zone, fam.famille)} title="Retirer toute la famille de cette zone" style={{ ...lien, color: "#a12b2b" }}>retirer la famille de cette zone</button>
+                      <button type="button" onClick={() => void retirerLot(r.lignes, r.libelle)} title="Retirer tout le rayon de cette zone" style={{ ...lien, color: "#a12b2b" }}>retirer le rayon de cette zone</button>
                     </div>
                   )}
-                  {ouverte && fam.sous.map((g) => {
-                    const cleSous = `${cleFamille(zone, fam.famille)}|${g.nom ?? ""}`;
+                  {ouverte && r.sous.map((g) => {
+                    const cleSous = `${cleFamille(zone, r.code)}|${g.nom ?? ""}`;
                     const sousOuverte = enRecherche || (bascules[cleSous] ?? true);
                     const compteesSous = g.lignes.filter(compte).length;
                     return (
                       <div key={g.nom ?? "∅"} style={{ marginTop: 6 }}>
                         {plusieursSous && (
-                          /* Sous-catégorie : accordéon clair, comme dans le menu produits */
+                          /* Sous-catégorie : accordéon clair teinté du rayon, comme dans le menu produits */
                           <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleSous]: !sousOuverte }))} aria-expanded={sousOuverte} style={{
                             width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-                            padding: "9px 12px", background: sousOuverte ? "#f0ebe3" : "#fff", border: "1.5px solid #e5ddd0", borderLeft: `3px solid ${couleurFamille(fam.famille)}`,
+                            padding: "9px 12px", background: sousOuverte ? "#f0ebe3" : "#fff", border: "1.5px solid #e5ddd0", borderLeft: `3px solid ${couleur}`,
                             borderRadius: sousOuverte ? "8px 8px 0 0" : 8, cursor: "pointer", marginBottom: sousOuverte ? 0 : 4,
-                            fontSize: 11, fontWeight: 700, color: couleurFamille(fam.famille), textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "inherit",
+                            fontSize: 11, fontWeight: 700, color: couleur, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "inherit",
                           }}>
                             <span>{g.nom ?? "Autre"} <span style={{ fontWeight: 500, opacity: 0.8 }}>({g.lignes.length})</span></span>
                             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -582,7 +590,7 @@ function Feuille() {
                         )}
                         {sousOuverte && (
                           <div style={plusieursSous ? { padding: "6px 6px 2px", background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 8px 8px", marginBottom: 4 } : undefined}>
-                            {g.lignes.map((l) => carte(l))}
+                            {g.lignes.map((l) => carte(l, couleur))}
                           </div>
                         )}
                       </div>
@@ -599,7 +607,7 @@ function Feuille() {
                 {voirRetirees ? "▾" : "▸"} {retireesZone.length} produit{retireesZone.length > 1 ? "s" : ""} retiré{retireesZone.length > 1 ? "s" : ""} de la liste
               </button>
               {voirRetirees && !lectureSeule && (
-                <button type="button" onClick={() => { for (const f of new Set(retireesZone.map((l) => l.famille ?? null))) void retirerFamille(zone, f, true); }} style={{ ...lien, color: "#2D6A4F", marginLeft: 10 }}>tout remettre</button>
+                <button type="button" onClick={() => void retirerLot(retireesZone, "retirés", true)} style={{ ...lien, color: "#2D6A4F", marginLeft: 10 }}>tout remettre</button>
               )}
               {voirRetirees && retireesZone.map((l) => (
                 <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", fontSize: 13, color: "#8a8378", background: "#faf7f2", borderRadius: 8, marginTop: 4 }}>

@@ -6,7 +6,6 @@ import { useProfile } from "@/lib/ProfileContext";
 import { fetchApi } from "@/lib/fetchApi";
 import { SEUIL_HABITUEL } from "@/lib/commandeHabituels";
 import { libelleZone, nomUnite, quantiteAffichee, type UniteCommande, type UniteTaille } from "@/lib/commandeArticles";
-import { CAT_COLORS, type Category } from "@/types/ingredients";
 
 /**
  * Écran de commande simplifié (fournisseurs avec suppliers.commande_simplifiee, Maël d'abord).
@@ -68,15 +67,8 @@ const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCa
 const euros = (n: number) => n.toFixed(2).replace(".", ",") + " €";
 const qteTexte = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
 
-/** Couleur du titre de rayon : celle de sa catégorie dans les listes de produits (même couleur chez tous les fournisseurs) */
-const CATEGORIE_DU_RAYON: Record<string, Category> = {
-  cremerie: "cremerie_fromage", charcuterie: "charcuterie_viande", fruits_legumes: "legumes_herbes",
-  base_pizza: "epicerie_salee", epicerie_cuisine: "epicerie_salee", epicerie_sucree: "epicerie_sucree",
-  maree_surgeles: "maree", hygiene: "emballage",
-  bar_softs: "soft", bar_sirops: "sirops", bar_bieres: "biere", bar_vins: "vins",
-  bar_liqueurs: "liqueurs", bar_spiritueux: "spiritueux", bar_cafe: "cafeteria",
-};
-const couleurRayon = (code: string) => CAT_COLORS[CATEGORIE_DU_RAYON[code] ?? "autre"];
+/** Couleur du titre de rayon : partagée avec l'inventaire (src/lib/rayons.ts) */
+import { couleurRayon } from "@/lib/rayons";
 
 /**
  * Aller-retour vers la fiche produit (admins, managers) : l'état de l'écran est gardé le temps de corriger
