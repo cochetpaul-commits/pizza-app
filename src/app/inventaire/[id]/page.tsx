@@ -77,6 +77,10 @@ function Feuille() {
   const [etatLigne, setEtatLigne] = useState<Record<string, "attente" | "ok" | "erreur">>({});
   const [voirRetirees, setVoirRetirees] = useState(false);
   const [modaleAjout, setModaleAjout] = useState(false);
+  /** Familles repliées, clé « zone|famille » (comme les rayons de l'écran de commande) */
+  const [repliees, setRepliees] = useState<Set<string>>(new Set());
+  const cleFamille = (z: string, fam: string | null) => `${z}|${fam ?? ""}`;
+  const basculerFamille = (z: string, fam: string | null) => setRepliees((r) => { const n = new Set(r); const k = cleFamille(z, fam); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const minuteries = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const fichierRef = useRef<HTMLInputElement | null>(null);
 
@@ -241,6 +245,19 @@ function Feuille() {
     setLignes((prev) => prev.map((x) => (x.id === l.id ? { ...x, retiree: !remettre } : x)));
   }
 
+  /** Retire (ou remet) toutes les lignes d'une famille dans la zone, sans toucher aux fiches */
+  async function retirerFamille(z: string, fam: string | null, remettre = false) {
+    if (lectureSeule) return;
+    const cibles = lignes.filter((l) => l.zone === z && (l.famille ?? null) === fam && l.retiree === remettre);
+    if (!cibles.length) return;
+    if (!remettre && !confirm(`Retirer les ${cibles.length} produits de « ${fam ?? "Sans famille"} » de la zone ${libelleZone(z)} ?\nIls restent dans « retirés » et peuvent être remis.`)) return;
+    const ids = cibles.map((l) => l.id);
+    const { error } = await supabase.from("inventaire_lignes").update({ retiree: !remettre, updated_at: new Date().toISOString() }).in("id", ids);
+    if (error) { setMessage(`Pas enregistré : ${error.message}`); return; }
+    setLignes((prev) => prev.map((x) => (ids.includes(x.id) ? { ...x, retiree: !remettre } : x)));
+    setMessage(`${cibles.length} produit(s) ${remettre ? "remis" : "retiré(s)"} (${fam ?? "Sans famille"}).`);
+  }
+
   async function changerZone(l: Ligne, nouvelle: string) {
     if (lectureSeule || nouvelle === l.zone) return;
     const { error } = await supabase.from("inventaire_lignes").update({ zone: nouvelle, updated_at: new Date().toISOString() }).eq("id", l.id);
@@ -352,13 +369,24 @@ function Feuille() {
             <span style={{ fontSize: 12.5, color: "#6f6656" }}>
               {lignesZone.length} produit{lignesZone.length > 1 ? "s" : ""}{valeurZone > 0 ? <> · valeur comptée <strong style={{ color: "#1a1a1a" }}>{eur(valeurZone)}</strong> HT</> : null}
             </span>
-            {!lectureSeule && (
-              <button type="button" onClick={() => setModaleAjout(true)} style={{ ...bouton("#fff", ACCENT), height: 34, fontSize: 12.5 }}>+ Ajouter des produits</button>
-            )}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button type="button" onClick={() => {
+                const familles = [...new Set(lignesZone.map((l) => l.famille ?? null))];
+                const toutesRepliees = familles.every((f) => repliees.has(cleFamille(zone, f)));
+                setRepliees((r) => { const n = new Set(r); for (const f of familles) { if (toutesRepliees) n.delete(cleFamille(zone, f)); else n.add(cleFamille(zone, f)); } return n; });
+              }} style={lien}>{[...new Set(lignesZone.map((l) => l.famille ?? null))].every((f) => repliees.has(cleFamille(zone, f))) && lignesZone.length ? "tout déplier" : "tout replier"}</button>
+              {!lectureSeule && (
+                <button type="button" onClick={() => setModaleAjout(true)} style={{ ...bouton("#fff", ACCENT), height: 34, fontSize: 12.5 }}>+ Ajouter</button>
+              )}
+            </div>
           </div>
 
           {lignesZone.map((l, i) => {
             const nouvelleFamille = i === 0 || lignesZone[i - 1].famille !== l.famille;
+            const repliee = repliees.has(cleFamille(zone, l.famille));
+            if (repliee && !nouvelleFamille) return null;
+            const lignesFamille = lignesZone.filter((x) => (x.famille ?? null) === (l.famille ?? null));
+            const compteesFamille = lignesFamille.filter(compte).length;
             const s = saisies[l.id] ?? { colis: "", unites: "" };
             const contenu = l.cond_contenu;
             const deuxChamps = contenu != null && contenu > 1;
@@ -372,10 +400,20 @@ function Feuille() {
             return (
               <React.Fragment key={l.id}>
                 {nouvelleFamille && (
-                  <div style={{ fontFamily: OSWALD, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "#8a8378", margin: "14px 4px 6px" }}>
-                    {l.famille ?? "Sans famille"}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 4px 6px" }}>
+                    <button type="button" onClick={() => basculerFamille(zone, l.famille)} title={repliee ? "Déplier" : "Replier"} style={{
+                      flex: 1, display: "flex", alignItems: "center", gap: 8, border: "none", background: repliee ? "#ece6db" : "transparent", borderRadius: 8, padding: repliee ? "6px 8px" : "0 4px", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                    }}>
+                      <span style={{ fontSize: 11, color: "#8a8378" }}>{repliee ? "▸" : "▾"}</span>
+                      <span style={{ fontFamily: OSWALD, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "#1a1a1a" }}>{l.famille ?? "Sans famille"}</span>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: compteesFamille === lignesFamille.length ? "#2D6A4F" : "#999" }}>{compteesFamille}/{lignesFamille.length}</span>
+                    </button>
+                    {!lectureSeule && (
+                      <button type="button" onClick={() => void retirerFamille(zone, l.famille)} title="Retirer toute la famille de cette zone" style={{ ...lien, color: "#a12b2b" }}>retirer la famille</button>
+                    )}
                   </div>
                 )}
+                {repliee ? null : (
                 <div style={{
                   display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 4, borderRadius: 10,
                   background: "#fff", border: `1px solid ${compte(l) ? "#cfe3d6" : "#ece6db"}`,
@@ -439,6 +477,7 @@ function Feuille() {
                     background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent",
                   }} />
                 </div>
+                )}
               </React.Fragment>
             );
           })}
@@ -448,6 +487,9 @@ function Feuille() {
               <button type="button" onClick={() => setVoirRetirees((v) => !v)} style={{ ...lien, fontSize: 12.5 }}>
                 {voirRetirees ? "▾" : "▸"} {retireesZone.length} produit{retireesZone.length > 1 ? "s" : ""} retiré{retireesZone.length > 1 ? "s" : ""} de la liste
               </button>
+              {voirRetirees && !lectureSeule && (
+                <button type="button" onClick={() => { for (const f of new Set(retireesZone.map((l) => l.famille ?? null))) void retirerFamille(zone, f, true); }} style={{ ...lien, color: "#2D6A4F", marginLeft: 10 }}>tout remettre</button>
+              )}
               {voirRetirees && retireesZone.map((l) => (
                 <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", fontSize: 13, color: "#8a8378", background: "#faf7f2", borderRadius: 8, marginTop: 4 }}>
                   <span style={{ flex: 1, textDecoration: "line-through" }}>{l.nom_feuille ?? l.nom}</span>
@@ -480,7 +522,44 @@ function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjoute
   const [resultats, setResultats] = useState<{ id: string; name: string; category: string | null }[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [catCreation, setCatCreation] = useState<Category>("epicerie_salee");
-  void etabId;
+  const [mode, setMode] = useState<"produits" | "categorie" | "fournisseur">("produits");
+  const [fournisseurs, setFournisseurs] = useState<{ id: string; name: string }[]>([]);
+  const [fournisseurId, setFournisseurId] = useState("");
+  const [lot, setLot] = useState<{ id: string; name: string }[] | null>(null);
+
+  // Fournisseurs de l'établissement (ajout d'un fournisseur entier dans la zone)
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("suppliers").select("id, name").eq("etablissement_id", etabId).eq("is_active", true).order("name");
+      setFournisseurs((data ?? []) as { id: string; name: string }[]);
+    })();
+  }, [etabId]);
+
+  // Lot à ajouter : tous les produits d'une catégorie, ou tous les produits achetés chez un fournisseur (offres actives + fournisseur de la fiche)
+  useEffect(() => {
+    (async () => {
+      setLot(null);
+      if (mode === "categorie" && cat) {
+        let req = supabase.from("ingredients").select("id, name").eq("is_active", true).eq("category", cat).order("name").limit(1000);
+        if (etabCle) req = req.or(`establishments.cs.{"${etabCle}"},establishments.is.null`);
+        const { data } = await req;
+        setLot((data ?? []) as { id: string; name: string }[]);
+      } else if (mode === "fournisseur" && fournisseurId) {
+        const [{ data: offs }, { data: directs }] = await Promise.all([
+          supabase.from("supplier_offers").select("ingredient_id").eq("supplier_id", fournisseurId).eq("is_active", true).limit(2000),
+          supabase.from("ingredients").select("id").eq("supplier_id", fournisseurId).eq("is_active", true).limit(1000),
+        ]);
+        const ids = [...new Set([...(offs ?? []).map((o) => o.ingredient_id as string), ...(directs ?? []).map((d) => d.id as string)])];
+        if (!ids.length) { setLot([]); return; }
+        const { data: ings } = await inChunks<{ id: string; name: string }>(ids, (b) => {
+          let req = supabase.from("ingredients").select("id, name").in("id", b).eq("is_active", true);
+          if (etabCle) req = req.or(`establishments.cs.{"${etabCle}"},establishments.is.null`);
+          return req;
+        });
+        setLot(ings.sort((a, b) => a.name.localeCompare(b.name, "fr")));
+      }
+    })();
+  }, [mode, cat, fournisseurId, etabCle]);
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -500,17 +579,50 @@ function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjoute
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "16px 16px 0 0", width: "100%", maxWidth: 900, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 -8px 30px rgba(0,0,0,0.2)" }}>
         <div style={{ padding: "14px 16px 8px" }}>
-          <div style={{ fontFamily: OSWALD, fontSize: 16, fontWeight: 700 }}>Ajouter des produits dans « {libelleZone(zone)} »</div>
-          <input autoFocus type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher dans la base produits…"
-            style={{ width: "100%", height: 42, borderRadius: 10, border: "1px solid #ddd6c8", padding: "0 12px", fontSize: 15, boxSizing: "border-box", marginTop: 8 }} />
-          <div style={{ display: "flex", gap: 4, overflowX: "auto", marginTop: 8, paddingBottom: 4 }}>
-            <button type="button" onClick={() => setCat("")} style={puce(cat === "")}>Toutes</button>
-            {CATEGORIES.map((c) => <button key={c} type="button" onClick={() => setCat(c === cat ? "" : c)} style={puce(cat === c)}>{CAT_LABELS[c]}</button>)}
+          <div style={{ fontFamily: OSWALD, fontSize: 16, fontWeight: 700 }}>Ajouter dans « {libelleZone(zone)} »</div>
+          <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+            {([["produits", "Produits"], ["categorie", "Catégorie entière"], ["fournisseur", "Fournisseur entier"]] as const).map(([m, l]) => (
+              <button key={m} type="button" onClick={() => setMode(m)} style={puce(mode === m)}>{l}</button>
+            ))}
           </div>
+          {mode === "produits" && (
+            <input autoFocus type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher dans la base produits…"
+              style={{ width: "100%", height: 42, borderRadius: 10, border: "1px solid #ddd6c8", padding: "0 12px", fontSize: 15, boxSizing: "border-box", marginTop: 8 }} />
+          )}
+          {mode !== "fournisseur" && (
+            <div style={{ display: "flex", gap: 4, overflowX: "auto", marginTop: 8, paddingBottom: 4 }}>
+              {mode === "produits" && <button type="button" onClick={() => setCat("")} style={puce(cat === "")}>Toutes</button>}
+              {CATEGORIES.map((c) => <button key={c} type="button" onClick={() => setCat(c === cat ? "" : c)} style={puce(cat === c)}>{CAT_LABELS[c]}</button>)}
+            </div>
+          )}
+          {mode === "fournisseur" && (
+            <select value={fournisseurId} onChange={(e) => setFournisseurId(e.target.value)} style={{ width: "100%", height: 42, borderRadius: 10, border: "1px solid #ddd6c8", padding: "0 10px", fontSize: 15, background: "#fff", marginTop: 8 }}>
+              <option value="">— Choisir un fournisseur —</option>
+              {fournisseurs.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          )}
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "0 16px" }}>
-          {resultats.length === 0 && (q.trim().length >= 2 || cat) && <div style={{ fontSize: 13, color: "#999", padding: 12 }}>Aucun produit.</div>}
-          {resultats.map((r) => {
+          {mode !== "produits" && (
+            lot == null ? <div style={{ fontSize: 13, color: "#999", padding: 12 }}>{(mode === "categorie" && !cat) || (mode === "fournisseur" && !fournisseurId) ? "Choisis une catégorie ou un fournisseur." : "Chargement…"}</div>
+            : (() => {
+              const nouveaux = lot.filter((x) => !dejaLa.has(x.id));
+              return (
+                <div style={{ padding: "8px 0" }}>
+                  <div style={{ fontSize: 13, marginBottom: 8 }}>
+                    <strong>{lot.length}</strong> produit{lot.length > 1 ? "s" : ""}, dont <strong>{nouveaux.length}</strong> pas encore dans la zone.
+                  </div>
+                  <button type="button" disabled={nouveaux.length === 0 || enCours} onClick={() => { void onAjouter(nouveaux.map((x) => x.id)).then(onClose); }}
+                    style={{ ...bouton(ACCENT, "#fff"), opacity: nouveaux.length === 0 ? 0.5 : 1 }}>
+                    Ajouter les {nouveaux.length} produits dans {libelleZone(zone)}
+                  </button>
+                  <div style={{ fontSize: 12, color: "#8a8378", marginTop: 10, lineHeight: 1.5 }}>{nouveaux.slice(0, 60).map((x) => x.name).join(" · ")}{nouveaux.length > 60 ? " · …" : ""}</div>
+                </div>
+              );
+            })()
+          )}
+          {mode === "produits" && resultats.length === 0 && (q.trim().length >= 2 || cat) && <div style={{ fontSize: 13, color: "#999", padding: 12 }}>Aucun produit.</div>}
+          {mode === "produits" && resultats.map((r) => {
             const present = dejaLa.has(r.id);
             return (
               <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderBottom: "1px solid #f3efe7", opacity: present ? 0.5 : 1 }}>
@@ -520,7 +632,7 @@ function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjoute
               </label>
             );
           })}
-          {q.trim().length >= 2 && !exact && (
+          {mode === "produits" && q.trim().length >= 2 && !exact && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, borderRadius: 10, background: "rgba(45,106,79,0.06)", border: "1.5px dashed rgba(45,106,79,0.35)", margin: "8px 0", flexWrap: "wrap" }}>
               <span style={{ flex: 1, fontSize: 12.5 }}>Créer « <b>{q.trim()}</b> » (fiche à vérifier) dans</span>
               <select value={catCreation} onChange={(e) => setCatCreation(e.target.value as Category)} style={{ fontSize: 12, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff" }}>
@@ -533,9 +645,11 @@ function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjoute
         </div>
         <div style={{ padding: "10px 16px 16px", borderTop: "1px solid #f0ebe2", display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button type="button" onClick={onClose} style={bouton("#fff", "#1a1a1a")}>Fermer</button>
-          <button type="button" disabled={sel.size === 0 || enCours} onClick={() => { void onAjouter([...sel]).then(onClose); }} style={{ ...bouton(ACCENT, "#fff"), opacity: sel.size === 0 ? 0.5 : 1 }}>
-            Ajouter {sel.size > 0 ? `(${sel.size})` : ""}
-          </button>
+          {mode === "produits" && (
+            <button type="button" disabled={sel.size === 0 || enCours} onClick={() => { void onAjouter([...sel]).then(onClose); }} style={{ ...bouton(ACCENT, "#fff"), opacity: sel.size === 0 ? 0.5 : 1 }}>
+              Ajouter {sel.size > 0 ? `(${sel.size})` : ""}
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -212,17 +212,31 @@ export async function ajouterLigne(inv: Inv, ingredientId: string, zone: string)
   return rep({ ok: true, id: data.id });
 }
 
-/** Plusieurs produits d'un coup dans une zone (modale « Ajouter des produits ») */
+/** Plusieurs produits d'un coup dans une zone (catégorie ou fournisseur entier) : conditionnements lus une fois, une seule insertion */
 export async function ajouterLignes(inv: Inv, ingredientIds: string[], zone: string): Promise<Reponse> {
-  let ajoutes = 0, dejaLa = 0;
-  const erreurs: string[] = [];
-  for (const id of [...new Set(ingredientIds)]) {
-    const r = await ajouterLigne(inv, id, zone);
-    if (r.status === 200) ajoutes++;
-    else if (r.status === 409 && String((r.body as { error?: string }).error ?? "").startsWith("Ce produit")) dejaLa++;
-    else erreurs.push(String((r.body as { error?: string }).error ?? "erreur"));
+  if (inv.statut === "cloture") return rep({ error: "Inventaire clôturé" }, 409);
+  const { data: z } = await supabaseAdmin.from("storage_zones").select("name").eq("etablissement_id", inv.etablissement_id).eq("name", zone).maybeSingle();
+  if (!z) return rep({ error: "Zone inconnue" }, 400);
+  const ids = [...new Set(ingredientIds)];
+  const { data: existantes } = await supabaseAdmin.from("inventaire_lignes").select("id, ingredient_id, retiree").eq("inventaire_id", inv.id).eq("zone", zone).in("ingredient_id", ids);
+  const deja = new Map((existantes ?? []).map((l) => [l.ingredient_id as string, l]));
+  const aRemettre = (existantes ?? []).filter((l) => l.retiree).map((l) => l.id as string);
+  if (aRemettre.length) await supabaseAdmin.from("inventaire_lignes").update({ retiree: false, updated_at: new Date().toISOString() }).in("id", aRemettre);
+  const nouveaux = ids.filter((id) => !deja.has(id));
+  const conds = nouveaux.length ? await conditionnements(nouveaux) : new Map();
+  const { data: dernier } = await supabaseAdmin.from("inventaire_lignes").select("ordre").eq("inventaire_id", inv.id)
+    .order("ordre", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
+  let ordre = Number(dernier?.ordre ?? 0);
+  const aInserer = nouveaux.filter((id) => conds.has(id)).map((id) => {
+    const c = conds.get(id)!;
+    ordre += 1;
+    return { inventaire_id: inv.id, ingredient_id: id, zone, ordre, famille: c.famille ?? "Ajouts hors liste", quantite: 0, colis: null, unites: null, ...colonnesCond(c.cond, c.uniteFiche) };
+  });
+  for (let i = 0; i < aInserer.length; i += 300) {
+    const { error } = await supabaseAdmin.from("inventaire_lignes").insert(aInserer.slice(i, i + 300));
+    if (error) return rep({ error: error.message }, 500);
   }
-  return rep({ ok: erreurs.length === 0, ajoutes, deja_la: dejaLa, erreurs });
+  return rep({ ok: true, ajoutes: aInserer.length + aRemettre.length, deja_la: ids.length - nouveaux.length - aRemettre.length, erreurs: [] });
 }
 
 /** Création rapide d'une fiche (à vérifier) depuis l'inventaire, puis ligne dans la zone */
