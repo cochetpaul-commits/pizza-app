@@ -13,6 +13,7 @@ import { coutUniteComptee, type OffreValo } from "@/lib/inventaireValorisation";
 import { cleEtab } from "@/lib/zonesEtablissement";
 import { CATEGORIES, CAT_LABELS, type Category } from "@/types/ingredients";
 import { couleurRayon, rayonDuProduit, RAYON_AUTRES } from "@/lib/rayons";
+import { getSupplierColor } from "@/lib/supplierColors";
 void categorieDeFamille;
 
 /**
@@ -32,7 +33,7 @@ type Ligne = {
   nom_feuille: string | null; rattachement: string | null; aVerifier: boolean; inactive: boolean;
 };
 type Fiche = {
-  id: string; name: string; status: string | null; is_active: boolean; category: string | null; sub_category: string | null; rayon_commande: string | null; default_unit: string | null; default_supplier_id: string | null;
+  id: string; name: string; status: string | null; is_active: boolean; category: string | null; sub_category: string | null; rayon_commande: string | null; default_unit: string | null; default_supplier_id: string | null; supplier_id: string | null;
   purchase_price: number | null; purchase_unit: number | null; purchase_unit_label: string | null; piece_weight_g: number | null; piece_volume_ml: number | null; density_g_per_ml: number | null;
 };
 type Saisie = { colis: string; unites: string };
@@ -73,6 +74,8 @@ function Feuille() {
   const [rayons, setRayons] = useState<{ code: string; libelle: string; ordre: number }[]>([]);
   const [articles, setArticles] = useState<Record<string, ArticleFournisseur[]>>({});
   const [offres, setOffres] = useState<Record<string, (OffreValo & OffreActive)[]>>({});
+  /** Fournisseurs (nom, couleur) pour la pastille sous le nom du produit, comme sur la fiche produit */
+  const [fournisseurs, setFournisseurs] = useState<Record<string, { name: string; color: string | null }>>({});
   const [saisies, setSaisies] = useState<Record<string, Saisie>>({});
   const [zone, setZone] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -102,7 +105,7 @@ function Feuille() {
     ]);
     const ids = [...new Set((ls ?? []).map((l) => l.ingredient_id as string))];
     const [{ data: ings }, { data: arts }, { data: offs }] = await Promise.all([
-      inChunks<Fiche>(ids, (b) => supabase.from("ingredients").select("id, name, status, is_active, category, sub_category, rayon_commande, default_unit, default_supplier_id, purchase_price, purchase_unit, purchase_unit_label, piece_weight_g, piece_volume_ml, density_g_per_ml").in("id", b)),
+      inChunks<Fiche>(ids, (b) => supabase.from("ingredients").select("id, name, status, is_active, category, sub_category, rayon_commande, default_unit, default_supplier_id, supplier_id, purchase_price, purchase_unit, purchase_unit_label, piece_weight_g, piece_volume_ml, density_g_per_ml").in("id", b)),
       inChunks<ArticleFournisseur & { ingredient_id: string }>(ids, (b) => supabase.from("commande_articles").select("ingredient_id, supplier_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande").in("ingredient_id", b)),
       inChunks<OffreValo & OffreActive & { ingredient_id: string }>(ids, (b) => supabase.from("supplier_offers").select("ingredient_id, supplier_id, is_active, valid_from, valid_to, created_at, unit, unit_price, pack_price, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, pack_unit, price_kind, piece_weight_g, density_kg_per_l").in("ingredient_id", b)),
     ]);
@@ -112,6 +115,13 @@ function Feuille() {
     for (const a of arts) (artDe[a.ingredient_id] ??= []).push(a);
     const offDe: Record<string, (OffreValo & OffreActive)[]> = {};
     for (const o of offs) (offDe[o.ingredient_id] ??= []).push(o);
+    const idsFournisseurs = [...new Set([
+      ...ings.flatMap((f) => [f.default_supplier_id, f.supplier_id]),
+      ...arts.map((a) => a.supplier_id), ...offs.map((o) => o.supplier_id),
+    ].filter((x): x is string => !!x))];
+    const fournDe: Record<string, { name: string; color: string | null }> = {};
+    const { data: sups } = await inChunks<{ id: string; name: string; color: string | null }>(idsFournisseurs, (b) => supabase.from("suppliers").select("id, name, color").in("id", b));
+    for (const s of sups) fournDe[s.id] = { name: s.name, color: s.color };
     const liste = ((ls ?? []) as Omit<Ligne, "nom" | "aVerifier" | "inactive">[]).map((l) => {
       const f = ficheDe[l.ingredient_id];
       return { ...l, nom: f?.name ?? l.nom_feuille ?? "?", aVerifier: f?.status === "to_check", inactive: !f || f.is_active === false };
@@ -122,7 +132,7 @@ function Feuille() {
     const nomsZones = (z ?? []).map((x) => x.name as string);
     setZones(nomsZones);
     setLignes(liste);
-    setFiches(ficheDe); setArticles(artDe); setOffres(offDe);
+    setFiches(ficheDe); setArticles(artDe); setOffres(offDe); setFournisseurs(fournDe);
     setRayons([...((ry ?? []) as { code: string; libelle: string; ordre: number }[]), RAYON_AUTRES]);
     // Colis unique (contenu 1) : un seul champ, « colis » ; sans conditionnement : un seul champ, « unités ».
     // Une quantité déjà enregistrée ailleurs (ancien inventaire) est reportée dans le champ affiché.
@@ -184,6 +194,15 @@ function Feuille() {
     if (!f) return null;
     return choisirConditionnement(f.default_supplier_id, articles[l.ingredient_id] ?? [], offres[l.ingredient_id] ?? []);
   }, [fiches, articles, offres]);
+  /** Fournisseur affiché sous le nom : celui du conditionnement retenu, sinon de la dernière offre active, sinon celui de la fiche */
+  const fournisseurDe = useCallback((l: Ligne, c: Conditionnement | null) => {
+    const f = fiches[l.ingredient_id];
+    if (!f) return null;
+    const date = (o: OffreActive) => o.valid_from ?? o.created_at ?? "";
+    const derniere = [...(offres[l.ingredient_id] ?? [])].sort((a, b) => date(b).localeCompare(date(a)))[0];
+    const sid = c?.supplier_id ?? derniere?.supplier_id ?? f.default_supplier_id ?? f.supplier_id;
+    return sid ? fournisseurs[sid] ?? null : null;
+  }, [fiches, offres, fournisseurs]);
   const coutDe = useCallback((l: Ligne) => {
     const f = fiches[l.ingredient_id];
     if (!f) return { cout: null, source: null, raison: "fiche supprimée" };
@@ -325,6 +344,7 @@ function Feuille() {
     const peutColis = !!c && c.contenu > 1;
     const valo = coutDe(l);
     const f = fiches[l.ingredient_id];
+    const fournisseur = fournisseurDe(l, c);
     const detailPiece = f?.piece_weight_g ? `${f.piece_weight_g >= 1000 ? `${txt(f.piece_weight_g / 1000)} kg` : `${txt(f.piece_weight_g)} g`} la pièce` : f?.piece_volume_ml ? `${f.piece_volume_ml >= 1000 ? `${txt(f.piece_volume_ml / 1000)} L` : `${txt(f.piece_volume_ml)} mL`} la pièce` : null;
     return (
       <React.Fragment key={l.id}>
@@ -343,6 +363,12 @@ function Feuille() {
                     </div>
                     {l.nom_feuille && normNom(l.nom_feuille) !== normNom(l.nom) && (
                       <div style={{ fontSize: 11.5, color: "#a79f90", marginTop: 1 }}>fiche : {l.nom}</div>
+                    )}
+                    {/* Pastille fournisseur, la même que sur la fiche produit */}
+                    {fournisseur && (
+                      <div style={{ marginTop: 3 }}>
+                        <span className="pastille" style={{ "--pastille-c": getSupplierColor(fournisseur.name, fournisseur.color) } as React.CSSProperties}>{fournisseur.name}</span>
+                      </div>
                     )}
                     {(l.rattachement === "approché" || l.rattachement === "rattaché par ressemblance" || l.aVerifier || l.inactive) && (
                       <span style={{
