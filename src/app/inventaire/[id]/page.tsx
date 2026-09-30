@@ -79,6 +79,8 @@ function Feuille() {
   const [enCours, setEnCours] = useState<string | null>(null);
   const [etatLigne, setEtatLigne] = useState<Record<string, "attente" | "ok" | "erreur">>({});
   const [voirRetirees, setVoirRetirees] = useState(false);
+  /** Recherche dans la zone affichée (nom de la feuille ou nom de la fiche) : familles et sous-catégories ouvertes pendant la recherche */
+  const [filtre, setFiltre] = useState("");
   const [modaleAjout, setModaleAjout] = useState(false);
   /** Familles ouvertes ou fermées à la main, clé « zone|famille » (sinon : ouvertes si elles ont déjà des lignes comptées, comme les rayons de la commande) */
   const [bascules, setBascules] = useState<Record<string, boolean>>({});
@@ -364,7 +366,10 @@ function Feuille() {
   if (!inv) return <div style={{ maxWidth: 900, margin: "0 auto", padding: 24, color: "#999" }}>Chargement…</div>;
 
   const lignesZoneToutes = zone ? parZone.get(zone) ?? [] : [];
-  const lignesZone = lignesZoneToutes.filter((l) => !l.retiree);
+  const motsFiltre = normNom(filtre).split(" ").filter((m) => m.length >= 2);
+  const correspond = (l: Ligne) => motsFiltre.length === 0 || motsFiltre.every((m) => normNom(`${l.nom_feuille ?? ""} ${l.nom}`).includes(m));
+  const lignesZone = lignesZoneToutes.filter((l) => !l.retiree && correspond(l));
+  const enRecherche = motsFiltre.length > 0;
   const retireesZone = lignesZoneToutes.filter((l) => l.retiree);
   const actives = lignes.filter((l) => !l.retiree);
   const totalComptees = actives.filter(compte).length;
@@ -448,9 +453,22 @@ function Feuille() {
 
       {zone && (
         <div>
+          <div style={{ position: "relative", margin: "0 0 8px" }}>
+            <input type="search" value={filtre} onChange={(e) => setFiltre(e.target.value)} placeholder={`Rechercher dans ${libelleZone(zone)}…`} inputMode="search"
+              style={{ width: "100%", height: 42, borderRadius: 12, border: "1.5px solid #ddd6c8", padding: "0 36px 0 12px", fontSize: 15, boxSizing: "border-box", background: "#fff", fontFamily: "inherit" }} />
+            {filtre && (
+              <button type="button" onClick={() => setFiltre("")} aria-label="Effacer" style={{ position: "absolute", right: 6, top: 6, width: 30, height: 30, borderRadius: 15, border: "none", background: "#f0ebe3", color: "#6f6656", cursor: "pointer", fontSize: 15 }}>×</button>
+            )}
+          </div>
+          {enRecherche && lignesZone.length === 0 && (
+            <div style={{ fontSize: 13, color: "#8a8378", margin: "0 4px 8px" }}>
+              Aucun produit ne correspond dans {libelleZone(zone)}.
+              {lignes.some((l) => !l.retiree && l.zone !== zone && correspond(l)) && <> Trouvé dans : {[...new Set(lignes.filter((l) => !l.retiree && l.zone !== zone && correspond(l)).map((l) => libelleZone(l.zone)))].join(", ")}.</>}
+            </div>
+          )}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "0 4px 6px" }}>
             <span style={{ fontSize: 12.5, color: "#6f6656" }}>
-              {lignesZone.length} produit{lignesZone.length > 1 ? "s" : ""}{valeurZone > 0 ? <> · valeur comptée <strong style={{ color: "#1a1a1a" }}>{eur(valeurZone)}</strong> HT</> : null}
+              {lignesZone.length} produit{lignesZone.length > 1 ? "s" : ""}{enRecherche ? " trouvés" : ""}{valeurZone > 0 ? <> · valeur comptée <strong style={{ color: "#1a1a1a" }}>{eur(valeurZone)}</strong> HT</> : null}
             </span>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {(() => {
@@ -483,7 +501,7 @@ function Feuille() {
             }
             return familles.map((fam, i) => {
               const compteesFamille = fam.lignes.filter(compte).length;
-              const ouverte = bascules[cleFamille(zone, fam.famille)] ?? compteesFamille > 0;
+              const ouverte = enRecherche || (bascules[cleFamille(zone, fam.famille)] ?? compteesFamille > 0);
               const plusieursSous = fam.sous.length > 1 || (fam.sous.length === 1 && fam.sous[0].nom != null);
               return (
                 <div key={fam.famille ?? "∅"} style={{ margin: `${i === 0 ? 4 : 10}px 0 6px` }}>
@@ -508,7 +526,7 @@ function Feuille() {
                   )}
                   {ouverte && fam.sous.map((g) => {
                     const cleSous = `${cleFamille(zone, fam.famille)}|${g.nom ?? ""}`;
-                    const sousOuverte = bascules[cleSous] ?? true;
+                    const sousOuverte = enRecherche || (bascules[cleSous] ?? true);
                     const compteesSous = g.lignes.filter(compte).length;
                     return (
                       <div key={g.nom ?? "∅"} style={{ marginTop: 6 }}>
