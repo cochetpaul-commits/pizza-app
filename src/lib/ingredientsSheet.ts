@@ -17,6 +17,7 @@ export const COLS = [
   { key: "name", header: "Nom", edit: true },
   { key: "is_active", header: "Actif (oui/non)", edit: true },
   { key: "establishments", header: "Établissements (Bello Mio / Piccola Mia / les deux)", edit: true },
+  { key: "achete_chez", header: "Acheté chez (info)", edit: false },
   { key: "category", header: "Catégorie", edit: true },
   { key: "sub_category", header: "Sous-catégorie", edit: true },
   { key: "fournisseur", header: "Fournisseur (info)", edit: false },

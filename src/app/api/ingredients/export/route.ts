@@ -37,12 +37,35 @@ export async function GET(req: NextRequest) {
     if (!data || data.length < 1000) break;
   }
 
-  const [{ data: offers }, { data: suppliers }, { data: zones }] = await Promise.all([
+  const [{ data: offers }, { data: suppliers }, { data: zones }, { data: etabsRows }] = await Promise.all([
     supabaseAdmin.from("supplier_offers").select("*").eq("is_active", true).order("created_at", { ascending: false }).range(0, 4999),
     supabaseAdmin.from("suppliers").select("id, name"),
     supabaseAdmin.from("storage_zones").select("name").order("display_order"),
+    supabaseAdmin.from("etablissements").select("id, slug"),
   ]);
   const supName = new Map((suppliers ?? []).map((s) => [s.id as string, s.name as string]));
+
+  // « Acheté chez (info) » : établissements où le produit a déjà eu une offre (toutes offres, actives ou fermées).
+  // Sert à repérer une fiche marquée « les deux » alors qu'un seul restaurant l'achète.
+  const etabKey = new Map((etabsRows ?? []).map((e) => [e.id as string, String(e.slug).includes("piccola") ? "piccola" : "bellomio"]));
+  const acheteChez = new Map<string, Set<string>>();
+  for (let from = 0; ; from += 1000) {
+    const { data } = await supabaseAdmin.from("supplier_offers").select("ingredient_id, etablissement_id").not("etablissement_id", "is", null).range(from, from + 999);
+    for (const o of (data ?? []) as { ingredient_id: string; etablissement_id: string }[]) {
+      const k = etabKey.get(o.etablissement_id);
+      if (!k) continue;
+      const s = acheteChez.get(o.ingredient_id) ?? new Set<string>();
+      s.add(k);
+      acheteChez.set(o.ingredient_id, s);
+    }
+    if (!data || data.length < 1000) break;
+  }
+  const acheteChezOut = (id: string): string => {
+    const s = acheteChez.get(id);
+    if (!s || s.size === 0) return "";
+    if (s.size === 2) return "les deux";
+    return s.has("piccola") ? "Piccola Mia" : "Bello Mio";
+  };
   // Une offre active par produit : la plus récente si plusieurs fournisseurs
   const offerBy = new Map<string, Record<string, unknown>>();
   for (const o of (offers ?? []) as Record<string, unknown>[]) if (!offerBy.has(o.ingredient_id as string)) offerBy.set(o.ingredient_id as string, o);
@@ -82,6 +105,7 @@ export async function GET(req: NextRequest) {
         case "is_active": v = boolOut(r.is_active); break;
         case "favori_commande": v = boolOut(r.favori_commande); break;
         case "establishments": v = estabsOut(r.establishments); break;
+        case "achete_chez": v = acheteChezOut(r.id as string); break;
         case "fournisseur": v = sid ? supName.get(sid) ?? "" : ""; break;
         case "prix_kg": v = prixKg(r, o); break;
         case "allergens": v = allergensOut(r.allergens); break;
@@ -123,6 +147,7 @@ export async function GET(req: NextRequest) {
     ["Une case laissée vide ne change rien : la valeur déjà enregistrée (poids, volume, réf., prix…) est conservée. Pour modifier une valeur, écris la nouvelle."],
     ["Réf. fournisseur et Date du prix : la référence article chez le fournisseur et la date à laquelle ce prix a été relevé. Modifiables : elles sont reprises dans l'offre enregistrée à l'import."],
     ["3. Les colonnes marquées (info) sont indicatives et ne sont pas relues à l'import (fournisseur, prix au kg, libellé facture)."],
+    ["Établissements : une fiche « les deux » est une seule et même fiche, partagée par Bello Mio et Piccola Mia ; elle sort dans les deux exports et une correction s'applique aux deux. « Acheté chez (info) » indique où le produit a réellement été acheté : si une fiche « les deux » n'est achetée que dans un restaurant, écris ce restaurant dans « Établissements » pour la réserver."],
     ["Prix : « Base de prix » dit si le produit s'achète au kg, au litre ou à la pièce (bouteille, boîte…). « Prix HT par kg, L ou pièce » est le prix de cette base. Si le produit arrive par carton / colis, indique le nombre d'unités par conditionnement et le prix du conditionnement (l'un des deux prix suffit, l'autre se déduit)."],
     ["4. Catégorie : utiliser le code (ex. « legumes_herbes »), voir la feuille Listes. Zones de stockage : le nom exact d'une zone existante."],
     ["5. Une ligne sans ID mais avec un Nom crée un nouveau produit."],
