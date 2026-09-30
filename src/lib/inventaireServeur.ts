@@ -189,29 +189,62 @@ export async function importerFeuille(
   return rep({ ok: true, lignes: aInserer.length, ...stats, doublons: lecture.doublons, desactivees, erreurs });
 }
 
-/** Produit hors liste ajouté dans une zone (en fin de zone) */
+/** Produit hors liste ajouté dans une zone (en fin de zone) ; une ligne retirée du même produit dans la zone est remise */
 export async function ajouterLigne(inv: Inv, ingredientId: string, zone: string): Promise<Reponse> {
   if (inv.statut === "cloture") return rep({ error: "Inventaire clôturé" }, 409);
   const { data: z } = await supabaseAdmin.from("storage_zones").select("name").eq("etablissement_id", inv.etablissement_id).eq("name", zone).maybeSingle();
   if (!z) return rep({ error: "Zone inconnue" }, 400);
   const c = (await conditionnements([ingredientId])).get(ingredientId);
   if (!c) return rep({ error: "Produit introuvable" }, 404);
-  const { data: existe } = await supabaseAdmin.from("inventaire_lignes").select("id").eq("inventaire_id", inv.id).eq("ingredient_id", ingredientId).eq("zone", zone).maybeSingle();
+  const { data: existe } = await supabaseAdmin.from("inventaire_lignes").select("id, retiree").eq("inventaire_id", inv.id).eq("ingredient_id", ingredientId).eq("zone", zone).limit(1).maybeSingle();
+  if (existe && existe.retiree) {
+    await supabaseAdmin.from("inventaire_lignes").update({ retiree: false, updated_at: new Date().toISOString() }).eq("id", existe.id);
+    return rep({ ok: true, id: existe.id, remise: true });
+  }
   if (existe) return rep({ error: "Ce produit est déjà dans cette zone", id: existe.id }, 409);
   const { data: dernier } = await supabaseAdmin.from("inventaire_lignes").select("ordre").eq("inventaire_id", inv.id)
     .order("ordre", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
   const { data, error } = await supabaseAdmin.from("inventaire_lignes").insert({
     inventaire_id: inv.id, ingredient_id: ingredientId, zone, ordre: Number(dernier?.ordre ?? 0) + 1,
-    famille: "Ajouts hors liste", quantite: 0, colis: null, unites: null, ...colonnesCond(c.cond, c.uniteFiche),
+    famille: c.famille ?? "Ajouts hors liste", quantite: 0, colis: null, unites: null, ...colonnesCond(c.cond, c.uniteFiche),
   }).select("id").single();
   if (error) return rep({ error: error.message }, 500);
   return rep({ ok: true, id: data.id });
 }
 
+/** Plusieurs produits d'un coup dans une zone (modale « Ajouter des produits ») */
+export async function ajouterLignes(inv: Inv, ingredientIds: string[], zone: string): Promise<Reponse> {
+  let ajoutes = 0, dejaLa = 0;
+  const erreurs: string[] = [];
+  for (const id of [...new Set(ingredientIds)]) {
+    const r = await ajouterLigne(inv, id, zone);
+    if (r.status === 200) ajoutes++;
+    else if (r.status === 409 && String((r.body as { error?: string }).error ?? "").startsWith("Ce produit")) dejaLa++;
+    else erreurs.push(String((r.body as { error?: string }).error ?? "erreur"));
+  }
+  return rep({ ok: erreurs.length === 0, ajoutes, deja_la: dejaLa, erreurs });
+}
+
+/** Création rapide d'une fiche (à vérifier) depuis l'inventaire, puis ligne dans la zone */
+export async function creerProduitEtLigne(inv: Inv, nom: string, categorie: string, zone: string, userId: string): Promise<Reponse> {
+  if (inv.statut === "cloture") return rep({ error: "Inventaire clôturé" }, 409);
+  const n = nom.trim();
+  if (n.length < 2) return rep({ error: "Nom trop court" }, 400);
+  const { data: etab } = await supabaseAdmin.from("etablissements").select("slug").eq("id", inv.etablissement_id).maybeSingle();
+  const { data: cree, error } = await supabaseAdmin.from("ingredients").insert({
+    name: n, category: categorie, default_unit: "pc", status: "to_check",
+    status_note: `Créée depuis l'inventaire du ${inv.date} : à vérifier (prix, conditionnement)`,
+    etablissement_id: inv.etablissement_id, establishments: [etab?.slug === "piccola" ? "piccola" : "bellomio"], user_id: userId,
+  }).select("id").single();
+  if (error || !cree) return rep({ error: error?.message ?? "Fiche non créée" }, 500);
+  const r = await ajouterLigne(inv, cree.id as string, zone);
+  return rep({ ...(r.body as object), ingredient_id: cree.id }, r.status);
+}
+
 /** Clôture : statut, puis mouvements de stock (une ligne par produit et par unité comptée, toutes zones additionnées) */
 export async function cloturer(inv: Inv, userId: string): Promise<Reponse> {
   if (inv.statut === "cloture") return rep({ error: "Déjà clôturé" }, 409);
-  const { data: lignes } = await supabaseAdmin.from("inventaire_lignes").select("ingredient_id, colis, unites, cond_contenu, unite, quantite").eq("inventaire_id", inv.id);
+  const { data: lignes } = await supabaseAdmin.from("inventaire_lignes").select("ingredient_id, colis, unites, cond_contenu, unite, quantite").eq("inventaire_id", inv.id).eq("retiree", false);
   const nonComptees = (lignes ?? []).filter((l) => l.colis == null && l.unites == null).length;
   const parProduit = new Map<string, { quantite: number; unite: string }>();
   for (const l of lignes ?? []) {

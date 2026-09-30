@@ -8,11 +8,17 @@ import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { inChunks } from "@/lib/supabaseChunks";
 import { useProfile } from "@/lib/ProfileContext";
 import { libelleZone } from "@/lib/commandeArticles";
-import { totalLigne } from "@/lib/inventaire";
+import { choisirConditionnement, totalLigne, type ArticleFournisseur, type Conditionnement, type OffreActive } from "@/lib/inventaire";
+import { coutUniteComptee, type OffreValo } from "@/lib/inventaireValorisation";
+import { cleEtab } from "@/lib/zonesEtablissement";
+import { CATEGORIES, CAT_LABELS, type Category } from "@/types/ingredients";
 
 /**
  * Inventaire « feuille » : saisie zone par zone, dans l'ordre de la feuille papier (famille, puis produit).
- * Deux champs par produit, colis et unités ; total = colis × contenu + unités (conditionnement retenu à l'import).
+ * Deux champs par produit, colis et unités ; total = colis × contenu + unités. Chaque ligne se compte à l'unité
+ * ou par colis (conditionnement de commande de la fiche), affiche le détail du conditionnement et le coût
+ * unitaire, s'ouvre sur la fiche produit (crayon), se retire de la liste (et se remet), change de zone.
+ * Zones : ajout depuis l'écran. Produits : ajout par recherche ou par catégorie, création rapide d'une fiche.
  * Enregistrement au fil de la saisie ; clôturé = lecture seule (un admin peut rouvrir). Admins et managers.
  */
 
@@ -20,9 +26,12 @@ type Inventaire = { id: string; etablissement_id: string; date: string; type: "f
 type Ligne = {
   id: string; ingredient_id: string; zone: string; ordre: number | null; famille: string | null;
   colis: number | null; unites: number | null; quantite: number; unite: string | null;
-  cond_contenu: number | null; cond_libelle: string | null; nom: string;
-  /** Nom tel qu'imprimé sur la feuille, fournisseur et rattachement du fichier */
-  nom_feuille: string | null; rattachement: string | null; aVerifier: boolean;
+  cond_contenu: number | null; cond_libelle: string | null; retiree: boolean; nom: string;
+  nom_feuille: string | null; rattachement: string | null; aVerifier: boolean; inactive: boolean;
+};
+type Fiche = {
+  id: string; name: string; status: string | null; is_active: boolean; category: string | null; default_unit: string | null; default_supplier_id: string | null;
+  purchase_price: number | null; purchase_unit: number | null; purchase_unit_label: string | null; piece_weight_g: number | null; piece_volume_ml: number | null; density_g_per_ml: number | null;
 };
 type Saisie = { colis: string; unites: string };
 
@@ -30,6 +39,7 @@ const ACCENT = "#D4775A";
 const OSWALD = "var(--font-oswald), Oswald, sans-serif";
 const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(",", ".")));
 const txt = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
+const eur = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 const normNom = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 const fmtDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const pluriel = (u: string | null, n: number) => {
@@ -37,6 +47,7 @@ const pluriel = (u: string | null, n: number) => {
   if (n <= 1 || !m || ["kg", "g", "l", "ml", "cl", "pc", "colis"].includes(m)) return m;
   return m.endsWith("s") || m.endsWith("x") ? m : m === "plateau" ? "plateaux" : m === "seau" ? "seaux" : `${m}s`;
 };
+const uniteFiche = (u: string | null | undefined) => (u === "kg" ? "kg" : u === "l" ? "litre" : u === "g" ? "kg" : u === "ml" ? "litre" : "pièce");
 
 export default function InventaireFeuillePage() {
   return (
@@ -52,16 +63,20 @@ function Feuille() {
   const { isGroupAdmin } = useProfile();
   const [inv, setInv] = useState<Inventaire | null>(null);
   const [etabNom, setEtabNom] = useState("");
+  const [etabSlug, setEtabSlug] = useState("");
   const [zones, setZones] = useState<string[]>([]);
   const [lignes, setLignes] = useState<Ligne[]>([]);
+  const [fiches, setFiches] = useState<Record<string, Fiche>>({});
+  const [articles, setArticles] = useState<Record<string, ArticleFournisseur[]>>({});
+  const [offres, setOffres] = useState<Record<string, (OffreValo & OffreActive)[]>>({});
   const [saisies, setSaisies] = useState<Record<string, Saisie>>({});
   const [zone, setZone] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [enCours, setEnCours] = useState<string | null>(null);
   const [etatLigne, setEtatLigne] = useState<Record<string, "attente" | "ok" | "erreur">>({});
-  const [recherche, setRecherche] = useState("");
-  const [resultats, setResultats] = useState<{ id: string; name: string }[]>([]);
+  const [voirRetirees, setVoirRetirees] = useState(false);
+  const [modaleAjout, setModaleAjout] = useState(false);
   const minuteries = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const fichierRef = useRef<HTMLInputElement | null>(null);
 
@@ -71,22 +86,33 @@ function Feuille() {
     const invRow = i as Inventaire;
     const [{ data: z }, { data: e }, { data: ls }] = await Promise.all([
       supabase.from("storage_zones").select("name, display_order").eq("etablissement_id", invRow.etablissement_id).order("display_order"),
-      supabase.from("etablissements").select("nom").eq("id", invRow.etablissement_id).maybeSingle(),
-      supabase.from("inventaire_lignes").select("id, ingredient_id, zone, ordre, famille, colis, unites, quantite, unite, cond_contenu, cond_libelle, nom_feuille, rattachement")
+      supabase.from("etablissements").select("nom, slug").eq("id", invRow.etablissement_id).maybeSingle(),
+      supabase.from("inventaire_lignes").select("id, ingredient_id, zone, ordre, famille, colis, unites, quantite, unite, cond_contenu, cond_libelle, retiree, nom_feuille, rattachement")
         .eq("inventaire_id", id).order("ordre", { ascending: true, nullsFirst: false }).limit(5000),
     ]);
     const ids = [...new Set((ls ?? []).map((l) => l.ingredient_id as string))];
-    const { data: ings } = await inChunks<{ id: string; name: string; status: string }>(ids, (b) => supabase.from("ingredients").select("id, name, status").in("id", b));
-    const ficheDe = new Map(ings.map((x) => [x.id, x]));
-    const liste = ((ls ?? []) as Omit<Ligne, "nom" | "aVerifier">[]).map((l) => ({
-      ...l, nom: ficheDe.get(l.ingredient_id)?.name ?? "?", aVerifier: ficheDe.get(l.ingredient_id)?.status === "to_check" && l.rattachement === "À CRÉER",
-    }));
+    const [{ data: ings }, { data: arts }, { data: offs }] = await Promise.all([
+      inChunks<Fiche>(ids, (b) => supabase.from("ingredients").select("id, name, status, is_active, category, default_unit, default_supplier_id, purchase_price, purchase_unit, purchase_unit_label, piece_weight_g, piece_volume_ml, density_g_per_ml").in("id", b)),
+      inChunks<ArticleFournisseur & { ingredient_id: string }>(ids, (b) => supabase.from("commande_articles").select("ingredient_id, supplier_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande").in("ingredient_id", b)),
+      inChunks<OffreValo & OffreActive & { ingredient_id: string }>(ids, (b) => supabase.from("supplier_offers").select("ingredient_id, supplier_id, is_active, valid_from, valid_to, created_at, unit, unit_price, pack_price, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, pack_unit, price_kind, piece_weight_g, density_kg_per_l").in("ingredient_id", b)),
+    ]);
+    const ficheDe: Record<string, Fiche> = {};
+    for (const f of ings) ficheDe[f.id] = f;
+    const artDe: Record<string, ArticleFournisseur[]> = {};
+    for (const a of arts) (artDe[a.ingredient_id] ??= []).push(a);
+    const offDe: Record<string, (OffreValo & OffreActive)[]> = {};
+    for (const o of offs) (offDe[o.ingredient_id] ??= []).push(o);
+    const liste = ((ls ?? []) as Omit<Ligne, "nom" | "aVerifier" | "inactive">[]).map((l) => {
+      const f = ficheDe[l.ingredient_id];
+      return { ...l, nom: f?.name ?? l.nom_feuille ?? "?", aVerifier: f?.status === "to_check", inactive: !f || f.is_active === false };
+    });
     setInv(invRow);
     setEtabNom((e?.nom as string | undefined) ?? "");
+    setEtabSlug((e?.slug as string | undefined) ?? "");
     const nomsZones = (z ?? []).map((x) => x.name as string);
-    // Zones de la feuille d'abord (ordre des zones de l'établissement), puis les zones sans ligne
     setZones(nomsZones);
     setLignes(liste);
+    setFiches(ficheDe); setArticles(artDe); setOffres(offDe);
     // Colis unique (contenu 1) : un seul champ, « colis » ; sans conditionnement : un seul champ, « unités ».
     // Une quantité déjà enregistrée ailleurs (ancien inventaire) est reportée dans le champ affiché.
     setSaisies(Object.fromEntries(liste.map((l) => {
@@ -108,6 +134,18 @@ function Feuille() {
     return m;
   }, [lignes]);
   const compte = (l: Ligne) => { const s = saisies[l.id]; return !!s && (s.colis.trim() !== "" || s.unites.trim() !== ""); };
+
+  /** Conditionnement de commande de la fiche (pour compter par colis) et coût d'une unité comptée */
+  const condProduit = useCallback((l: Ligne): Conditionnement | null => {
+    const f = fiches[l.ingredient_id];
+    if (!f) return null;
+    return choisirConditionnement(f.default_supplier_id, articles[l.ingredient_id] ?? [], offres[l.ingredient_id] ?? []);
+  }, [fiches, articles, offres]);
+  const coutDe = useCallback((l: Ligne) => {
+    const f = fiches[l.ingredient_id];
+    if (!f) return { cout: null, source: null, raison: "fiche supprimée" };
+    return coutUniteComptee(l.unite, f, offres[l.ingredient_id] ?? []);
+  }, [fiches, offres]);
 
   /** Enregistre une ligne 500 ms après la dernière frappe */
   function saisir(l: Ligne, champ: keyof Saisie, valeur: string) {
@@ -166,35 +204,76 @@ function Feuille() {
   }
 
   async function cloturer() {
-    const restant = lignes.filter((l) => !compte(l)).length;
+    const restant = lignes.filter((l) => !l.retiree && !compte(l)).length;
     for (const [lid, t] of minuteries.current) { clearTimeout(t); await enregistrer(lid); }
     if (!confirm(`Clôturer l'inventaire ?${restant ? `\n${restant} ligne(s) non comptée(s) : elles resteront vides.` : ""}\nIl ne sera plus modifiable (sauf réouverture par un admin).`)) return;
     await action("cloture", { action: "cloturer" }, (j) => j.avertissement ? String(j.avertissement)
       : `Inventaire clôturé : ${Number(j.total ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € HT${Number(j.sans_prix) ? `, ${j.sans_prix} ligne(s) sans prix` : ""} (${j.mouvements} produits dans les mouvements de stock).`);
   }
 
-  useEffect(() => {
-    const q = recherche.trim();
-    if (q.length < 2) { setResultats([]); return; }
-    const t = setTimeout(async () => {
-      const { data } = await supabase.from("ingredients").select("id, name").ilike("name", `%${q}%`).eq("is_active", true).order("name").limit(15);
-      setResultats((data ?? []) as { id: string; name: string }[]);
-    }, 250);
-    return () => clearTimeout(t);
-  }, [recherche]);
+  /** Compter par colis (conditionnement de la fiche) ou à l'unité ; les quantités déjà saisies sont converties */
+  async function basculerComptage(l: Ligne) {
+    if (lectureSeule) return;
+    const t = minuteries.current.get(l.id);
+    if (t) { clearTimeout(t); await enregistrer(l.id); }
+    const s = saisiesRef.current[l.id] ?? { colis: "", unites: "" };
+    const totalActuel = totalLigne(num(s.colis), num(s.unites), l.cond_contenu);
+    const c = condProduit(l);
+    const parColis = !(l.cond_contenu != null && l.cond_contenu > 1);
+    let maj: Partial<Ligne>;
+    if (parColis) {
+      if (!c || c.contenu <= 1) return;
+      maj = { cond_contenu: c.contenu, cond_libelle: c.libelle, unite: c.unite, colis: null, unites: totalActuel };
+    } else {
+      const f = fiches[l.ingredient_id];
+      maj = { cond_contenu: null, cond_libelle: null, unite: uniteFiche(f?.default_unit), colis: null, unites: totalActuel };
+    }
+    const { error } = await supabase.from("inventaire_lignes").update({ ...maj, quantite: totalActuel ?? 0, updated_at: new Date().toISOString() }).eq("id", l.id);
+    if (error) { setMessage(`Pas enregistré : ${error.message}`); return; }
+    setLignes((prev) => prev.map((x) => (x.id === l.id ? { ...x, ...maj } : x)));
+    setSaisies((prev) => ({ ...prev, [l.id]: maj.cond_contenu != null && maj.cond_contenu > 1 ? { colis: "", unites: txt(totalActuel) } : { colis: "", unites: txt(totalActuel) } }));
+  }
 
-  async function ajouter(ingredientId: string) {
-    if (!zone) return;
-    await action("ajout", { action: "ajouter", ingredient_id: ingredientId, zone }, () => "Produit ajouté en fin de zone.");
-    setRecherche(""); setResultats([]);
+  async function retirer(l: Ligne, remettre = false) {
+    if (lectureSeule) return;
+    const { error } = await supabase.from("inventaire_lignes").update({ retiree: !remettre, updated_at: new Date().toISOString() }).eq("id", l.id);
+    if (error) { setMessage(`Pas enregistré : ${error.message}`); return; }
+    setLignes((prev) => prev.map((x) => (x.id === l.id ? { ...x, retiree: !remettre } : x)));
+  }
+
+  async function changerZone(l: Ligne, nouvelle: string) {
+    if (lectureSeule || nouvelle === l.zone) return;
+    const { error } = await supabase.from("inventaire_lignes").update({ zone: nouvelle, updated_at: new Date().toISOString() }).eq("id", l.id);
+    if (error) { setMessage(`Pas enregistré : ${error.message}`); return; }
+    setLignes((prev) => prev.map((x) => (x.id === l.id ? { ...x, zone: nouvelle } : x)));
+  }
+
+  async function ajouterZone() {
+    if (!inv) return;
+    const nom = prompt("Nom de la nouvelle zone (ex. RÉSERVE, FRIGO BAR) :")?.trim().toUpperCase();
+    if (!nom) return;
+    if (zones.some((z) => normNom(z) === normNom(nom))) { setMessage("Cette zone existe déjà."); return; }
+    const { error } = await supabase.from("storage_zones").insert({ name: nom, etablissement_id: inv.etablissement_id, display_order: zones.length + 1, supplier_ids: [], category_slugs: [] });
+    if (error) { setMessage(error.message); return; }
+    setZones((z) => [...z, nom]);
+    setZone(nom);
+    setMessage(`Zone « ${libelleZone(nom)} » ajoutée.`);
   }
 
   if (erreur) return <div style={{ maxWidth: 900, margin: "0 auto", padding: 24, color: "#8a2b2b" }}>{erreur}</div>;
   if (!inv) return <div style={{ maxWidth: 900, margin: "0 auto", padding: 24, color: "#999" }}>Chargement…</div>;
 
-  const lignesZone = zone ? parZone.get(zone) ?? [] : [];
-  const totalComptees = lignes.filter(compte).length;
+  const lignesZoneToutes = zone ? parZone.get(zone) ?? [] : [];
+  const lignesZone = lignesZoneToutes.filter((l) => !l.retiree);
+  const retireesZone = lignesZoneToutes.filter((l) => l.retiree);
+  const actives = lignes.filter((l) => !l.retiree);
+  const totalComptees = actives.filter(compte).length;
   const aDesSaisies = totalComptees > 0;
+  const valeurZone = lignesZone.reduce((t, l) => {
+    const s = saisies[l.id]; const q = s ? totalLigne(num(s.colis), num(s.unites), l.cond_contenu) : null;
+    const c = coutDe(l).cout;
+    return t + (q != null && c != null ? q * c : 0);
+  }, 0);
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "16px 12px 80px" }}>
@@ -207,7 +286,7 @@ function Feuille() {
           <div style={{ fontSize: 13, color: "#6f6656", marginTop: 2 }}>
             {etabNom} · {inv.type === "fin_exercice" ? "Fin d'exercice" : "Mensuel"} ·{" "}
             <span style={{ fontWeight: 700, color: inv.statut === "cloture" ? "#2D6A4F" : ACCENT }}>{inv.statut === "cloture" ? "Clôturé" : "En cours"}</span>
-            {" "}· {totalComptees} / {lignes.length} lignes comptées
+            {" "}· {totalComptees} / {actives.length} lignes comptées
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -248,7 +327,7 @@ function Feuille() {
       {/* Zones, dans l'ordre des feuilles */}
       <div className="inventaire-zones" style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none", margin: "14px 0 10px", padding: "6px 0", position: "sticky", top: 0, zIndex: 5, background: "#f2ede4" }}>
         {zones.map((z) => {
-          const ls = parZone.get(z) ?? [];
+          const ls = (parZone.get(z) ?? []).filter((l) => !l.retiree);
           const n = ls.filter(compte).length;
           const actif = z === zone;
           return (
@@ -260,10 +339,24 @@ function Feuille() {
             </button>
           );
         })}
+        {!lectureSeule && (
+          <button type="button" onClick={() => void ajouterZone()} title="Ajouter une zone de stockage" style={{
+            flexShrink: 0, padding: "8px 12px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 700, border: "1px dashed #b0a894", background: "#fff", color: "#6f6656",
+          }}>+ zone</button>
+        )}
       </div>
 
       {zone && (
         <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "0 4px 6px" }}>
+            <span style={{ fontSize: 12.5, color: "#6f6656" }}>
+              {lignesZone.length} produit{lignesZone.length > 1 ? "s" : ""}{valeurZone > 0 ? <> · valeur comptée <strong style={{ color: "#1a1a1a" }}>{eur(valeurZone)}</strong> HT</> : null}
+            </span>
+            {!lectureSeule && (
+              <button type="button" onClick={() => setModaleAjout(true)} style={{ ...bouton("#fff", ACCENT), height: 34, fontSize: 12.5 }}>+ Ajouter des produits</button>
+            )}
+          </div>
+
           {lignesZone.map((l, i) => {
             const nouvelleFamille = i === 0 || lignesZone[i - 1].famille !== l.famille;
             const s = saisies[l.id] ?? { colis: "", unites: "" };
@@ -271,6 +364,11 @@ function Feuille() {
             const deuxChamps = contenu != null && contenu > 1;
             const total = totalLigne(num(s.colis), num(s.unites), contenu);
             const etat = etatLigne[l.id];
+            const c = condProduit(l);
+            const peutColis = !!c && c.contenu > 1;
+            const valo = coutDe(l);
+            const f = fiches[l.ingredient_id];
+            const detailPiece = f?.piece_weight_g ? `${f.piece_weight_g >= 1000 ? `${txt(f.piece_weight_g / 1000)} kg` : `${txt(f.piece_weight_g)} g`} la pièce` : f?.piece_volume_ml ? `${f.piece_volume_ml >= 1000 ? `${txt(f.piece_volume_ml / 1000)} L` : `${txt(f.piece_volume_ml)} mL`} la pièce` : null;
             return (
               <React.Fragment key={l.id}>
                 {nouvelleFamille && (
@@ -283,21 +381,49 @@ function Feuille() {
                   background: "#fff", border: `1px solid ${compte(l) ? "#cfe3d6" : "#ece6db"}`,
                 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.25 }}>
-                      <span style={{ color: "#b0a894", fontWeight: 500, marginRight: 6, fontSize: 12 }}>{l.ordre ?? ""}</span>{l.nom_feuille ?? l.nom}
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.25, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: "#b0a894", fontWeight: 500, fontSize: 12 }}>{l.ordre ?? ""}</span>
+                      <span style={{ minWidth: 0 }}>{l.nom_feuille ?? l.nom}</span>
+                      {f && (
+                        <a href={`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(`/inventaire/${id}`)}`} title="Modifier la fiche produit (prix, conditionnement, zone)"
+                          onClick={(e) => e.stopPropagation()} style={{ fontSize: 12, color: "#8a8378", textDecoration: "none", border: "1px solid #ddd6c8", borderRadius: 6, padding: "0 5px", lineHeight: "18px", flexShrink: 0 }}>✎</a>
+                      )}
                     </div>
                     {l.nom_feuille && normNom(l.nom_feuille) !== normNom(l.nom) && (
                       <div style={{ fontSize: 11.5, color: "#a79f90", marginTop: 1 }}>fiche : {l.nom}</div>
                     )}
-                    {(l.rattachement === "approché" || l.aVerifier) && (
+                    {(l.rattachement === "approché" || l.rattachement === "rattaché par ressemblance" || l.aVerifier || l.inactive) && (
                       <span style={{
-                        display: "inline-block", marginTop: 3, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8,
-                        background: l.aVerifier ? "#fde7ef" : "#fdf3d4", color: l.aVerifier ? "#b0306a" : "#8a6a12",
-                      }}>{l.aVerifier ? "fiche à vérifier" : "rattaché par ressemblance"}</span>
+                        display: "inline-block", marginTop: 3, marginRight: 4, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8,
+                        background: l.inactive ? "#fde7e7" : l.aVerifier ? "#fde7ef" : "#fdf3d4", color: l.inactive ? "#a12b2b" : l.aVerifier ? "#b0306a" : "#8a6a12",
+                      }}>{l.inactive ? (f ? "fiche désactivée" : "fiche supprimée") : l.aVerifier ? "fiche à vérifier" : "rattaché par ressemblance"}</span>
                     )}
                     <div style={{ fontSize: 12, color: "#8a8378", marginTop: 2 }}>
-                      {contenu != null && contenu > 1 ? l.cond_libelle : `compté en ${l.cond_libelle ?? l.unite ?? "unités"}`}
+                      {deuxChamps ? l.cond_libelle : `compté en ${l.cond_libelle ?? l.unite ?? "unités"}`}
                       {total != null && <> · <strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong></>}
+                      {total != null && valo.cout != null && <span style={{ color: "#6f6656" }}> · {eur(total * valo.cout)}</span>}
+                    </div>
+                    {/* Détail du conditionnement et du prix : pour ne pas se tromper de comptage */}
+                    <div style={{ fontSize: 11, color: "#8a8378", marginTop: 2, display: "flex", flexWrap: "wrap", gap: "2px 8px", alignItems: "center" }}>
+                      {c && <span>fiche : <strong style={{ color: "#6f6656" }}>{c.libelle}</strong></span>}
+                      {detailPiece && <span>{detailPiece}</span>}
+                      <span style={{ color: valo.cout == null ? "#b45309" : "#6f6656" }}>
+                        {valo.cout == null ? `sans prix${valo.raison ? ` (${valo.raison})` : ""}` : `${eur(valo.cout)} / ${l.unite ?? "unité"}${valo.source === "ancienne_offre" ? " (ancien prix)" : ""}`}
+                      </span>
+                      {!lectureSeule && (
+                        <>
+                          {peutColis && (
+                            <button type="button" onClick={() => void basculerComptage(l)} style={lien}>
+                              {deuxChamps ? "compter à l'unité" : `compter par ${c!.libelle.split(" ")[0]}`}
+                            </button>
+                          )}
+                          <select value={l.zone} onChange={(e) => void changerZone(l, e.target.value)} title="Déplacer vers une autre zone"
+                            style={{ fontSize: 11, border: "none", background: "transparent", color: "#8a8378", cursor: "pointer", padding: 0 }}>
+                            {zones.map((z) => <option key={z} value={z}>→ {libelleZone(z)}</option>)}
+                          </select>
+                          <button type="button" onClick={() => void retirer(l)} title="Retirer de la liste (la fiche n'est pas touchée)" style={{ ...lien, color: "#a12b2b" }}>retirer</button>
+                        </>
+                      )}
                     </div>
                   </div>
                   {contenu != null && (
@@ -317,21 +443,101 @@ function Feuille() {
             );
           })}
 
-          {!lectureSeule && (
-            <div style={{ marginTop: 16, background: "#fff", borderRadius: 12, border: "1px dashed #ddd6c8", padding: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Ajouter un produit hors liste dans « {libelleZone(zone)} »</div>
-              <input type="search" value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher dans la base produits…"
-                style={{ width: "100%", height: 42, borderRadius: 10, border: "1px solid #ddd6c8", padding: "0 12px", fontSize: 15, boxSizing: "border-box" }} />
-              {resultats.map((r) => (
-                <button key={r.id} type="button" disabled={!!enCours} onClick={() => void ajouter(r.id)}
-                  style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 8px", border: "none", borderBottom: "1px solid #f3efe7", background: "none", fontSize: 14, cursor: "pointer" }}>
-                  + {r.name}
-                </button>
+          {retireesZone.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <button type="button" onClick={() => setVoirRetirees((v) => !v)} style={{ ...lien, fontSize: 12.5 }}>
+                {voirRetirees ? "▾" : "▸"} {retireesZone.length} produit{retireesZone.length > 1 ? "s" : ""} retiré{retireesZone.length > 1 ? "s" : ""} de la liste
+              </button>
+              {voirRetirees && retireesZone.map((l) => (
+                <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", fontSize: 13, color: "#8a8378", background: "#faf7f2", borderRadius: 8, marginTop: 4 }}>
+                  <span style={{ flex: 1, textDecoration: "line-through" }}>{l.nom_feuille ?? l.nom}</span>
+                  {!lectureSeule && <button type="button" onClick={() => void retirer(l, true)} style={{ ...lien, color: "#2D6A4F" }}>remettre</button>}
+                </div>
               ))}
             </div>
           )}
         </div>
       )}
+
+      {modaleAjout && zone && inv && (
+        <ModaleAjout zone={zone} etabId={inv.etablissement_id} etabCle={cleEtab(etabSlug)} dejaLa={new Set(lignesZone.map((l) => l.ingredient_id))}
+          enCours={!!enCours} onClose={() => setModaleAjout(false)}
+          onAjouter={async (ids) => { await action("ajout", { action: "ajouter", ingredient_ids: ids, zone }, (j) => `${j.ajoutes} produit(s) ajouté(s) dans ${libelleZone(zone)}${Number(j.deja_la) ? `, ${j.deja_la} déjà présent(s)` : ""}.`); }}
+          onCreer={async (nom, categorie) => { await action("creation", { action: "creer", nom, categorie, zone }, () => `Fiche « ${nom} » créée (à vérifier) et ajoutée dans ${libelleZone(zone)}.`); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Ajout de produits dans la zone : recherche, filtre par catégorie, sélection multiple, création rapide */
+function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjouter, onCreer }: {
+  zone: string; etabId: string; etabCle: string | null; dejaLa: Set<string>; enCours: boolean; onClose: () => void;
+  onAjouter: (ids: string[]) => Promise<void>; onCreer: (nom: string, categorie: string) => Promise<void>;
+}) {
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState<"" | Category>("");
+  const [resultats, setResultats] = useState<{ id: string; name: string; category: string | null }[]>([]);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [catCreation, setCatCreation] = useState<Category>("epicerie_salee");
+  void etabId;
+
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      let req = supabase.from("ingredients").select("id, name, category").eq("is_active", true).order("name").limit(80);
+      if (etabCle) req = req.or(`establishments.cs.{"${etabCle}"},establishments.is.null`);
+      if (q.trim().length >= 2) req = req.ilike("name", `%${q.trim()}%`);
+      if (cat) req = req.eq("category", cat);
+      if (q.trim().length < 2 && !cat) { setResultats([]); return; }
+      const { data } = await req;
+      setResultats((data ?? []) as { id: string; name: string; category: string | null }[]);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, cat, etabCle]);
+
+  const exact = resultats.some((r) => normNom(r.name) === normNom(q));
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "16px 16px 0 0", width: "100%", maxWidth: 900, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 -8px 30px rgba(0,0,0,0.2)" }}>
+        <div style={{ padding: "14px 16px 8px" }}>
+          <div style={{ fontFamily: OSWALD, fontSize: 16, fontWeight: 700 }}>Ajouter des produits dans « {libelleZone(zone)} »</div>
+          <input autoFocus type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher dans la base produits…"
+            style={{ width: "100%", height: 42, borderRadius: 10, border: "1px solid #ddd6c8", padding: "0 12px", fontSize: 15, boxSizing: "border-box", marginTop: 8 }} />
+          <div style={{ display: "flex", gap: 4, overflowX: "auto", marginTop: 8, paddingBottom: 4 }}>
+            <button type="button" onClick={() => setCat("")} style={puce(cat === "")}>Toutes</button>
+            {CATEGORIES.map((c) => <button key={c} type="button" onClick={() => setCat(c === cat ? "" : c)} style={puce(cat === c)}>{CAT_LABELS[c]}</button>)}
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 16px" }}>
+          {resultats.length === 0 && (q.trim().length >= 2 || cat) && <div style={{ fontSize: 13, color: "#999", padding: 12 }}>Aucun produit.</div>}
+          {resultats.map((r) => {
+            const present = dejaLa.has(r.id);
+            return (
+              <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderBottom: "1px solid #f3efe7", opacity: present ? 0.5 : 1 }}>
+                <input type="checkbox" disabled={present} checked={sel.has(r.id)} onChange={() => setSel((s) => { const n = new Set(s); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} style={{ width: 18, height: 18, accentColor: ACCENT }} />
+                <span style={{ flex: 1, fontSize: 14 }}>{r.name}</span>
+                <span style={{ fontSize: 11, color: "#999" }}>{present ? "déjà dans la zone" : CAT_LABELS[r.category as Category] ?? r.category}</span>
+              </label>
+            );
+          })}
+          {q.trim().length >= 2 && !exact && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, borderRadius: 10, background: "rgba(45,106,79,0.06)", border: "1.5px dashed rgba(45,106,79,0.35)", margin: "8px 0", flexWrap: "wrap" }}>
+              <span style={{ flex: 1, fontSize: 12.5 }}>Créer « <b>{q.trim()}</b> » (fiche à vérifier) dans</span>
+              <select value={catCreation} onChange={(e) => setCatCreation(e.target.value as Category)} style={{ fontSize: 12, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff" }}>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+              </select>
+              <button type="button" disabled={enCours} onClick={() => { void onCreer(q.trim(), catCreation).then(onClose); }}
+                style={{ padding: "7px 12px", borderRadius: 8, border: "none", background: "#2D6A4F", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Créer</button>
+            </div>
+          )}
+        </div>
+        <div style={{ padding: "10px 16px 16px", borderTop: "1px solid #f0ebe2", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button type="button" onClick={onClose} style={bouton("#fff", "#1a1a1a")}>Fermer</button>
+          <button type="button" disabled={sel.size === 0 || enCours} onClick={() => { void onAjouter([...sel]).then(onClose); }} style={{ ...bouton(ACCENT, "#fff"), opacity: sel.size === 0 ? 0.5 : 1 }}>
+            Ajouter {sel.size > 0 ? `(${sel.size})` : ""}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -356,6 +562,11 @@ function Champ({ etiquette, valeur, desactive, onChange }: { etiquette: string; 
   );
 }
 
+const lien: React.CSSProperties = { border: "none", background: "none", color: ACCENT, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0, fontFamily: "inherit" };
+const puce = (actif: boolean): React.CSSProperties => ({
+  flexShrink: 0, padding: "5px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+  border: actif ? `1.5px solid ${ACCENT}` : "1px solid #ddd6c8", background: actif ? "#FFF0EB" : "#fff", color: actif ? ACCENT : "#6f6656",
+});
 const bouton = (bg: string, fg: string): React.CSSProperties => ({
   height: 40, padding: "0 14px", borderRadius: 10, border: bg === "#fff" ? "1px solid #ddd6c8" : "none", background: bg, color: fg,
   fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",

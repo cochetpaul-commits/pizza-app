@@ -34,7 +34,7 @@ export async function valoriserInventaire(invId: string, etabId: string): Promis
   const [{ data: lignes }, { data: zones }] = await Promise.all([
     supabaseAdmin.from("inventaire_lignes")
       .select("id, ingredient_id, zone, ordre, famille, colis, unites, quantite, unite, cond_contenu, cond_libelle, cout_unitaire, nom_feuille")
-      .eq("inventaire_id", invId).order("ordre", { ascending: true, nullsFirst: false }).limit(5000),
+      .eq("inventaire_id", invId).eq("retiree", false).order("ordre", { ascending: true, nullsFirst: false }).limit(5000),
     supabaseAdmin.from("storage_zones").select("name, display_order").eq("etablissement_id", etabId),
   ]);
   for (const z of zones ?? []) ordreZones.set(z.name as string, Number(z.display_order ?? 99));
