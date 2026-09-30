@@ -86,7 +86,7 @@ function Feuille() {
   /** Recherche dans la zone affichée (nom de la feuille ou nom de la fiche) : familles et sous-catégories ouvertes pendant la recherche */
   const [filtre, setFiltre] = useState("");
   const [modaleAjout, setModaleAjout] = useState(false);
-  /** Familles ouvertes ou fermées à la main, clé « zone|famille » (sinon : ouvertes si elles ont déjà des lignes comptées, comme les rayons de la commande) */
+  /** Rayons et sous-catégories ouverts ou fermés à la main, clés « zone|rayon » et « zone|rayon|sous-catégorie » (tout est replié par défaut) */
   const [bascules, setBascules] = useState<Record<string, boolean>>({});
   const cleFamille = (z: string, fam: string | null) => `${z}|${fam ?? ""}`;
   const minuteries = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -537,10 +537,11 @@ function Feuille() {
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {(() => {
                 const codes = [...new Set(lignesZone.map(rayonDe))];
-                const estOuverte = (c: string) => bascules[cleFamille(zone, c)] ?? lignesZone.some((l) => rayonDe(l) === c && compte(l));
+                const clesSous = [...new Set(lignesZone.map((l) => `${cleFamille(zone, rayonDe(l))}|${fiches[l.ingredient_id]?.sub_category ?? ""}`))];
+                const estOuverte = (c: string) => bascules[cleFamille(zone, c)] ?? false;
                 const toutesFermees = codes.length > 0 && codes.every((c) => !estOuverte(c));
                 return (
-                  <button type="button" onClick={() => setBascules((b) => { const n = { ...b }; for (const c of codes) n[cleFamille(zone, c)] = toutesFermees; return n; })} style={lien}>
+                  <button type="button" onClick={() => setBascules((b) => { const n = { ...b }; for (const c of codes) n[cleFamille(zone, c)] = toutesFermees; for (const k of clesSous) n[k] = toutesFermees; return n; })} style={lien}>
                     {toutesFermees ? "tout déplier" : "tout replier"}
                   </button>
                 );
@@ -570,7 +571,8 @@ function Feuille() {
             return groupes.map((r, i) => {
               const couleur = couleurRayon(r.code);
               const comptees = r.lignes.filter(compte).length;
-              const ouverte = enRecherche || (bascules[cleFamille(zone, r.code)] ?? comptees > 0);
+              // Replié par défaut (rayons et sous-catégories) : on n'ouvre que ce que l'on compte
+              const ouverte = enRecherche || (bascules[cleFamille(zone, r.code)] ?? false);
               const plusieursSous = r.sous.length > 1 || (r.sous.length === 1 && r.sous[0].nom != null);
               return (
                 <div key={r.code} style={{ margin: `${i === 0 ? 4 : 10}px 0 6px` }}>
@@ -595,16 +597,16 @@ function Feuille() {
                   )}
                   {ouverte && r.sous.map((g) => {
                     const cleSous = `${cleFamille(zone, r.code)}|${g.nom ?? ""}`;
-                    const sousOuverte = enRecherche || (bascules[cleSous] ?? true);
+                    const sousOuverte = enRecherche || (bascules[cleSous] ?? false);
                     const compteesSous = g.lignes.filter(compte).length;
                     return (
                       <div key={g.nom ?? "∅"} style={{ marginTop: 6 }}>
                         {plusieursSous && (
-                          /* Sous-catégorie : accordéon clair teinté du rayon, comme dans le menu produits */
+                          /* Sous-catégorie : simple barre de la couleur du rayon, sans fond (pas de boîte blanche) */
                           <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleSous]: !sousOuverte }))} aria-expanded={sousOuverte} style={{
                             width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-                            padding: "9px 12px", background: sousOuverte ? "#f0ebe3" : "#fff", border: "1.5px solid #e5ddd0", borderLeft: `3px solid ${couleur}`,
-                            borderRadius: sousOuverte ? "8px 8px 0 0" : 8, cursor: "pointer", marginBottom: sousOuverte ? 0 : 4,
+                            padding: "8px 12px", background: "transparent", border: "none", borderLeft: `3px solid ${couleur}`,
+                            borderRadius: 0, cursor: "pointer", marginBottom: 4,
                             fontSize: 11, fontWeight: 700, color: couleur, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "inherit",
                           }}>
                             <span>{g.nom ?? "Autre"} <span style={{ fontWeight: 500, opacity: 0.8 }}>({g.lignes.length})</span></span>
@@ -615,7 +617,7 @@ function Feuille() {
                           </button>
                         )}
                         {sousOuverte && (
-                          <div style={plusieursSous ? { padding: "6px 6px 2px", background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 8px 8px", marginBottom: 4 } : undefined}>
+                          <div style={plusieursSous ? { padding: "0 0 2px 6px", marginBottom: 4 } : undefined}>
                             {g.lignes.map((l) => carte(l, couleur))}
                           </div>
                         )}
