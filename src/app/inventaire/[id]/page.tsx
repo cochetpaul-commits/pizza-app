@@ -326,7 +326,7 @@ function Feuille() {
     return (
       <React.Fragment key={l.id}>
                 <div style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 4, borderRadius: 10,
+                  display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 4, borderRadius: 10, flexWrap: "wrap",
                   background: "#fff", border: `1px solid ${compte(l) ? "#cfe3d6" : "#ece6db"}`, borderLeft: `3px solid ${couleur}`,
                 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -375,14 +375,18 @@ function Feuille() {
                       )}
                     </div>
                   </div>
-                  {contenu != null && (
-                    <Champ etiquette={deuxChamps ? "colis" : l.unite ?? "colis"} valeur={s.colis} desactive={lectureSeule}
-                      onChange={(v) => saisir(l, "colis", v)} />
-                  )}
-                  {(deuxChamps || contenu == null) && (
-                    <Champ etiquette={contenu == null ? l.unite ?? "unités" : "unités"} valeur={s.unites} desactive={lectureSeule}
-                      onChange={(v) => saisir(l, "unites", v)} />
-                  )}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexShrink: 0, marginLeft: "auto" }}>
+                    {contenu != null && (
+                      <Champ etiquette={deuxChamps ? "colis" : l.unite ?? "colis"} valeur={s.colis} desactive={lectureSeule}
+                        pas={!deuxChamps && (l.unite === "kg" || l.unite === "litre") ? 0.5 : 1}
+                        onChange={(v) => saisir(l, "colis", v)} />
+                    )}
+                    {(deuxChamps || contenu == null) && (
+                      <Champ etiquette={contenu == null ? l.unite ?? "unités" : "unités"} valeur={s.unites} desactive={lectureSeule}
+                        pas={contenu == null && (l.unite === "kg" || l.unite === "litre") ? 0.5 : 1}
+                        onChange={(v) => saisir(l, "unites", v)} />
+                    )}
+                  </div>
                   <span title={etat === "erreur" ? "Pas enregistré" : etat === "attente" ? "Enregistrement…" : "Enregistré"} style={{
                     width: 8, height: 8, borderRadius: 4, flexShrink: 0,
                     background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent",
@@ -763,23 +767,35 @@ function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjoute
   );
 }
 
-function Champ({ etiquette, valeur, desactive, onChange }: { etiquette: string; valeur: string; desactive: boolean; onChange: (v: string) => void }) {
+/** Champ de comptage avec − / + (comme l'écran de commande : pas de clavier obligatoire) ; la saisie au clavier reste possible */
+function Champ({ etiquette, valeur, desactive, onChange, pas = 1 }: { etiquette: string; valeur: string; desactive: boolean; onChange: (v: string) => void; pas?: number }) {
+  const n = num(valeur) ?? 0;
+  const fixer = (v: number) => onChange(txt(Math.max(0, Math.round(v * 100) / 100)));
+  const btn = (actif: boolean): React.CSSProperties => ({
+    width: 40, height: 40, borderRadius: 20, border: "none", fontSize: 24, fontWeight: 700, lineHeight: 1, padding: 0,
+    background: actif ? ACCENT : "#ece4d4", color: actif ? "#fff" : "#b8ad9a", cursor: actif ? "pointer" : "default",
+    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, touchAction: "manipulation", fontFamily: "inherit",
+  });
   return (
-    <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, flexShrink: 0 }}>
-      <input inputMode="decimal" value={valeur} disabled={desactive} onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          // Entrée : champ suivant (saisie rapide de la feuille au clavier)
-          if (e.key !== "Enter") return;
-          e.preventDefault();
-          const champs = [...document.querySelectorAll<HTMLInputElement>("input[inputmode=decimal]:not([disabled])")];
-          champs[champs.indexOf(e.currentTarget) + 1]?.focus();
-        }}
-        style={{
-          width: 64, height: 40, borderRadius: 10, border: "1.5px solid #ddd6c8", textAlign: "center", fontSize: 17, fontWeight: 700,
-          background: desactive ? "#f3efe7" : "#fff", boxSizing: "border-box",
-        }} />
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <button type="button" aria-label="Moins" disabled={desactive || n <= 0} onClick={() => fixer(n - pas)} style={btn(!desactive && n > 0)}>−</button>
+        <input inputMode="decimal" value={valeur} disabled={desactive} onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            // Entrée : champ suivant (saisie rapide de la feuille au clavier)
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            const champs = [...document.querySelectorAll<HTMLInputElement>("input[inputmode=decimal]:not([disabled])")];
+            champs[champs.indexOf(e.currentTarget) + 1]?.focus();
+          }}
+          style={{
+            width: 56, height: 40, borderRadius: 10, border: `1.5px solid ${valeur.trim() ? ACCENT : "#ddd6c8"}`, textAlign: "center", fontSize: 18, fontWeight: 700, fontFamily: OSWALD,
+            background: desactive ? "#f3efe7" : "#fff", boxSizing: "border-box",
+          }} />
+        <button type="button" aria-label="Plus" disabled={desactive} onClick={() => fixer(n + pas)} style={btn(!desactive)}>+</button>
+      </div>
       <span style={{ fontSize: 10.5, color: "#8a8378" }}>{etiquette}</span>
-    </label>
+    </div>
   );
 }
 
