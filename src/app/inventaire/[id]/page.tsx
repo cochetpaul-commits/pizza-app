@@ -14,6 +14,7 @@ import { cleEtab } from "@/lib/zonesEtablissement";
 import { CATEGORIES, CAT_LABELS, type Category } from "@/types/ingredients";
 import { couleurRayon, rayonDuProduit, RAYON_AUTRES } from "@/lib/rayons";
 import { getSupplierColor } from "@/lib/supplierColors";
+import { correspondRecherche, filtrerRecherche, normaliserRecherche } from "@/lib/rechercheTolerante";
 void categorieDeFamille;
 
 /**
@@ -429,10 +430,10 @@ function Feuille() {
   if (!inv) return <div style={{ maxWidth: 900, margin: "0 auto", padding: 24, color: "#999" }}>Chargement…</div>;
 
   const lignesZoneToutes = zone ? parZone.get(zone) ?? [] : [];
-  const motsFiltre = normNom(filtre).split(" ").filter((m) => m.length >= 2);
-  const correspond = (l: Ligne) => motsFiltre.length === 0 || motsFiltre.every((m) => normNom(`${l.nom_feuille ?? ""} ${l.nom}`).includes(m));
+  // Recherche tolérante aux fautes (« aqua filete » trouve ACQUA FILETTE), sur le nom de la feuille et celui de la fiche
+  const enRecherche = normaliserRecherche(filtre).split(" ").some((m) => m.length >= 2);
+  const correspond = (l: Ligne) => !enRecherche || correspondRecherche(filtre, `${l.nom_feuille ?? ""} ${l.nom}`);
   const lignesZone = lignesZoneToutes.filter((l) => !l.retiree && correspond(l));
-  const enRecherche = motsFiltre.length > 0;
   const retireesZone = lignesZoneToutes.filter((l) => l.retiree);
   const actives = lignes.filter((l) => !l.retiree);
   const totalComptees = actives.filter(compte).length;
@@ -708,18 +709,24 @@ function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjoute
     })();
   }, [mode, cat, fournisseurId, etabCle]);
 
+  // Catalogue de l'établissement chargé une fois : la recherche se fait ensuite sur place, tolérante aux fautes
+  const [catalogue, setCatalogue] = useState<{ id: string; name: string; category: string | null }[] | null>(null);
   useEffect(() => {
-    const t = setTimeout(async () => {
-      let req = supabase.from("ingredients").select("id, name, category").eq("is_active", true).order("name").limit(80);
+    (async () => {
+      let req = supabase.from("ingredients").select("id, name, category").eq("is_active", true).order("name").limit(5000);
       if (etabCle) req = req.or(`establishments.cs.{"${etabCle}"},establishments.is.null`);
-      if (q.trim().length >= 2) req = req.ilike("name", `%${q.trim()}%`);
-      if (cat) req = req.eq("category", cat);
-      if (q.trim().length < 2 && !cat) { setResultats([]); return; }
       const { data } = await req;
-      setResultats((data ?? []) as { id: string; name: string; category: string | null }[]);
-    }, 250);
+      setCatalogue((data ?? []) as { id: string; name: string; category: string | null }[]);
+    })();
+  }, [etabCle]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!catalogue || (q.trim().length < 2 && !cat)) { setResultats([]); return; }
+      const base = cat ? catalogue.filter((x) => x.category === cat) : catalogue;
+      setResultats((q.trim().length >= 2 ? filtrerRecherche(base, q, (x) => x.name) : base).slice(0, 80));
+    }, 150);
     return () => clearTimeout(t);
-  }, [q, cat, etabCle]);
+  }, [q, cat, catalogue]);
 
   const exact = resultats.some((r) => normNom(r.name) === normNom(q));
   return (
