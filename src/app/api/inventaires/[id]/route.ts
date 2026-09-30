@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { etabAccessDenied, roleDenied } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { ajouterLigne, ajouterLignes, chargerInventaire, cloturer, creerProduitEtLigne, importerFeuille, rouvrir } from "@/lib/inventaireServeur";
+import type { CreationProduit } from "@/lib/inventaire";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const body = (await req.json().catch(() => ({}))) as { action?: string; tableau?: unknown; ingredient_id?: string; ingredient_ids?: string[]; zone?: string; nom?: string; categorie?: string };
+  const body = (await req.json().catch(() => ({}))) as {
+    action?: string; tableau?: unknown; ingredient_id?: string; ingredient_ids?: string[]; zone?: string; nom?: string; categorie?: string;
+    /** création rapide : fiche minimale (unité d'achat, type de pièce, taille, colisage, fournisseur, sous-catégorie), sans prix */
+    fiche?: Partial<CreationProduit>;
+  };
   let r;
   if (body.action === "importer") {
     if (!Array.isArray(body.tableau)) return NextResponse.json({ error: "Fichier illisible" }, { status: 400 });
@@ -31,7 +36,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     r = Array.isArray(body.ingredient_ids) ? await ajouterLignes(inv, body.ingredient_ids.map(String), body.zone) : await ajouterLigne(inv, String(body.ingredient_id), body.zone);
   } else if (body.action === "creer") {
     if (!body.nom || !body.categorie || !body.zone) return NextResponse.json({ error: "Nom, catégorie et zone requis" }, { status: 400 });
-    r = await creerProduitEtLigne(inv, String(body.nom), String(body.categorie), String(body.zone), userId);
+    const f = body.fiche ?? {};
+    r = await creerProduitEtLigne(inv, {
+      nom: String(body.nom), categorie: String(body.categorie), sous_categorie: f.sous_categorie ?? null, supplier_id: f.supplier_id ?? null,
+      unite: f.unite ?? "piece", type_piece: f.type_piece ?? null, taille_qte: f.taille_qte ?? null, taille_unite: f.taille_unite ?? null,
+      colisage: f.colisage ?? null, contenu: f.contenu ?? null,
+    }, String(body.zone), userId);
   } else if (body.action === "cloturer") {
     r = await cloturer(inv, userId);
   } else if (body.action === "rouvrir") {

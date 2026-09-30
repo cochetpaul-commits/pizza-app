@@ -8,7 +8,8 @@ import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { inChunks } from "@/lib/supabaseChunks";
 import { useProfile } from "@/lib/ProfileContext";
 import { libelleZone } from "@/lib/commandeArticles";
-import { categorieDeFamille, choisirConditionnement, totalLigne, type ArticleFournisseur, type Conditionnement, type OffreActive } from "@/lib/inventaire";
+import { articleDeFiche, categorieDeFamille, choisirConditionnement, conditionnementDArticle, ficheDepuisCreation, totalLigne, type ArticleFournisseur, type Conditionnement, type CreationProduit, type FicheConditionnement, type OffreActive } from "@/lib/inventaire";
+import { libelleType, TYPES_COLISAGE } from "@/lib/commandeArticles";
 import { coutUniteComptee, type OffreValo } from "@/lib/inventaireValorisation";
 import { cleEtab } from "@/lib/zonesEtablissement";
 import { CATEGORIES, CAT_LABELS, type Category } from "@/types/ingredients";
@@ -91,6 +92,9 @@ function Feuille() {
   const [bascules, setBascules] = useState<Record<string, boolean>>({});
   const cleFamille = (z: string, fam: string | null) => `${z}|${fam ?? ""}`;
   const minuteries = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  /** Action serveur en cours (ajout, création…) : les événements temps réel qu'elle provoque ne rechargent pas en plus */
+  const actionEnCours = useRef(false);
+  const rechargement = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fichierRef = useRef<HTMLInputElement | null>(null);
 
   const charger = useCallback(async () => {
@@ -161,7 +165,14 @@ function Feuille() {
           return;
         }
         const r = payload.new as Partial<Ligne> & { id: string };
-        if (payload.eventType === "INSERT" || !lignesRef.current.some((l) => l.id === r.id)) { void charger(); return; }
+        if (payload.eventType === "INSERT" || !lignesRef.current.some((l) => l.id === r.id)) {
+          // Lignes ajoutées par quelqu'un d'autre : un seul rechargement pour tout un lot (pas un par ligne) ;
+          // mes propres ajouts rechargent déjà à la fin de l'action.
+          if (actionEnCours.current) return;
+          if (rechargement.current) clearTimeout(rechargement.current);
+          rechargement.current = setTimeout(() => { rechargement.current = null; void charger(); }, 800);
+          return;
+        }
         if (minuteries.current.has(r.id)) return; // je suis en train de taper cette ligne
         setLignes((prev) => prev.map((l) => (l.id === r.id ? { ...l, ...r, nom: l.nom, aVerifier: l.aVerifier, inactive: l.inactive } : l)));
         const contenu = r.cond_contenu ?? null;
@@ -245,7 +256,8 @@ function Feuille() {
   useEffect(() => () => { for (const [lid, t] of minuteries.current) { clearTimeout(t); void enregistrer(lid); } }, []);
 
   async function action(nom: string, corps: Record<string, unknown>, succes: (j: Record<string, unknown>) => string) {
-    setEnCours(nom); setMessage(null);
+    setEnCours(nom); setMessage(null); actionEnCours.current = true;
+    if (rechargement.current) { clearTimeout(rechargement.current); rechargement.current = null; }
     try {
       const res = await fetchApi(`/api/inventaires/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) });
       const json = await res.json().catch(() => ({}));
@@ -253,7 +265,10 @@ function Feuille() {
       setMessage(succes(json));
       await charger();
       return json;
-    } finally { setEnCours(null); }
+    } catch (e) {
+      setMessage(`Pas enregistré : ${e instanceof Error ? e.message : "réseau indisponible"}`);
+      return {};
+    } finally { setEnCours(null); actionEnCours.current = false; }
   }
 
   async function importer(f: File) {
@@ -653,7 +668,12 @@ function Feuille() {
         <ModaleAjout zone={zone} etabId={inv.etablissement_id} etabCle={cleEtab(etabSlug)} dejaLa={new Set(lignesZone.map((l) => l.ingredient_id))}
           enCours={!!enCours} onClose={() => setModaleAjout(false)}
           onAjouter={async (ids) => { await action("ajout", { action: "ajouter", ingredient_ids: ids, zone }, (j) => `${j.ajoutes} produit(s) ajouté(s) dans ${libelleZone(zone)}${Number(j.deja_la) ? `, ${j.deja_la} déjà présent(s)` : ""}.`); }}
-          onCreer={async (nom, categorie) => { await action("creation", { action: "creer", nom, categorie, zone }, () => `Fiche « ${nom} » créée (à vérifier) et ajoutée dans ${libelleZone(zone)}.`); }}
+          onCreer={async (fiche) => {
+            const j = await action("creation", { action: "creer", nom: fiche.nom, categorie: fiche.categorie, zone, fiche }, (j) =>
+              j.reprise ? `« ${fiche.nom} » existait déjà${j.reactivee ? " (fiche réactivée)" : ""} : ajouté dans ${libelleZone(zone)}.`
+                : `Fiche « ${fiche.nom} » créée (prix à renseigner) et ajoutée dans ${libelleZone(zone)}.`);
+            return !!(j as { ok?: boolean }).ok;
+          }}
         />
       )}
     </div>
@@ -663,13 +683,14 @@ function Feuille() {
 /** Ajout de produits dans la zone : recherche, filtre par catégorie, sélection multiple, création rapide */
 function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjouter, onCreer }: {
   zone: string; etabId: string; etabCle: string | null; dejaLa: Set<string>; enCours: boolean; onClose: () => void;
-  onAjouter: (ids: string[]) => Promise<void>; onCreer: (nom: string, categorie: string) => Promise<void>;
+  onAjouter: (ids: string[]) => Promise<void>; onCreer: (fiche: CreationProduit) => Promise<boolean>;
 }) {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<"" | Category>("");
   const [resultats, setResultats] = useState<{ id: string; name: string; category: string | null }[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
-  const [catCreation, setCatCreation] = useState<Category>("epicerie_salee");
+  /** Mini-fiche de création (ouverte depuis « Créer ») */
+  const [creation, setCreation] = useState<CreationProduit | null>(null);
   const [mode, setMode] = useState<"produits" | "categorie" | "fournisseur">("produits");
   const [fournisseurs, setFournisseurs] = useState<{ id: string; name: string }[]>([]);
   const [fournisseurId, setFournisseurId] = useState("");
@@ -710,13 +731,13 @@ function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjoute
   }, [mode, cat, fournisseurId, etabCle]);
 
   // Catalogue de l'établissement chargé une fois : la recherche se fait ensuite sur place, tolérante aux fautes
-  const [catalogue, setCatalogue] = useState<{ id: string; name: string; category: string | null }[] | null>(null);
+  const [catalogue, setCatalogue] = useState<{ id: string; name: string; category: string | null; sub_category: string | null }[] | null>(null);
   useEffect(() => {
     (async () => {
-      let req = supabase.from("ingredients").select("id, name, category").eq("is_active", true).order("name").limit(5000);
+      let req = supabase.from("ingredients").select("id, name, category, sub_category").eq("is_active", true).order("name").limit(5000);
       if (etabCle) req = req.or(`establishments.cs.{"${etabCle}"},establishments.is.null`);
       const { data } = await req;
-      setCatalogue((data ?? []) as { id: string; name: string; category: string | null }[]);
+      setCatalogue((data ?? []) as { id: string; name: string; category: string | null; sub_category: string | null }[]);
     })();
   }, [etabCle]);
   useEffect(() => {
@@ -786,15 +807,18 @@ function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjoute
               </label>
             );
           })}
-          {mode === "produits" && q.trim().length >= 2 && !exact && (
+          {mode === "produits" && q.trim().length >= 2 && !exact && !creation && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, borderRadius: 10, background: "rgba(45,106,79,0.06)", border: "1.5px dashed rgba(45,106,79,0.35)", margin: "8px 0", flexWrap: "wrap" }}>
-              <span style={{ flex: 1, fontSize: 12.5 }}>Créer « <b>{q.trim()}</b> » (fiche à vérifier) dans</span>
-              <select value={catCreation} onChange={(e) => setCatCreation(e.target.value as Category)} style={{ fontSize: 12, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff" }}>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
-              </select>
-              <button type="button" disabled={enCours} onClick={() => { void onCreer(q.trim(), catCreation).then(onClose); }}
-                style={{ padding: "7px 12px", borderRadius: 8, border: "none", background: "#2D6A4F", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Créer</button>
+              <span style={{ flex: 1, fontSize: 12.5 }}>Pas dans la base ? Créer « <b>{q.trim()}</b> » avec une fiche minimale (sans prix)</span>
+              <button type="button" disabled={enCours} onClick={() => setCreation({ nom: q.trim(), categorie: cat || "epicerie_salee", unite: "piece", type_piece: "piece", colisage: null, contenu: 6 })}
+                style={{ padding: "7px 12px", borderRadius: 8, border: "none", background: "#2D6A4F", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Créer…</button>
             </div>
+          )}
+          {mode === "produits" && creation && (
+            <MiniFiche creation={creation} onChange={setCreation} fournisseurs={fournisseurs} enCours={enCours}
+              sousCategories={[...new Set((catalogue ?? []).filter((x) => x.category === creation.categorie && x.sub_category).map((x) => x.sub_category as string))].sort((a, b) => a.localeCompare(b, "fr"))}
+              onAnnuler={() => setCreation(null)}
+              onCreer={async () => { const ok = await onCreer(creation); if (ok) onClose(); }} />
           )}
         </div>
         <div style={{ padding: "10px 16px 16px", borderTop: "1px solid #f0ebe2", display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -851,3 +875,97 @@ const bouton = (bg: string, fg: string): React.CSSProperties => ({
   height: 40, padding: "0 14px", borderRadius: 10, border: bg === "#fff" ? "1px solid #ddd6c8" : "none", background: bg, color: fg,
   fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
 });
+
+/** Mini-fiche de création depuis l'inventaire : le minimum pour compter et retrouver le produit, sans le prix */
+function MiniFiche({ creation: c, onChange, fournisseurs, sousCategories, enCours, onAnnuler, onCreer }: {
+  creation: CreationProduit; onChange: (c: CreationProduit) => void; fournisseurs: { id: string; name: string }[]; sousCategories: string[];
+  enCours: boolean; onAnnuler: () => void; onCreer: () => Promise<void>;
+}) {
+  const maj = (p: Partial<CreationProduit>) => onChange({ ...c, ...p });
+  const piece = c.unite === "piece";
+  const verif = ficheDepuisCreation(c);
+  const article = verif.ok ? articleDeFiche(verif.fiche as unknown as FicheConditionnement) : null;
+  const cond = article ? conditionnementDArticle(article, null) : null;
+  const etiquette: React.CSSProperties = { fontSize: 10.5, fontWeight: 700, color: "#8a7e6b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 };
+  const champ: React.CSSProperties = { width: "100%", height: 38, borderRadius: 8, border: "1px solid #ddd6c8", padding: "0 10px", fontSize: 14, boxSizing: "border-box", background: "#fff", fontFamily: "inherit" };
+  const bloc: React.CSSProperties = { flex: "1 1 180px", minWidth: 0 };
+  return (
+    <div style={{ padding: 12, borderRadius: 12, background: "rgba(45,106,79,0.05)", border: "1.5px solid rgba(45,106,79,0.3)", margin: "8px 0" }}>
+      <div style={{ fontFamily: OSWALD, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Nouveau produit <span style={{ fontWeight: 400, color: "#8a7e6b", fontSize: 12 }}>· le prix viendra de la facture</span></div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ ...bloc, flexBasis: "100%" }}>
+          <div style={etiquette}>Nom</div>
+          <input value={c.nom} onChange={(e) => maj({ nom: e.target.value })} style={champ} />
+        </div>
+        <div style={bloc}>
+          <div style={etiquette}>Catégorie</div>
+          <select value={c.categorie} onChange={(e) => maj({ categorie: e.target.value, sous_categorie: null })} style={champ}>
+            {CATEGORIES.map((k) => <option key={k} value={k}>{CAT_LABELS[k]}</option>)}
+          </select>
+        </div>
+        <div style={bloc}>
+          <div style={etiquette}>Sous-catégorie</div>
+          <input list="sous-categories-creation" value={c.sous_categorie ?? ""} onChange={(e) => maj({ sous_categorie: e.target.value })} placeholder="ex. Eaux" style={champ} />
+          <datalist id="sous-categories-creation">{sousCategories.map((s) => <option key={s} value={s} />)}</datalist>
+        </div>
+        <div style={bloc}>
+          <div style={etiquette}>Fournisseur</div>
+          <select value={c.supplier_id ?? ""} onChange={(e) => maj({ supplier_id: e.target.value || null })} style={champ}>
+            <option value="">— pas encore connu —</option>
+            {fournisseurs.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+        </div>
+        <div style={{ ...bloc, flexBasis: "100%" }}>
+          <div style={etiquette}>Acheté</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {([["piece", "à la pièce"], ["kg", "au kilo"], ["litre", "au litre"]] as const).map(([u, l]) => (
+              <button key={u} type="button" onClick={() => maj({ unite: u })} style={puce(c.unite === u)}>{l}</button>
+            ))}
+          </div>
+        </div>
+        {piece && (
+          <>
+            <div style={bloc}>
+              <div style={etiquette}>Type de pièce</div>
+              <select value={c.type_piece ?? "piece"} onChange={(e) => maj({ type_piece: e.target.value })} style={champ}>
+                {TYPES_COLISAGE.map((t) => <option key={t} value={t}>{libelleType(t)}</option>)}
+              </select>
+            </div>
+            <div style={bloc}>
+              <div style={etiquette}>Taille d&apos;une pièce (facultatif)</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input type="number" inputMode="decimal" min={0} step="any" value={c.taille_qte ?? ""} onChange={(e) => maj({ taille_qte: e.target.value === "" ? null : Number(e.target.value) })} placeholder="750" style={{ ...champ, flex: 1 }} />
+                <select value={c.taille_unite ?? "ml"} onChange={(e) => maj({ taille_unite: e.target.value as CreationProduit["taille_unite"] })} style={{ ...champ, width: 80 }}>
+                  {(["g", "kg", "ml", "l"] as const).map((u) => <option key={u} value={u}>{u === "l" ? "L" : u === "ml" ? "mL" : u}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={bloc}>
+              <div style={etiquette}>Conditionnement de commande</div>
+              <select value={c.colisage ?? ""} onChange={(e) => maj({ colisage: e.target.value || null })} style={champ}>
+                <option value="">— à l&apos;unité —</option>
+                {TYPES_COLISAGE.filter((t) => t !== "piece" && t !== (c.type_piece ?? "piece")).map((t) => <option key={t} value={t}>{libelleType(t)}</option>)}
+              </select>
+            </div>
+            {c.colisage && (
+              <div style={bloc}>
+                <div style={etiquette}>Pièces par {libelleType(c.colisage).toLowerCase()}</div>
+                <input type="number" inputMode="numeric" min={1} step={1} value={c.contenu ?? ""} onChange={(e) => maj({ contenu: e.target.value === "" ? null : Number(e.target.value) })} style={champ} />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      <div style={{ marginTop: 10, fontSize: 12.5, color: verif.ok ? "#2D6A4F" : "#a12b2b" }}>
+        {verif.ok
+          ? <>Fiche : <strong>{cond?.libelle ?? (c.unite === "kg" ? "kg" : c.unite === "litre" ? "litre" : "pièce")}</strong>{cond && cond.contenu > 1 ? <> · compté par {libelleType(c.colisage ?? "").toLowerCase()} et par {cond.unite}</> : <> · compté en {cond?.unite ?? "unités"}</>}</>
+          : verif.erreur}
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+        <button type="button" onClick={onAnnuler} style={{ ...bouton("#fff", "#1a1a1a"), height: 36, fontSize: 12.5 }}>Annuler</button>
+        <button type="button" disabled={enCours || !verif.ok} onClick={() => void onCreer()}
+          style={{ ...bouton("#2D6A4F", "#fff"), height: 36, fontSize: 12.5, opacity: enCours || !verif.ok ? 0.6 : 1 }}>{enCours ? "Création…" : "Créer et ajouter dans la zone"}</button>
+      </div>
+    </div>
+  );
+}

@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { CAT_LABELS, type Category } from "@/types/ingredients";
-import { categorieDeFamille, choisirConditionnement, comptageFeuille, lireFeuille, totalLigne, uniteFicheDe, UUID, type ArticleFournisseur, type Conditionnement, type OffreActive } from "@/lib/inventaire";
+import { articleDeFiche, categorieDeFamille, choisirConditionnement, comptageFeuille, conditionnementDArticle, ficheDepuisCreation, lireFeuille, totalLigne, uniteFicheDe, UUID, type ArticleFournisseur, type Conditionnement, type CreationProduit, type FicheConditionnement, type OffreActive } from "@/lib/inventaire";
 import { figerValorisation } from "@/lib/inventaireValoServeur";
 
 /**
@@ -24,7 +24,7 @@ export async function conditionnements(ids: string[]) {
   for (let i = 0; i < ids.length; i += 300) {
     const lot = ids.slice(i, i + 300);
     const [{ data: ings }, { data: arts }, { data: offres }] = await Promise.all([
-      supabaseAdmin.from("ingredients").select("id, name, category, default_unit, default_supplier_id").in("id", lot),
+      supabaseAdmin.from("ingredients").select("id, name, category, default_unit, default_supplier_id, order_unit_label, order_quantity, order_element, order_element_permis, purchase_unit_label, piece_weight_g, piece_volume_ml").in("id", lot),
       supabaseAdmin.from("commande_articles")
         .select("ingredient_id, supplier_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande")
         .in("ingredient_id", lot),
@@ -34,8 +34,10 @@ export async function conditionnements(ids: string[]) {
       const id = ing.id as string;
       const a = ((arts ?? []) as unknown as (ArticleFournisseur & { ingredient_id: string })[]).filter((x) => x.ingredient_id === id);
       const o = ((offres ?? []) as unknown as (OffreActive & { ingredient_id: string })[]).filter((x) => x.ingredient_id === id);
+      // Sans article de commande (produit sans offre) : conditionnement d'après la fiche seule, sinon unités
+      const deFiche = articleDeFiche(ing as unknown as FicheConditionnement);
       res.set(id, {
-        cond: choisirConditionnement((ing.default_supplier_id as string | null) ?? null, a, o),
+        cond: choisirConditionnement((ing.default_supplier_id as string | null) ?? null, a, o) ?? (deFiche ? conditionnementDArticle(deFiche, null) : null),
         uniteFiche: (ing.default_unit as string | null) ?? "pc",
         nom: ing.name as string,
         famille: CAT_LABELS[ing.category as Category] ?? (ing.category as string | null) ?? null,
@@ -239,18 +241,46 @@ export async function ajouterLignes(inv: Inv, ingredientIds: string[], zone: str
   return rep({ ok: true, ajoutes: aInserer.length + aRemettre.length, deja_la: ids.length - nouveaux.length - aRemettre.length, erreurs: [] });
 }
 
-/** Création rapide d'une fiche (à vérifier) depuis l'inventaire, puis ligne dans la zone */
-export async function creerProduitEtLigne(inv: Inv, nom: string, categorie: string, zone: string, userId: string): Promise<Reponse> {
+/**
+ * Création rapide d'une fiche (à vérifier, sans prix) depuis l'inventaire, puis ligne dans la zone.
+ * Une fiche du même nom dans l'établissement est reprise (réactivée si besoin) plutôt que doublée.
+ * Avec un fournisseur, l'article de commande est créé d'après la fiche : le produit se retrouve dans la commande.
+ */
+export async function creerProduitEtLigne(inv: Inv, creation: CreationProduit, zone: string, userId: string): Promise<Reponse> {
   if (inv.statut === "cloture") return rep({ error: "Inventaire clôturé" }, 409);
-  const n = nom.trim();
-  if (n.length < 2) return rep({ error: "Nom trop court" }, 400);
+  const v = ficheDepuisCreation(creation);
+  if (!v.ok) return rep({ error: v.erreur }, 400);
+  const nom = v.fiche.name as string;
+  const { data: homonymes } = await supabaseAdmin.from("ingredients").select("id, name, is_active")
+    .eq("etablissement_id", inv.etablissement_id).ilike("name", nom.replace(/[%_\\]/g, (c) => `\\${c}`)).limit(5);
+  const existante = (homonymes ?? []).find((h) => String(h.name).trim().toLowerCase() === nom.toLowerCase());
+  if (existante) {
+    if (existante.is_active === false) {
+      await supabaseAdmin.from("ingredients").update({ is_active: true, status: "to_check", status_note: `Réactivée depuis l'inventaire du ${inv.date}` }).eq("id", existante.id);
+    }
+    const r = await ajouterLigne(inv, existante.id as string, zone);
+    return rep({ ...(r.body as object), ingredient_id: existante.id, reprise: true, reactivee: existante.is_active === false }, r.status);
+  }
+  if (v.fiche.supplier_id) {
+    const { data: f } = await supabaseAdmin.from("suppliers").select("id").eq("id", v.fiche.supplier_id as string).eq("etablissement_id", inv.etablissement_id).maybeSingle();
+    if (!f) return rep({ error: "Fournisseur inconnu pour cet établissement" }, 400);
+  }
   const { data: etab } = await supabaseAdmin.from("etablissements").select("slug").eq("id", inv.etablissement_id).maybeSingle();
   const { data: cree, error } = await supabaseAdmin.from("ingredients").insert({
-    name: n, category: categorie, default_unit: "pc", status: "to_check",
-    status_note: `Créée depuis l'inventaire du ${inv.date} : à vérifier (prix, conditionnement)`,
+    ...v.fiche, status: "to_check", is_active: true,
+    status_note: `Créée depuis l'inventaire du ${inv.date} : à vérifier (prix)`,
     etablissement_id: inv.etablissement_id, establishments: [etab?.slug === "piccola" ? "piccola" : "bellomio"], user_id: userId,
   }).select("id").single();
   if (error || !cree) return rep({ error: error?.message ?? "Fiche non créée" }, 500);
+  // Article de commande chez le fournisseur choisi, dérivé de la fiche (pas de prix : l'offre viendra de la facture)
+  const article = v.fiche.supplier_id ? articleDeFiche(v.fiche as unknown as FicheConditionnement) : null;
+  if (article) {
+    const { error: ea } = await supabaseAdmin.from("commande_articles").insert({
+      supplier_id: v.fiche.supplier_id, ingredient_id: cree.id, unite_commande: article.unite_commande, contenu_nb: article.contenu_nb,
+      element: article.element, element_qte: article.element_qte, element_unite: article.element_unite, commande_element_permise: false, updated_by: userId,
+    });
+    if (ea) console.error("commande_articles depuis l'inventaire :", ea.message);
+  }
   const r = await ajouterLigne(inv, cree.id as string, zone);
   return rep({ ...(r.body as object), ingredient_id: cree.id }, r.status);
 }

@@ -7,13 +7,14 @@
  * - Quantité totale = colis × contenu + unités (1 colis = contenu × élément).
  * - Lecture du fichier de la feuille papier : zone, famille, nom, identifiant de la fiche, dans l'ordre.
  */
-import { libelleColisage, nomUnite, type CommandeArticle } from "@/lib/commandeArticles";
+import { libelleColisage, nomUnite, TYPES_COLISAGE, UNITES_COMMANDE, type CommandeArticle, type ElementCommande, type UniteCommande, type UniteTaille } from "@/lib/commandeArticles";
 
 export type ArticleFournisseur = CommandeArticle & { supplier_id: string };
 export type OffreActive = { supplier_id: string; created_at: string | null; valid_from: string | null };
 
 export type Conditionnement = {
-  supplier_id: string;
+  /** Fournisseur de l'article de commande ; null quand le conditionnement vient de la fiche seule */
+  supplier_id: string | null;
   /** Éléments par colis (1 : le colis est l'unité comptée) */
   contenu: number;
   /** « carton de 6 bouteilles » */
@@ -21,6 +22,14 @@ export type Conditionnement = {
   /** Nom de l'unité comptée : « bouteille », « colis », « kg » */
   unite: string;
 };
+
+/** Conditionnement compté d'après un article de commande */
+export function conditionnementDArticle(article: CommandeArticle, supplierId: string | null): Conditionnement {
+  const contenu = Number(article.contenu_nb) > 0 ? Number(article.contenu_nb) : 1;
+  const auPoids = article.unite_commande === "kg" || article.unite_commande === "litre";
+  const unite = auPoids || contenu <= 1 ? nomUnite(article.unite_commande) : nomUnite(article.element ?? "piece");
+  return { supplier_id: supplierId, contenu: auPoids ? 1 : contenu, libelle: libelleColisage({ ...article, contenu_nb: contenu }), unite };
+}
 
 export function choisirConditionnement(
   defaultSupplierId: string | null,
@@ -33,10 +42,97 @@ export function choisirConditionnement(
     (defaultSupplierId ? articles.find((a) => a.supplier_id === defaultSupplierId) : undefined)
     ?? (derniere ? articles.find((a) => a.supplier_id === derniere.supplier_id) : undefined);
   if (!article) return null;
-  const contenu = Number(article.contenu_nb) > 0 ? Number(article.contenu_nb) : 1;
-  const auPoids = article.unite_commande === "kg" || article.unite_commande === "litre";
-  const unite = auPoids || contenu <= 1 ? nomUnite(article.unite_commande) : nomUnite(article.element ?? "piece");
-  return { supplier_id: article.supplier_id, contenu: auPoids ? 1 : contenu, libelle: libelleColisage({ ...article, contenu_nb: contenu }), unite };
+  return conditionnementDArticle(article, article.supplier_id);
+}
+
+/** Code d'unité de commande d'après un libellé libre de la fiche (même règle que cmd_unite_code en SQL) */
+export function codeUnite(p: string | null | undefined): UniteCommande | null {
+  const u = String(p ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+  if (!u) return null;
+  if (["piece", "pieces", "pc", "pcs"].includes(u)) return "piece";
+  if (["l", "litre", "litres"].includes(u)) return "litre";
+  if (["kg", "kilo", "kilos"].includes(u)) return "kg";
+  if (u === "boite" || u === "boites") return "boite";
+  if (u === "fut" || u === "futs") return "fut";
+  const liste = UNITES_COMMANDE as readonly string[];
+  if (liste.includes(u)) return u as UniteCommande;
+  const sans = u.replace(/s+$/, "");
+  if (liste.includes(sans)) return sans as UniteCommande;
+  return null;
+}
+
+/** Champs de la fiche qui décrivent le conditionnement de commande */
+export type FicheConditionnement = {
+  order_unit_label: string | null; order_quantity: number | null; order_element: string | null; order_element_permis?: boolean | null;
+  purchase_unit_label: string | null; piece_weight_g: number | null; piece_volume_ml: number | null;
+};
+
+/** Article de commande dérivé de la fiche seule (même règle que cmd_conditionnement_fiche en SQL) ; null si l'unité n'est pas reconnue */
+export function articleDeFiche(f: FicheConditionnement): CommandeArticle | null {
+  const u = codeUnite(f.order_unit_label);
+  if (!u) return null;
+  if (u === "kg" || u === "litre") return { unite_commande: u, contenu_nb: 1, element: null, element_qte: null, element_unite: null, commande_element_permise: false, precommande: false };
+  let c = u === "piece" ? 1 : Number(f.order_quantity) > 0 ? Number(f.order_quantity) : 1;
+  if (c < 0) c = 1;
+  const pt = codeUnite(f.purchase_unit_label);
+  let e: ElementCommande | null = null;
+  if (c > 1) {
+    const oe = codeUnite(f.order_element);
+    e = (oe && oe !== "kg" && oe !== "litre" ? oe : pt && pt !== "kg" && pt !== "litre" && pt !== "piece" ? pt : "piece") as ElementCommande;
+  }
+  let q: number | null = null, ut: UniteTaille | null = null;
+  if (Number(f.piece_weight_g) > 0) { const g = Number(f.piece_weight_g); if (g >= 1000) { q = g / 1000; ut = "kg"; } else { q = g; ut = "g"; } }
+  else if (Number(f.piece_volume_ml) > 0) { const ml = Number(f.piece_volume_ml); if (ml >= 1000) { q = ml / 1000; ut = "l"; } else { q = ml; ut = "ml"; } }
+  return { unite_commande: u, contenu_nb: c, element: e, element_qte: q, element_unite: ut, commande_element_permise: !!f.order_element_permis && e != null && c > 1, precommande: false };
+}
+
+/** Création rapide depuis l'inventaire : ce que l'on remplit sans le prix */
+export type CreationProduit = {
+  nom: string; categorie: string; sous_categorie?: string | null; supplier_id?: string | null;
+  /** Acheté à la pièce, au kilo ou au litre */
+  unite: "piece" | "kg" | "litre";
+  /** Type de pièce (bouteille, pot, sachet…) quand acheté à la pièce */
+  type_piece?: string | null;
+  /** Taille d'une pièce (750 ml, 250 g…) */
+  taille_qte?: number | null; taille_unite?: "g" | "kg" | "ml" | "l" | null;
+  /** Conditionnement de commande (carton, colis…) et nombre de pièces dedans */
+  colisage?: string | null; contenu?: number | null;
+};
+
+/** Contrôle et traduit la création rapide en colonnes de la fiche (sans prix) */
+export function ficheDepuisCreation(c: CreationProduit): { ok: true; fiche: Record<string, unknown> } | { ok: false; erreur: string } {
+  const nom = String(c.nom ?? "").trim();
+  if (nom.length < 2) return { ok: false, erreur: "Nom trop court" };
+  if (!c.categorie) return { ok: false, erreur: "Catégorie requise" };
+  if (!["piece", "kg", "litre"].includes(c.unite)) return { ok: false, erreur: "Unité d'achat inconnue" };
+  const types = TYPES_COLISAGE as readonly string[];
+  const typePiece = c.unite === "piece" ? (c.type_piece && types.includes(c.type_piece) ? c.type_piece : "piece") : null;
+  if (c.type_piece && c.unite === "piece" && !types.includes(c.type_piece)) return { ok: false, erreur: "Type de pièce inconnu" };
+  const colisage = c.colisage ? c.colisage : null;
+  if (colisage && !types.includes(colisage)) return { ok: false, erreur: "Conditionnement inconnu" };
+  const contenu = colisage ? Number(c.contenu) : null;
+  if (colisage && (!Number.isFinite(contenu) || contenu! <= 0)) return { ok: false, erreur: "Nombre de pièces par conditionnement : nombre positif" };
+  const qte = c.taille_qte == null || c.taille_qte === 0 ? null : Number(c.taille_qte);
+  if (qte != null && (!Number.isFinite(qte) || qte <= 0)) return { ok: false, erreur: "Taille : quantité positive" };
+  if (qte != null && !["g", "kg", "ml", "l"].includes(c.taille_unite ?? "")) return { ok: false, erreur: "Taille : unité inconnue" };
+  const auPoids = c.unite !== "piece";
+  const poids = !auPoids && qte != null && (c.taille_unite === "g" || c.taille_unite === "kg") ? (c.taille_unite === "kg" ? qte * 1000 : qte) : null;
+  const volume = !auPoids && qte != null && (c.taille_unite === "ml" || c.taille_unite === "l") ? (c.taille_unite === "l" ? qte * 1000 : qte) : null;
+  return {
+    ok: true,
+    fiche: {
+      name: nom, category: c.categorie, sub_category: c.sous_categorie?.trim() || null,
+      supplier_id: c.supplier_id || null, default_supplier_id: c.supplier_id || null,
+      default_unit: c.unite === "kg" ? "kg" : c.unite === "litre" ? "l" : "pc",
+      purchase_unit_label: c.unite === "kg" ? "kg" : c.unite === "litre" ? "L" : typePiece,
+      piece_weight_g: poids, piece_volume_ml: volume,
+      // Unité de commande : le colis s'il y en a un, sinon la pièce (ou kg / litre) ; la commande en dérive
+      order_unit_label: colisage ?? (auPoids ? c.unite : typePiece),
+      order_quantity: colisage ? contenu : null,
+      order_element: colisage && contenu! > 1 ? typePiece : null,
+      order_element_permis: false,
+    },
+  };
 }
 
 /** Total en unités comptées ; null tant que rien n'est saisi (≠ 0 compté) */
