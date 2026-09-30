@@ -105,6 +105,7 @@ function Feuille() {
   /** Action serveur en cours (ajout, création…) : les événements temps réel qu'elle provoque ne rechargent pas en plus */
   const actionEnCours = useRef(false);
   const rechargement = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dernierChargement = useRef(0);
   const fichierRef = useRef<HTMLInputElement | null>(null);
 
   const charger = useCallback(async () => {
@@ -161,6 +162,7 @@ function Feuille() {
     setZones(nomsZones);
     setLignes(liste);
     setFiches(ficheDe); setArticles(artDe); setOffres(offDe); setFournisseurs(fournDe);
+    dernierChargement.current = Date.now();
     setRayons([...((ry ?? []) as { code: string; libelle: string; ordre: number }[]), RAYON_AUTRES]);
     // Colis unique (contenu 1) : un seul champ, « colis » ; sans conditionnement : un seul champ, « unités ».
     // Une quantité déjà enregistrée ailleurs (ancien inventaire) est reportée dans le champ affiché.
@@ -207,9 +209,27 @@ function Feuille() {
             : { colis: txt(colis), unites: txt(unites) },
         }));
       })
+      // Fiche produit modifiée (catégorie, sous-catégorie, rayon, conditionnement, nom…) : la feuille se réorganise
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "ingredients", filter: `etablissement_id=eq.${inv.etablissement_id}` }, (payload) => {
+        const r = payload.new as { id?: string };
+        if (!r?.id || !lignesRef.current.some((l) => l.ingredient_id === r.id)) return;
+        if (rechargement.current) clearTimeout(rechargement.current);
+        rechargement.current = setTimeout(() => { rechargement.current = null; void charger(); }, 800);
+      })
       .subscribe((etat) => setDirect(etat === "SUBSCRIBED"));
     return () => { void supabase.removeChannel(canal); };
-  }, [inv?.id, charger]);
+  }, [inv?.id, inv?.etablissement_id, charger]);
+
+  // Retour sur l'onglet (après une fiche modifiée ailleurs, par exemple) : rechargement si le dernier date de plus de 15 s
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible" || actionEnCours.current) return;
+      if (Date.now() - dernierChargement.current < 15000) return;
+      void charger();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [charger]);
 
   const lectureSeule = !inv || inv.statut === "cloture";
 
@@ -577,7 +597,7 @@ function Feuille() {
             }}>
               {libelleZone(z)} <span style={{ fontWeight: 500, color: n === ls.length && ls.length ? "#2D6A4F" : "#999" }}>{n}/{ls.length}</span>
               {/* Valeur comptée de la zone, sous le nom */}
-              <div style={{ fontSize: 11, fontWeight: 600, color: valeur > 0 ? "#6f6656" : "#c4bcae", marginTop: 1 }}>{valeur > 0 ? eur(valeur) : "—"}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: n > 0 ? "#6f6656" : "#c4bcae", marginTop: 1 }}>{n > 0 ? eur(valeur) : "—"}</div>
             </button>
           );
         })}
