@@ -223,12 +223,16 @@ function isPackPrice(offer: OfferRow | null, orderQty: number | null): boolean {
  *  If order_quantity is set (e.g. 2.5 for "bac 2.5kg"), multiply unit_price × order_quantity.
  *  Otherwise fall back to pack_price or unit_price from the offer.
  */
-function computeOrderUnitPrice(offer: OfferRow | null, orderQty: number | null): number | null {
+function computeOrderUnitPrice(offer: OfferRow | null, orderQty: number | null, elementSize?: { g: number | null; ml: number | null }): number | null {
   if (!offer) return null;
   const kind = offer.price_kind ?? "unit";
 
-  // If the ingredient has an explicit order_quantity, use unit_price × quantity
+  // If the ingredient has an explicit order_quantity (nombre d'éléments), use unit_price × quantity ;
+  // produit au kg / L avec des éléments de taille connue : × la taille de l'élément (colis de 8 pots de 250 g = 2 kg)
   if (orderQty && orderQty > 0 && offer.unit_price) {
+    const u = (offer.unit ?? "").toLowerCase();
+    if (u === "kg" && elementSize?.g && elementSize.g > 0) return offer.unit_price * orderQty * (elementSize.g / 1000);
+    if (u === "l" && elementSize?.ml && elementSize.ml > 0) return offer.unit_price * orderQty * (elementSize.ml / 1000);
     return offer.unit_price * orderQty;
   }
 
@@ -898,7 +902,7 @@ function CommandesPage() {
 
     let items: CatalogItem[] = [];
     if (allIds.length > 0) {
-      const selectCols = "id, name, category, sub_category, default_unit, favori_commande, order_unit_label, order_quantity, stock_objectif, stock_min, storage_zone, etablissement_id, " + ZONES_EMBED;
+      const selectCols = "id, name, category, sub_category, default_unit, favori_commande, order_unit_label, order_quantity, piece_weight_g, piece_volume_ml, stock_objectif, stock_min, storage_zone, etablissement_id, " + ZONES_EMBED;
       // Par paquets : au-delà de ~200 identifiants l'URL dépasse la limite PostgREST (400 silencieux)
       const { data: ingRows, error: ingErrMsg } = await inChunks<Record<string, unknown>>(allIds, (batch) => {
         let q = supabase.from("ingredients").select(selectCols).in("id", batch);
@@ -923,7 +927,7 @@ function CommandesPage() {
           order_unit_label: ing.order_unit_label ?? null,
           order_quantity: oq,
           order_unit: ing.order_unit_label ?? deriveOrderUnit(offer) ?? ing.default_unit,
-          prix_commande: computeOrderUnitPrice(offer, oq),
+          prix_commande: computeOrderUnitPrice(offer, oq, { g: ing.piece_weight_g ?? null, ml: ing.piece_volume_ml ?? null }),
           prix_par_colis: isPackPrice(offer, oq),
           pack_count: offer?.pack_count ?? null,
           pack_each_qty: offer?.pack_each_qty ?? null,

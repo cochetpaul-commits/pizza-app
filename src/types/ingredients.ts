@@ -139,6 +139,10 @@ export type Ingredient = {
   // Établissements qui utilisent cet ingrédient
   establishments?: string[] | null;
 
+  // Conditionnement de commande (la commande en est dérivée pour tous les fournisseurs)
+  order_element?: string | null;
+  order_element_permis?: boolean | null;
+
   // Lieux de stockage POUR L'ÉTABLISSEMENT COURANT (voir src/lib/zonesEtablissement.ts) ;
   // en base, ingredients.storage_zone n'est que le miroir de l'établissement de rattachement
   storage_zone?: string | null;

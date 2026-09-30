@@ -30,6 +30,8 @@ export const COLS = [
   { key: "prix_date", header: "Date du prix (AAAA-MM-JJ)", edit: true },
   { key: "order_unit_label", header: "Conditionnement de commande", edit: true },
   { key: "order_quantity", header: "Qté par conditionnement", edit: true },
+  { key: "order_element", header: "Élément du conditionnement", edit: true },
+  { key: "order_element_permis", header: "Commande à l'élément (oui/non)", edit: true },
   { key: "default_unit", header: "Unité de base (g/kg/l/pc)", edit: true },
   { key: "piece_weight_g", header: "Poids d'une pièce (g)", edit: true },
   { key: "piece_volume_ml", header: "Volume d'une pièce (ml)", edit: true },

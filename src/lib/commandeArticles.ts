@@ -8,9 +8,17 @@
 
 export const UNITES_COMMANDE = [
   "piece", "colis", "carton", "seau", "pochette", "barquette", "bouteille",
-  "sachet", "paquet", "boite", "bac", "pot", "plateau", "filet", "botte", "fut", "kg", "litre",
+  "sachet", "paquet", "boite", "bac", "pot", "plateau", "filet", "botte", "fut",
+  "bidon", "bloc", "brick", "cagette", "meule", "pack", "poche", "sac", "kg", "litre",
 ] as const;
 export type UniteCommande = (typeof UNITES_COMMANDE)[number];
+/** Types de colisage / d'élément (tout sauf le poids et le volume) : liste unique de la fiche produit et de la commande */
+export const TYPES_COLISAGE = UNITES_COMMANDE.filter((u) => u !== "kg" && u !== "litre") as Exclude<UniteCommande, "kg" | "litre">[];
+/** Libellé d'un type pour un menu déroulant (« Boîte », « Fût », « Pièce »…) */
+export function libelleType(u: string): string {
+  const l = LIBELLE[u as UniteCommande]?.un ?? u;
+  return l.charAt(0).toUpperCase() + l.slice(1);
+}
 
 /** Éléments contenus dans une unité de commande (mêmes contenants, sans kg ni litre) */
 export type ElementCommande = Exclude<UniteCommande, "kg" | "litre">;
@@ -51,6 +59,14 @@ const LIBELLE: Record<UniteCommande, { un: string; plusieurs: string }> = {
   filet: { un: "filet", plusieurs: "filets" },
   botte: { un: "botte", plusieurs: "bottes" },
   fut: { un: "fût", plusieurs: "fûts" },
+  bidon: { un: "bidon", plusieurs: "bidons" },
+  bloc: { un: "bloc", plusieurs: "blocs" },
+  brick: { un: "brick", plusieurs: "bricks" },
+  cagette: { un: "cagette", plusieurs: "cagettes" },
+  meule: { un: "meule", plusieurs: "meules" },
+  pack: { un: "pack", plusieurs: "packs" },
+  poche: { un: "poche", plusieurs: "poches" },
+  sac: { un: "sac", plusieurs: "sacs" },
   kg: { un: "kg", plusieurs: "kg" },
   litre: { un: "litre", plusieurs: "litres" },
 };
@@ -69,16 +85,19 @@ export function taille(qte: number, unite: UniteTaille): string {
 
 /**
  * Libellé de l'unité de commande, calculé (jamais saisi) :
- * « colis 2 × 1 kg », « colis 8 × 250 g », « carton de 6 boîtes », « plateau de 30 »,
- * « seau 2,5 kg », « pièce 125 g », « kg ».
+ * « colis de 8 pots 250 g », « carton de 6 bouteilles 750 mL », « colis 2 × 1 kg » (éléments sans nom),
+ * « carton de 6 boîtes », « plateau de 30 », « seau 2,5 kg », « pièce 125 g », « kg ».
+ * (Miroir SQL : public.cmd_libelle_colisage.)
  */
 export function libelleColisage(a: CommandeArticle): string {
   const unite = nomUnite(a.unite_commande);
   if (a.unite_commande === "kg" || a.unite_commande === "litre") return unite;
   const t = a.element_qte != null && a.element_unite ? taille(a.element_qte, a.element_unite) : null;
   if (a.contenu_nb <= 1) return t ? `${unite} ${t}` : unite;
+  const nomme = a.element && a.element !== "piece";
+  if (t && nomme) return `${unite} de ${nombre(a.contenu_nb)} ${nomUnite(a.element!, a.contenu_nb)} ${t}`;
   if (t) return `${unite} ${nombre(a.contenu_nb)} × ${t}`;
-  if (a.element) return `${unite} de ${nombre(a.contenu_nb)} ${nomUnite(a.element, a.contenu_nb)}`;
+  if (nomme) return `${unite} de ${nombre(a.contenu_nb)} ${nomUnite(a.element!, a.contenu_nb)}`;
   return `${unite} de ${nombre(a.contenu_nb)}`;
 }
 

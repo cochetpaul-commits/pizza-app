@@ -293,8 +293,8 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     try {
       sessionStorage.setItem(CLE_RETOUR, JSON.stringify({ supplierId, onglet, bascules, recherche, y: window.scrollY, t: Date.now() } satisfies EtatRetour));
     } catch { /* navigation privée : retour en haut de la liste */ }
-    // fournisseur : la fiche affiche aussi le conditionnement de commande chez lui (bloc « Commande chez … »)
-    router.push(`/ingredients?edit=${a.ingredient_id}&fournisseur=${supplierId}&back=${encodeURIComponent(`/commandes?supplier_id=${supplierId}`)}`);
+    // Le conditionnement de commande se règle sur la fiche (bloc « Commande & Stock ») : l'écran suit automatiquement
+    router.push(`/ingredients?edit=${a.ingredient_id}&back=${encodeURIComponent(`/commandes?supplier_id=${supplierId}`)}`);
   }
 
   // En quittant l'écran, les appuis en attente partent tout de suite (jamais perdus)

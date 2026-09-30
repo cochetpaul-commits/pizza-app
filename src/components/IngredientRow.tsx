@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { TYPES_COLISAGE, libelleType, libelleColisage, libelleElement, type UniteCommande, type ElementCommande } from "@/lib/commandeArticles";
 
 import type { CSSProperties } from "react";
 import {
@@ -57,19 +58,9 @@ function MobileAccordion({ label, sectionKey, isOpen, onToggleSection, children 
 
 
 
-// ─── Unified packaging type options (shared by piece type, conditionnement, order unit) ──
-const PACK_TYPES = [
-  "piece", "bac", "barquette", "bidon", "bloc", "boite", "bouteille",
-  "brick", "cagette", "carton", "fut", "meule", "pack", "paquet",
-  "plateau", "poche", "sac", "sachet", "seau",
-] as const;
-const PACK_LABELS: Record<string, string> = {
-  piece: "Piece", bac: "Bac", barquette: "Barquette", bidon: "Bidon",
-  bloc: "Bloc", boite: "Boite", bouteille: "Bouteille", brick: "Brick",
-  cagette: "Cagette", carton: "Carton", fut: "Fut", meule: "Meule",
-  pack: "Pack", paquet: "Paquet", plateau: "Plateau", poche: "Poche",
-  sac: "Sac", sachet: "Sachet", seau: "Seau",
-};
+// ─── Types de colisage : liste unique (fiche produit et commande), voir src/lib/commandeArticles.ts ──
+const PACK_TYPES = TYPES_COLISAGE;
+const PACK_LABELS: Record<string, string> = Object.fromEntries(TYPES_COLISAGE.map((p) => [p, libelleType(p)]));
 
 // ─── StyledSelect (custom dropdown replacing native <select>) ────────────
 type SelectOption = { value: string; label: string; disabled?: boolean };
@@ -243,6 +234,8 @@ export type EditState = {
   allergens: string[];
   orderUnitLabel: string;
   orderQuantity: string;
+  orderElement: string;        // élément contenu (bouteille, pot, filet…) quand Qté > 1 ; "" = type de pièce du prix
+  orderElementPermis: boolean; // commande possible à l'élément
   storageZone: string;
   stockMin: string;
   stockObjectif: string;
@@ -743,7 +736,7 @@ export const IngredientRow = React.memo(function IngredientRow({
                 options={[{ value: "", label: "—" }, { value: "kg", label: "kg" }, { value: "litre", label: "litre" }, { value: "", label: "", disabled: true }, ...PACK_TYPES.map(p => ({ value: p, label: PACK_LABELS[p] }))]}
               />
             </div>
-            {edit.orderUnitLabel && !["kg", "litre", "pièce"].includes(edit.orderUnitLabel) && (
+            {edit.orderUnitLabel && !["kg", "litre", "piece", "pièce"].includes(edit.orderUnitLabel) && (
               <div>
                 <div style={fieldLabel}>Qté</div>
                 <input style={{ ...inputStyle, width: 55 }} value={edit.orderQuantity} onChange={(e) => onEditChange({ ...edit, orderQuantity: numVal(e.target.value) })} placeholder="6" />
@@ -757,6 +750,50 @@ export const IngredientRow = React.memo(function IngredientRow({
               />
             </div>
           </div>
+          {/* Contenu de l'unité de commande : élément + commande à l'élément (l'écran de commande en est dérivé) */}
+          {(() => {
+            const contenu = parseFloat(edit.orderQuantity.replace(",", "."));
+            const uc = edit.orderUnitLabel;
+            const plusieurs = !!uc && !["kg", "litre", "piece", "pièce"].includes(uc) && Number.isFinite(contenu) && contenu > 1;
+            const typePiece = edit.baseUnit === "piece" ? edit.baseUnitLabel : "";
+            const elementEffectif = plusieurs ? (edit.orderElement || (typePiece && typePiece !== "piece" ? typePiece : "piece")) : null;
+            const tailleQ = edit.baseUnit === "piece" ? parseFloat(edit.pieceContentQty.replace(",", ".")) : NaN;
+            const tailleU = edit.pieceContentUnit;
+            const apercu = uc ? libelleColisage({
+              unite_commande: (uc === "pièce" ? "piece" : uc) as UniteCommande,
+              contenu_nb: plusieurs ? contenu : 1,
+              element: elementEffectif as ElementCommande | null,
+              element_qte: Number.isFinite(tailleQ) && tailleQ > 0 ? tailleQ : null,
+              element_unite: Number.isFinite(tailleQ) && tailleQ > 0 ? (tailleU === "cl" ? "ml" : tailleU) as "g" | "kg" | "ml" | "l" : null,
+              commande_element_permise: plusieurs && edit.orderElementPermis,
+              precommande: false,
+            }) : null;
+            return (
+              <div style={{ marginBottom: 8 }}>
+                {plusieurs && (
+                  <div style={{ display: "flex", gap: 6, alignItems: "end", flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 100 }}>
+                      <div style={fieldLabel}>Élément (contenu)</div>
+                      <StyledSelect value={edit.orderElement} onChange={(v) => onEditChange({ ...edit, orderElement: v })}
+                        placeholder="—"
+                        options={[{ value: "", label: typePiece && typePiece !== "piece" ? `${PACK_LABELS[typePiece] ?? typePiece} (type du prix)` : "Pièce" }, ...PACK_TYPES.map(p => ({ value: p, label: PACK_LABELS[p] }))]}
+                      />
+                    </div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#1a1a1a", paddingBottom: 6, cursor: "pointer" }}>
+                      <input type="checkbox" checked={edit.orderElementPermis} onChange={(e) => onEditChange({ ...edit, orderElementPermis: e.target.checked })} />
+                      Commande possible à l&apos;élément
+                    </label>
+                  </div>
+                )}
+                {apercu && (
+                  <div style={{ fontSize: 11, color: "#6f6656", marginTop: 4 }}>
+                    Sur l&apos;écran de commande : <strong style={{ color: "#1a1a1a" }}>{apercu}</strong>
+                    {plusieurs && edit.orderElementPermis && elementEffectif ? <> · à l&apos;élément : <strong style={{ color: "#1a1a1a" }}>{libelleElement({ unite_commande: uc as UniteCommande, contenu_nb: contenu, element: elementEffectif as ElementCommande, element_qte: null, element_unite: null, commande_element_permise: true, precommande: false })}</strong></> : null}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Stock levels */}
           <div style={fieldLabel}>Niveaux de stock</div>

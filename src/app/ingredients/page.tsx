@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef, Suspense } from "react";
-import { BlocCommandeFournisseur, type EnregistreurBloc } from "@/components/commandes/BlocCommandeFournisseur";
 import { RecoverProductsModal } from "@/components/RecoverProductsModal";
 import { DuplicatesModal } from "@/components/DuplicatesModal";
 import { ImportExportModal } from "@/components/ImportExportModal";
@@ -159,10 +158,6 @@ function IngredientsPageInner() {
   const searchParams = useSearchParams();
   const backUrl = searchParams.get("back") ?? null;
   const editParam = searchParams.get("edit");
-  /** Ouverte depuis l'écran de commande : fournisseur dont on peut corriger le conditionnement de commande */
-  const fournisseurParam = searchParams.get("fournisseur");
-  /** Enregistrement du bloc « Commande chez … », fait par le même bouton « Enregistrer » que la fiche */
-  const enregistreurBloc = useRef<EnregistreurBloc | null>(null);
   const supplierParam = searchParams.get("supplier");
 
   const [tab, setTab] = useState<Tab>("all");
@@ -772,6 +767,8 @@ function IngredientsPageInner() {
       allergens: parseAllergens(x.allergens),
       orderUnitLabel: x.order_unit_label || guessOrderUnit(off),
       orderQuantity: x.order_quantity != null ? String(x.order_quantity) : "",
+      orderElement: x.order_element ?? "",
+      orderElementPermis: !!x.order_element_permis,
       storageZone: x.storage_zone ?? "",
       stockMin: x.stock_min != null ? String(x.stock_min) : "",
       stockObjectif: x.stock_objectif != null ? String(x.stock_objectif) : "",
@@ -928,6 +925,8 @@ function IngredientsPageInner() {
       allergens: edit.allergens.length ? edit.allergens : null,
       order_unit_label: orderLabel || null,
       order_quantity: orderQuantity,
+      order_element: edit.orderElement || null,
+      order_element_permis: edit.orderElementPermis,
       stock_min: parseNum(edit.stockMin) ?? null,
       stock_objectif: parseNum(edit.stockObjectif) ?? null,
       stock_max: parseNum(edit.stockMax) ?? null,
@@ -1006,9 +1005,6 @@ function IngredientsPageInner() {
     if (savingRef.current) return;
     savingRef.current = true;
     try {
-      // D'abord le conditionnement de commande (s'il a été modifié) : en cas d'erreur, on reste sur la fiche, rien n'est perdu
-      const erreurBloc = enregistreurBloc.current ? await enregistreurBloc.current() : null;
-      if (erreurBloc) { alert(`Conditionnement de commande : ${erreurBloc}`); return; }
       await runSaveEdit();
     } finally { savingRef.current = false; }
   }, [runSaveEdit]);
@@ -1563,9 +1559,6 @@ function IngredientsPageInner() {
                             }}
                             subCategorySuggestions={subCategorySuggestions}
                           />
-                          {fournisseurParam && x.id === editParam && editingId === x.id && (
-                            <BlocCommandeFournisseur supplierId={fournisseurParam} ingredientId={x.id} enregistreur={enregistreurBloc} />
-                          )}
                         </div>
                       );
                     });

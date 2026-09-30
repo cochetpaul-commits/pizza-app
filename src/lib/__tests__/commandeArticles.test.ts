@@ -8,10 +8,12 @@ const art = (p: Partial<CommandeArticle>): CommandeArticle => ({
 
 describe("libelleColisage", () => {
   it("colis de bacs avec taille", () => {
-    expect(libelleColisage(art({ unite_commande: "colis", contenu_nb: 2, element: "bac", element_qte: 1, element_unite: "kg" }))).toBe("colis 2 × 1 kg");
+    expect(libelleColisage(art({ unite_commande: "colis", contenu_nb: 2, element: "bac", element_qte: 1, element_unite: "kg" }))).toBe("colis de 2 bacs 1 kg");
+    // éléments sans nom (pièces) : forme courte
+    expect(libelleColisage(art({ unite_commande: "colis", contenu_nb: 2, element: "piece", element_qte: 1, element_unite: "kg" }))).toBe("colis 2 × 1 kg");
   });
-  it("colis 8 × 250 g", () => {
-    expect(libelleColisage(art({ unite_commande: "colis", contenu_nb: 8, element: "pot", element_qte: 250, element_unite: "g" }))).toBe("colis 8 × 250 g");
+  it("colis de 8 pots 250 g", () => {
+    expect(libelleColisage(art({ unite_commande: "colis", contenu_nb: 8, element: "pot", element_qte: 250, element_unite: "g" }))).toBe("colis de 8 pots 250 g");
   });
   it("carton de 6 boîtes sans taille", () => {
     expect(libelleColisage(art({ unite_commande: "carton", contenu_nb: 6, element: "boite" }))).toBe("carton de 6 boîtes");
@@ -26,7 +28,7 @@ describe("libelleColisage", () => {
   });
   it("élément commandable seul (crème au litre)", () => {
     const creme = art({ unite_commande: "colis", contenu_nb: 12, element: "bouteille", element_qte: 1, element_unite: "l", commande_element_permise: true });
-    expect(libelleColisage(creme)).toBe("colis 12 × 1 L");
+    expect(libelleColisage(creme)).toBe("colis de 12 bouteilles 1 L");
     expect(libelleElement(creme)).toBe("bouteille 1 L");
     expect(libelleElement({ ...creme, commande_element_permise: false })).toBeNull();
   });

@@ -6,7 +6,7 @@ type Changement = { id: string | null; ligne: number; nom: string; nouveau: bool
 type Erreur = { ligne: number; nom: string; message: string };
 
 const NUM_KEYS: ColKey[] = ["order_quantity", "piece_weight_g", "piece_volume_ml", "density_g_per_ml", "stock_min", "stock_objectif", "stock_max"];
-const TXT_KEYS: ColKey[] = ["name", "sub_category", "order_unit_label", "popina_name"];
+const TXT_KEYS: ColKey[] = ["name", "sub_category", "order_unit_label", "order_element", "popina_name"];
 /** Colonnes de zone → établissement (clé establishments, ou « défaut » = établissement de l'import) et rang */
 const ZONE_KEYS: Partial<Record<ColKey, { cle: "bellomio" | "piccola" | "defaut"; rang: 1 | 2 }>> = {
   storage_zone_bm: { cle: "bellomio", rang: 1 }, storage_zone_2_bm: { cle: "bellomio", rang: 2 },
@@ -127,7 +127,7 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
         // indépendamment du bloc prix ; l'offre active est synchronisée plus bas. Vide = inchangée.
         case "supplier_sku": if (s) set("supplier_sku", s); break;
         case "prix_date": break; // traité avec le prix
-        case "is_active": case "favori_commande": { const b = boolIn(s); if (s && b === undefined) erreurs.push({ ligne, nom: nomCell, message: `${key} : « ${s} » n'est ni oui ni non` }); else if (b !== undefined) set(key, b); break; }
+        case "is_active": case "favori_commande": case "order_element_permis": { const b = boolIn(s); if (s && b === undefined) erreurs.push({ ligne, nom: nomCell, message: `${key} : « ${s} » n'est ni oui ni non` }); else if (b !== undefined) set(key, b); break; }
         case "establishments": { const e = estabsIn(s); if (e === "invalide") erreurs.push({ ligne, nom: nomCell, message: `Établissements « ${s} » non reconnus` }); else if (e) set("establishments", e); break; }
         case "category": { if (!s) break; const c = s.toLowerCase(); if (!(CATEGORIES as readonly string[]).includes(c)) erreurs.push({ ligne, nom: nomCell, message: `Catégorie « ${s} » inconnue (voir feuille Listes)` }); else set("category", c); break; }
         case "default_unit": { if (!s) break; const u = s.toLowerCase().replace("pcs", "pc").replace("pièce", "pc").replace("piece", "pc"); if (!(UNITES_BASE as readonly string[]).includes(u)) erreurs.push({ ligne, nom: nomCell, message: `Unité de base « ${s} » : g, kg, l ou pc` }); else set("default_unit", u); break; }
