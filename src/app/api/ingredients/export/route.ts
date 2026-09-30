@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   const [{ data: offers }, { data: suppliers }, { data: zones }, { data: etabsRows }] = await Promise.all([
     supabaseAdmin.from("supplier_offers").select("*").eq("is_active", true).order("created_at", { ascending: false }).range(0, 4999),
     supabaseAdmin.from("suppliers").select("id, name"),
-    supabaseAdmin.from("storage_zones").select("name").order("display_order"),
+    supabaseAdmin.from("storage_zones").select("name, etablissement_id").order("display_order"),
     supabaseAdmin.from("etablissements").select("id, slug"),
   ]);
   const supName = new Map((suppliers ?? []).map((s) => [s.id as string, s.name as string]));
@@ -60,6 +60,24 @@ export async function GET(req: NextRequest) {
     }
     if (!data || data.length < 1000) break;
   }
+  // Zones de stockage PAR ÉTABLISSEMENT (ingredient_zones, rang 1 / 2)
+  const zonesParEtab = new Map<string, string>(); // `${ingredient_id}|${bellomio|piccola}|${rang}` → zone
+  for (let from = 0; ; from += 1000) {
+    const { data } = await supabaseAdmin.from("ingredient_zones").select("ingredient_id, etablissement_id, zone, rang").not("rang", "is", null).range(from, from + 999);
+    for (const z of (data ?? []) as { ingredient_id: string; etablissement_id: string; zone: string; rang: number }[]) {
+      const k = etabKey.get(z.etablissement_id);
+      if (k) zonesParEtab.set(`${z.ingredient_id}|${k}|${z.rang}`, z.zone);
+    }
+    if (!data || data.length < 1000) break;
+  }
+  const zoneDe = (id: string, cle: "bellomio" | "piccola", rang: 1 | 2) => zonesParEtab.get(`${id}|${cle}|${rang}`) ?? "";
+  // Colonnes du fichier : les zones du périmètre seulement (Bello Mio, Piccola Mia, ou les deux), jamais les en-têtes génériques
+  const colonnes = COLS.filter((c) => {
+    if (c.key === "storage_zone" || c.key === "storage_zone_2") return false;
+    if (c.key === "storage_zone_bm" || c.key === "storage_zone_2_bm") return etab !== "piccola";
+    if (c.key === "storage_zone_pm" || c.key === "storage_zone_2_pm") return etab !== "bellomio";
+    return true;
+  });
   const acheteChezOut = (id: string): string => {
     const s = acheteChez.get(id);
     if (!s || s.size === 0) return "";
@@ -93,9 +111,13 @@ export async function GET(req: NextRequest) {
     const sid = (o?.supplier_id as string) ?? (r.supplier_id as string) ?? null;
     const cell: Record<string, unknown> = {};
     const px = prixDepuisOffre(o, r);
-    for (const c of COLS) {
+    for (const c of colonnes) {
       let v: unknown;
       switch (c.key) {
+        case "storage_zone_bm": v = zoneDe(r.id as string, "bellomio", 1); break;
+        case "storage_zone_2_bm": v = zoneDe(r.id as string, "bellomio", 2); break;
+        case "storage_zone_pm": v = zoneDe(r.id as string, "piccola", 1); break;
+        case "storage_zone_2_pm": v = zoneDe(r.id as string, "piccola", 2); break;
         case "prix_base": v = px.base ?? ""; break;
         case "prix_unitaire": v = px.unitaire; break;
         case "prix_nb": v = px.nb; break;
@@ -118,15 +140,15 @@ export async function GET(req: NextRequest) {
   });
 
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(data, { header: COLS.map((c) => c.header) });
-  ws["!cols"] = COLS.map((c) => ({ wch: c.key === "name" ? 44 : c.key === "id" ? 38 : Math.min(28, Math.max(12, c.header.length * 0.8)) }));
+  const ws = XLSX.utils.json_to_sheet(data, { header: colonnes.map((c) => c.header) });
+  ws["!cols"] = colonnes.map((c) => ({ wch: c.key === "name" ? 44 : c.key === "id" ? 38 : Math.min(28, Math.max(12, c.header.length * 0.8)) }));
   ws["!freeze"] = { xSplit: 2, ySplit: 1 };
-  ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: data.length, c: COLS.length - 1 } }) };
+  ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: data.length, c: colonnes.length - 1 } }) };
   XLSX.utils.book_append_sheet(wb, ws, SHEET_PRODUITS);
 
   // Listes de valeurs autorisées
   const subCats = [...new Set(rows.map((r) => r.sub_category as string).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
-  const zoneNames = [...new Set((zones ?? []).map((z) => z.name as string))];
+  const zoneNames = [...new Set((zones ?? []).map((z) => `${z.name}${etabKey.get(z.etablissement_id as string) === "piccola" ? " (Piccola Mia)" : " (Bello Mio)"}`))];
   const maxLen = Math.max(CATEGORY_HELP.length, subCats.length, zoneNames.length, UNITES_BASE.length);
   const listes = Array.from({ length: maxLen }, (_, i) => ({
     "Catégories (code = libellé)": CATEGORY_HELP[i] ?? "",
@@ -149,7 +171,7 @@ export async function GET(req: NextRequest) {
     ["3. Les colonnes marquées (info) sont indicatives et ne sont pas relues à l'import (fournisseur, prix au kg, libellé facture)."],
     ["Établissements : une fiche « les deux » est une seule et même fiche, partagée par Bello Mio et Piccola Mia ; elle sort dans les deux exports et une correction s'applique aux deux. « Acheté chez (info) » indique où le produit a réellement été acheté : si une fiche « les deux » n'est achetée que dans un restaurant, écris ce restaurant dans « Établissements » pour la réserver."],
     ["Prix : « Base de prix » dit si le produit s'achète au kg, au litre ou à la pièce (bouteille, boîte…). « Prix HT par kg, L ou pièce » est le prix de cette base. Si le produit arrive par carton / colis, indique le nombre d'unités par conditionnement et le prix du conditionnement (l'un des deux prix suffit, l'autre se déduit)."],
-    ["4. Catégorie : utiliser le code (ex. « legumes_herbes »), voir la feuille Listes. Zones de stockage : le nom exact d'une zone existante."],
+    ["4. Catégorie : utiliser le code (ex. « legumes_herbes »), voir la feuille Listes. Zones de stockage : le nom exact d'une zone de CET établissement (chaque restaurant a ses zones, une fiche partagée en a une par restaurant ; la colonne « Zone … Bello Mio » ne change que Bello Mio, « Zone … Piccola Mia » que Piccola Mia). Pour retirer une zone : écrire « aucune »."],
     ["5. Une ligne sans ID mais avec un Nom crée un nouveau produit."],
     ["6. Pour rendre un produit invisible sans le supprimer : Actif = non."],
     ["7. Réimporte le fichier depuis Base produits → bouton Import / Export : l'appli montre d'abord ce qui va changer, tu confirmes ensuite."],

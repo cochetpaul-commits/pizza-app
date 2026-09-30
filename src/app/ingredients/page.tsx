@@ -928,13 +928,21 @@ function IngredientsPageInner() {
       allergens: edit.allergens.length ? edit.allergens : null,
       order_unit_label: orderLabel || null,
       order_quantity: orderQuantity,
-      storage_zone: edit.storageZone || null,
       stock_min: parseNum(edit.stockMin) ?? null,
       stock_objectif: parseNum(edit.stockObjectif) ?? null,
       stock_max: parseNum(edit.stockMax) ?? null,
       establishments: edit.establishments.length ? edit.establishments : ["bellomio", "piccola"],
     } as Record<string, unknown>;
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
+    // Zone de stockage : propre à l'établissement courant (fiche partagée : l'autre restaurant garde la sienne)
+    if (!u1.error) {
+      const zoneEtab = etab?.id ?? items.find((x) => x.id === editingId)?.etablissement_id ?? null;
+      const avantZone = items.find((x) => x.id === editingId)?.storage_zone ?? null;
+      if (zoneEtab && (edit.storageZone || null) !== avantZone) {
+        const z = await supabase.rpc("set_zone_stockage", { p_ingredient: editingId, p_etab: zoneEtab, p_rang: 1, p_zone: edit.storageZone || null });
+        if (z.error) alert(`Zone de stockage : ${z.error.message}`);
+      }
+    }
     if (u1.error) {
       if (u1.error.message.includes("ingredients_etab_name")) {
         alert(`Un ingredient "${name}" existe deja. Choisissez un autre nom.`);

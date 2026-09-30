@@ -6,7 +6,14 @@ type Changement = { id: string | null; ligne: number; nom: string; nouveau: bool
 type Erreur = { ligne: number; nom: string; message: string };
 
 const NUM_KEYS: ColKey[] = ["order_quantity", "piece_weight_g", "piece_volume_ml", "density_g_per_ml", "stock_min", "stock_objectif", "stock_max"];
-const TXT_KEYS: ColKey[] = ["name", "sub_category", "order_unit_label", "storage_zone", "storage_zone_2", "popina_name"];
+const TXT_KEYS: ColKey[] = ["name", "sub_category", "order_unit_label", "popina_name"];
+/** Colonnes de zone → établissement (clé establishments, ou « défaut » = établissement de l'import) et rang */
+const ZONE_KEYS: Partial<Record<ColKey, { cle: "bellomio" | "piccola" | "defaut"; rang: 1 | 2 }>> = {
+  storage_zone_bm: { cle: "bellomio", rang: 1 }, storage_zone_2_bm: { cle: "bellomio", rang: 2 },
+  storage_zone_pm: { cle: "piccola", rang: 1 }, storage_zone_2_pm: { cle: "piccola", rang: 2 },
+  storage_zone: { cle: "defaut", rang: 1 }, storage_zone_2: { cle: "defaut", rang: 2 },
+};
+type ZoneAEcrire = { etabId: string; rang: 1 | 2; zone: string | null };
 void SHEET_PRODUITS;
 
 export type ResultatImport = { status: number; body: unknown };
@@ -28,8 +35,9 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
     return { status: 400, body: { error: `Colonnes non reconnues. Le fichier doit venir de l'export (colonne « ${COLS[0].header} » requise).` } };
   }
 
-  const { data: zones } = await supabaseAdmin.from("storage_zones").select("name");
-  const zoneByNorm = new Map((zones ?? []).map((z) => [norm(z.name), z.name as string]));
+  // Zones PAR ÉTABLISSEMENT : `${etabId}|${nom normalisé}` → nom exact
+  const { data: zones } = await supabaseAdmin.from("storage_zones").select("name, etablissement_id");
+  const zoneByNorm = new Map((zones ?? []).map((z) => [`${z.etablissement_id}|${norm(z.name)}`, z.name as string]));
   const { data: offersAll } = await supabaseAdmin.from("supplier_offers").select("*").eq("is_active", true).order("created_at", { ascending: false }).range(0, 4999);
   const offerBy = new Map<string, Record<string, unknown>>();
   for (const o of (offersAll ?? []) as Record<string, unknown>[]) if (!offerBy.has(o.ingredient_id as string)) offerBy.set(o.ingredient_id as string, o);
@@ -65,6 +73,13 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
     for (const r of data ?? []) existing.set(r.id as string, r as Record<string, unknown>);
   }
 
+  // Zones actuelles par établissement des fiches du fichier : `${id}|${etabId}|${rang}` → zone
+  const zonesActuelles = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data } = await supabaseAdmin.from("ingredient_zones").select("ingredient_id, etablissement_id, zone, rang").in("ingredient_id", ids.slice(i, i + 150)).not("rang", "is", null);
+    for (const z of (data ?? []) as Array<{ ingredient_id: string; etablissement_id: string; zone: string; rang: number }>) zonesActuelles.set(`${z.ingredient_id}|${z.etablissement_id}|${z.rang}`, z.zone);
+  }
+
   // Noms du fichier → fiches existantes portant ce nom (pour le contrôle de conflit)
   const lowerKey = (v: unknown) => String(v ?? "").trim().toLowerCase();
   const nomsFichier = [...new Set(sheetRows.map((r) => { const h = [...headerMap.entries()].find(([, k]) => k === "name")?.[0]; return h ? lowerKey(r[h]) : ""; }).filter(Boolean))];
@@ -92,6 +107,7 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
 
     const patch: Record<string, unknown> = {};
     const champs: Changement["champs"] = {};
+    const zonesAEcrire: ZoneAEcrire[] = [];
     const set = (k: string, v: unknown) => {
       const a = avant ? avant[k] ?? null : null;
       const same = JSON.stringify(a) === JSON.stringify(v ?? null) || (typeof a === "number" && typeof v === "number" && Math.abs(a - v) < 1e-9) || (a != null && v != null && String(a) === String(v));
@@ -115,7 +131,22 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
         case "establishments": { const e = estabsIn(s); if (e === "invalide") erreurs.push({ ligne, nom: nomCell, message: `Établissements « ${s} » non reconnus` }); else if (e) set("establishments", e); break; }
         case "category": { if (!s) break; const c = s.toLowerCase(); if (!(CATEGORIES as readonly string[]).includes(c)) erreurs.push({ ligne, nom: nomCell, message: `Catégorie « ${s} » inconnue (voir feuille Listes)` }); else set("category", c); break; }
         case "default_unit": { if (!s) break; const u = s.toLowerCase().replace("pcs", "pc").replace("pièce", "pc").replace("piece", "pc"); if (!(UNITES_BASE as readonly string[]).includes(u)) erreurs.push({ ligne, nom: nomCell, message: `Unité de base « ${s} » : g, kg, l ou pc` }); else set("default_unit", u); break; }
-        case "storage_zone": case "storage_zone_2": { if (!s) { set(key, null); break; } const z = zoneByNorm.get(norm(s)); if (!z) erreurs.push({ ligne, nom: nomCell, message: `Zone « ${s} » inconnue (voir feuille Listes)` }); else set(key, z); break; }
+        case "storage_zone_bm": case "storage_zone_2_bm": case "storage_zone_pm": case "storage_zone_2_pm": case "storage_zone": case "storage_zone_2": {
+          // Zone DE L'ÉTABLISSEMENT de la colonne (en-tête générique = établissement de l'import). « aucune » / « - » = retirée.
+          const zk = ZONE_KEYS[key]!;
+          const cle = zk.cle === "defaut" ? etabDefaut : zk.cle;
+          const etabId = etabIdOf(cle);
+          if (!etabId) break;
+          // Nouvelle fiche : la zone d'un établissement où elle n'est pas visible est ignorée
+          const visible = nouveau ? ((patch.establishments as string[] | undefined) ?? [etabDefaut]).includes(cle) : ((avant?.establishments as string[] | null) ?? [cle]).includes(cle) || (avant?.establishments as string[] | null) === null;
+          if (!visible) { erreurs.push({ ligne, nom: nomCell, message: `Zone « ${s} » ignorée : la fiche n'est pas ouverte à ${cle === "piccola" ? "Piccola Mia" : "Bello Mio"} (colonne Établissements)` }); break; }
+          const retirer = ["aucune", "aucun", "-", "sans", "vide", "non"].includes(s.toLowerCase());
+          const z = retirer ? null : zoneByNorm.get(`${etabId}|${norm(s)}`);
+          if (z === undefined) { erreurs.push({ ligne, nom: nomCell, message: `Zone « ${s} » inconnue pour ${cle === "piccola" ? "Piccola Mia" : "Bello Mio"} (voir feuille Listes)` }); break; }
+          const a = id ? zonesActuelles.get(`${id}|${etabId}|${zk.rang}`) ?? null : null;
+          if ((nouveau && z) || (!nouveau && a !== z)) { champs[key] = { avant: a, apres: z }; zonesAEcrire.push({ etabId, rang: zk.rang, zone: z }); }
+          break;
+        }
         case "status": { const st = statusIn(s); if (st === "invalide") erreurs.push({ ligne, nom: nomCell, message: `Statut « ${s} » : « validé » ou « à vérifier »` }); else if (st) set("status", st); break; }
         case "allergens": set("allergens", allergensIn(s)); break;
         default:
@@ -221,6 +252,7 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
     }
     if (Object.keys(champs).length) changements.push({ id, ligne, nom: nomCell || String(avant?.name ?? ""), nouveau, champs });
     (row as Record<string, unknown>).__patch = patch;
+    if (zonesAEcrire.length) (row as Record<string, unknown>).__zones = zonesAEcrire;
   });
 
   if (mode !== "commit") {
@@ -231,7 +263,15 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
 
   let modifies = 0, crees = 0, prixMaj = 0, refsMaj = 0, offresFermees = 0;
   const echecs: Erreur[] = [];
-  const todo = sheetRows.map((r, i) => ({ row: r, idx: i })).filter(({ row }) => Object.keys((row.__patch as Record<string, unknown>) ?? {}).length || row.__prix || row.__offreMaj || row.__fermerOffres);
+  const todo = sheetRows.map((r, i) => ({ row: r, idx: i })).filter(({ row }) => Object.keys((row.__patch as Record<string, unknown>) ?? {}).length || row.__prix || row.__offreMaj || row.__fermerOffres || row.__zones);
+  // Zones par établissement (rpc set_zone_stockage : rang 1 / 2, miroir ingredients.storage_zone tenu par trigger)
+  const ecrireZones = async (ingredientId: string, zs: ZoneAEcrire[] | undefined): Promise<string | null> => {
+    for (const z of zs ?? []) {
+      const { error } = await supabaseAdmin.rpc("set_zone_stockage", { p_ingredient: ingredientId, p_etab: z.etabId, p_rang: z.rang, p_zone: z.zone });
+      if (error) return error.message;
+    }
+    return null;
+  };
   type Prix = { base: PrixBase; unitaire: number; nb: number | null; cond: number | null; sid: string | null; sku: string | null; date: string | null };
   const ecrireOffre = async (ingredientId: string, ing: Record<string, unknown> | undefined, p: Prix, actif = true): Promise<string | null> => {
     // Fiche « Actif = non » : on ne crée ni ne réactive d'offre (vécu 24/09 : deux fiches Sum désactivées ressorties avec une offre active)
@@ -290,12 +330,14 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
           offresFermees += (fermees ?? []).length;
         }
         if (prix) { const e = await ecrireOffre(id, existing.get(id), prix, actif); if (e) { echecs.push({ ligne, nom: String(patch.name ?? existing.get(id)?.name ?? ""), message: `prix : ${e}` }); return; } }
+        { const e = await ecrireZones(id, row.__zones as ZoneAEcrire[] | undefined); if (e) { echecs.push({ ligne, nom: String(patch.name ?? existing.get(id)?.name ?? ""), message: `zone : ${e}` }); return; } }
         modifies++;
       } else {
         const estabs = (patch.establishments as string[]) ?? [etabDefaut];
         const { data: cree, error } = await supabaseAdmin.from("ingredients").insert({ ...patch, user_id: userId, etablissement_id: etabIdOf(estabs[0]) ?? etabIdOf(etabDefaut), status: patch.status ?? "to_check" }).select("id, etablissement_id, piece_weight_g, supplier_id").single();
         if (error) { echecs.push({ ligne, nom: String(patch.name ?? ""), message: error.message }); return; }
         crees++;
+        if (cree) { const e = await ecrireZones(cree.id as string, row.__zones as ZoneAEcrire[] | undefined); if (e) echecs.push({ ligne, nom: String(patch.name ?? ""), message: `créé, mais zone non enregistrée : ${e}` }); }
         if (prix && cree && prix.sid) { const e = await ecrireOffre(cree.id as string, cree as Record<string, unknown>, prix, patch.is_active !== false); if (e) echecs.push({ ligne, nom: String(patch.name ?? ""), message: `créé, mais prix non enregistré : ${e}` }); }
       }
     }));

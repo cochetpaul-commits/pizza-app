@@ -56,6 +56,18 @@ describe("prixUniteCommande", () => {
   it("vendu au kg", () => {
     expect(prixUniteCommande(art({ unite_commande: "kg" }), { unit: "kg", unit_price: 9.9, pack_price: null, pack_count: null })).toBe(9.9);
   });
+  it("offre au colis de 1 sans prix unitaire (paquet de 1 kg à 20,75 €) : prix du paquet", () => {
+    const cafe = art({ unite_commande: "paquet", contenu_nb: 1 });
+    expect(prixUniteCommande(cafe, { unit: null, unit_price: null, pack_price: 20.75, pack_count: 1 })).toBe(20.75);
+  });
+  it("offre au colis sans prix unitaire : colis de N commandé par 2N, et à l'élément", () => {
+    const pots = art({ unite_commande: "colis", contenu_nb: 12, element: "pot", commande_element_permise: true });
+    const offre = { unit: null, unit_price: null, pack_price: 18, pack_count: 6 };
+    expect(prixUniteCommande(pots, offre)).toBe(36);
+    expect(prixUniteCommande(pots, offre, true)).toBe(3);
+    // au poids : jamais déduit d'un prix au colis
+    expect(prixUniteCommande(art({ unite_commande: "kg" }), offre)).toBeNull();
+  });
 });
 
 describe("quantiteAffichee (écran)", () => {

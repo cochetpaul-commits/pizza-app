@@ -34,6 +34,12 @@ export const COLS = [
   { key: "piece_weight_g", header: "Poids d'une pièce (g)", edit: true },
   { key: "piece_volume_ml", header: "Volume d'une pièce (ml)", edit: true },
   { key: "density_g_per_ml", header: "Densité (g/ml)", edit: true },
+  // Zones PAR ÉTABLISSEMENT : l'export ne sort que les colonnes du périmètre choisi (les deux en périmètre « Les deux »),
+  // l'import écrit chaque colonne dans son établissement. Les en-têtes génériques (anciens fichiers) vont dans l'établissement de l'import.
+  { key: "storage_zone_bm", header: "Zone de stockage Bello Mio", edit: true },
+  { key: "storage_zone_2_bm", header: "Zone 2 Bello Mio", edit: true },
+  { key: "storage_zone_pm", header: "Zone de stockage Piccola Mia", edit: true },
+  { key: "storage_zone_2_pm", header: "Zone 2 Piccola Mia", edit: true },
   { key: "storage_zone", header: "Zone de stockage", edit: true },
   { key: "storage_zone_2", header: "Zone de stockage 2", edit: true },
   { key: "stock_min", header: "Stock mini", edit: true },

@@ -15,7 +15,9 @@ const LIBELLES: Record<string, string> = {
   prix: "Prix fournisseur", prix_ref: "Réf. / date du prix", supplier_sku: "Réf. fournisseur (fiche)",
   order_unit_label: "Conditionnement", order_quantity: "Qté / conditionnement", default_unit: "Unité de base",
   piece_weight_g: "Poids pièce (g)", piece_volume_ml: "Volume pièce (ml)", density_g_per_ml: "Densité",
-  storage_zone: "Zone", storage_zone_2: "Zone 2", stock_min: "Stock mini", stock_objectif: "Stock objectif", stock_max: "Stock maxi",
+  storage_zone: "Zone", storage_zone_2: "Zone 2",
+  storage_zone_bm: "Zone Bello Mio", storage_zone_2_bm: "Zone 2 Bello Mio", storage_zone_pm: "Zone Piccola Mia", storage_zone_2_pm: "Zone 2 Piccola Mia",
+  stock_min: "Stock mini", stock_objectif: "Stock objectif", stock_max: "Stock maxi",
   favori_commande: "Favori", status: "Statut", allergens: "Allergènes", popina_name: "Nom Popina",
 };
 const fmt = (v: unknown) => v === null || v === undefined || v === "" ? "—" : Array.isArray(v) ? v.join(", ") : typeof v === "boolean" ? (v ? "oui" : "non") : String(v);

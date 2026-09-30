@@ -10,6 +10,8 @@ import { StepperInput } from "@/components/StepperInput";
 import { compressImage } from "@/lib/compressImage";
 import { computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import { CAT_COLORS } from "@/types/ingredients";
+import { useEtablissement } from "@/lib/EtablissementContext";
+import { zonesPour, type ZoneEtabRow } from "@/lib/zonesEtablissement";
 
 const PriceEvolutionChart = dynamic(() => import("./PriceEvolutionChart"), { ssr: false });
 
@@ -21,6 +23,7 @@ type Ingredient = {
   order_unit_label?: string | null;
   order_quantity?: number | null;
   storage_zone?: string | null;
+  etablissement_id?: string | null;
   parent_ingredient_id?: string | null;
   rendement?: number | null;
   is_derived?: boolean;
@@ -63,6 +66,7 @@ function fmtPrice(v: number, unit: string) {
 }
 
 function IngredientDetailInner() {
+  const { current: etab } = useEtablissement();
   const params = useParams();
   const searchParams = useSearchParams();
   const id = params.id as string;
@@ -131,7 +135,7 @@ function IngredientDetailInner() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Non connecté");
 
-        const ingQuery = supabase.from("ingredients").select("*").eq("id", id);
+        const ingQuery = supabase.from("ingredients").select("*, ingredient_zones(etablissement_id, zone, rang)").eq("id", id);
 
         const offQuery = supabase.from("supplier_offers")
           .select("id, supplier_id, unit, unit_price, supplier_label, is_active, created_at, establishment, price_kind")
@@ -146,7 +150,10 @@ function IngredientDetailInner() {
 
         if (e1) throw new Error(e1.message);
         if (e2) throw new Error(e2.message);
-        const ingTyped = ing as Ingredient;
+        const { ingredient_zones: zonesRows, ...ingSansZones } = ing as Ingredient & { ingredient_zones?: ZoneEtabRow[] | null };
+        // Zone de stockage de l'établissement courant (sinon celle de l'établissement de rattachement)
+        const zoneEtabId = etab?.id ?? ingSansZones.etablissement_id ?? null;
+        const ingTyped = { ...ingSansZones, storage_zone: zonesPour(zonesRows, zoneEtabId).zone1 } as Ingredient;
         setIngredient(ingTyped);
         setOrderUnit(ingTyped.order_unit_label ?? "");
         setOrderQuantity(ingTyped.order_quantity != null ? String(ingTyped.order_quantity) : "");
@@ -172,15 +179,19 @@ function IngredientDetailInner() {
       }
     };
     run();
-  }, [id]);
+  }, [id, etab?.id]);
 
   // Load storage zones
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("storage_zones").select("id, name").order("display_order").order("name");
+      // Zones de l'établissement courant (sinon de l'établissement de rattachement de la fiche)
+      const zoneEtabId = etab?.id ?? ingredient?.etablissement_id ?? null;
+      let q = supabase.from("storage_zones").select("id, name").order("display_order").order("name");
+      if (zoneEtabId) q = q.eq("etablissement_id", zoneEtabId);
+      const { data } = await q;
       setStorageZoneOptions((data ?? []) as { id: string; name: string }[]);
     })();
-  }, []);
+  }, [etab?.id, ingredient?.etablissement_id]);
 
   // Load derived ingredients + parent info
   useEffect(() => {
@@ -418,7 +429,10 @@ function IngredientDetailInner() {
             onChange={async (e) => {
               const val = e.target.value || null;
               setStorageZone(e.target.value);
-              await supabase.from("ingredients").update({ storage_zone: val }).eq("id", id);
+              const zoneEtabId = etab?.id ?? ingredient?.etablissement_id ?? null;
+              if (!zoneEtabId) return;
+              const r = await supabase.rpc("set_zone_stockage", { p_ingredient: id, p_etab: zoneEtabId, p_rang: 1, p_zone: val });
+              if (r.error) { alert(r.error.message); return; }
               setStorageZoneSaved(true);
               setTimeout(() => setStorageZoneSaved(false), 2000);
             }}

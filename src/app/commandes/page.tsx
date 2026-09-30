@@ -16,6 +16,7 @@ import { BottomSheet } from "@/components/layout/BottomSheet";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { inChunks } from "@/lib/supabaseChunks";
+import { ZONES_EMBED, appliquerZonesEtab, type ZoneEtabRow } from "@/lib/zonesEtablissement";
 import { CommandeSimplifiee } from "@/components/commandes/CommandeSimplifiee";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -897,14 +898,16 @@ function CommandesPage() {
 
     let items: CatalogItem[] = [];
     if (allIds.length > 0) {
-      const selectCols = "id, name, category, sub_category, default_unit, favori_commande, order_unit_label, order_quantity, stock_objectif, stock_min, storage_zone";
+      const selectCols = "id, name, category, sub_category, default_unit, favori_commande, order_unit_label, order_quantity, stock_objectif, stock_min, storage_zone, etablissement_id, " + ZONES_EMBED;
       // Par paquets : au-delà de ~200 identifiants l'URL dépasse la limite PostgREST (400 silencieux)
       const { data: ingRows, error: ingErrMsg } = await inChunks<Record<string, unknown>>(allIds, (batch) => {
         let q = supabase.from("ingredients").select(selectCols).in("id", batch);
         if (etabKey) q = q.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
-        return q;
+        // select composé (embed ingredient_zones) : le typage PostgREST ne sait pas l'analyser
+        return q as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
       });
-      const ingData = ingRows.sort((a, b) =>
+      // Zone de stockage de l'établissement courant (fiche partagée : chaque restaurant a la sienne)
+      const ingData = appliquerZonesEtab(ingRows as Array<Record<string, unknown> & { ingredient_zones?: ZoneEtabRow[] | null }>, etab?.id).sort((a, b) =>
         String(a.category ?? "").localeCompare(String(b.category ?? ""), "fr") || String(a.name ?? "").localeCompare(String(b.name ?? ""), "fr"));
       const ingErr = ingErrMsg ? { message: ingErrMsg } : null;
 

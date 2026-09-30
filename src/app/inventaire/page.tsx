@@ -9,6 +9,7 @@ import { CATEGORIES, CAT_LABELS, CAT_COLORS, type Category, type Ingredient } fr
 import { openApiFile } from "@/lib/fetchApi";
 import { useRouter } from "next/navigation";
 import { fermerOffresActives } from "@/lib/offerClosing";
+import { ZONES_EMBED, appliquerZonesEtab, type ZoneEtabRow } from "@/lib/zonesEtablissement";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -225,7 +226,7 @@ export default function InventairePage() {
     (async () => {
       let q = supabase
         .from("ingredients")
-        .select("*")
+        .select("*, " + ZONES_EMBED)
         .eq("is_active", true)
         .order("name");
       // Visibilité par établissement (establishments), PAS établissement de
@@ -245,14 +246,16 @@ export default function InventairePage() {
       if (etabId) supQ = supQ.eq("etablissement_id", etabId);
       // Tous les fournisseurs (les 2 etablissements) pour la pastille produit
       const supAllQ = supabase.from("suppliers").select("id, name, color").eq("is_active", true);
-      let xzQ = supabase.from("ingredient_zones").select("ingredient_id, zone");
+      // Emplacements supplémentaires (rang null) et zone secondaire (rang 2) ; la zone principale (rang 1) vient avec la fiche
+      let xzQ = supabase.from("ingredient_zones").select("ingredient_id, zone").or("rang.is.null,rang.eq.2");
       if (etabId) xzQ = xzQ.eq("etablissement_id", etabId);
       const [{ data, error }, { data: zData }, { data: packData }, { data: supData }, { data: supAllData }, { data: xzData }] = await Promise.all([q, zq, packQ, supQ, supAllQ, xzQ]);
       const xz: ExtraZones = {};
       for (const r of (xzData ?? []) as { ingredient_id: string; zone: string }[]) (xz[r.ingredient_id] ??= []).push(r.zone);
       setExtraZones(xz);
       if (error) { console.error("ingredients query:", error); }
-      setIngredients((data ?? []) as Ingredient[]);
+      // storage_zone = zone principale DANS CET ÉTABLISSEMENT (fiche partagée : chaque restaurant a la sienne)
+      setIngredients(appliquerZonesEtab((data ?? []) as unknown as (Ingredient & { ingredient_zones?: ZoneEtabRow[] | null })[], etabId) as Ingredient[]);
       const zList = (zData ?? []) as StorageZone[];
       setZones(zList);
       if (zList.length > 0) setActiveZone(zList[0].name);
@@ -608,8 +611,9 @@ export default function InventairePage() {
       : `Supprimer la zone "${zone.name}" ?`;
     if (!confirm(msg)) return;
 
-    if (count > 0) {
-      await supabase.from("ingredients").update({ storage_zone: null }).eq("storage_zone", zone.name);
+    if (count > 0 && etab?.id) {
+      // Affectations de cette zone dans CET établissement (le miroir ingredients.storage_zone suit par trigger)
+      await supabase.from("ingredient_zones").delete().eq("etablissement_id", etab.id).eq("zone", zone.name);
     }
     await supabase.from("storage_zones").delete().eq("id", zone.id);
     const zList = await loadZones();
@@ -638,7 +642,7 @@ export default function InventairePage() {
     if (!name || name === zone.name) return;
     const { error } = await supabase.from("storage_zones").update({ name }).eq("id", zone.id);
     if (error) { alert(error.message); return; }
-    await supabase.from("ingredients").update({ storage_zone: name }).eq("storage_zone", zone.name);
+    if (etab?.id) await supabase.from("ingredient_zones").update({ zone: name }).eq("etablissement_id", etab.id).eq("zone", zone.name);
     setIngredients(prev => prev.map(i => i.storage_zone === zone.name ? { ...i, storage_zone: name } : i));
     if (activeZone === zone.name) setActiveZone(name);
     await loadZones();
@@ -655,8 +659,12 @@ export default function InventairePage() {
     const sansZone = ids.filter(id => { const ing = ingredients.find(i => i.id === id); return ing ? isUnzoned(ing, zones, extraZones) : false; });
     const enPlus = ids.filter(id => !sansZone.includes(id));
     let error: { message: string } | null = null;
-    if (sansZone.length > 0) {
-      const r = await supabase.from("ingredients").update({ storage_zone: activeZone }).in("id", sansZone);
+    if (sansZone.length > 0 && etab?.id) {
+      // Zone principale DANS CET ÉTABLISSEMENT (ces fiches n'en ont pas encore ici)
+      const r = await supabase.from("ingredient_zones").upsert(
+        sansZone.map(id => ({ etablissement_id: etab.id, ingredient_id: id, zone: activeZone, rang: 1, source: "fiche", updated_at: new Date().toISOString() })),
+        { onConflict: "etablissement_id,ingredient_id,zone" },
+      );
       error = r.error;
     }
     if (!error && enPlus.length > 0 && etab?.id) {

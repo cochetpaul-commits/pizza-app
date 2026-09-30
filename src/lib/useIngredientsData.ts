@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchPriceAlerts, type PriceAlert } from "@/lib/priceAlerts";
 import type { Ingredient, LatestOffer, Supplier } from "@/types/ingredients";
 import { inChunks } from "@/lib/supabaseChunks";
+import { ZONES_EMBED, appliquerZonesEtab } from "@/lib/zonesEtablissement";
 
 const PAGE_SIZE = 1000;
 
@@ -23,7 +24,7 @@ function slugToOfferEstab(slug: string): string | null {
 }
 
 const INGREDIENT_COLS =
-  "id,name,import_name,popina_name,popina_dose_cl,category,sub_category,allergens,is_active,default_unit,purchase_price,purchase_unit,purchase_unit_label,purchase_unit_name,density_g_per_ml,piece_weight_g,piece_volume_ml,supplier_id,source_prep_recipe_name,source,recipe_id,status,status_note,validated_at,validated_by,cost_per_unit,cost_per_kg,etablissement_id,order_unit_label,order_quantity,storage_zone,parent_ingredient_id,rendement,is_derived,establishments,stock_min,stock_objectif,stock_max";
+  "id,name,import_name,popina_name,popina_dose_cl,category,sub_category,allergens,is_active,default_unit,purchase_price,purchase_unit,purchase_unit_label,purchase_unit_name,density_g_per_ml,piece_weight_g,piece_volume_ml,supplier_id,source_prep_recipe_name,source,recipe_id,status,status_note,validated_at,validated_by,cost_per_unit,cost_per_kg,etablissement_id,order_unit_label,order_quantity,storage_zone,storage_zone_2,parent_ingredient_id,rendement,is_derived,establishments,stock_min,stock_objectif,stock_max," + ZONES_EMBED;
 
 const OFFER_COLS =
   "ingredient_id,supplier_id,price_kind,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,establishment,updated_at";
@@ -75,7 +76,8 @@ async function fetchPage(page: number, etabId?: string | null, etabSlug?: string
   const { data, error } = await query;
 
   if (error) throw new Error(error.message);
-  const items = (data ?? []) as Ingredient[];
+  // Zones de stockage de l'établissement courant (fiche partagée : chaque restaurant a les siennes)
+  const items = appliquerZonesEtab((data ?? []) as unknown as Ingredient[], etabId);
   const allOffers = await fetchAllActiveOffers(items.map((i) => i.id));
   const offers = pickLatestOffers(allOffers);
 
@@ -98,7 +100,7 @@ async function searchIngredients(q: string, etabId?: string | null, etabSlug?: s
   const { data, error } = await query;
 
   if (error) throw new Error(error.message);
-  const items = (data ?? []) as Ingredient[];
+  const items = appliquerZonesEtab((data ?? []) as unknown as Ingredient[], etabId);
   const allOffers = await fetchAllActiveOffers(items.map((i) => i.id));
   const offers = pickLatestOffers(allOffers);
 
@@ -316,7 +318,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
       await doLoad(searchQuery, id);
       return;
     }
-    const updated = row as Ingredient;
+    const [updated] = appliquerZonesEtab([row as unknown as Ingredient], etabRef.current);
     const newAllOffers = await fetchAllActiveOffers([ingredientId]);
     const newOffers = pickLatestOffers(newAllOffers);
 

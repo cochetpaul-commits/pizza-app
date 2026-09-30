@@ -8,7 +8,7 @@
 
 export const UNITES_COMMANDE = [
   "piece", "colis", "carton", "seau", "pochette", "barquette", "bouteille",
-  "sachet", "boite", "bac", "pot", "plateau", "filet", "botte", "fut", "kg", "litre",
+  "sachet", "paquet", "boite", "bac", "pot", "plateau", "filet", "botte", "fut", "kg", "litre",
 ] as const;
 export type UniteCommande = (typeof UNITES_COMMANDE)[number];
 
@@ -43,6 +43,7 @@ const LIBELLE: Record<UniteCommande, { un: string; plusieurs: string }> = {
   barquette: { un: "barquette", plusieurs: "barquettes" },
   bouteille: { un: "bouteille", plusieurs: "bouteilles" },
   sachet: { un: "sachet", plusieurs: "sachets" },
+  paquet: { un: "paquet", plusieurs: "paquets" },
   boite: { un: "boîte", plusieurs: "boîtes" },
   bac: { un: "bac", plusieurs: "bacs" },
   pot: { un: "pot", plusieurs: "pots" },
@@ -107,10 +108,17 @@ function elementEnUnitePrix(a: CommandeArticle, unitePrix: string): number | nul
 export function prixUniteCommande(a: CommandeArticle, offre: OffrePrix | null, parElement = false): number | null {
   if (!offre) return null;
   const nb = parElement ? 1 : a.contenu_nb;
-  if (!parElement && offre.pack_price != null && offre.pack_price > 0 && offre.pack_count != null && offre.pack_count === a.contenu_nb && a.contenu_nb > 1) {
-    return arrondi(offre.pack_price);
+  const auPoids = a.unite_commande === "kg" || a.unite_commande === "litre";
+  const colis = offre.pack_price != null && offre.pack_price > 0 && offre.pack_count != null && offre.pack_count > 0;
+  // Même conditionnement que l'offre (pack_count = contenu_nb, y compris un colis de 1 : « paquet de 1 kg à 20,75 € ») : prix du colis tel quel
+  if (!parElement && !auPoids && colis && offre.pack_count === a.contenu_nb) {
+    return arrondi(offre.pack_price!);
   }
   const pu = offre.unit_price, unitePrix = (offre.unit ?? "").toLowerCase();
+  // Offre au colis sans prix unitaire (vécu 30/09, Cafés Celtik) : prix à l'élément = prix du colis ÷ nombre d'éléments
+  if ((pu == null || !(pu > 0)) && colis && !auPoids) {
+    return arrondi((offre.pack_price! / offre.pack_count!) * nb);
+  }
   if (pu == null || !(pu > 0)) return null;
   if (!parElement && a.unite_commande === "kg") return unitePrix === "kg" ? arrondi(pu) : null;
   if (!parElement && a.unite_commande === "litre") return unitePrix === "l" ? arrondi(pu) : null;
