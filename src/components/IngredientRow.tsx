@@ -18,7 +18,7 @@ import {
 } from "@/lib/offers";
 import { formatIngredientPrice } from "@/lib/formatPrice";
 import { cachedSupplierColor } from "@/lib/supplierColors";
-import { styleBarreCategorie, styleTitreCategorie, stylePastilleBarre } from "@/lib/styleCategories";
+import { couleurTexte, styleBarreCategorie, styleChevronBarre, styleTitreCategorie, stylePastilleBarre } from "@/lib/styleCategories";
 import { ALLERGENS, ALLERGEN_SHORT, parseAllergens } from "@/lib/allergens";
 import type { PriceAlert } from "@/lib/priceAlerts";
 import { IngredientAvatar } from "@/components/IngredientAvatar";
@@ -218,9 +218,9 @@ export const CategoryHeader = React.memo(function CategoryHeader({
   // Même barre que les rayons de l'inventaire et de la commande : dégradé de la couleur, texte blanc
   return (
     <button onClick={() => onToggle(cat)} aria-expanded={!isCollapsed} style={{ ...styleBarreCategorie(accent), marginTop: 12, marginBottom: 6 }}>
-      <span style={styleTitreCategorie}>{CAT_LABELS[cat]}</span>
+      <span style={styleTitreCategorie(accent)}>{CAT_LABELS[cat]}</span>
       <span style={stylePastilleBarre(accent)}>{count}</span>
-      <span style={{ color: "#fff", fontSize: 13, transition: "transform 0.2s", transform: isCollapsed ? "none" : "rotate(180deg)" }}>▼</span>
+      <span style={styleChevronBarre(accent, !isCollapsed)}>▼</span>
     </button>
   );
 });
@@ -335,6 +335,8 @@ export const IngredientRow = React.memo(function IngredientRow({
   const sb = stBadge(st);
 
   const catAccent = CAT_COLORS[x.category];
+  // Même couleur en version lisible quand elle sert de texte sur fond blanc (teintes claires assombries)
+  const catTexte = couleurTexte(catAccent);
   // Fiche désactivée (visible seulement avec « Afficher les désactivées ») : badge gris, pas d'alerte « prix manquant »
   const inactive = x.is_active === false;
   const inactiveBadge = <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 8, background: "rgba(0,0,0,0.06)", color: "#999", flexShrink: 0, textTransform: "uppercase" }}>Désactivée</span>;
@@ -368,14 +370,14 @@ export const IngredientRow = React.memo(function IngredientRow({
             />
           )}
           <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={28} editable />
-          <span className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: inactive ? "#999" : catAccent, flex: "1 1 0", minWidth: 0 }}>{x.name}</span>
+          <span className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: inactive ? "#999" : catTexte, flex: "1 1 0", minWidth: 0 }}>{x.name}</span>
           {inactive && inactiveBadge}
           {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", flexShrink: 0 }}>DERIVE</span>}
           {alert && <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", flexShrink: 0 }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
           <span className="pastille-ronde" style={{ fontSize: 11, padding: "2px 9px", flexShrink: 0 }}>{price}</span>
           <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: sb.bg, color: sb.color, flexShrink: 0 }}>{sb.label}</span>
           {/* Carte d'identité : catégorie ET fournisseur, toujours les deux */}
-          <span className="pastille" style={{ "--pastille-c": catAccent, flexShrink: 0 } as React.CSSProperties}>{CAT_LABELS[x.category]}</span>
+          <span className="pastille" style={{ "--pastille-c": catTexte, flexShrink: 0 } as React.CSSProperties}>{CAT_LABELS[x.category]}</span>
           {supplierName && supplierIdForDisplay ? (
             <button className="pastille" onClick={(e) => { e.stopPropagation(); onOpenSupplier?.(supplierIdForDisplay); }} style={{ "--pastille-c": cachedSupplierColor(supplierName), border: "none", cursor: "pointer", flexShrink: 0 } as React.CSSProperties}>{supplierName}</button>
           ) : <span style={{ fontSize: 11, color: "#ccc", flexShrink: 0 }}>—</span>}
@@ -431,7 +433,7 @@ export const IngredientRow = React.memo(function IngredientRow({
           )}
           {!compactMode && <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={30} editable />}
           <div className="produit-main">
-            <div className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: inactive ? "#999" : catAccent }}>{x.name}</div>
+            <div className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: inactive ? "#999" : catTexte }}>{x.name}</div>
             {inactive && inactiveBadge}
           </div>
           <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} style={{
@@ -445,7 +447,7 @@ export const IngredientRow = React.memo(function IngredientRow({
         {!compactMode && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, flexWrap: "wrap", paddingLeft: onToggleSelect ? 54 : 38 }}>
             <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 999, background: sb.bg, color: sb.color }}>{sb.label}</span>
-            <span className="pastille" style={{ "--pastille-c": catAccent } as React.CSSProperties}>
+            <span className="pastille" style={{ "--pastille-c": catTexte } as React.CSSProperties}>
               {CAT_LABELS[x.category]}{x.sub_category ? ` · ${x.sub_category}` : ""}
             </span>
             {alert && <span style={{ fontSize: 9, fontWeight: 700, color: alert.direction === "up" ? "#DC2626" : "#16A34A" }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}

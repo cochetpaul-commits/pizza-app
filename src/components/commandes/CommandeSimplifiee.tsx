@@ -69,7 +69,7 @@ const qteTexte = (n: number) => String(Math.round(n * 100) / 100).replace(".", "
 
 /** Couleur du titre de rayon : partagée avec l'inventaire (src/lib/rayons.ts) */
 import { couleurRayon } from "@/lib/rayons";
-import { styleBarreCategorie, styleTitreCategorie } from "@/lib/styleCategories";
+import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
 
 /**
  * Aller-retour vers la fiche produit (admins, managers) : l'état de l'écran est gardé le temps de corriger
@@ -491,13 +491,13 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
               {/* Titre de rayon : fond plein, texte blanc ; collé en haut de l'écran tant que le rayon ouvert défile */}
               <div className={ouvert ? "rayon-collant" : undefined} style={{ background: "#f2ede4", paddingBottom: ouvert ? 8 : 0 }}>
               <button type="button" onClick={() => setBascules((s) => ({ ...s, [r.code]: !ouvert }))} aria-expanded={ouvert} style={styleBarreCategorie(couleurRayon(r.code))}>
-                <span style={styleTitreCategorie}>
+                <span style={styleTitreCategorie(couleurRayon(r.code))}>
                   {r.libelle} <span style={{ opacity: 0.75, fontWeight: 400 }}>({r.articles.length})</span>
                 </span>
                 {r.dansCommande > 0 && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: couleurRayon(r.code), background: "#fff", borderRadius: 10, padding: "3px 8px" }}>{r.dansCommande}</span>
+                  <span style={stylePastilleBarre(couleurRayon(r.code))}>{r.dansCommande}</span>
                 )}
-                <span style={{ color: "#fff", fontSize: 13, transform: ouvert ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
+                <span style={styleChevronBarre(couleurRayon(r.code), ouvert)}>▼</span>
               </button>
               </div>
               {ouvert && r.articles.map((a) => carte(a, couleurRayon(r.code)))}

@@ -8,6 +8,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
 import { offerRowToCpu } from "@/lib/offerPricing";
 import { inChunks } from "@/lib/supabaseChunks";
+import { couleurTexte } from "@/lib/styleCategories";
 
 type Ingredient = {
   id: string;
@@ -240,7 +241,7 @@ export default function EpiceriePage() {
                   return (
                     <div key={ing.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 10px", borderRadius: 8, marginBottom: 3, background: inCalc ? "#FEF3E8" : "#FAF7F2", border: `1px solid ${inCalc ? "#FBBF24" : "#F0EBE0"}` }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 800, fontSize: 12, color: CAT_COLORS[ing.category], whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ing.name}</div>
+                        <div style={{ fontWeight: 800, fontSize: 12, color: couleurTexte(CAT_COLORS[ing.category]), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ing.name}</div>
                         <div style={{ fontSize: 11, color: "#9B8E7E" }}>
                           {hasPrice ? priceDisplay : <span style={{ color: "#DC2626" }}>prix manquant</span>}
                           {sup ? ` · ${sup}` : ""}
@@ -315,7 +316,7 @@ export default function EpiceriePage() {
                       {lines.map((l, i) => (
                         <tr key={l.id} style={{ borderBottom: "1px solid #F0EBE0", background: i % 2 === 0 ? "#fff" : "#FDFCFA" }}>
                           <td style={{ padding: "8px 10px", maxWidth: 200 }}>
-                            <div style={{ fontWeight: 800, color: CAT_COLORS[l.category], fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</div>
+                            <div style={{ fontWeight: 800, color: couleurTexte(CAT_COLORS[l.category]), fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</div>
                           </td>
                           <td style={{ padding: "4px 10px", textAlign: "right" }}>
                             <input type="number" min="0" step="1" value={l.pieceQtyOverride ?? l.pieceQty}

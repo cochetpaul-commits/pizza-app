@@ -10,6 +10,7 @@ import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { useRouter } from "next/navigation";
 import { fermerOffresActives } from "@/lib/offerClosing";
 import { ZONES_EMBED, appliquerZonesEtab, type ZoneEtabRow } from "@/lib/zonesEtablissement";
+import { couleurTexte } from "@/lib/styleCategories";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -751,7 +752,7 @@ export default function InventairePage() {
       .map(cat => ({
         cat,
         label: CAT_LABELS[cat],
-        color: CAT_COLORS[cat],
+        color: couleurTexte(CAT_COLORS[cat]),
         items: map.get(cat)!,
       }));
   }, [zoneIngredients, filterNonSaisis, quantities, searchInv, ingredients, activeZone]);

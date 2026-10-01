@@ -15,7 +15,7 @@ import { cleEtab } from "@/lib/zonesEtablissement";
 import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
 import { couleurRayon, rayonDuProduit, RAYON_AUTRES, RAYON_PREPARATIONS } from "@/lib/rayons";
 import { getSupplierColor } from "@/lib/supplierColors";
-import { styleBarreCategorie, styleSousCategorie, styleTitreCategorie } from "@/lib/styleCategories";
+import { couleurTexte, styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie } from "@/lib/styleCategories";
 import { correspondRecherche, filtrerRecherche, normaliserRecherche } from "@/lib/rechercheTolerante";
 void categorieDeFamille;
 
@@ -427,7 +427,7 @@ function Feuille() {
     const fournisseur = fournisseurDe(l, c);
     const detailPiece = f?.piece_weight_g ? `${f.piece_weight_g >= 1000 ? `${txt(f.piece_weight_g / 1000)} kg` : `${txt(f.piece_weight_g)} g`} la pièce` : f?.piece_volume_ml ? `${f.piece_volume_ml >= 1000 ? `${txt(f.piece_volume_ml / 1000)} L` : `${txt(f.piece_volume_ml)} mL`} la pièce` : null;
     // Titre à la couleur de la catégorie de la fiche, comme dans le menu produits (gris si fiche désactivée)
-    const couleurTitre = l.inactive ? "#999" : (f?.category && CAT_COLORS[f.category as Category]) || couleur;
+    const couleurTitre = l.inactive ? "#999" : couleurTexte((f?.category && CAT_COLORS[f.category as Category]) || couleur);
     // Nom du colis (« cartons ») et de l'élément (« bouteilles ») pour les intitulés des compteurs
     const nomColis = deuxChamps && l.cond_libelle ? pluriel(l.cond_libelle.split(" ")[0], 2) : null;
     return (
@@ -681,13 +681,13 @@ function Feuille() {
                 <div key={r.code} style={{ margin: `${i === 0 ? 4 : 10}px 0 6px` }}>
                   {/* Titre de rayon : fond plein, texte blanc, exactement comme l'écran de commande */}
                   <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleFamille(zone, r.code)]: !ouverte }))} aria-expanded={ouverte} style={styleBarreCategorie(couleur)}>
-                    <span style={styleTitreCategorie}>
+                    <span style={styleTitreCategorie(couleur)}>
                       {r.libelle} <span style={{ opacity: 0.75, fontWeight: 400 }}>({r.lignes.length})</span>
                     </span>
                     {comptees > 0 && (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: couleur, background: "#fff", borderRadius: 10, padding: "3px 8px" }}>{comptees}{comptees === r.lignes.length ? " ✓" : ""}</span>
+                      <span style={stylePastilleBarre(couleur)}>{comptees}{comptees === r.lignes.length ? " ✓" : ""}</span>
                     )}
-                    <span style={{ color: "#fff", fontSize: 13, transform: ouverte ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
+                    <span style={styleChevronBarre(couleur, ouverte)}>▼</span>
                   </button>
                   {ouverte && !lectureSeule && (
                     <div style={{ textAlign: "right", margin: "4px 6px 2px" }}>

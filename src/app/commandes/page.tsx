@@ -18,6 +18,7 @@ import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { inChunks } from "@/lib/supabaseChunks";
 import { ZONES_EMBED, appliquerZonesEtab, type ZoneEtabRow } from "@/lib/zonesEtablissement";
 import { CommandeSimplifiee } from "@/components/commandes/CommandeSimplifiee";
+import { couleurTexte } from "@/lib/styleCategories";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1923,7 +1924,7 @@ function CommandesPage() {
           <>
             {sortedCats.map((cat) => {
               const items = byCat[cat].sort((a, b) => a.name.localeCompare(b.name, "fr"));
-              const color = CAT_COLORS[cat] ?? "#6B7280";
+              const color = couleurTexte(CAT_COLORS[cat] ?? "#6B7280");
               return (
                 <div key={cat} style={{ marginBottom: 8 }}>
                   <div
@@ -2035,7 +2036,7 @@ function CommandesPage() {
           const allItems = [...favoris, ...others];
           const selectedCount = allItems.filter((i) => Number(quantities[i.id] ?? 0) > 0).length;
           const isOpen = openCats[cat] ?? false;
-          const color = CAT_COLORS[cat] ?? "#6B7280";
+          const color = couleurTexte(CAT_COLORS[cat] ?? "#6B7280");
 
           return (
             <div key={cat} style={{ marginTop: 16, marginBottom: 6 }}>

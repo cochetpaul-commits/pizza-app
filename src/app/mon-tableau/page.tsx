@@ -8,6 +8,7 @@ import { usePilotageRange } from "@/lib/pilotageRange";
 import { useTopBar } from "@/components/layout/TopBarContext";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { couleurTexte } from "@/lib/styleCategories";
 
 /* ── Types (réponse /api/mon-tableau) ─────────────────────── */
 
@@ -117,7 +118,7 @@ function CatSplit({ lines, total }: { lines: CatLine[]; total: number }) {
       {lines.map(l => {
         const pct = total > 0 ? (l.ca / total) * 100 : 0;
         const d = delta(l.ca, l.prevCa);
-        const color = CAT_COLORS[l.cat] ?? ACCENT;
+        const color = couleurTexte(CAT_COLORS[l.cat] ?? ACCENT);
         return (
           <div key={l.cat} style={{ marginBottom: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
@@ -178,7 +179,7 @@ function DetailProduits({ prods }: { prods: ProdLine[] }) {
       {ordre.map(([cat, items]) => {
         const caCat = items.reduce((s, p) => s + p.ca, 0);
         const qtyCat = items.reduce((s, p) => s + p.qty, 0);
-        const color = CAT_COLORS[cat] ?? ACCENT;
+        const color = couleurTexte(CAT_COLORS[cat] ?? ACCENT);
         const ouvert = ouverts.has(cat);
         return (
           <div key={cat} style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, overflow: "hidden" }}>

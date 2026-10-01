@@ -6,6 +6,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { fetchApi } from "@/lib/fetchApi";
 import { CAT_LABELS, CAT_COLORS, type Category } from "@/types/ingredients";
+import { couleurTexte } from "@/lib/styleCategories";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -399,7 +400,7 @@ function StockContent() {
         ) : (
           /* Categories accordion */
           grouped.map(([cat, catItems]) => {
-            const catColor = CAT_COLORS[cat as Category] ?? "#999";
+            const catColor = couleurTexte(CAT_COLORS[cat as Category] ?? "#999");
             const catLabel = CAT_LABELS[cat as Category] ?? cat;
             const isOpen = openCats.has(cat);
             const catAlertes = catItems.filter((i) => i.alerte).length;

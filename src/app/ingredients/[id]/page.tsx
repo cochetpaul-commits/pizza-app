@@ -12,6 +12,7 @@ import { computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import { CAT_COLORS } from "@/types/ingredients";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { zonesPour, type ZoneEtabRow } from "@/lib/zonesEtablissement";
+import { couleurTexte } from "@/lib/styleCategories";
 
 const PriceEvolutionChart = dynamic(() => import("./PriceEvolutionChart"), { ssr: false });
 
@@ -315,7 +316,7 @@ function IngredientDetailInner() {
             ) : (
               <span style={{
                 fontFamily: "Oswald, sans-serif", fontWeight: 700,
-                fontSize: 20, color: CAT_COLORS[ingredient.category as keyof typeof CAT_COLORS] ?? "#999",
+                fontSize: 20, color: couleurTexte(CAT_COLORS[ingredient.category as keyof typeof CAT_COLORS] ?? "#999"),
               }}>
                 {ingredient.name.trim().split(/\s+/).length >= 2
                   ? `${ingredient.name.trim().split(/\s+/)[0][0]}${ingredient.name.trim().split(/\s+/)[1][0]}`.toUpperCase()

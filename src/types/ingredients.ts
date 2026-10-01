@@ -50,27 +50,32 @@ export const CAT_LABELS: Record<Category, string> = {
   autre:              "Autre",
 };
 
+/**
+ * Palette des catégories : une couleur Pantone de l'année par catégorie (validée le 01/10/2026).
+ * Les teintes claires (Mimosa, Peach Fuzz, Sand Dollar, Illuminating) s'écrivent en foncé sur leur barre
+ * et en version assombrie sur fond blanc : voir couleurTexte / couleurTexteSur dans src/lib/styleCategories.ts.
+ */
 export const CAT_COLORS: Record<Category, string> = {
-  cremerie_fromage:   "#D97706", // ambre doré
-  charcuterie_viande: "#b85c3a", // terracotta foncé
-  maree:              "#5e8278", // vert sauge
-  vins:               "#8a6b3e", // brun doré
-  spiritueux:         "#7C3AED", // violet
-  biere:              "#D4A017", // doré bière
-  soft:               "#6b8f71", // vert sauge clair
-  cafeteria:          "#8B6914", // brun café
-  liqueurs:           "#9B59B6", // violet clair
-  sirops:             "#E67E22", // orange
-  legumes_herbes:     "#4a6741", // vert forêt
-  fruit:              "#D4775A", // terracotta
-  epicerie_salee:     "#7c5c3a", // brun tabac
-  epicerie_sucree:    "#c9952c", // doré chaud
-  preparation:        "#5e7a5e", // vert mousse
-  sauce:              "#9D6B4D", // brun cuivré
-  antipasti:          "#d4a03c", // jaune miel
-  emballage:          "#a8976b", // sable chaud
-  surgele:            "#5b8fa8", // bleu glacé
-  autre:              "#b0a894", // gris sable
+  cremerie_fromage:   "#F0C05A", // Mimosa 2009
+  charcuterie_viande: "#9B1B30", // Chili Pepper 2007
+  maree:              "#53B0AE", // Blue Turquoise 2005
+  vins:               "#955251", // Marsala 2015
+  spiritueux:         "#5F4B8B", // Ultra Violet 2018
+  biere:              "#F5DF4D", // Illuminating 2021
+  soft:               "#7BC4C4", // Aqua Sky 2003
+  cafeteria:          "#A47864", // Mocha Mousse 2025
+  liqueurs:           "#B163A3", // Radiant Orchid 2014
+  sirops:             "#BB2649", // Viva Magenta 2023
+  legumes_herbes:     "#88B04B", // Greenery 2017
+  fruit:              "#DD4124", // Tangerine Tango 2012
+  epicerie_salee:     "#0F4C81", // Classic Blue 2020
+  epicerie_sucree:    "#FFBE98", // Peach Fuzz 2024
+  preparation:        "#009473", // Emerald 2013
+  sauce:              "#BF1932", // True Red 2002
+  antipasti:          "#E2583E", // Tigerlily 2004
+  emballage:          "#DECDBE", // Sand Dollar 2006
+  surgele:            "#92A8D1", // Serenity 2016
+  autre:              "#939597", // Ultimate Gray 2021
 };
 
 export type Supplier = {
