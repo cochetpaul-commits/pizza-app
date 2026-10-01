@@ -15,7 +15,8 @@ import { cleEtab } from "@/lib/zonesEtablissement";
 import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
 import { couleurRayon, rayonDuProduit, RAYON_AUTRES, RAYON_PREPARATIONS } from "@/lib/rayons";
 import { getSupplierColor } from "@/lib/supplierColors";
-import { couleurTexte, styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie } from "@/lib/styleCategories";
+import { BoutonCrayon, BoutonCroix, Compteur, Conditionnement as CondLibelle, TuileProduit } from "@/components/TuileProduit";
+import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie } from "@/lib/styleCategories";
 import { correspondRecherche, filtrerRecherche, normaliserRecherche } from "@/lib/rechercheTolerante";
 void categorieDeFamille;
 
@@ -413,7 +414,15 @@ function Feuille() {
     setMessage(`Zone « ${libelleZone(nom)} » ajoutée.`);
   }
 
-  /** Carte d'une ligne : nom, détail du conditionnement et du prix, champs de saisie */
+  /** Entrée dans un compteur : champ suivant (saisie rapide de la feuille au clavier) */
+  const entreeSuivante = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const champs = [...document.querySelectorAll<HTMLInputElement>("input[inputmode=decimal]:not([disabled])")];
+    champs[champs.indexOf(e.currentTarget) + 1]?.focus();
+  };
+
+  /** Carte d'une ligne : tuile produit commune (nom, conditionnement, compteurs, fournisseur et total) */
   const carte = (l: Ligne, couleur: string) => {
     const s = saisies[l.id] ?? { colis: "", unites: "" };
     const contenu = l.cond_contenu;
@@ -426,84 +435,60 @@ function Feuille() {
     const f = fiches[l.ingredient_id];
     const fournisseur = fournisseurDe(l, c);
     const detailPiece = f?.piece_weight_g ? `${f.piece_weight_g >= 1000 ? `${txt(f.piece_weight_g / 1000)} kg` : `${txt(f.piece_weight_g)} g`} la pièce` : f?.piece_volume_ml ? `${f.piece_volume_ml >= 1000 ? `${txt(f.piece_volume_ml / 1000)} L` : `${txt(f.piece_volume_ml)} mL`} la pièce` : null;
-    // Titre à la couleur de la catégorie de la fiche, comme dans le menu produits (gris si fiche désactivée)
-    const couleurTitre = l.inactive ? "#999" : couleurTexte((f?.category && CAT_COLORS[f.category as Category]) || couleur);
-    // Nom du colis (« cartons ») et de l'élément (« bouteilles ») pour les intitulés des compteurs
+    // Couleur de la catégorie de la fiche (comme le menu produits), sinon celle du rayon
+    const couleurCat = (f?.category && CAT_COLORS[f.category as Category]) || couleur;
     const nomColis = deuxChamps && l.cond_libelle ? pluriel(l.cond_libelle.split(" ")[0], 2) : null;
+    const auPoids = l.unite === "kg" || l.unite === "litre";
+    const compteur = (champ: keyof Saisie, etiquette: string, pas: number) => {
+      const v = num(s[champ]) ?? 0;
+      const fixer = (x: number) => saisir(l, champ, txt(Math.max(0, Math.round(x * 100) / 100)));
+      return (
+        <Compteur valeur={s[champ]} etiquette={etiquette} desactive={lectureSeule} moinsActif={v > 0}
+          onMoins={() => fixer(v - pas)} onPlus={() => fixer(v + pas)} onSaisie={(x) => saisir(l, champ, x)} onEntree={entreeSuivante} />
+      );
+    };
+    const remarque = l.rattachement === "approché" || l.rattachement === "rattaché par ressemblance" || l.aVerifier || l.inactive;
     return (
-      <React.Fragment key={l.id}>
-                <div style={{
-                  padding: "8px 10px", marginBottom: 4, borderRadius: 10,
-                  background: "#fff", border: `1px solid ${compte(l) ? "#cfe3d6" : "#ece6db"}`, borderLeft: `3px solid ${couleur}`,
-                }}>
-                  {/* 1. Numéro dans sa colonne ; titre et ligne d'infos alignés l'un sous l'autre ; crayon et croix au bout du titre */}
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
-                    <span style={{ color: "#b0a894", fontWeight: 500, fontSize: 12, paddingTop: 1, flexShrink: 0 }}>{l.ordre ?? ""}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
-                        <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, lineHeight: 1.2, color: couleurTitre }}>{l.nom_feuille ?? l.nom}</span>
-                        {f && (
-                          <a href={`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(`/inventaire/${id}`)}`} title="Modifier la fiche produit (prix, conditionnement, zone)"
-                            onClick={(e) => e.stopPropagation()} style={{ fontSize: 12, color: "#8a8378", textDecoration: "none", border: "1px solid #ddd6c8", borderRadius: 6, padding: "0 5px", lineHeight: "20px", height: 22, boxSizing: "border-box", flexShrink: 0 }}>✎</a>
-                        )}
-                        {!lectureSeule && (
-                          <button type="button" onClick={() => void retirer(l)} aria-label="Retirer de la liste" title="Retirer de la liste (la fiche n'est pas touchée)" style={{
-                            width: 22, height: 22, borderRadius: 11, border: "none", background: "#fde7e7", color: "#a12b2b", fontSize: 15, fontWeight: 700, lineHeight: 1,
-                            display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0, fontFamily: "inherit",
-                          }}>×</button>
-                        )}
-                      </div>
-                  {/* 2. Une ligne d'infos sous le titre, alignée avec lui : conditionnement, remarques (pas de prix) */}
-                  <div style={{ fontSize: 11.5, color: "#8a8378", marginTop: 3, display: "flex", flexWrap: "wrap", gap: "3px 8px", alignItems: "center", lineHeight: 1.3 }}>
-                    <span><strong style={{ color: "#6f6656" }}>{c?.libelle ?? l.cond_libelle ?? l.unite ?? "unité"}</strong>{!c && detailPiece ? ` · ${detailPiece}` : ""}</span>
-                    {valo.cout == null && <span style={{ color: "#b45309" }}>sans prix{valo.raison ? ` (${valo.raison})` : ""}</span>}
-                    {(l.rattachement === "approché" || l.rattachement === "rattaché par ressemblance" || l.aVerifier || l.inactive) && (
-                      <span style={{
-                        fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8,
-                        background: l.inactive ? "#fde7e7" : l.aVerifier ? "#fde7ef" : "#fdf3d4", color: l.inactive ? "#a12b2b" : l.aVerifier ? "#b0306a" : "#8a6a12",
-                      }}>{l.inactive ? (f ? "fiche désactivée" : "fiche supprimée") : l.aVerifier ? "fiche à vérifier" : "rattaché par ressemblance"}</span>
-                    )}
-                    {!lectureSeule && peutColis && !deuxChamps && (
-                      <button type="button" onClick={() => void basculerComptage(l)} style={lien}>compter par {c!.libelle.split(" ")[0]}</button>
-                    )}
-                  </div>
-                    </div>
-                  </div>
-                  {/* 3. Compteurs sur toute la largeur, côte à côte (colis puis unités), intitulé sous le champ ; point d'état en haut à droite */}
-                  <div style={{ position: "relative", display: "flex", gap: 12, marginTop: 6 }}>
-                    {contenu != null && (
-                      <Champ etiquette={deuxChamps ? nomColis ?? "colis" : pluriel(l.unite ?? "colis", 2)} valeur={s.colis} desactive={lectureSeule}
-                        pas={!deuxChamps && (l.unite === "kg" || l.unite === "litre") ? 0.5 : 1}
-                        onChange={(v) => saisir(l, "colis", v)} />
-                    )}
-                    {(deuxChamps || contenu == null) && (
-                      <Champ etiquette={pluriel(l.unite ?? "unités", 2)} valeur={s.unites} desactive={lectureSeule}
-                        pas={contenu == null && (l.unite === "kg" || l.unite === "litre") ? 0.5 : 1}
-                        onChange={(v) => saisir(l, "unites", v)} />
-                    )}
-                    <span title={etat === "erreur" ? "Pas enregistré" : etat === "attente" ? "Enregistrement…" : "Enregistré"} style={{
-                      position: "absolute", right: -4, top: -4, width: 8, height: 8, borderRadius: 4,
-                      background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent",
-                    }} />
-                  </div>
-                  {/* 4. Rangée du bas : pastille fournisseur dans l'angle à gauche (même pastille que la fiche produit), total compté et valeur centrés */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8, marginTop: 5 }}>
-                    <span style={{ justifySelf: "start", minWidth: 0 }}>
-                      {fournisseur
-                        ? <span className="pastille" style={{ "--pastille-c": getSupplierColor(fournisseur.name, fournisseur.color) } as React.CSSProperties}>{fournisseur.name}</span>
-                        : recettes[l.ingredient_id]
-                          ? <span className="pastille" title={`Valorisée au coût de la recette « ${recettes[l.ingredient_id].name} »`} style={{ "--pastille-c": CAT_COLORS.preparation } as React.CSSProperties}>recette maison</span>
-                          : null}
-                    </span>
-                    <span style={{ fontSize: 12.5, color: "#8a8378", textAlign: "center" }}>
-                      {total != null
-                        ? <><strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong>{valo.cout != null && <span style={{ color: "#6f6656" }}> · {eur(total * valo.cout)}</span>}</>
-                        : <span style={{ color: "#c4bcae" }}>non compté</span>}
-                    </span>
-                    <span />
-                  </div>
-                </div>
-      </React.Fragment>
+      <TuileProduit key={l.id} couleur={couleurCat} fait={compte(l)} inactive={l.inactive} nom={l.nom_feuille ?? l.nom}
+        actions={<>
+          {f && <BoutonCrayon href={`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(`/inventaire/${id}`)}`} title="Modifier la fiche produit (prix, conditionnement, zone)" />}
+          {!lectureSeule && <BoutonCroix onClick={() => void retirer(l)} title="Retirer de la liste (la fiche n'est pas touchée)" />}
+        </>}
+        infos={<>
+          <span><CondLibelle>{c?.libelle ?? l.cond_libelle ?? l.unite ?? "unité"}</CondLibelle>{!c && detailPiece ? ` · ${detailPiece}` : ""}</span>
+          {valo.cout == null && <span style={{ color: "#b45309" }}>sans prix{valo.raison ? ` (${valo.raison})` : ""}</span>}
+          {remarque && (
+            <span style={{
+              fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8,
+              background: l.inactive ? "#fde7e7" : l.aVerifier ? "#fde7ef" : "#fdf3d4", color: l.inactive ? "#a12b2b" : l.aVerifier ? "#b0306a" : "#8a6a12",
+            }}>{l.inactive ? (f ? "fiche désactivée" : "fiche supprimée") : l.aVerifier ? "fiche à vérifier" : "rattaché par ressemblance"}</span>
+          )}
+          {!lectureSeule && peutColis && !deuxChamps && (
+            <button type="button" onClick={() => void basculerComptage(l)} style={lien}>compter par {c!.libelle.split(" ")[0]}</button>
+          )}
+        </>}
+        milieu={
+          /* Compteurs resserrés, centrés, côte à côte (colis puis unités) ; point d'état d'enregistrement en haut à droite */
+          <div style={{ position: "relative", display: "flex", justifyContent: "center", gap: 24, marginTop: 6 }}>
+            {contenu != null && compteur("colis", deuxChamps ? nomColis ?? "colis" : pluriel(l.unite ?? "colis", 2), !deuxChamps && auPoids ? 0.5 : 1)}
+            {(deuxChamps || contenu == null) && compteur("unites", pluriel(l.unite ?? "unités", 2), contenu == null && auPoids ? 0.5 : 1)}
+            <span title={etat === "erreur" ? "Pas enregistré" : etat === "attente" ? "Enregistrement…" : "Enregistré"} style={{
+              position: "absolute", right: -4, top: -4, width: 8, height: 8, borderRadius: 4,
+              background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent",
+            }} />
+          </div>
+        }
+        gauche={fournisseur
+          ? <span className="pastille" style={{ "--pastille-c": getSupplierColor(fournisseur.name, fournisseur.color) } as React.CSSProperties}>{fournisseur.name}</span>
+          : recettes[l.ingredient_id]
+            ? <span className="pastille" title={`Valorisée au coût de la recette « ${recettes[l.ingredient_id].name} »`} style={{ "--pastille-c": CAT_COLORS.preparation } as React.CSSProperties}>recette maison</span>
+            : null}
+        droite={<span style={{ fontSize: 12.5, color: "#8a8378" }}>
+          {total != null
+            ? <><strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong>{valo.cout != null && <span style={{ color: "#6f6656" }}> · {eur(total * valo.cout)}</span>}</>
+            : <span style={{ color: "#c4bcae" }}>non compté</span>}
+        </span>}
+      />
     );
   };
 
@@ -914,38 +899,6 @@ function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjoute
 }
 
 /** Champ de comptage avec − / + (comme l'écran de commande : pas de clavier obligatoire) ; la saisie au clavier reste possible */
-function Champ({ etiquette, valeur, desactive, onChange, pas = 1 }: { etiquette: string; valeur: string; desactive: boolean; onChange: (v: string) => void; pas?: number }) {
-  const n = num(valeur) ?? 0;
-  const fixer = (v: number) => onChange(txt(Math.max(0, Math.round(v * 100) / 100)));
-  const btn = (actif: boolean): React.CSSProperties => ({
-    width: 40, height: 40, borderRadius: 20, border: "none", fontSize: 24, fontWeight: 700, lineHeight: 1, padding: 0,
-    background: actif ? ACCENT : "#ece4d4", color: actif ? "#fff" : "#b8ad9a", cursor: actif ? "pointer" : "default",
-    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, touchAction: "manipulation", fontFamily: "inherit",
-  });
-  // Le compteur prend toute la largeur disponible : le champ s'étire entre les deux boutons
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, flex: 1, minWidth: 0 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%" }}>
-        <button type="button" aria-label="Moins" disabled={desactive || n <= 0} onClick={() => fixer(n - pas)} style={btn(!desactive && n > 0)}>−</button>
-        <input inputMode="decimal" value={valeur} disabled={desactive} onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            // Entrée : champ suivant (saisie rapide de la feuille au clavier)
-            if (e.key !== "Enter") return;
-            e.preventDefault();
-            const champs = [...document.querySelectorAll<HTMLInputElement>("input[inputmode=decimal]:not([disabled])")];
-            champs[champs.indexOf(e.currentTarget) + 1]?.focus();
-          }}
-          style={{
-            flex: 1, minWidth: 0, width: "100%", height: 40, borderRadius: 10, border: `1.5px solid ${valeur.trim() ? ACCENT : "#ddd6c8"}`, textAlign: "center", fontSize: 20, fontWeight: 700, fontFamily: OSWALD,
-            background: desactive ? "#f3efe7" : "#fff", boxSizing: "border-box", padding: 0,
-          }} />
-        <button type="button" aria-label="Plus" disabled={desactive} onClick={() => fixer(n + pas)} style={btn(!desactive)}>+</button>
-      </div>
-      <span style={{ fontSize: 10.5, color: "#8a8378" }}>{etiquette}</span>
-    </div>
-  );
-}
-
 const lien: React.CSSProperties = { border: "none", background: "none", color: ACCENT, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0, fontFamily: "inherit" };
 const puce = (actif: boolean): React.CSSProperties => ({
   flexShrink: 0, padding: "5px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",

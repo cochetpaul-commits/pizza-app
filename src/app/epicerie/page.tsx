@@ -8,6 +8,8 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
 import { offerRowToCpu } from "@/lib/offerPricing";
 import { inChunks } from "@/lib/supabaseChunks";
+import { TuileProduit } from "@/components/TuileProduit";
+import { cachedSupplierColor } from "@/lib/supplierColors";
 import { couleurTexte } from "@/lib/styleCategories";
 
 type Ingredient = {
@@ -239,19 +241,17 @@ export default function EpiceriePage() {
                     : offerData?.cpuUnit === "ml" ? (cpu! * 1000).toFixed(2) + " €/L"
                     : (cpu! * 1000).toFixed(2) + " €/kg";
                   return (
-                    <div key={ing.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 10px", borderRadius: 8, marginBottom: 3, background: inCalc ? "#FEF3E8" : "#FAF7F2", border: `1px solid ${inCalc ? "#FBBF24" : "#F0EBE0"}` }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 800, fontSize: 12, color: couleurTexte(CAT_COLORS[ing.category]), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ing.name}</div>
-                        <div style={{ fontSize: 11, color: "#9B8E7E" }}>
-                          {hasPrice ? priceDisplay : <span style={{ color: "#DC2626" }}>prix manquant</span>}
-                          {sup ? ` · ${sup}` : ""}
-                        </div>
-                      </div>
-                      <button onClick={() => addToCalc(ing)} disabled={inCalc || !hasPrice}
-                        style={{ marginLeft: 8, width: 26, height: 26, borderRadius: 6, border: "none", background: inCalc ? "#FBBF24" : hasPrice ? "#D4775A" : "#E5E7EB", color: inCalc ? "#fff" : hasPrice ? "#fff" : "#9CA3AF", fontWeight: 900, fontSize: 15, cursor: inCalc || !hasPrice ? "default" : "pointer" }}>
-                        {inCalc ? "✓" : "+"}
-                      </button>
-                    </div>
+                    <TuileProduit key={ing.id} couleur={CAT_COLORS[ing.category]} nom={ing.name} fait={inCalc} style={{ marginBottom: 4 }}
+                      infos={!hasPrice ? <span style={{ color: "#DC2626" }}>prix manquant</span> : undefined}
+                      gauche={sup ? <span className="pastille" style={{ "--pastille-c": cachedSupplierColor(sup) } as React.CSSProperties}>{sup}</span> : <span style={{ fontSize: 10, color: "#aaa" }}>— sans fournisseur</span>}
+                      droite={<>
+                        {hasPrice && <span className="pastille-ronde">{priceDisplay}</span>}
+                        <button type="button" onClick={() => addToCalc(ing)} disabled={inCalc || !hasPrice} aria-label={inCalc ? "Déjà dans le calcul" : "Ajouter au calcul"}
+                          style={{ width: 32, height: 32, borderRadius: 16, border: "none", background: inCalc ? "#2D6A4F" : hasPrice ? "#D4775A" : "#ece4d4", color: inCalc || hasPrice ? "#fff" : "#b8ad9a", fontWeight: 700, fontSize: 19, lineHeight: 1, cursor: inCalc || !hasPrice ? "default" : "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit" }}>
+                          {inCalc ? "✓" : "+"}
+                        </button>
+                      </>}
+                    />
                   );
                 })}
               </div>

@@ -19,9 +19,10 @@ import {
 import { formatIngredientPrice } from "@/lib/formatPrice";
 import { cachedSupplierColor } from "@/lib/supplierColors";
 import { couleurTexte, styleBarreCategorie, styleChevronBarre, styleTitreCategorie, stylePastilleBarre } from "@/lib/styleCategories";
+import { BoutonCrayon, BoutonCroix, Conditionnement, TuileProduit, cadreTuile } from "@/components/TuileProduit";
+import { articleDeFiche, type FicheConditionnement } from "@/lib/inventaire";
 import { ALLERGENS, ALLERGEN_SHORT, parseAllergens } from "@/lib/allergens";
 import type { PriceAlert } from "@/lib/priceAlerts";
-import { IngredientAvatar } from "@/components/IngredientAvatar";
 
 // ─── shared input style helpers ─────────────────────────────────────────────
 const inputStyle: CSSProperties = {
@@ -341,143 +342,68 @@ export const IngredientRow = React.memo(function IngredientRow({
   const inactive = x.is_active === false;
   const inactiveBadge = <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 8, background: "rgba(0,0,0,0.06)", color: "#999", flexShrink: 0, textTransform: "uppercase" }}>Désactivée</span>;
 
+  // Conditionnement de la fiche (même règle que l'inventaire et la commande) pour la ligne d'infos
+  const article = articleDeFiche(x as unknown as FicheConditionnement);
+  const cond = article ? libelleColisage(article) : null;
+  const ouvrir = () => { if (isEditing) onSaveEdit(); else onStartEdit(x); };
+  const petit: CSSProperties = { fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, border: "none", cursor: "pointer", flexShrink: 0, fontFamily: "inherit" };
+
   return (
-    <div style={{
-      background: "#fff", borderRadius: 12, border: "1.5px solid #ddd6c8",
-      borderLeft: `3px solid ${catAccent}`,
-      marginBottom: 6, overflow: "hidden",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-      transition: "box-shadow 0.2s, border-color 0.2s",
-    }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = catAccent; }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; e.currentTarget.style.borderLeftColor = catAccent; }}
-    >
-      {/* ── DESKTOP ROW — single line ── */}
-      <div
-        className="hidden md:block"
-        onClick={() => { if (isEditing) onSaveEdit(); else onStartEdit(x); }}
-        style={{ padding: "8px 16px", background: "white", transition: "background 0.1s", cursor: "pointer" }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {onToggleSelect && (
-            <input
-              type="checkbox"
-              checked={selected ?? false}
-              title="Sélectionner (actions groupées : catégorie, suppression)"
-              onChange={(e) => { e.stopPropagation(); onToggleSelect(x.id); }}
-              onClick={(e) => e.stopPropagation()}
-              style={{ width: 15, height: 15, accentColor: catAccent, cursor: "pointer", flexShrink: 0 }}
-            />
-          )}
-          <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={28} editable />
-          <span className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: inactive ? "#999" : catTexte, flex: "1 1 0", minWidth: 0 }}>{x.name}</span>
-          {inactive && inactiveBadge}
-          {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", flexShrink: 0 }}>DERIVE</span>}
-          {alert && <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)", flexShrink: 0 }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
-          <span className="pastille-ronde" style={{ fontSize: 11, padding: "2px 9px", flexShrink: 0 }}>{price}</span>
-          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: sb.bg, color: sb.color, flexShrink: 0 }}>{sb.label}</span>
-          {/* Carte d'identité : catégorie ET fournisseur, toujours les deux */}
-          <span className="pastille" style={{ "--pastille-c": catTexte, flexShrink: 0 } as React.CSSProperties}>{CAT_LABELS[x.category]}</span>
-          {supplierName && supplierIdForDisplay ? (
-            <button className="pastille" onClick={(e) => { e.stopPropagation(); onOpenSupplier?.(supplierIdForDisplay); }} style={{ "--pastille-c": cachedSupplierColor(supplierName), border: "none", cursor: "pointer", flexShrink: 0 } as React.CSSProperties}>{supplierName}</button>
-          ) : <span style={{ fontSize: 11, color: "#ccc", flexShrink: 0 }}>—</span>}
-          <button onClick={(e) => { e.stopPropagation(); onToggleEstablishment?.(x.id, "bellomio", ingEstabs); }} style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasBM ? "rgba(212,119,90,0.1)" : "rgba(0,0,0,0.04)", color: hasBM ? "#D4775A" : "#ccc", border: "none", cursor: "pointer", flexShrink: 0 }}>BM</button>
-          <button onClick={(e) => { e.stopPropagation(); onToggleEstablishment?.(x.id, "piccola", ingEstabs); }} style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: hasPM ? "rgba(212,160,60,0.1)" : "rgba(0,0,0,0.04)", color: hasPM ? "#D4A03C" : "#ccc", border: "none", cursor: "pointer", flexShrink: 0 }}>PM</button>
-          {alg.length > 0 && (
-            <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-              {alg.map(a => (
-                <span key={a} title={a} style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.20)" }}>
-                  {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
-                </span>
-              ))}
-            </div>
-          )}
-          {priceComparison && !priceComparison.isCheapest && priceComparison.cheapestName && (
-            <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
-              {priceComparison.cheapestName} ({priceComparison.cheapest.unit_price!.toFixed(2)}{"\u00A0\u20AC"}/{priceComparison.cheapest.unit ?? "kg"})
-            </span>
-          )}
-          {priceComparison && priceComparison.isCheapest && priceComparison.count > 1 && (
-            <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>Meilleur prix ({priceComparison.count})</span>
-          )}
-          {!hasPrice && !inactive && <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", flexShrink: 0 }}>prix manquant</span>}
+    <div style={{ ...cadreTuile(catAccent, false, selected ?? false), padding: 0 }}>
+      {/* ── Tuile commune : nom, infos, ligne du bas (même tuile sur ordinateur et téléphone) ── */}
+      <TuileProduit cadre={false} couleur={catAccent} inactive={inactive} nom={x.name} onClick={ouvrir}
+        avant={onToggleSelect && (
+          <input type="checkbox" checked={selected ?? false} title="Sélectionner (actions groupées : catégorie, suppression)"
+            onChange={(e) => { e.stopPropagation(); onToggleSelect(x.id); }} onClick={(e) => e.stopPropagation()}
+            style={{ width: 16, height: 16, accentColor: catAccent, cursor: "pointer", flexShrink: 0, marginTop: 1 }} />
+        )}
+        badges={<>
+          {inactive && <> {inactiveBadge}</>}
+          {x.is_derived && <> <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", verticalAlign: "middle" }}>DÉRIVÉ</span></>}
+          {alert && <> <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, verticalAlign: "middle", color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)" }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span></>}
+        </>}
+        actions={<>
           {st !== "validated" && canValidate && (
-            <button disabled={!canValidate} onClick={(e) => { e.stopPropagation(); onSetStatus(x.id, "validated"); }} style={{ height: 20, padding: "0 8px", borderRadius: 5, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 10, fontWeight: 600, cursor: "pointer", color: "#4a6741", flexShrink: 0 }}>Valider</button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onSetStatus(x.id, "validated"); }} style={{ height: 22, padding: "0 8px", borderRadius: 6, border: "1px solid #4a6741", background: "rgba(74,103,65,0.08)", fontSize: 10, fontWeight: 700, cursor: "pointer", color: "#4a6741", fontFamily: "inherit" }}>Valider</button>
           )}
           {!x.is_derived && onCreateDerived && (
-            <button onClick={(e) => { e.stopPropagation(); onCreateDerived(x); }} title="Derive" style={{ ...BTN_ACTION, background: "rgba(124,58,237,0.10)", color: "#7C3AED", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>⚗</button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onCreateDerived(x); }} title="Créer un produit dérivé (paré, cuit…)" style={{ ...BTN_ACTION, width: 22, height: 22, borderRadius: 6, background: "rgba(124,58,237,0.10)", color: "#7C3AED", fontSize: 11, fontWeight: 700 }}>⚗</button>
           )}
-          {isEditing && <button onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ ...BTN_ACTION, background: "#4a6741", color: "white", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>OK</button>}
-          <a href={`/ingredients/${x.id}`} onClick={(e) => e.stopPropagation()} title="Fiche detail" style={{ ...BTN_ACTION, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", fontSize: 13, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>→</a>
-          {/* Croix visible aussi fiche ouverte : c'est en la lisant qu'on decide de supprimer */}
-          <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} title="Supprimer le produit" style={{ ...BTN_ACTION, background: "rgba(220,38,38,0.10)", color: "#DC2626", flexShrink: 0 }}>✕</button>
-        </div>
-      </div>
-
-      {/* ── MOBILE ROW ── */}
-      <div
-        className="md:hidden"
-        onClick={() => { if (isEditing) onSaveEdit(); else onStartEdit(x); }}
-        style={{ padding: "10px 12px", background: "white", cursor: "pointer" }}
-      >
-        {/* Row 1: Checkbox + Avatar + Name + Price */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {onToggleSelect && (
-            <input
-              type="checkbox"
-              checked={selected ?? false}
-              onChange={(e) => { e.stopPropagation(); onToggleSelect(x.id); }}
-              onClick={(e) => e.stopPropagation()}
-              style={{ width: 16, height: 16, accentColor: catAccent, cursor: "pointer", flexShrink: 0 }}
-            />
-          )}
-          {!compactMode && <IngredientAvatar ingredientId={x.id} name={x.name} category={x.category} size={30} editable />}
-          <div className="produit-main">
-            <div className="produit-name" style={{ fontWeight: 600, fontSize: 13, color: inactive ? "#999" : catTexte }}>{x.name}</div>
-            {inactive && inactiveBadge}
-          </div>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(x.id, x.name); }} style={{
-            width: 24, height: 24, borderRadius: 6, border: "none",
-            background: "rgba(220,38,38,0.08)", color: "#DC2626",
-            fontSize: 12, cursor: "pointer", flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>x</button>
-        </div>
-        {/* Row 2: carte d'identité — statut · catégorie (sous-cat) · fournisseur, toujours les trois */}
-        {!compactMode && (
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, flexWrap: "wrap", paddingLeft: onToggleSelect ? 54 : 38 }}>
-            <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 999, background: sb.bg, color: sb.color }}>{sb.label}</span>
-            <span className="pastille" style={{ "--pastille-c": catTexte } as React.CSSProperties}>
-              {CAT_LABELS[x.category]}{x.sub_category ? ` · ${x.sub_category}` : ""}
+          <BoutonCrayon onClick={ouvrir} title={isEditing ? "Fermer la fiche" : "Modifier la fiche"} />
+          <a href={`/ingredients/${x.id}`} onClick={(e) => e.stopPropagation()} title="Fiche détaillée" style={{ ...BTN_ACTION, width: 22, height: 22, borderRadius: 6, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>→</a>
+          <BoutonCroix onClick={() => onDelete(x.id, x.name)} title="Supprimer le produit" />
+        </>}
+        infos={compactMode ? undefined : <>
+          {cond && <Conditionnement>{cond}</Conditionnement>}
+          <span className="pastille" style={{ "--pastille-c": catTexte } as React.CSSProperties}>{CAT_LABELS[x.category]}{x.sub_category ? ` · ${x.sub_category}` : ""}</span>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onToggleEstablishment?.(x.id, "bellomio", ingEstabs); }} title="Bello Mio" style={{ ...petit, background: hasBM ? "rgba(212,119,90,0.1)" : "rgba(0,0,0,0.04)", color: hasBM ? "#D4775A" : "#ccc" }}>BM</button>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onToggleEstablishment?.(x.id, "piccola", ingEstabs); }} title="Piccola Mia" style={{ ...petit, background: hasPM ? "rgba(212,160,60,0.1)" : "rgba(0,0,0,0.04)", color: hasPM ? "#D4A03C" : "#ccc" }}>PM</button>
+          {alg.length > 0 && alg.map(a => (
+            <span key={a} title={a} style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 4, background: "rgba(220,38,38,0.08)", color: "#DC2626", border: "1px solid rgba(220,38,38,0.20)" }}>
+              {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
             </span>
-            {alert && <span style={{ fontSize: 9, fontWeight: 700, color: alert.direction === "up" ? "#DC2626" : "#16A34A" }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span>}
-            {supplierName
+          ))}
+          {priceComparison && !priceComparison.isCheapest && priceComparison.cheapestName && (
+            <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>moins cher : {priceComparison.cheapestName} ({priceComparison.cheapest.unit_price!.toFixed(2)}{"\u00A0\u20AC"}/{priceComparison.cheapest.unit ?? "kg"})</span>
+          )}
+          {priceComparison && priceComparison.isCheapest && priceComparison.count > 1 && (
+            <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>Meilleur prix ({priceComparison.count} fournisseurs)</span>
+          )}
+          {!hasPrice && !inactive && <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626" }}>prix manquant</span>}
+        </>}
+        gauche={<>
+          {supplierName && supplierIdForDisplay
+            ? <button type="button" className="pastille" onClick={(e) => { e.stopPropagation(); onOpenSupplier?.(supplierIdForDisplay); }} style={{ "--pastille-c": cachedSupplierColor(supplierName), border: "none", cursor: "pointer" } as React.CSSProperties}>{supplierName}</button>
+            : supplierName
               ? <span className="pastille" style={{ "--pastille-c": cachedSupplierColor(supplierName) } as React.CSSProperties}>{supplierName}</span>
               : <span style={{ fontSize: 10, color: "#aaa" }}>— sans fournisseur</span>}
-          </div>
-        )}
-        {/* Row 3: Price comparison */}
-        {!compactMode && priceComparison && (
-          <div style={{ paddingLeft: onToggleSelect ? 54 : 38, marginTop: 3 }}>
-            {!priceComparison.isCheapest && priceComparison.cheapestName ? (
-              <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>
-                - cher : {priceComparison.cheapestName} ({priceComparison.cheapest.unit_price!.toFixed(2)}{"\u00A0\u20AC"}/{priceComparison.cheapest.unit ?? "kg"})
-              </span>
-            ) : priceComparison.count > 1 ? (
-              <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>
-                Meilleur prix ({priceComparison.count} fournisseurs)
-              </span>
-            ) : null}
-          </div>
-        )}
-        {!compactMode && !hasPrice && !inactive && <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", marginTop: 4, paddingLeft: onToggleSelect ? 54 : 38 }}>prix manquant</div>}
-        {/* Prix : pastille ronde en bas à droite (charte) */}
-        {hasPrice && (
-          <div className="produit-footer">
-            <span className="pastille-ronde">{price}</span>
-          </div>
-        )}
-      </div>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: sb.bg, color: sb.color }}>{sb.label}</span>
+        </>}
+        droite={<>
+          {hasPrice && <span className="pastille-ronde">{price}</span>}
+          {isEditing && <button type="button" onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ ...BTN_ACTION, width: "auto", padding: "0 10px", background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700 }}>OK</button>}
+        </>}
+      />
 
       {/* ── DUPLICATE ALERT ── */}
       {isEditing && duplicateMatch && (

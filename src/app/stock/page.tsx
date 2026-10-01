@@ -7,6 +7,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { fetchApi } from "@/lib/fetchApi";
 import { CAT_LABELS, CAT_COLORS, type Category } from "@/types/ingredients";
 import { couleurTexte } from "@/lib/styleCategories";
+import { TuileProduit } from "@/components/TuileProduit";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -451,67 +452,18 @@ function StockContent() {
                 {isOpen && (
                   <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 4 }}>
                     {catItems.map((item) => (
-                      <div
-                        key={item.ingredient_id}
-                        onClick={() => loadMovements(item)}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 12,
-                          padding: "10px 16px", cursor: "pointer",
-                          background: item.alerte ? "#FFFBF5" : "#fff",
-                          borderRadius: 10,
-                          border: item.alerte ? "1px solid #FECACA" : "1px solid #f0ebe0",
-                          transition: "border-color 0.15s",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = catColor + "60"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = item.alerte ? "#FECACA" : "#f0ebe0"; }}
-                      >
-                        {/* Name */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{item.name}</div>
-                          {item.stock_min != null && (
-                            <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>
-                              Min : {fmtQty(item.stock_min)} {item.unit ?? ""}
-                              {item.stock_objectif != null && <> — Obj : {fmtQty(item.stock_objectif)} {item.unit ?? ""}</>}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Receptions badge */}
-                        {item.receptions > 0 && (
-                          <span style={{
-                            fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
-                            background: "#E8F5E9", color: "#2D6A4F",
-                          }}>
-                            +{fmtQty(item.receptions)}
-                          </span>
-                        )}
-
-                        {/* Ventes badge */}
-                        {item.ventes > 0 && (
-                          <span style={{
-                            fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
-                            background: "#FEF2F2", color: "#D4775A",
-                          }}>
-                            -{fmtQty(item.ventes)}
-                          </span>
-                        )}
-
-                        {/* Stock value */}
-                        <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <div style={{
-                            fontSize: 16, fontWeight: 700, fontFamily: "'Oswald', sans-serif",
-                            color: item.alerte ? "#B91C1C" : "#1a1a1a",
-                          }}>
-                            {fmtQty(item.stock)}
-                          </div>
-                          <div style={{ fontSize: 10, color: "#999" }}>{item.unit ?? ""}</div>
-                        </div>
-
-                        {/* Alert icon */}
-                        {item.alerte && (
-                          <span style={{ fontSize: 14, flexShrink: 0 }}>⚠</span>
-                        )}
-                      </div>
+                      <TuileProduit key={item.ingredient_id} couleur={CAT_COLORS[cat as Category] ?? "#999"} nom={item.name} onClick={() => loadMovements(item)}
+                        style={{ marginBottom: 0, background: item.alerte ? "#FFFBF5" : "#fff" }}
+                        infos={item.stock_min != null ? (
+                          <span>min {fmtQty(item.stock_min)} {item.unit ?? ""}{item.stock_objectif != null ? ` · objectif ${fmtQty(item.stock_objectif)} ${item.unit ?? ""}` : ""}</span>
+                        ) : undefined}
+                        gauche={<>
+                          {item.receptions > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6, background: "#E8F5E9", color: "#2D6A4F" }}>+{fmtQty(item.receptions)} reçus</span>}
+                          {item.ventes > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6, background: "#FEF2F2", color: "#D4775A" }}>−{fmtQty(item.ventes)} vendus</span>}
+                          {item.alerte && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6, background: "#FEF2F2", color: "#B91C1C" }}>⚠ sous le minimum</span>}
+                        </>}
+                        droite={<span className="pastille-ronde" style={{ fontFamily: "'Oswald', sans-serif", fontSize: 16, background: item.alerte ? "#FEF2F2" : "rgba(26,26,26,0.06)", color: item.alerte ? "#B91C1C" : "#1a1a1a" }}>{fmtQty(item.stock)} {item.unit ?? ""}</span>}
+                      />
                     ))}
                   </div>
                 )}

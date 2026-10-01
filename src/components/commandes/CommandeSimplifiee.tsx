@@ -70,6 +70,7 @@ const qteTexte = (n: number) => String(Math.round(n * 100) / 100).replace(".", "
 /** Couleur du titre de rayon : partagée avec l'inventaire (src/lib/rayons.ts) */
 import { couleurRayon } from "@/lib/rayons";
 import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
+import { BoutonCrayon, Compteur, Conditionnement, TuileProduit } from "@/components/TuileProduit";
 
 /**
  * Aller-retour vers la fiche produit (admins, managers) : l'état de l'écran est gardé le temps de corriger
@@ -323,100 +324,64 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     const detail = ligne && ligne.apports.length > 0 && (ligne.apports.length > 1 || ligne.apports[0].user_id !== data!.moi)
       ? ligne.apports.map((p) => `${p.user_id === data!.moi ? "moi" : p.nom} ${qteTexte(p.quantite)}`).join(" · ")
       : null;
-    const btn = (actif: boolean): React.CSSProperties => ({
-      width: 48, height: 48, borderRadius: 24, border: "none", fontSize: 26, fontWeight: 700, lineHeight: 1,
-      background: actif ? ACCENT : "#ece4d4", color: actif ? "#fff" : "#b8ad9a", cursor: actif ? "pointer" : "default",
-      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, touchAction: "manipulation",
-    });
-
-    const texteIndication: React.CSSProperties = { fontSize: 12.5, color: ACCENT, marginTop: 6, whiteSpace: "normal", overflowWrap: "anywhere" };
+    const texteIndication: React.CSSProperties = { fontSize: 12.5, color: ACCENT, marginTop: 4, whiteSpace: "normal", overflowWrap: "anywhere" };
+    // Tuile produit commune : nom, conditionnement et prix, indications, puis zones à gauche et compteur à droite
     return (
-      <div key={a.ingredient_id} style={{
-        background: "#fff", borderRadius: 14, border: `1.5px solid ${total > 0 ? ACCENT : "#ddd6c8"}`, borderLeft: `4px solid ${couleur}`,
-        padding: "12px 12px 12px 14px", marginBottom: 8,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
-              <div style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a", lineHeight: 1.25, minWidth: 0 }}>{a.nom}</div>
-              {peutCorrigerFiche && (
-                <button type="button" aria-label={`Ouvrir la fiche produit ${a.nom}`} title="Ouvrir la fiche produit"
-                  onClick={() => void ouvrirFiche(a)}
-                  style={{
-                    flexShrink: 0, width: 28, height: 24, marginTop: -2, border: "none", background: "transparent", padding: 0,
-                    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#b0a894",
-                  }}>
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                  </svg>
-                </button>
-              )}
-            </div>
-            <div style={{ fontSize: 12, color: "#8a8378", marginTop: 3 }}>
-              {unite}{prix != null ? ` · ${euros(prix)}` : ""}{a.ref ? ` · ${a.ref}` : ""}
-            </div>
-          </div>
-          {brouillon && (total === 0 ? (
-            <button type="button" aria-label={`Ajouter ${a.nom}`} 
-              onClick={() => fixerMaPart(a, m, 1)}
-              style={{ ...btn(true), width: "auto", minWidth: 64, padding: "0 16px", fontSize: 18 }}>
-              + 1
-            </button>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button type="button" aria-label="Moins" disabled={maPart <= 0}
-                onClick={() => fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2))} style={btn(maPart > 0)}>−</button>
-              <div style={{ minWidth: 34, textAlign: "center", fontSize: 22, fontWeight: 700, fontFamily: OSWALD }}>{qteTexte(total)}</div>
-              <button type="button" aria-label="Plus"
-                onClick={() => fixerMaPart(a, m, Math.round((maPart + pas) * 2) / 2)} style={btn(true)}>+</button>
-            </div>
+      <TuileProduit key={a.ingredient_id} couleur={couleur} fait={total > 0} nom={a.nom}
+        actions={peutCorrigerFiche ? <BoutonCrayon onClick={() => void ouvrirFiche(a)} title="Ouvrir la fiche produit" /> : undefined}
+        infos={<>
+          <Conditionnement>{unite}</Conditionnement>
+          {(prix != null || a.ref) && <span>{prix != null ? euros(prix) : ""}{prix != null && a.ref ? " · " : ""}{a.ref ? `réf. ${a.ref}` : ""}</span>}
+        </>}
+        milieu={<>
+          {data!.indication === "derniere_commande" ? (a.derniere && (
+            <div style={texteIndication}>Dernière commande : {quantiteAffichee(a, a.derniere.quantite, a.derniere.mode)}</div>
+          )) : (estHabituel(a) && a.habituel && (
+            // Médiane par livraison
+            <div style={texteIndication}>D&apos;habitude : {quantiteAffichee(a, a.habituel.quantite, a.habituel.mode)} par livraison</div>
           ))}
-        </div>
-        {/* Sous la ligne, sur toute la largeur de la carte : jamais coupé, passe à la ligne (iPhone) */}
-        {data!.indication === "derniere_commande" ? (a.derniere && (
-          <div style={texteIndication}>Dernière commande : {quantiteAffichee(a, a.derniere.quantite, a.derniere.mode)}</div>
-        )) : (estHabituel(a) && a.habituel && (
-          // Médiane par livraison
-          <div style={texteIndication}>D&apos;habitude : {quantiteAffichee(a, a.habituel.quantite, a.habituel.mode)} par livraison</div>
+          {a.stock_objectif != null && (
+            <div style={{ ...texteIndication, color: "#6f6656", marginTop: 2 }}>Stock idéal : {quantiteAffichee(a, a.stock_objectif, a.contenu_nb > 1 ? "element" : "uc")}</div>
+          )}
+          {total > 0 && !a.au_poids && a.contenu_nb > 1 && (
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginTop: 2, whiteSpace: "normal", overflowWrap: "anywhere" }}>En cours : {quantiteAffichee(a, total, m)}</div>
+          )}
+          {a.unite_element && brouillon && (
+            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+              {(["uc", "element"] as Mode[]).map((x) => (
+                <button key={x} type="button" onClick={() => setModes((s) => ({ ...s, [a.ingredient_id]: x }))}
+                  style={{
+                    flex: 1, minHeight: 34, padding: "4px 8px", borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: "pointer", lineHeight: 1.2,
+                    border: m === x ? `1.5px solid ${ACCENT}` : "1px solid #ddd6c8",
+                    background: m === x ? "#FFF0EB" : "#f7f3ec", color: m === x ? ACCENT : "#8a8378",
+                  }}>
+                  {/* « Par carton de 6 » / « Par bouteille » : l'autre bouton dit déjà ce qu'il y a dans le carton */}
+                  Par {x === "element" ? a.unite_element : a.contenu_nb > 1 && a.element ? `${nomUnite(a.unite_commande)} de ${qteTexte(a.contenu_nb)}` : a.unite_uc}
+                </button>
+              ))}
+            </div>
+          )}
+          {(detail || (autreLigne && autreLigne.quantite > 0)) && (
+            <div style={{ fontSize: 12, color: "#6f6656", marginTop: 6 }}>
+              {detail}
+              {autreLigne && autreLigne.quantite > 0 && <>{detail ? " — " : ""}aussi {quantiteAffichee(a, autreLigne.quantite, autreMode)}</>}
+            </div>
+          )}
+        </>}
+        gauche={a.zones.map((z) => (
+          <span key={z.nom} className="pastille" style={{ "--pastille-c": z.couleur ?? "#8a8378" } as React.CSSProperties}>{libelleZone(z.nom)}</span>
         ))}
-        {a.stock_objectif != null && (
-          <div style={{ ...texteIndication, color: "#6f6656", marginTop: 2 }}>
-            Stock idéal : {quantiteAffichee(a, a.stock_objectif, a.contenu_nb > 1 ? "element" : "uc")}
-          </div>
-        )}
-        {total > 0 && !a.au_poids && a.contenu_nb > 1 && (
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginTop: 2, whiteSpace: "normal", overflowWrap: "anywhere" }}>En cours : {quantiteAffichee(a, total, m)}</div>
-        )}
-        {a.unite_element && brouillon && (
-          <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-            {(["uc", "element"] as Mode[]).map((x) => (
-              <button key={x} type="button" onClick={() => setModes((s) => ({ ...s, [a.ingredient_id]: x }))}
-                style={{
-                  flex: 1, minHeight: 36, padding: "4px 8px", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", lineHeight: 1.2,
-                  border: m === x ? `1.5px solid ${ACCENT}` : "1px solid #ddd6c8",
-                  background: m === x ? "#FFF0EB" : "#f7f3ec", color: m === x ? ACCENT : "#8a8378",
-                }}>
-                {/* « Par carton de 6 » / « Par bouteille » : l'autre bouton dit déjà ce qu'il y a dans le carton */}
-                Par {x === "element" ? a.unite_element : a.contenu_nb > 1 && a.element ? `${nomUnite(a.unite_commande)} de ${qteTexte(a.contenu_nb)}` : a.unite_uc}
-              </button>
-            ))}
-          </div>
-        )}
-        {(detail || (autreLigne && autreLigne.quantite > 0)) && (
-          <div style={{ fontSize: 12, color: "#6f6656", marginTop: 8 }}>
-            {detail}
-            {autreLigne && autreLigne.quantite > 0 && <>{detail ? " — " : ""}aussi {quantiteAffichee(a, autreLigne.quantite, autreMode)}</>}
-          </div>
-        )}
-        {/* Zones de stockage : pastilles dans l'angle en bas à gauche, comme la pastille fournisseur de l'inventaire */}
-        {a.zones.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
-            {a.zones.map((z) => (
-              <span key={z.nom} className="pastille" style={{ "--pastille-c": z.couleur ?? "#8a8378" } as React.CSSProperties}>{libelleZone(z.nom)}</span>
-            ))}
-          </div>
-        )}
-      </div>
+        droite={brouillon ? (total === 0 ? (
+          <button type="button" aria-label={`Ajouter ${a.nom}`} onClick={() => fixerMaPart(a, m, 1)} style={{
+            height: 40, minWidth: 64, padding: "0 16px", borderRadius: 20, border: "none", background: ACCENT, color: "#fff", fontSize: 16, fontWeight: 700,
+            cursor: "pointer", touchAction: "manipulation", fontFamily: "inherit",
+          }}>+ 1</button>
+        ) : (
+          <Compteur valeur={qteTexte(total)} moinsActif={maPart > 0}
+            onMoins={() => fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2))}
+            onPlus={() => fixerMaPart(a, m, Math.round((maPart + pas) * 2) / 2)} />
+        )) : undefined}
+      />
     );
   }
 
