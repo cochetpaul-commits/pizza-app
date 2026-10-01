@@ -16,7 +16,7 @@ import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingre
 import { couleurRayon, rayonDuProduit, RAYON_AUTRES, RAYON_PREPARATIONS } from "@/lib/rayons";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { BoutonCrayon, BoutonCroix, Compteur, Conditionnement as CondLibelle, TuileProduit } from "@/components/TuileProduit";
-import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie } from "@/lib/styleCategories";
+import { couleurTexte, styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie } from "@/lib/styleCategories";
 import { correspondRecherche, filtrerRecherche, normaliserRecherche } from "@/lib/rechercheTolerante";
 void categorieDeFamille;
 
@@ -392,14 +392,25 @@ function Feuille() {
   }
 
   /** Retire (ou remet) un lot de lignes (un rayon entier dans la zone), sans toucher aux fiches */
-  async function retirerLot(cibles: Ligne[], libelle: string, remettre = false) {
+  async function retirerLot(cibles: Ligne[], libelle: string, remettre = false, sansConfirmation = false) {
     if (lectureSeule || !cibles.length) return;
-    if (!remettre && !confirm(`Retirer les ${cibles.length} produits de « ${libelle} » de cette zone ?\nIls restent dans « retirés » et peuvent être remis.`)) return;
+    if (!remettre && !sansConfirmation && !confirm(`Retirer les ${cibles.length} produits de « ${libelle} » de cette zone ?\nIls restent dans « retirés » et peuvent être remis.`)) return;
     const ids = cibles.map((l) => l.id);
     const { error } = await supabase.from("inventaire_lignes").update({ retiree: !remettre, updated_at: new Date().toISOString() }).in("id", ids);
     if (error) { setMessage(`Pas enregistré : ${error.message}`); return; }
     setLignes((prev) => prev.map((x) => (ids.includes(x.id) ? { ...x, retiree: !remettre } : x)));
     setMessage(`${cibles.length} produit(s) ${remettre ? "remis" : "retiré(s)"} (${libelle}).`);
+  }
+
+  /** Retire tous les produits de la zone affichée (ils restent dans « retirés ») et passe à la zone suivante */
+  async function retirerZone() {
+    if (!zone || lectureSeule) return;
+    const actives = (parZone.get(zone) ?? []).filter((l) => !l.retiree);
+    const comptees = actives.filter(compte).length;
+    if (!confirm(`Retirer la zone « ${libelleZone(zone)} » de l'inventaire ?\n${actives.length} produit(s)${comptees ? `, dont ${comptees} compté(s),` : ""} passeront dans « retirés » et pourront être remis.`)) return;
+    await retirerLot(actives, libelleZone(zone), false, true);
+    const suivante = zones.find((z) => z !== zone && (parZone.get(z) ?? []).some((l) => !l.retiree && !actives.includes(l)));
+    if (suivante) setZone(suivante);
   }
 
   async function ajouterZone() {
@@ -580,7 +591,7 @@ function Feuille() {
 
       {/* Zones, dans l'ordre des feuilles */}
       <div className="inventaire-zones" style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none", margin: "14px 0 10px", padding: "6px 0", position: "sticky", top: 0, zIndex: 5, background: "#f2ede4" }}>
-        {zones.map((z) => {
+        {zones.filter((z) => z === zone || (parZone.get(z) ?? []).some((l) => !l.retiree)).map((z) => {
           const ls = (parZone.get(z) ?? []).filter((l) => !l.retiree);
           const n = ls.filter(compte).length;
           const valeur = n > 0 ? valeurDe(ls) : 0;
@@ -597,9 +608,15 @@ function Feuille() {
           );
         })}
         {!lectureSeule && (
-          <button type="button" onClick={() => void ajouterZone()} title="Ajouter une zone de stockage" style={{
-            flexShrink: 0, padding: "8px 12px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 700, border: "1px dashed #b0a894", background: "#fff", color: "#6f6656", alignSelf: "stretch", fontFamily: "inherit",
-          }}>+ zone</button>
+          /* Zones sans produit (retirées de l'inventaire ou jamais remplies) : à rouvrir d'ici, ou nouvelle zone */
+          <select value="" onChange={(e) => { const v = e.target.value; if (v === "__nouvelle__") void ajouterZone(); else if (v) setZone(v); }}
+            title="Ouvrir une zone sans produit, ou créer une zone" aria-label="Autres zones" style={{
+              flexShrink: 0, padding: "0 12px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 700, border: "1px dashed #b0a894", background: "#fff", color: "#6f6656", alignSelf: "stretch", fontFamily: "inherit",
+            }}>
+            <option value="">+ zone</option>
+            {zones.filter((z) => z !== zone && !(parZone.get(z) ?? []).some((l) => !l.retiree)).map((z) => <option key={z} value={z}>{libelleZone(z)} (vide)</option>)}
+            <option value="__nouvelle__">+ Nouvelle zone…</option>
+          </select>
         )}
       </div>
 
@@ -637,6 +654,9 @@ function Feuille() {
               {!lectureSeule && (
                 <button type="button" onClick={() => setModaleAjout(true)} style={{ ...bouton("#fff", ACCENT), height: 34, fontSize: 12.5 }}>+ Ajouter</button>
               )}
+              {!lectureSeule && lignesZoneToutes.some((l) => !l.retiree) && (
+                <button type="button" onClick={() => void retirerZone()} title="Retirer tous les produits de cette zone de l'inventaire" style={{ ...lien, color: "#a12b2b" }}>retirer la zone</button>
+              )}
             </div>
           </div>
 
@@ -672,13 +692,15 @@ function Feuille() {
                     {comptees > 0 && (
                       <span style={stylePastilleBarre(couleur)}>{comptees}{comptees === r.lignes.length ? " ✓" : ""}</span>
                     )}
+                    {!lectureSeule && (
+                      /* Retirer tout le rayon de cette zone (les produits restent dans « retirés ») */
+                      <span role="button" tabIndex={0} title={`Retirer « ${r.libelle} » de cette zone`} aria-label={`Retirer le rayon ${r.libelle}`}
+                        onClick={(e) => { e.stopPropagation(); void retirerLot(r.lignes, r.libelle); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); void retirerLot(r.lignes, r.libelle); } }}
+                        style={croixBarre(couleur)}>×</span>
+                    )}
                     <span style={styleChevronBarre(couleur, ouverte)}>▼</span>
                   </button>
-                  {ouverte && !lectureSeule && (
-                    <div style={{ textAlign: "right", margin: "4px 6px 2px" }}>
-                      <button type="button" onClick={() => void retirerLot(r.lignes, r.libelle)} title="Retirer tout le rayon de cette zone" style={{ ...lien, color: "#a12b2b" }}>retirer le rayon de cette zone</button>
-                    </div>
-                  )}
                   {ouverte && r.sous.map((g) => {
                     const cleSous = `${cleFamille(zone, r.code)}|${g.nom ?? ""}`;
                     // Sans en-tête de sous-catégorie (rayon sans sous-catégories), les cartes sont toujours visibles
@@ -692,6 +714,12 @@ function Feuille() {
                             <span>{g.nom ?? "Autre"} <span style={{ fontWeight: 500, opacity: 0.8 }}>({g.lignes.length})</span></span>
                             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                               {compteesSous > 0 && <span style={{ fontSize: 10.5, color: compteesSous === g.lignes.length ? "#2D6A4F" : "#8a7e6b" }}>{compteesSous}/{g.lignes.length}</span>}
+                              {!lectureSeule && (
+                                <span role="button" tabIndex={0} title={`Retirer « ${g.nom ?? "Autre"} » de cette zone`} aria-label={`Retirer la sous-catégorie ${g.nom ?? "Autre"}`}
+                                  onClick={(e) => { e.stopPropagation(); void retirerLot(g.lignes, `${r.libelle} · ${g.nom ?? "Autre"}`); }}
+                                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); void retirerLot(g.lignes, `${r.libelle} · ${g.nom ?? "Autre"}`); } }}
+                                  style={croixPetite}>×</span>
+                              )}
                               <span style={{ fontSize: 10, transition: "transform 0.2s", transform: sousOuverte ? "rotate(0)" : "rotate(-90deg)" }}>▼</span>
                             </span>
                           </button>
@@ -899,6 +927,16 @@ function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjoute
 }
 
 /** Champ de comptage avec − / + (comme l'écran de commande : pas de clavier obligatoire) ; la saisie au clavier reste possible */
+/** Croix de retrait dans une barre de rayon (ronde, claire, à la couleur de la barre) */
+const croixBarre = (couleur: string): React.CSSProperties => ({
+  width: 22, height: 22, borderRadius: 11, background: "rgba(255,255,255,0.9)", color: couleurTexte(couleur), fontSize: 15, fontWeight: 700, lineHeight: 1,
+  display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0,
+});
+/** Petite croix rose (sous-catégorie), la même que sur les cartes */
+const croixPetite: React.CSSProperties = {
+  width: 18, height: 18, borderRadius: 9, background: "#fde7e7", color: "#a12b2b", fontSize: 12, fontWeight: 700, lineHeight: 1,
+  display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0,
+};
 const lien: React.CSSProperties = { border: "none", background: "none", color: ACCENT, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0, fontFamily: "inherit" };
 const puce = (actif: boolean): React.CSSProperties => ({
   flexShrink: 0, padding: "5px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
