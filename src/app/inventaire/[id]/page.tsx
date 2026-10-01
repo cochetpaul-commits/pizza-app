@@ -10,10 +10,10 @@ import { useProfile } from "@/lib/ProfileContext";
 import { libelleZone } from "@/lib/commandeArticles";
 import { articleDeFiche, categorieDeFamille, choisirConditionnement, conditionnementDArticle, ficheDepuisCreation, totalLigne, type ArticleFournisseur, type Conditionnement, type CreationProduit, type FicheConditionnement, type OffreActive } from "@/lib/inventaire";
 import { libelleType, TYPES_COLISAGE } from "@/lib/commandeArticles";
-import { coutUniteComptee, type OffreValo } from "@/lib/inventaireValorisation";
+import { coutUniteComptee, type OffreValo, type RecetteValo } from "@/lib/inventaireValorisation";
 import { cleEtab } from "@/lib/zonesEtablissement";
 import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
-import { couleurRayon, rayonDuProduit, RAYON_AUTRES } from "@/lib/rayons";
+import { couleurRayon, rayonDuProduit, RAYON_AUTRES, RAYON_PREPARATIONS } from "@/lib/rayons";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { correspondRecherche, filtrerRecherche, normaliserRecherche } from "@/lib/rechercheTolerante";
 void categorieDeFamille;
@@ -86,6 +86,8 @@ function Feuille() {
   const [rayons, setRayons] = useState<{ code: string; libelle: string; ordre: number }[]>([]);
   const [articles, setArticles] = useState<Record<string, ArticleFournisseur[]>>({});
   const [offres, setOffres] = useState<Record<string, (OffreValo & OffreActive)[]>>({});
+  /** Préparations maison : recette cuisine dont le produit est la sortie, pour valoriser au coût de recette */
+  const [recettes, setRecettes] = useState<Record<string, RecetteValo & { name: string }>>({});
   /** Fournisseurs (nom, couleur) pour la pastille sous le nom du produit, comme sur la fiche produit */
   const [fournisseurs, setFournisseurs] = useState<Record<string, { name: string; color: string | null }>>({});
   const [saisies, setSaisies] = useState<Record<string, Saisie>>({});
@@ -120,11 +122,21 @@ function Feuille() {
       supabase.from("rayons_commande").select("code, libelle, ordre").order("ordre"),
     ]);
     const ids = [...new Set((ls ?? []).map((l) => l.ingredient_id as string))];
-    const [{ data: ings }, { data: arts }, { data: offs }] = await Promise.all([
+    const [{ data: ings }, { data: arts }, { data: offs }, { data: recs }] = await Promise.all([
       inChunks<Fiche>(ids, (b) => supabase.from("ingredients").select("id, name, status, is_active, category, sub_category, rayon_commande, default_unit, default_supplier_id, supplier_id, purchase_price, purchase_unit, purchase_unit_label, piece_weight_g, piece_volume_ml, density_g_per_ml, order_unit_label, order_quantity, order_element, order_element_permis").in("id", b)),
       inChunks<ArticleFournisseur & { ingredient_id: string }>(ids, (b) => supabase.from("commande_articles").select("ingredient_id, supplier_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande").in("ingredient_id", b)),
       inChunks<OffreValo & OffreActive & { ingredient_id: string }>(ids, (b) => supabase.from("supplier_offers").select("ingredient_id, supplier_id, is_active, valid_from, valid_to, created_at, unit, unit_price, pack_price, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, pack_unit, price_kind, piece_weight_g, density_kg_per_l").in("ingredient_id", b)),
+      inChunks<RecetteValo & { output_ingredient_id: string; name: string; updated_at: string | null }>(ids, (b) => supabase.from("kitchen_recipes").select("output_ingredient_id, name, cost_per_kg, total_cost, yield_grams, updated_at").in("output_ingredient_id", b).eq("is_active", true)),
     ]);
+    // Plusieurs recettes pour une même sortie : la plus récemment modifiée
+    const recDe: Record<string, RecetteValo & { name: string }> = {};
+    const recMaj: Record<string, string> = {};
+    for (const r of recs) {
+      const maj = String(r.updated_at ?? "");
+      if (recDe[r.output_ingredient_id] && recMaj[r.output_ingredient_id] >= maj) continue;
+      recDe[r.output_ingredient_id] = { name: r.name, cost_per_kg: r.cost_per_kg, total_cost: r.total_cost, yield_grams: r.yield_grams };
+      recMaj[r.output_ingredient_id] = maj;
+    }
     const ficheDe: Record<string, Fiche> = {};
     for (const f of ings) ficheDe[f.id] = f;
     const artDe: Record<string, ArticleFournisseur[]> = {};
@@ -161,9 +173,9 @@ function Feuille() {
     const nomsZones = (z ?? []).map((x) => x.name as string);
     setZones(nomsZones);
     setLignes(liste);
-    setFiches(ficheDe); setArticles(artDe); setOffres(offDe); setFournisseurs(fournDe);
+    setFiches(ficheDe); setArticles(artDe); setOffres(offDe); setFournisseurs(fournDe); setRecettes(recDe);
     dernierChargement.current = Date.now();
-    setRayons([...((ry ?? []) as { code: string; libelle: string; ordre: number }[]), RAYON_AUTRES]);
+    setRayons([...((ry ?? []) as { code: string; libelle: string; ordre: number }[]), RAYON_PREPARATIONS, RAYON_AUTRES]);
     // Colis unique (contenu 1) : un seul champ, « colis » ; sans conditionnement : un seul champ, « unités ».
     // Une quantité déjà enregistrée ailleurs (ancien inventaire) est reportée dans le champ affiché.
     setSaisies(Object.fromEntries(liste.map((l) => {
@@ -258,8 +270,8 @@ function Feuille() {
   const coutDe = useCallback((l: Ligne) => {
     const f = fiches[l.ingredient_id];
     if (!f) return { cout: null, source: null, raison: "fiche supprimée" };
-    return coutUniteComptee(l.unite, f, offres[l.ingredient_id] ?? []);
-  }, [fiches, offres]);
+    return coutUniteComptee(l.unite, f, offres[l.ingredient_id] ?? [], recettes[l.ingredient_id]);
+  }, [fiches, offres, recettes]);
 
   /** Enregistre une ligne 500 ms après la dernière frappe */
   function saisir(l: Ligne, champ: keyof Saisie, valeur: string) {
@@ -476,7 +488,11 @@ function Feuille() {
                   {/* 4. Rangée du bas : pastille fournisseur dans l'angle à gauche (même pastille que la fiche produit), total compté et valeur centrés */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8, marginTop: 5 }}>
                     <span style={{ justifySelf: "start", minWidth: 0 }}>
-                      {fournisseur && <span className="pastille" style={{ "--pastille-c": getSupplierColor(fournisseur.name, fournisseur.color) } as React.CSSProperties}>{fournisseur.name}</span>}
+                      {fournisseur
+                        ? <span className="pastille" style={{ "--pastille-c": getSupplierColor(fournisseur.name, fournisseur.color) } as React.CSSProperties}>{fournisseur.name}</span>
+                        : recettes[l.ingredient_id]
+                          ? <span className="pastille" title={`Valorisée au coût de la recette « ${recettes[l.ingredient_id].name} »`} style={{ "--pastille-c": CAT_COLORS.preparation } as React.CSSProperties}>recette maison</span>
+                          : null}
                     </span>
                     <span style={{ fontSize: 12.5, color: "#8a8378", textAlign: "center" }}>
                       {total != null

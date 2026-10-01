@@ -48,3 +48,21 @@ describe("choisirOffre / familleUnite", () => {
     expect(familleUnite(null)).toBe("pc");
   });
 });
+
+describe("préparations maison : coût de recette", () => {
+  it("compté au kg, coût au kilo de la recette quand ni offre ni prix de fiche", () => {
+    expect(coutUniteComptee("kg", {}, [], { cost_per_kg: 12.97 })).toEqual({ cout: 12.97, source: "recette" });
+  });
+  it("coût total ÷ poids produit quand le coût au kilo n'est pas enregistré", () => {
+    expect(coutUniteComptee("kg", {}, [], { cost_per_kg: null, total_cost: 11.34, yield_grams: 874 })).toEqual({ cout: 12.9748, source: "recette" });
+  });
+  it("compté à la pièce (bac de 2 kg) : × poids d'une pièce", () => {
+    expect(coutUniteComptee("pièce", { piece_weight_g: 2000 }, [], { cost_per_kg: 10 })).toEqual({ cout: 20, source: "recette" });
+  });
+  it("l'offre ou le prix de fiche passent avant la recette", () => {
+    expect(coutUniteComptee("kg", { purchase_price: 8, purchase_unit: 1, purchase_unit_label: "kg" }, [], { cost_per_kg: 12 })).toEqual({ cout: 8, source: "fiche" });
+  });
+  it("recette sans coût : toujours sans prix", () => {
+    expect(coutUniteComptee("kg", {}, [], { cost_per_kg: null, total_cost: null, yield_grams: 500 })).toMatchObject({ cout: null, source: null });
+  });
+});

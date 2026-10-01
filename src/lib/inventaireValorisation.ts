@@ -17,7 +17,9 @@ export type FicheValo = {
 };
 export type OffreValo = Record<string, unknown> & { is_active?: boolean | null; valid_from?: string | null; created_at?: string | null; valid_to?: string | null };
 
-export type Valorisation = { cout: number | null; source: "offre" | "ancienne_offre" | "fiche" | null; raison?: string };
+/** Recette cuisine dont le produit est la sortie (préparation maison) : coût au kilo d'après les prix d'achat de ses ingrédients */
+export type RecetteValo = { cost_per_kg?: number | null; total_cost?: number | null; yield_grams?: number | null };
+export type Valorisation = { cout: number | null; source: "offre" | "ancienne_offre" | "fiche" | "recette" | null; raison?: string };
 
 const n = (v: unknown) => { const x = typeof v === "number" ? v : Number(String(v ?? "").replace(",", ".")); return Number.isFinite(x) ? x : 0; };
 const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
@@ -53,8 +55,16 @@ function cpuFiche(f: FicheValo): CpuByUnit {
   return enrichCpuWithConversions({ piece_weight_g: f.piece_weight_g, density_kg_per_l: f.density_g_per_ml }, cpu);
 }
 
-/** Coût HT d'une unité comptée */
-export function coutUniteComptee(unite: string | null | undefined, fiche: FicheValo, offres: OffreValo[]): Valorisation {
+/** Coût au kilo d'une préparation maison : celui enregistré sur la recette, sinon coût total ÷ poids produit */
+export function coutKgRecette(r: RecetteValo | null | undefined): number | null {
+  if (!r) return null;
+  if (n(r.cost_per_kg) > 0) return n(r.cost_per_kg);
+  if (n(r.total_cost) > 0 && n(r.yield_grams) > 0) return n(r.total_cost) / (n(r.yield_grams) / 1000);
+  return null;
+}
+
+/** Coût HT d'une unité comptée ; `recette` : la recette dont le produit est la sortie (préparation maison, valorisée au coût de recette) */
+export function coutUniteComptee(unite: string | null | undefined, fiche: FicheValo, offres: OffreValo[], recette?: RecetteValo | null): Valorisation {
   const { offre, ancienne } = choisirOffre(offres);
   let cpu: CpuByUnit = {};
   let source: Valorisation["source"] = null;
@@ -63,6 +73,10 @@ export function coutUniteComptee(unite: string | null | undefined, fiche: FicheV
     source = ancienne ? "ancienne_offre" : "offre";
   }
   if (!cpu.g && !cpu.ml && !cpu.pcs) { cpu = cpuFiche(fiche); source = cpu.g || cpu.ml || cpu.pcs ? "fiche" : null; }
+  if (!source) {
+    const kg = coutKgRecette(recette);
+    if (kg != null) { cpu = enrichCpuWithConversions({ piece_weight_g: fiche.piece_weight_g, density_kg_per_l: fiche.density_g_per_ml }, { g: kg / 1000 }); source = "recette"; }
+  }
   if (!source) return { cout: null, source: null, raison: "aucun prix" };
 
   const poidsG = n(fiche.piece_weight_g), volMl = n(fiche.piece_volume_ml);

@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { CAT_LABELS, type Category } from "@/types/ingredients";
-import { coutUniteComptee, type OffreValo } from "@/lib/inventaireValorisation";
+import { coutUniteComptee, type OffreValo, type RecetteValo } from "@/lib/inventaireValorisation";
 import { totalLigne } from "@/lib/inventaire";
 
 /**
@@ -41,14 +41,18 @@ export async function valoriserInventaire(invId: string, etabId: string): Promis
   const ids = [...new Set((lignes ?? []).map((l) => l.ingredient_id as string))];
   const fiches = new Map<string, Record<string, unknown>>();
   const offres = new Map<string, OffreValo[]>();
+  // Préparations maison : la recette cuisine dont le produit est la sortie donne le coût au kilo
+  const recettes = new Map<string, RecetteValo>();
   for (let i = 0; i < ids.length; i += 200) {
     const lot = ids.slice(i, i + 200);
-    const [{ data: ings }, { data: offs }] = await Promise.all([
+    const [{ data: ings }, { data: offs }, { data: recs }] = await Promise.all([
       supabaseAdmin.from("ingredients").select("id, name, category, is_active, status, purchase_price, purchase_unit, purchase_unit_label, piece_weight_g, piece_volume_ml, density_g_per_ml").in("id", lot),
       supabaseAdmin.from("supplier_offers").select("ingredient_id, is_active, valid_from, valid_to, created_at, unit, unit_price, pack_price, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, pack_unit, price_kind, piece_weight_g, density_kg_per_l").in("ingredient_id", lot),
+      supabaseAdmin.from("kitchen_recipes").select("output_ingredient_id, cost_per_kg, total_cost, yield_grams").in("output_ingredient_id", lot).eq("is_active", true),
     ]);
     for (const f of ings ?? []) fiches.set(f.id as string, f as Record<string, unknown>);
     for (const o of (offs ?? []) as (OffreValo & { ingredient_id: string })[]) offres.set(o.ingredient_id, [...(offres.get(o.ingredient_id) ?? []), o]);
+    for (const r of (recs ?? []) as (RecetteValo & { output_ingredient_id: string })[]) if (!recettes.has(r.output_ingredient_id)) recettes.set(r.output_ingredient_id, r);
   }
 
   const out: LigneValorisee[] = (lignes ?? []).map((l) => {
@@ -59,7 +63,7 @@ export async function valoriserInventaire(invId: string, etabId: string): Promis
     let source: string | null = cout != null ? "figé" : null;
     let raison: string | null = null;
     if (cout == null && f) {
-      const v = coutUniteComptee(unite, f, offres.get(l.ingredient_id as string) ?? []);
+      const v = coutUniteComptee(unite, f, offres.get(l.ingredient_id as string) ?? [], recettes.get(l.ingredient_id as string));
       cout = v.cout; source = v.source; raison = v.raison ?? null;
     }
     if (!f) raison = "fiche supprimée";
