@@ -352,16 +352,6 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
                 </button>
               )}
             </div>
-            {a.zones.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
-                {a.zones.map((z) => (
-                  <span key={z.nom} style={{
-                    fontSize: 11, fontWeight: 600, lineHeight: 1.2, padding: "2px 7px", borderRadius: 8,
-                    color: z.couleur ?? "#8a8378", background: `${z.couleur ?? "#8a8378"}14`, border: `1px solid ${z.couleur ?? "#8a8378"}33`,
-                  }}>{libelleZone(z.nom)}</span>
-                ))}
-              </div>
-            )}
             <div style={{ fontSize: 12, color: "#8a8378", marginTop: 3 }}>
               {unite}{prix != null ? ` · ${euros(prix)}` : ""}{a.ref ? ` · ${a.ref}` : ""}
             </div>
@@ -416,6 +406,14 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
           <div style={{ fontSize: 12, color: "#6f6656", marginTop: 8 }}>
             {detail}
             {autreLigne && autreLigne.quantite > 0 && <>{detail ? " — " : ""}aussi {quantiteAffichee(a, autreLigne.quantite, autreMode)}</>}
+          </div>
+        )}
+        {/* Zones de stockage : pastilles dans l'angle en bas à gauche, comme la pastille fournisseur de l'inventaire */}
+        {a.zones.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
+            {a.zones.map((z) => (
+              <span key={z.nom} className="pastille" style={{ "--pastille-c": z.couleur ?? "#8a8378" } as React.CSSProperties}>{libelleZone(z.nom)}</span>
+            ))}
           </div>
         )}
       </div>
