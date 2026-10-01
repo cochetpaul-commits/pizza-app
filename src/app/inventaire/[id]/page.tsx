@@ -444,7 +444,6 @@ function Feuille() {
                     <span style={{ color: valo.cout == null ? "#b45309" : "#8a8378" }}>
                       {valo.cout == null ? `sans prix${valo.raison ? ` (${valo.raison})` : ""}` : `${eur(valo.cout)} / ${l.unite ?? "unité"}${valo.source === "ancienne_offre" ? " (ancien prix)" : ""}`}
                     </span>
-                    {l.nom_feuille && normNom(l.nom_feuille) !== normNom(l.nom) && <span style={{ color: "#a79f90" }}>fiche : {l.nom}</span>}
                     {(l.rattachement === "approché" || l.rattachement === "rattaché par ressemblance" || l.aVerifier || l.inactive) && (
                       <span style={{
                         fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8,
@@ -455,8 +454,8 @@ function Feuille() {
                       <button type="button" onClick={() => void basculerComptage(l)} style={lien}>compter par {c!.libelle.split(" ")[0]}</button>
                     )}
                   </div>
-                  {/* 3. Compteurs centrés, côte à côte (colis puis unités), intitulé sous le champ ; point d'état à droite */}
-                  <div style={{ position: "relative", display: "flex", justifyContent: "center", gap: 14, marginTop: 6 }}>
+                  {/* 3. Compteurs sur toute la largeur, côte à côte (colis puis unités), intitulé sous le champ ; point d'état en haut à droite */}
+                  <div style={{ position: "relative", display: "flex", gap: 12, marginTop: 6 }}>
                     {contenu != null && (
                       <Champ etiquette={deuxChamps ? nomColis ?? "colis" : pluriel(l.unite ?? "colis", 2)} valeur={s.colis} desactive={lectureSeule}
                         pas={!deuxChamps && (l.unite === "kg" || l.unite === "litre") ? 0.5 : 1}
@@ -468,7 +467,7 @@ function Feuille() {
                         onChange={(v) => saisir(l, "unites", v)} />
                     )}
                     <span title={etat === "erreur" ? "Pas enregistré" : etat === "attente" ? "Enregistrement…" : "Enregistré"} style={{
-                      position: "absolute", right: 0, top: 11, width: 8, height: 8, borderRadius: 4,
+                      position: "absolute", right: -4, top: -4, width: 8, height: 8, borderRadius: 4,
                       background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent",
                     }} />
                   </div>
@@ -909,13 +908,14 @@ function Champ({ etiquette, valeur, desactive, onChange, pas = 1 }: { etiquette:
   const n = num(valeur) ?? 0;
   const fixer = (v: number) => onChange(txt(Math.max(0, Math.round(v * 100) / 100)));
   const btn = (actif: boolean): React.CSSProperties => ({
-    width: 30, height: 30, borderRadius: 15, border: "none", fontSize: 19, fontWeight: 700, lineHeight: 1, padding: 0,
+    width: 36, height: 36, borderRadius: 18, border: "none", fontSize: 22, fontWeight: 700, lineHeight: 1, padding: 0,
     background: actif ? ACCENT : "#ece4d4", color: actif ? "#fff" : "#b8ad9a", cursor: actif ? "pointer" : "default",
     display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, touchAction: "manipulation", fontFamily: "inherit",
   });
+  // Le compteur prend toute la largeur disponible : le champ s'étire entre les deux boutons
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, flexShrink: 0 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, flex: 1, minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%" }}>
         <button type="button" aria-label="Moins" disabled={desactive || n <= 0} onClick={() => fixer(n - pas)} style={btn(!desactive && n > 0)}>−</button>
         <input inputMode="decimal" value={valeur} disabled={desactive} onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
@@ -926,7 +926,7 @@ function Champ({ etiquette, valeur, desactive, onChange, pas = 1 }: { etiquette:
             champs[champs.indexOf(e.currentTarget) + 1]?.focus();
           }}
           style={{
-            width: 48, height: 30, borderRadius: 8, border: `1.5px solid ${valeur.trim() ? ACCENT : "#ddd6c8"}`, textAlign: "center", fontSize: 16, fontWeight: 700, fontFamily: OSWALD,
+            flex: 1, minWidth: 0, width: "100%", height: 36, borderRadius: 9, border: `1.5px solid ${valeur.trim() ? ACCENT : "#ddd6c8"}`, textAlign: "center", fontSize: 18, fontWeight: 700, fontFamily: OSWALD,
             background: desactive ? "#f3efe7" : "#fff", boxSizing: "border-box", padding: 0,
           }} />
         <button type="button" aria-label="Plus" disabled={desactive} onClick={() => fixer(n + pas)} style={btn(!desactive)}>+</button>
