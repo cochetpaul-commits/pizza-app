@@ -423,27 +423,27 @@ function Feuille() {
                   padding: "8px 10px", marginBottom: 4, borderRadius: 10,
                   background: "#fff", border: `1px solid ${compte(l) ? "#cfe3d6" : "#ece6db"}`, borderLeft: `3px solid ${couleur}`,
                 }}>
-                  {/* 1. Titre sur toute la largeur, crayon et croix au bout */}
+                  {/* 1. Numéro dans sa colonne ; titre et ligne d'infos alignés l'un sous l'autre ; crayon et croix au bout du titre */}
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
                     <span style={{ color: "#b0a894", fontWeight: 500, fontSize: 12, paddingTop: 1, flexShrink: 0 }}>{l.ordre ?? ""}</span>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, lineHeight: 1.2, color: couleurTitre }}>{l.nom_feuille ?? l.nom}</span>
-                    {f && (
-                      <a href={`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(`/inventaire/${id}`)}`} title="Modifier la fiche produit (prix, conditionnement, zone)"
-                        onClick={(e) => e.stopPropagation()} style={{ fontSize: 12, color: "#8a8378", textDecoration: "none", border: "1px solid #ddd6c8", borderRadius: 6, padding: "0 5px", lineHeight: "20px", height: 22, boxSizing: "border-box", flexShrink: 0 }}>✎</a>
-                    )}
-                    {!lectureSeule && (
-                      <button type="button" onClick={() => void retirer(l)} aria-label="Retirer de la liste" title="Retirer de la liste (la fiche n'est pas touchée)" style={{
-                        width: 22, height: 22, borderRadius: 11, border: "none", background: "#fde7e7", color: "#a12b2b", fontSize: 15, fontWeight: 700, lineHeight: 1,
-                        display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0, fontFamily: "inherit",
-                      }}>×</button>
-                    )}
-                  </div>
-                  {/* 2. Une ligne d'infos : total compté et valeur, conditionnement, prix, remarques */}
-                  <div style={{ fontSize: 11.5, color: "#8a8378", marginTop: 4, display: "flex", flexWrap: "wrap", gap: "3px 8px", alignItems: "center", lineHeight: 1.3 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, lineHeight: 1.2, color: couleurTitre }}>{l.nom_feuille ?? l.nom}</span>
+                        {f && (
+                          <a href={`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(`/inventaire/${id}`)}`} title="Modifier la fiche produit (prix, conditionnement, zone)"
+                            onClick={(e) => e.stopPropagation()} style={{ fontSize: 12, color: "#8a8378", textDecoration: "none", border: "1px solid #ddd6c8", borderRadius: 6, padding: "0 5px", lineHeight: "20px", height: 22, boxSizing: "border-box", flexShrink: 0 }}>✎</a>
+                        )}
+                        {!lectureSeule && (
+                          <button type="button" onClick={() => void retirer(l)} aria-label="Retirer de la liste" title="Retirer de la liste (la fiche n'est pas touchée)" style={{
+                            width: 22, height: 22, borderRadius: 11, border: "none", background: "#fde7e7", color: "#a12b2b", fontSize: 15, fontWeight: 700, lineHeight: 1,
+                            display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0, fontFamily: "inherit",
+                          }}>×</button>
+                        )}
+                      </div>
+                  {/* 2. Une ligne d'infos sous le titre, alignée avec lui : conditionnement, remarques (pas de prix) */}
+                  <div style={{ fontSize: 11.5, color: "#8a8378", marginTop: 3, display: "flex", flexWrap: "wrap", gap: "3px 8px", alignItems: "center", lineHeight: 1.3 }}>
                     <span><strong style={{ color: "#6f6656" }}>{c?.libelle ?? l.cond_libelle ?? l.unite ?? "unité"}</strong>{!c && detailPiece ? ` · ${detailPiece}` : ""}</span>
-                    <span style={{ color: valo.cout == null ? "#b45309" : "#8a8378" }}>
-                      {valo.cout == null ? `sans prix${valo.raison ? ` (${valo.raison})` : ""}` : `${eur(valo.cout)} / ${l.unite ?? "unité"}${valo.source === "ancienne_offre" ? " (ancien prix)" : ""}`}
-                    </span>
+                    {valo.cout == null && <span style={{ color: "#b45309" }}>sans prix{valo.raison ? ` (${valo.raison})` : ""}</span>}
                     {(l.rattachement === "approché" || l.rattachement === "rattaché par ressemblance" || l.aVerifier || l.inactive) && (
                       <span style={{
                         fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8,
@@ -453,6 +453,8 @@ function Feuille() {
                     {!lectureSeule && peutColis && !deuxChamps && (
                       <button type="button" onClick={() => void basculerComptage(l)} style={lien}>compter par {c!.libelle.split(" ")[0]}</button>
                     )}
+                  </div>
+                    </div>
                   </div>
                   {/* 3. Compteurs sur toute la largeur, côte à côte (colis puis unités), intitulé sous le champ ; point d'état en haut à droite */}
                   <div style={{ position: "relative", display: "flex", gap: 12, marginTop: 6 }}>
@@ -908,7 +910,7 @@ function Champ({ etiquette, valeur, desactive, onChange, pas = 1 }: { etiquette:
   const n = num(valeur) ?? 0;
   const fixer = (v: number) => onChange(txt(Math.max(0, Math.round(v * 100) / 100)));
   const btn = (actif: boolean): React.CSSProperties => ({
-    width: 36, height: 36, borderRadius: 18, border: "none", fontSize: 22, fontWeight: 700, lineHeight: 1, padding: 0,
+    width: 40, height: 40, borderRadius: 20, border: "none", fontSize: 24, fontWeight: 700, lineHeight: 1, padding: 0,
     background: actif ? ACCENT : "#ece4d4", color: actif ? "#fff" : "#b8ad9a", cursor: actif ? "pointer" : "default",
     display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, touchAction: "manipulation", fontFamily: "inherit",
   });
@@ -926,7 +928,7 @@ function Champ({ etiquette, valeur, desactive, onChange, pas = 1 }: { etiquette:
             champs[champs.indexOf(e.currentTarget) + 1]?.focus();
           }}
           style={{
-            flex: 1, minWidth: 0, width: "100%", height: 36, borderRadius: 9, border: `1.5px solid ${valeur.trim() ? ACCENT : "#ddd6c8"}`, textAlign: "center", fontSize: 18, fontWeight: 700, fontFamily: OSWALD,
+            flex: 1, minWidth: 0, width: "100%", height: 40, borderRadius: 10, border: `1.5px solid ${valeur.trim() ? ACCENT : "#ddd6c8"}`, textAlign: "center", fontSize: 20, fontWeight: 700, fontFamily: OSWALD,
             background: desactive ? "#f3efe7" : "#fff", boxSizing: "border-box", padding: 0,
           }} />
         <button type="button" aria-label="Plus" disabled={desactive} onClick={() => fixer(n + pas)} style={btn(!desactive)}>+</button>
