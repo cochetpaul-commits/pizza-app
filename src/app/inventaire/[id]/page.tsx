@@ -12,7 +12,7 @@ import { articleDeFiche, categorieDeFamille, choisirConditionnement, conditionne
 import { libelleType, TYPES_COLISAGE } from "@/lib/commandeArticles";
 import { coutUniteComptee, type OffreValo } from "@/lib/inventaireValorisation";
 import { cleEtab } from "@/lib/zonesEtablissement";
-import { CATEGORIES, CAT_LABELS, type Category } from "@/types/ingredients";
+import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
 import { couleurRayon, rayonDuProduit, RAYON_AUTRES } from "@/lib/rayons";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { correspondRecherche, filtrerRecherche, normaliserRecherche } from "@/lib/rechercheTolerante";
@@ -388,13 +388,6 @@ function Feuille() {
     setMessage(`${cibles.length} produit(s) ${remettre ? "remis" : "retiré(s)"} (${libelle}).`);
   }
 
-  async function changerZone(l: Ligne, nouvelle: string) {
-    if (lectureSeule || nouvelle === l.zone) return;
-    const { error } = await supabase.from("inventaire_lignes").update({ zone: nouvelle, updated_at: new Date().toISOString() }).eq("id", l.id);
-    if (error) { setMessage(`Pas enregistré : ${error.message}`); return; }
-    setLignes((prev) => prev.map((x) => (x.id === l.id ? { ...x, zone: nouvelle } : x)));
-  }
-
   async function ajouterZone() {
     if (!inv) return;
     const nom = prompt("Nom de la nouvelle zone (ex. RÉSERVE, FRIGO BAR) :")?.trim().toUpperCase();
@@ -420,80 +413,77 @@ function Feuille() {
     const f = fiches[l.ingredient_id];
     const fournisseur = fournisseurDe(l, c);
     const detailPiece = f?.piece_weight_g ? `${f.piece_weight_g >= 1000 ? `${txt(f.piece_weight_g / 1000)} kg` : `${txt(f.piece_weight_g)} g`} la pièce` : f?.piece_volume_ml ? `${f.piece_volume_ml >= 1000 ? `${txt(f.piece_volume_ml / 1000)} L` : `${txt(f.piece_volume_ml)} mL`} la pièce` : null;
+    // Titre à la couleur de la catégorie de la fiche, comme dans le menu produits (gris si fiche désactivée)
+    const couleurTitre = l.inactive ? "#999" : (f?.category && CAT_COLORS[f.category as Category]) || couleur;
+    // Nom du colis (« cartons ») et de l'élément (« bouteilles ») pour les intitulés des compteurs
+    const nomColis = deuxChamps && l.cond_libelle ? pluriel(l.cond_libelle.split(" ")[0], 2) : null;
     return (
       <React.Fragment key={l.id}>
                 <div style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", marginBottom: 4, borderRadius: 10, flexWrap: "wrap",
+                  padding: "8px 10px", marginBottom: 4, borderRadius: 10,
                   background: "#fff", border: `1px solid ${compte(l) ? "#cfe3d6" : "#ece6db"}`, borderLeft: `3px solid ${couleur}`,
                 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.25, display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ color: "#b0a894", fontWeight: 500, fontSize: 12 }}>{l.ordre ?? ""}</span>
-                      <span style={{ minWidth: 0 }}>{l.nom_feuille ?? l.nom}</span>
-                      {f && (
-                        <a href={`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(`/inventaire/${id}`)}`} title="Modifier la fiche produit (prix, conditionnement, zone)"
-                          onClick={(e) => e.stopPropagation()} style={{ fontSize: 12, color: "#8a8378", textDecoration: "none", border: "1px solid #ddd6c8", borderRadius: 6, padding: "0 5px", lineHeight: "18px", flexShrink: 0 }}>✎</a>
-                      )}
-                    </div>
-                    {l.nom_feuille && normNom(l.nom_feuille) !== normNom(l.nom) && (
-                      <div style={{ fontSize: 11.5, color: "#a79f90", marginTop: 1 }}>fiche : {l.nom}</div>
+                  {/* 1. Titre sur toute la largeur, crayon et croix au bout */}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+                    <span style={{ color: "#b0a894", fontWeight: 500, fontSize: 12, paddingTop: 1, flexShrink: 0 }}>{l.ordre ?? ""}</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, lineHeight: 1.2, color: couleurTitre }}>{l.nom_feuille ?? l.nom}</span>
+                    {f && (
+                      <a href={`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(`/inventaire/${id}`)}`} title="Modifier la fiche produit (prix, conditionnement, zone)"
+                        onClick={(e) => e.stopPropagation()} style={{ fontSize: 12, color: "#8a8378", textDecoration: "none", border: "1px solid #ddd6c8", borderRadius: 6, padding: "0 5px", lineHeight: "20px", height: 22, boxSizing: "border-box", flexShrink: 0 }}>✎</a>
                     )}
-                    {/* Pastille fournisseur, la même que sur la fiche produit */}
-                    {fournisseur && (
-                      <div style={{ marginTop: 3 }}>
-                        <span className="pastille" style={{ "--pastille-c": getSupplierColor(fournisseur.name, fournisseur.color) } as React.CSSProperties}>{fournisseur.name}</span>
-                      </div>
+                    {!lectureSeule && (
+                      <button type="button" onClick={() => void retirer(l)} aria-label="Retirer de la liste" title="Retirer de la liste (la fiche n'est pas touchée)" style={{
+                        width: 22, height: 22, borderRadius: 11, border: "none", background: "#fde7e7", color: "#a12b2b", fontSize: 15, fontWeight: 700, lineHeight: 1,
+                        display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0, fontFamily: "inherit",
+                      }}>×</button>
                     )}
+                  </div>
+                  {/* 2. Une ligne d'infos : total compté et valeur, conditionnement, prix, remarques */}
+                  <div style={{ fontSize: 11.5, color: "#8a8378", marginTop: 4, display: "flex", flexWrap: "wrap", gap: "3px 8px", alignItems: "center", lineHeight: 1.3 }}>
+                    <span><strong style={{ color: "#6f6656" }}>{c?.libelle ?? l.cond_libelle ?? l.unite ?? "unité"}</strong>{!c && detailPiece ? ` · ${detailPiece}` : ""}</span>
+                    <span style={{ color: valo.cout == null ? "#b45309" : "#8a8378" }}>
+                      {valo.cout == null ? `sans prix${valo.raison ? ` (${valo.raison})` : ""}` : `${eur(valo.cout)} / ${l.unite ?? "unité"}${valo.source === "ancienne_offre" ? " (ancien prix)" : ""}`}
+                    </span>
+                    {l.nom_feuille && normNom(l.nom_feuille) !== normNom(l.nom) && <span style={{ color: "#a79f90" }}>fiche : {l.nom}</span>}
                     {(l.rattachement === "approché" || l.rattachement === "rattaché par ressemblance" || l.aVerifier || l.inactive) && (
                       <span style={{
-                        display: "inline-block", marginTop: 3, marginRight: 4, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8,
+                        fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8,
                         background: l.inactive ? "#fde7e7" : l.aVerifier ? "#fde7ef" : "#fdf3d4", color: l.inactive ? "#a12b2b" : l.aVerifier ? "#b0306a" : "#8a6a12",
                       }}>{l.inactive ? (f ? "fiche désactivée" : "fiche supprimée") : l.aVerifier ? "fiche à vérifier" : "rattaché par ressemblance"}</span>
                     )}
-                    <div style={{ fontSize: 12, color: "#8a8378", marginTop: 2 }}>
-                      {deuxChamps ? l.cond_libelle : `compté en ${l.cond_libelle ?? l.unite ?? "unités"}`}
-                      {total != null && <> · <strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong></>}
-                      {total != null && valo.cout != null && <span style={{ color: "#6f6656" }}> · {eur(total * valo.cout)}</span>}
-                    </div>
-                    {/* Détail du conditionnement et du prix : pour ne pas se tromper de comptage */}
-                    <div style={{ fontSize: 11, color: "#8a8378", marginTop: 2, display: "flex", flexWrap: "wrap", gap: "2px 8px", alignItems: "center" }}>
-                      {c && <span>fiche : <strong style={{ color: "#6f6656" }}>{c.libelle}</strong></span>}
-                      {detailPiece && <span>{detailPiece}</span>}
-                      <span style={{ color: valo.cout == null ? "#b45309" : "#6f6656" }}>
-                        {valo.cout == null ? `sans prix${valo.raison ? ` (${valo.raison})` : ""}` : `${eur(valo.cout)} / ${l.unite ?? "unité"}${valo.source === "ancienne_offre" ? " (ancien prix)" : ""}`}
-                      </span>
-                      {!lectureSeule && (
-                        <>
-                          {peutColis && !deuxChamps && (
-                            <button type="button" onClick={() => void basculerComptage(l)} style={lien}>
-                              compter par {c!.libelle.split(" ")[0]}
-                            </button>
-                          )}
-                          <select value={l.zone} onChange={(e) => void changerZone(l, e.target.value)} title="Déplacer vers une autre zone"
-                            style={{ fontSize: 11, border: "none", background: "transparent", color: "#8a8378", cursor: "pointer", padding: 0 }}>
-                            {zones.map((z) => <option key={z} value={z}>→ {libelleZone(z)}</option>)}
-                          </select>
-                          <button type="button" onClick={() => void retirer(l)} title="Retirer de la liste (la fiche n'est pas touchée)" style={{ ...lien, color: "#a12b2b" }}>retirer</button>
-                        </>
-                      )}
-                    </div>
+                    {!lectureSeule && peutColis && !deuxChamps && (
+                      <button type="button" onClick={() => void basculerComptage(l)} style={lien}>compter par {c!.libelle.split(" ")[0]}</button>
+                    )}
                   </div>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexShrink: 0, marginLeft: "auto" }}>
+                  {/* 3. Compteurs centrés, côte à côte (colis puis unités), intitulé sous le champ ; point d'état à droite */}
+                  <div style={{ position: "relative", display: "flex", justifyContent: "center", gap: 14, marginTop: 6 }}>
                     {contenu != null && (
-                      <Champ etiquette={deuxChamps ? "colis" : l.unite ?? "colis"} valeur={s.colis} desactive={lectureSeule}
+                      <Champ etiquette={deuxChamps ? nomColis ?? "colis" : pluriel(l.unite ?? "colis", 2)} valeur={s.colis} desactive={lectureSeule}
                         pas={!deuxChamps && (l.unite === "kg" || l.unite === "litre") ? 0.5 : 1}
                         onChange={(v) => saisir(l, "colis", v)} />
                     )}
                     {(deuxChamps || contenu == null) && (
-                      <Champ etiquette={contenu == null ? l.unite ?? "unités" : "unités"} valeur={s.unites} desactive={lectureSeule}
+                      <Champ etiquette={pluriel(l.unite ?? "unités", 2)} valeur={s.unites} desactive={lectureSeule}
                         pas={contenu == null && (l.unite === "kg" || l.unite === "litre") ? 0.5 : 1}
                         onChange={(v) => saisir(l, "unites", v)} />
                     )}
+                    <span title={etat === "erreur" ? "Pas enregistré" : etat === "attente" ? "Enregistrement…" : "Enregistré"} style={{
+                      position: "absolute", right: 0, top: 11, width: 8, height: 8, borderRadius: 4,
+                      background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent",
+                    }} />
                   </div>
-                  <span title={etat === "erreur" ? "Pas enregistré" : etat === "attente" ? "Enregistrement…" : "Enregistré"} style={{
-                    width: 8, height: 8, borderRadius: 4, flexShrink: 0,
-                    background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent",
-                  }} />
+                  {/* 4. Rangée du bas : pastille fournisseur dans l'angle à gauche (même pastille que la fiche produit), total compté et valeur centrés */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8, marginTop: 5 }}>
+                    <span style={{ justifySelf: "start", minWidth: 0 }}>
+                      {fournisseur && <span className="pastille" style={{ "--pastille-c": getSupplierColor(fournisseur.name, fournisseur.color) } as React.CSSProperties}>{fournisseur.name}</span>}
+                    </span>
+                    <span style={{ fontSize: 12.5, color: "#8a8378", textAlign: "center" }}>
+                      {total != null
+                        ? <><strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong>{valo.cout != null && <span style={{ color: "#6f6656" }}> · {eur(total * valo.cout)}</span>}</>
+                        : <span style={{ color: "#c4bcae" }}>non compté</span>}
+                    </span>
+                    <span />
+                  </div>
                 </div>
       </React.Fragment>
     );
@@ -532,43 +522,45 @@ function Feuille() {
           <div style={{ fontSize: 13, color: "#6f6656", marginTop: 2 }}>
             {etabNom} · {inv.type === "fin_exercice" ? "Fin d'exercice" : "Mensuel"} ·{" "}
             <span style={{ fontWeight: 700, color: inv.statut === "cloture" ? "#2D6A4F" : ACCENT }}>{inv.statut === "cloture" ? "Clôturé" : "En cours"}</span>
-            {" "}· {totalComptees} / {actives.length} lignes comptées
+            {" "}· {totalComptees} / {actives.length} comptées
             {direct && <span title="Les comptages des autres personnes apparaissent ici en direct" style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 700, color: "#2D6A4F" }}>● en direct</span>}
           </div>
           {totalComptees > 0 && (
             <div style={{ marginTop: 6, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: "#8a7e6b", textTransform: "uppercase", letterSpacing: "0.06em" }}>Total en cours</span>
               <span style={{ fontFamily: OSWALD, fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{eur(valeurTotale)}</span>
-              <span style={{ fontSize: 12, color: "#8a8378" }}>HT, toutes zones{sansPrixComptees > 0 ? ` · ${sansPrixComptees} ligne${sansPrixComptees > 1 ? "s" : ""} comptée${sansPrixComptees > 1 ? "s" : ""} sans prix` : ""}</span>
+              <span style={{ fontSize: 12, color: "#8a8378" }}>HT{sansPrixComptees > 0 ? ` · ${sansPrixComptees} ligne${sansPrixComptees > 1 ? "s" : ""} sans prix` : ""}</span>
             </div>
           )}
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {/* Boutons bas (34 px) pour tenir sur une ligne au téléphone : Clôturer d'abord, Supprimer en lien discret */}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", width: "100%" }}>
+          {!lectureSeule && lignes.length > 0 && (
+            <button type="button" disabled={!!enCours} onClick={() => void cloturer()} style={boutonBas(ACCENT, "#fff")}>
+              {enCours === "cloture" ? "Clôture…" : "Clôturer"}
+            </button>
+          )}
+          {lignes.length > 0 && (
+            <button type="button" onClick={() => openApiFile(`/api/inventaire/pdf?id=${id}`)} style={boutonBas("#fff", "#1a1a1a")} title="Export comptable : valorisation HT par zone, famille et catégorie">
+              PDF comptable
+            </button>
+          )}
           {!lectureSeule && !aDesSaisies && (
             <>
               <input ref={fichierRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
                 onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void importer(f); }} />
-              <button type="button" disabled={!!enCours} onClick={() => fichierRef.current?.click()} style={bouton("#fff", "#1a1a1a")}>
-                {enCours === "import" ? "Import…" : lignes.length ? "Remplacer par la feuille (fichier)" : "Importer la feuille (fichier)"}
+              <button type="button" disabled={!!enCours} onClick={() => fichierRef.current?.click()} style={boutonBas("#fff", "#1a1a1a")}>
+                {enCours === "import" ? "Import…" : lignes.length ? "Remplacer par la feuille" : "Importer la feuille"}
               </button>
             </>
           )}
-          {lignes.length > 0 && (
-            <button type="button" onClick={() => openApiFile(`/api/inventaire/pdf?id=${id}`)} style={bouton("#fff", "#1a1a1a")} title="Export comptable : valorisation HT par zone, famille et catégorie">
-              PDF comptable
-            </button>
-          )}
-          {!lectureSeule && lignes.length > 0 && (
-            <button type="button" disabled={!!enCours} onClick={() => void cloturer()} style={bouton(ACCENT, "#fff")}>
-              {enCours === "cloture" ? "Clôture…" : "Clôturer"}
-            </button>
-          )}
           {inv.statut === "cloture" && isGroupAdmin && (
             <button type="button" disabled={!!enCours} onClick={() => { if (confirm("Rouvrir cet inventaire ? Il redevient modifiable ; les mouvements de stock seront refaits à la prochaine clôture.")) void action("rouvrir", { action: "rouvrir" }, () => "Inventaire rouvert."); }}
-              style={bouton("#fff", "#b45309")}>Rouvrir (admin)</button>
+              style={boutonBas("#fff", "#b45309")}>Rouvrir (admin)</button>
           )}
           {(!lectureSeule || isGroupAdmin) && (
-            <button type="button" disabled={!!enCours} onClick={() => void supprimerInventaire()} title="Supprimer cet inventaire et toutes ses lignes" style={bouton("#fff", "#a12b2b")}>
+            <button type="button" disabled={!!enCours} onClick={() => void supprimerInventaire()} title="Supprimer cet inventaire et toutes ses lignes"
+              style={{ ...boutonBas("#fff", "#a12b2b"), border: "none", background: "none", marginLeft: "auto", padding: "0 4px" }}>
               {enCours === "suppression" ? "Suppression…" : "Supprimer"}
             </button>
           )}
@@ -917,7 +909,7 @@ function Champ({ etiquette, valeur, desactive, onChange, pas = 1 }: { etiquette:
   const n = num(valeur) ?? 0;
   const fixer = (v: number) => onChange(txt(Math.max(0, Math.round(v * 100) / 100)));
   const btn = (actif: boolean): React.CSSProperties => ({
-    width: 40, height: 40, borderRadius: 20, border: "none", fontSize: 24, fontWeight: 700, lineHeight: 1, padding: 0,
+    width: 30, height: 30, borderRadius: 15, border: "none", fontSize: 19, fontWeight: 700, lineHeight: 1, padding: 0,
     background: actif ? ACCENT : "#ece4d4", color: actif ? "#fff" : "#b8ad9a", cursor: actif ? "pointer" : "default",
     display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, touchAction: "manipulation", fontFamily: "inherit",
   });
@@ -934,8 +926,8 @@ function Champ({ etiquette, valeur, desactive, onChange, pas = 1 }: { etiquette:
             champs[champs.indexOf(e.currentTarget) + 1]?.focus();
           }}
           style={{
-            width: 56, height: 40, borderRadius: 10, border: `1.5px solid ${valeur.trim() ? ACCENT : "#ddd6c8"}`, textAlign: "center", fontSize: 18, fontWeight: 700, fontFamily: OSWALD,
-            background: desactive ? "#f3efe7" : "#fff", boxSizing: "border-box",
+            width: 48, height: 30, borderRadius: 8, border: `1.5px solid ${valeur.trim() ? ACCENT : "#ddd6c8"}`, textAlign: "center", fontSize: 16, fontWeight: 700, fontFamily: OSWALD,
+            background: desactive ? "#f3efe7" : "#fff", boxSizing: "border-box", padding: 0,
           }} />
         <button type="button" aria-label="Plus" disabled={desactive} onClick={() => fixer(n + pas)} style={btn(!desactive)}>+</button>
       </div>
@@ -949,6 +941,7 @@ const puce = (actif: boolean): React.CSSProperties => ({
   flexShrink: 0, padding: "5px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
   border: actif ? `1.5px solid ${ACCENT}` : "1px solid #ddd6c8", background: actif ? "#FFF0EB" : "#fff", color: actif ? ACCENT : "#6f6656",
 });
+const boutonBas = (bg: string, fg: string): React.CSSProperties => ({ ...bouton(bg, fg), height: 34, fontSize: 12.5, padding: "0 12px" });
 const bouton = (bg: string, fg: string): React.CSSProperties => ({
   height: 40, padding: "0 14px", borderRadius: 10, border: bg === "#fff" ? "1px solid #ddd6c8" : "none", background: bg, color: fg,
   fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
