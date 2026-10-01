@@ -15,6 +15,7 @@ import { cleEtab } from "@/lib/zonesEtablissement";
 import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
 import { couleurRayon, rayonDuProduit, RAYON_AUTRES, RAYON_PREPARATIONS } from "@/lib/rayons";
 import { getSupplierColor } from "@/lib/supplierColors";
+import { styleBarreCategorie, styleSousCategorie, styleTitreCategorie } from "@/lib/styleCategories";
 import { correspondRecherche, filtrerRecherche, normaliserRecherche } from "@/lib/rechercheTolerante";
 void categorieDeFamille;
 
@@ -679,12 +680,8 @@ function Feuille() {
               return (
                 <div key={r.code} style={{ margin: `${i === 0 ? 4 : 10}px 0 6px` }}>
                   {/* Titre de rayon : fond plein, texte blanc, exactement comme l'écran de commande */}
-                  <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleFamille(zone, r.code)]: !ouverte }))} aria-expanded={ouverte} style={{
-                    width: "100%", minHeight: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 14px",
-                    background: couleur, border: "none", borderRadius: 14, cursor: "pointer", textAlign: "left", touchAction: "manipulation",
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.12)", fontFamily: "inherit",
-                  }}>
-                    <span style={{ flex: 1, fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: "0.04em", color: "#fff" }}>
+                  <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleFamille(zone, r.code)]: !ouverte }))} aria-expanded={ouverte} style={styleBarreCategorie(couleur)}>
+                    <span style={styleTitreCategorie}>
                       {r.libelle} <span style={{ opacity: 0.75, fontWeight: 400 }}>({r.lignes.length})</span>
                     </span>
                     {comptees > 0 && (
@@ -705,13 +702,8 @@ function Feuille() {
                     return (
                       <div key={g.nom ?? "∅"} style={{ marginTop: 6 }}>
                         {plusieursSous && (
-                          /* Sous-catégorie : simple barre de la couleur du rayon, sans fond (pas de boîte blanche) */
-                          <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleSous]: !sousOuverte }))} aria-expanded={sousOuverte} style={{
-                            width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-                            padding: "8px 12px", background: "transparent", border: "none", borderLeft: `3px solid ${couleur}`,
-                            borderRadius: 0, cursor: "pointer", marginBottom: 4,
-                            fontSize: 11, fontWeight: 700, color: couleur, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "inherit",
-                          }}>
+                          /* Sous-catégorie : même accordéon teinté que le menu produits */
+                          <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleSous]: !sousOuverte }))} aria-expanded={sousOuverte} style={styleSousCategorie(couleur, sousOuverte)}>
                             <span>{g.nom ?? "Autre"} <span style={{ fontWeight: 500, opacity: 0.8 }}>({g.lignes.length})</span></span>
                             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                               {compteesSous > 0 && <span style={{ fontSize: 10.5, color: compteesSous === g.lignes.length ? "#2D6A4F" : "#8a7e6b" }}>{compteesSous}/{g.lignes.length}</span>}

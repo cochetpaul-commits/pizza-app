@@ -47,6 +47,7 @@ import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import DuplicatePanel from "@/components/DuplicatePanel";
 import { detectDuplicates, similarity, type DuplicatePair } from "@/lib/duplicateDetection";
+import { normaliserSousCategorie, styleSousCategorie } from "@/lib/styleCategories";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { dateFermeture, fermerOffresActives } from "@/lib/offerClosing";
@@ -253,13 +254,14 @@ function IngredientsPageInner() {
     return CATEGORIES_ALPHA.map((cat) => ({ cat, items: byCategory.get(cat) ?? [] })).filter((g) => g.items.length > 0);
   }, [filtered, CATEGORIES_ALPHA]);
 
-  // Sub-category suggestions (unique values from all items, sorted)
-  const subCategorySuggestions = useMemo(() => {
-    const set = new Set<string>();
+  // Sous-catégories déjà utilisées, par catégorie (orthographes distinctes, triées)
+  const sousCategoriesParCategorie = useMemo(() => {
+    const m: Record<string, Set<string>> = {};
     for (const x of items) {
-      if (x.sub_category) set.add(x.sub_category);
+      if (!x.sub_category) continue;
+      (m[x.category] ??= new Set()).add(x.sub_category);
     }
-    return [...set].sort((a, b) => a.localeCompare(b, "fr"));
+    return Object.fromEntries(Object.entries(m).map(([c, s]) => [c, [...s].sort((a, b) => a.localeCompare(b, "fr"))])) as Record<string, string[]>;
   }, [items]);
 
   // Collapsed by default; open all when searching
@@ -920,7 +922,7 @@ function IngredientsPageInner() {
     }
 
     const up: Partial<IngredientUpsert> = {
-      name, category: edit.category, sub_category: edit.subCategory.trim() || null, is_active: edit.is_active,
+      name, category: edit.category, sub_category: normaliserSousCategorie(edit.subCategory, sousCategoriesParCategorie[edit.category] ?? []), is_active: edit.is_active,
       ...(edit.useOffer ? {} : { supplier_id }), // Don't update supplier_id when using offers (managed via supplier_offers table)
       piece_volume_ml: pieceVolumeMl,
       piece_weight_g: pieceWeightG,
@@ -1525,11 +1527,7 @@ function IngredientsPageInner() {
                         <div key={x.id} id={`ing-${x.id}`}>
                           {showSubHeader && (
                             <button type="button" onClick={() => setCollapsedSubs((prev) => { const n = new Set(prev); if (n.has(subKey)) n.delete(subKey); else n.add(subKey); return n; })}
-                              aria-expanded={!subCollapsed} style={{
-                                width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: "6px 0 4px",
-                                padding: "8px 12px", background: subCollapsed ? "#fff" : "#f0ebe3", border: "1.5px solid #e5ddd0", borderLeft: `3px solid ${CAT_COLORS[cat] ?? "#999"}`,
-                                borderRadius: 8, cursor: "pointer", fontSize: 10.5, fontWeight: 700, color: CAT_COLORS[cat] ?? "#999", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "inherit", textAlign: "left",
-                              }}>
+                              aria-expanded={!subCollapsed} style={styleSousCategorie(CAT_COLORS[cat] ?? "#999", !subCollapsed)}>
                               <span>{x.sub_category ?? "Autre"} <span style={{ fontWeight: 500, opacity: 0.8 }}>({nbSub})</span></span>
                               <span style={{ fontSize: 10, transition: "transform 0.2s", transform: subCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
                             </button>
@@ -1571,7 +1569,7 @@ function IngredientsPageInner() {
                                 return next;
                               });
                             }}
-                            subCategorySuggestions={subCategorySuggestions}
+                            subCategorySuggestions={sousCategoriesParCategorie[(editingId === x.id && edit ? edit.category : x.category)] ?? []}
                           />
                           )}
                         </div>

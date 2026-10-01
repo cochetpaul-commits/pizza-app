@@ -69,6 +69,7 @@ const qteTexte = (n: number) => String(Math.round(n * 100) / 100).replace(".", "
 
 /** Couleur du titre de rayon : partagée avec l'inventaire (src/lib/rayons.ts) */
 import { couleurRayon } from "@/lib/rayons";
+import { styleBarreCategorie, styleTitreCategorie } from "@/lib/styleCategories";
 
 /**
  * Aller-retour vers la fiche produit (admins, managers) : l'état de l'écran est gardé le temps de corriger
@@ -491,14 +492,8 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
             <div key={r.code} style={{ marginBottom: 10 }}>
               {/* Titre de rayon : fond plein, texte blanc ; collé en haut de l'écran tant que le rayon ouvert défile */}
               <div className={ouvert ? "rayon-collant" : undefined} style={{ background: "#f2ede4", paddingBottom: ouvert ? 8 : 0 }}>
-              <button type="button" onClick={() => setBascules((s) => ({ ...s, [r.code]: !ouvert }))} aria-expanded={ouvert}
-                style={{
-                  width: "100%", minHeight: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 14px",
-                  background: couleurRayon(r.code), border: "none", borderRadius: 14,
-                  cursor: "pointer", textAlign: "left", touchAction: "manipulation",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
-                }}>
-                <span style={{ flex: 1, fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: "0.04em", color: "#fff" }}>
+              <button type="button" onClick={() => setBascules((s) => ({ ...s, [r.code]: !ouvert }))} aria-expanded={ouvert} style={styleBarreCategorie(couleurRayon(r.code))}>
+                <span style={styleTitreCategorie}>
                   {r.libelle} <span style={{ opacity: 0.75, fontWeight: 400 }}>({r.articles.length})</span>
                 </span>
                 {r.dansCommande > 0 && (

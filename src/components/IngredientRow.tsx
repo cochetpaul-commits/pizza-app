@@ -18,6 +18,7 @@ import {
 } from "@/lib/offers";
 import { formatIngredientPrice } from "@/lib/formatPrice";
 import { cachedSupplierColor } from "@/lib/supplierColors";
+import { styleBarreCategorie, styleTitreCategorie, stylePastilleBarre } from "@/lib/styleCategories";
 import { ALLERGENS, ALLERGEN_SHORT, parseAllergens } from "@/lib/allergens";
 import type { PriceAlert } from "@/lib/priceAlerts";
 import { IngredientAvatar } from "@/components/IngredientAvatar";
@@ -180,35 +181,46 @@ export type CategoryHeaderProps = {
   onToggle: (cat: Category) => void;
 };
 
+/**
+ * Sous-catégorie : menu déroulant des sous-catégories déjà utilisées dans la catégorie, ou création d'une nouvelle.
+ * Une seule orthographe par sous-catégorie : la saisie est rapprochée des existantes à l'enregistrement.
+ */
+function SousCategorieChoix({ valeur, existantes, onChange }: { valeur: string; existantes: string[]; onChange: (v: string) => void }) {
+  const cle = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const connue = existantes.find((e) => cle(e) === cle(valeur));
+  const [nouvelle, setNouvelle] = useState(!!valeur.trim() && !connue);
+  const options = [...existantes].sort((a, b) => a.localeCompare(b, "fr"));
+  if (nouvelle) {
+    return (
+      <div style={{ display: "flex", gap: 4 }}>
+        <input autoFocus style={{ ...inputStyle, flex: 1, minWidth: 0 }} value={valeur} onChange={(e) => onChange(e.target.value)} placeholder="Nouvelle sous-catégorie" />
+        <button type="button" title="Choisir dans la liste" onClick={() => { setNouvelle(false); onChange(connue ?? ""); }}
+          style={{ ...inputStyle, width: 34, padding: 0, cursor: "pointer", color: "#8a8378" }}>▾</button>
+      </div>
+    );
+  }
+  return (
+    <select style={{ ...inputStyle, cursor: "pointer" }} value={connue ?? ""} onChange={(e) => {
+      if (e.target.value === "__nouvelle__") { setNouvelle(true); onChange(""); return; }
+      onChange(e.target.value);
+    }}>
+      <option value="">— aucune —</option>
+      {options.map((s) => <option key={s} value={s}>{s}</option>)}
+      <option value="__nouvelle__">+ Nouvelle sous-catégorie…</option>
+    </select>
+  );
+}
+
 export const CategoryHeader = React.memo(function CategoryHeader({
   cat, count, isCollapsed, onToggle,
 }: CategoryHeaderProps) {
   const accent = CAT_COLORS[cat];
+  // Même barre que les rayons de l'inventaire et de la commande : dégradé de la couleur, texte blanc
   return (
-    <button
-      onClick={() => onToggle(cat)}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = accent; }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; e.currentTarget.style.borderLeftColor = accent; }}
-      style={{
-        width: "100%", display: "flex", alignItems: "center", gap: 10,
-        padding: "12px 16px", background: "#fff",
-        border: "1.5px solid #ddd6c8", borderLeft: `3px solid ${accent}`,
-        borderRadius: 12, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-        marginTop: 16, marginBottom: 6,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-        transition: "box-shadow 0.2s, border-color 0.2s",
-      }}
-    >
-      <span style={{ width: 10, height: 10, borderRadius: "50%", background: accent, flexShrink: 0 }} />
-      <span style={{
-        fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700,
-        letterSpacing: "0.14em", textTransform: "uppercase", color: accent,
-      }}>{CAT_LABELS[cat]}</span>
-      <span style={{
-        marginLeft: "auto", fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
-        background: `${accent}18`, color: accent,
-      }}>{count}</span>
-      <span style={{ fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
+    <button onClick={() => onToggle(cat)} aria-expanded={!isCollapsed} style={{ ...styleBarreCategorie(accent), marginTop: 12, marginBottom: 6 }}>
+      <span style={styleTitreCategorie}>{CAT_LABELS[cat]}</span>
+      <span style={stylePastilleBarre(accent)}>{count}</span>
+      <span style={{ color: "#fff", fontSize: 13, transition: "transform 0.2s", transform: isCollapsed ? "none" : "rotate(180deg)" }}>▼</span>
     </button>
   );
 });
@@ -869,14 +881,7 @@ export const IngredientRow = React.memo(function IngredientRow({
               </div>
               <div>
                 <div style={fieldLabel}>Sous-catégorie</div>
-                <input style={inputStyle} value={edit.subCategory} list={`subcat-${x.id}`}
-                  onChange={(e) => onEditChange({ ...edit, subCategory: e.target.value })}
-                  placeholder="Ex: Vins rouges, Rhum..." />
-                {subCategorySuggestions && subCategorySuggestions.length > 0 && (
-                  <datalist id={`subcat-${x.id}`}>
-                    {subCategorySuggestions.map(s => <option key={s} value={s} />)}
-                  </datalist>
-                )}
+                <SousCategorieChoix valeur={edit.subCategory} existantes={subCategorySuggestions ?? []} onChange={(v) => onEditChange({ ...edit, subCategory: v })} />
               </div>
               <div>
                 <div style={fieldLabel}>Fournisseur</div>
@@ -920,14 +925,7 @@ export const IngredientRow = React.memo(function IngredientRow({
               </div>
               <div>
                 <div style={fieldLabel}>Sous-catégorie</div>
-                <input style={inputStyle} value={edit.subCategory} list={`subcat-${x.id}`}
-                  onChange={(e) => onEditChange({ ...edit, subCategory: e.target.value })}
-                  placeholder="Ex: Vins rouges, Rhum..." />
-                {subCategorySuggestions && subCategorySuggestions.length > 0 && (
-                  <datalist id={`subcat-${x.id}`}>
-                    {subCategorySuggestions.map(s => <option key={s} value={s} />)}
-                  </datalist>
-                )}
+                <SousCategorieChoix valeur={edit.subCategory} existantes={subCategorySuggestions ?? []} onChange={(v) => onEditChange({ ...edit, subCategory: v })} />
               </div>
               <div>
                 <div style={fieldLabel}>Fournisseur</div>
