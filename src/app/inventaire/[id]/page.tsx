@@ -591,19 +591,26 @@ function Feuille() {
 
       {/* Zones, dans l'ordre des feuilles */}
       <div className="inventaire-zones" style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none", margin: "14px 0 10px", padding: "6px 0", position: "sticky", top: 0, zIndex: 5, background: "#f2ede4" }}>
-        {zones.filter((z) => z === zone || (parZone.get(z) ?? []).some((l) => !l.retiree)).map((z) => {
-          const ls = (parZone.get(z) ?? []).filter((l) => !l.retiree);
+        {/* Une zone reste visible tant qu'elle a des lignes, même toutes retirées (grisée) ; seules les zones sans aucune ligne passent dans « + zone » */}
+        {zones.filter((z) => z === zone || (parZone.get(z) ?? []).length > 0).map((z) => {
+          const toutes = parZone.get(z) ?? [];
+          const ls = toutes.filter((l) => !l.retiree);
           const n = ls.filter(compte).length;
           const valeur = n > 0 ? valeurDe(ls) : 0;
           const actif = z === zone;
+          const retiree = toutes.length > 0 && ls.length === 0;
           return (
-            <button key={z} type="button" onClick={() => setZone(z)} style={{
+            <button key={z} type="button" onClick={() => setZone(z)} title={retiree ? `Tous les produits de ${libelleZone(z)} ont été retirés : ouvre la zone pour les remettre` : undefined} style={{
               flexShrink: 0, padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", fontFamily: "inherit",
-              border: actif ? `1.5px solid ${ACCENT}` : "1px solid #ddd6c8", background: actif ? "#FFF0EB" : "#fff", color: actif ? ACCENT : "#1a1a1a", textAlign: "center",
+              border: actif ? `1.5px solid ${ACCENT}` : retiree ? "1px dashed #c4bcae" : "1px solid #ddd6c8", background: actif ? "#FFF0EB" : retiree ? "#faf7f2" : "#fff",
+              color: actif ? ACCENT : retiree ? "#8a8378" : "#1a1a1a", textAlign: "center",
             }}>
-              {libelleZone(z)} <span style={{ fontWeight: 500, color: n === ls.length && ls.length ? "#2D6A4F" : "#999" }}>{n}/{ls.length}</span>
+              {libelleZone(z)}{" "}
+              {retiree
+                ? <span style={{ fontWeight: 500, color: "#a12b2b" }}>retirée</span>
+                : <span style={{ fontWeight: 500, color: n === ls.length && ls.length ? "#2D6A4F" : "#999" }}>{n}/{ls.length}</span>}
               {/* Valeur comptée de la zone, sous le nom */}
-              <div style={{ fontSize: 11, fontWeight: 600, color: n > 0 ? "#6f6656" : "#c4bcae", marginTop: 1 }}>{n > 0 ? eur(valeur) : "—"}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: n > 0 ? "#6f6656" : "#c4bcae", marginTop: 1 }}>{retiree ? `${toutes.length} à remettre` : n > 0 ? eur(valeur) : "—"}</div>
             </button>
           );
         })}
@@ -614,7 +621,7 @@ function Feuille() {
               flexShrink: 0, padding: "0 12px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 700, border: "1px dashed #b0a894", background: "#fff", color: "#6f6656", alignSelf: "stretch", fontFamily: "inherit",
             }}>
             <option value="">+ zone</option>
-            {zones.filter((z) => z !== zone && !(parZone.get(z) ?? []).some((l) => !l.retiree)).map((z) => <option key={z} value={z}>{libelleZone(z)} (vide)</option>)}
+            {zones.filter((z) => z !== zone && (parZone.get(z) ?? []).length === 0).map((z) => <option key={z} value={z}>{libelleZone(z)} (vide)</option>)}
             <option value="__nouvelle__">+ Nouvelle zone…</option>
           </select>
         )}
@@ -629,6 +636,17 @@ function Feuille() {
               <button type="button" onClick={() => setFiltre("")} aria-label="Effacer" style={{ position: "absolute", right: 6, top: 6, width: 30, height: 30, borderRadius: 15, border: "none", background: "#f0ebe3", color: "#6f6656", cursor: "pointer", fontSize: 15 }}>×</button>
             )}
           </div>
+          {!enRecherche && lignesZone.length === 0 && retireesZone.length > 0 && (
+            /* Zone vidée (« retirer la zone » ou croix de rayon) : le dire clairement et proposer de tout remettre */
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 12px", margin: "0 0 10px", background: "#fde7e7", border: "1px solid #f3c6c6", borderRadius: 12, fontSize: 13, color: "#7a1f1f" }}>
+              <span style={{ flex: 1, minWidth: 180 }}>
+                <strong>Tous les produits de {libelleZone(zone)} ont été retirés</strong> ({retireesZone.length}). Rien n&apos;est perdu : ils sont dans la liste « retirés » ci-dessous.
+              </span>
+              {!lectureSeule && (
+                <button type="button" onClick={() => void retirerLot(retireesZone, libelleZone(zone), true)} style={{ ...bouton("#fff", "#2D6A4F"), height: 34, fontSize: 12.5 }}>Tout remettre</button>
+              )}
+            </div>
+          )}
           {enRecherche && lignesZone.length === 0 && (
             <div style={{ fontSize: 13, color: "#8a8378", margin: "0 4px 8px" }}>
               Aucun produit ne correspond dans {libelleZone(zone)}.
