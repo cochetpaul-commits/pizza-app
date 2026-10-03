@@ -31,11 +31,14 @@ function creerEnvironnement() {
     Object.assign(f, {
       getId: () => f._id, getName: () => f._nom, setName: (n) => { f._nom = n; return f; }, getUrl: () => "https://drive.google.com/file/d/" + f._id + "/view",
       setDescription: (d) => { f._desc = d; return f; }, getDescription: () => f._desc, getDateCreated: () => f._cree, getSize: () => b.getSize(),
-      getBlob: () => b, setTrashed: (t) => { f._corbeille = t; return f; }, moveTo: (d) => { f._parent._fichiers = f._parent._fichiers.filter((x) => x !== f); d._fichiers.push(f); f._parent = d; return f; }
+      getBlob: () => b, getMimeType: () => b.getContentType(), setTrashed: (t) => { f._corbeille = t; return f; },
+      moveTo: (d) => { f._parent._fichiers = f._parent._fichiers.filter((x) => x !== f); d._fichiers.push(f); f._parent = d; return f; },
+      makeCopy: (n, d) => { const c = fichier(n, b.copyBlob(), d); d._fichiers.push(c); return c; }
     });
     fichiers[f._id] = f;
     return f;
   }
+  const dossiers = {};
   function iterateur(liste) { let i = 0; return { hasNext: () => i < liste.length, next: () => liste[i++] }; }
   function dossier(nom, parent) {
     const d = { _id: id("d"), _nom: nom, _dossiers: [], _fichiers: [], _parent: parent, _corbeille: false };
@@ -46,13 +49,19 @@ function creerEnvironnement() {
       getFolders: () => iterateur(d._dossiers.filter((x) => !x._corbeille)), getFiles: () => iterateur(d._fichiers.filter((x) => !x._corbeille)),
       createFolder: (n) => { const s = dossier(n, d); d._dossiers.push(s); return s; },
       createFile: (a, contenu, type) => { const b = typeof a === "string" ? blob(a, contenu, type) : a; const f = fichier(b.getName(), b, d); d._fichiers.push(f); return f; },
-      setTrashed: (t) => { d._corbeille = t; return d; }
+      setTrashed: (t) => { d._corbeille = t; return d; },
+      moveTo: (p) => { d._parent._dossiers = d._parent._dossiers.filter((x) => x !== d); p._dossiers.push(d); d._parent = p; return d; }
     });
+    dossiers[d._id] = d;
     return d;
   }
   const racine = dossier("Mon Drive", null);
   const docsOcr = {};
-  const DriveApp = { getRootFolder: () => racine, getFileById: (i) => fichiers[i] || { setTrashed: () => {}, moveTo: () => {} }, getFolderById: () => racine };
+  const DriveApp = {
+    getRootFolder: () => racine,
+    getFileById: (i) => { if (fichiers[i]) return fichiers[i]; if (String(i).startsWith("doc_")) return { setTrashed: () => {} }; throw new Error("fichier introuvable : " + i); },
+    getFolderById: (i) => { if (dossiers[i]) return dossiers[i]; throw new Error("dossier introuvable : " + i); }
+  };
   const Drive = { Files: {
     create: (meta, b) => { const i = id("doc"); docsOcr[i] = b._contenu; return { id: i }; },
     get: (i) => ({ md5Checksum: fichiers[i] ? md5(fichiers[i]._blob) : null }),
@@ -65,10 +74,11 @@ function creerEnvironnement() {
   function feuille(nom) {
     const f = { _nom: nom, _lignes: [] };
     Object.assign(f, {
-      getName: () => nom, appendRow: (r) => { f._lignes.push(r); return f; }, setFrozenRows: () => f, getLastRow: () => f._lignes.length,
+      getName: () => f._nom, setName: (n) => { f._nom = n; return f; }, appendRow: (r) => { f._lignes.push(r); return f; }, setFrozenRows: () => f, getLastRow: () => f._lignes.length,
       getRange: (r, c, n, m) => ({
         getValues: () => f._lignes.slice(r - 1, r - 1 + n).map((l) => { const out = []; for (let k = 0; k < m; k++) out.push(l[c - 1 + k] === undefined ? "" : l[c - 1 + k]); return out; }),
-        setValues: (v) => { for (let k = 0; k < v.length; k++) f._lignes[r - 1 + k] = v[k]; }
+        setValues: (v) => { for (let k = 0; k < v.length; k++) f._lignes[r - 1 + k] = v[k]; },
+        setValue: (v) => { if (!f._lignes[r - 1]) f._lignes[r - 1] = []; f._lignes[r - 1][c - 1] = v; }
       }),
       deleteRows: (r, n) => { f._lignes.splice(r - 1, n); }
     });
@@ -78,7 +88,7 @@ function creerEnvironnement() {
   function classeur(nom) {
     const c = { _id: id("ss"), _nom: nom, _feuilles: [feuille("Feuille 1")] };
     Object.assign(c, {
-      getId: () => c._id, getSheetByName: (n) => c._feuilles.find((x) => x._nom === n) || null, insertSheet: (n) => { const f = feuille(n); c._feuilles.push(f); return f; },
+      getId: () => c._id, getUrl: () => "https://docs.google.com/spreadsheets/d/" + c._id, getSheetByName: (n) => c._feuilles.find((x) => x._nom === n) || null, insertSheet: (n) => { const f = feuille(n); c._feuilles.push(f); return f; },
       getSheets: () => c._feuilles, deleteSheet: (f) => { c._feuilles = c._feuilles.filter((x) => x !== f); }
     });
     classeurs[c._id] = c;
@@ -128,7 +138,7 @@ function creerEnvironnement() {
     DriveApp, Drive, DocumentApp, SpreadsheetApp, GmailApp, Utilities,
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (k in props ? props[k] : null), setProperty: (k, v) => { props[k] = v; }, deleteProperty: (k) => { delete props[k]; }, getKeys: () => Object.keys(props) }) },
     MailApp: { sendEmail: (o) => mails.push(o) },
-    ScriptApp: { getProjectTriggers: () => [], newTrigger: () => ({ timeBased: () => ({ everyHours: () => ({ create: () => {} }), onWeekDay: () => ({ atHour: () => ({ create: () => {} }) }) }) }), WeekDay: { MONDAY: 1 } }
+    ScriptApp: { getProjectTriggers: () => [], newTrigger: () => ({ timeBased: () => ({ everyHours: () => ({ create: () => {} }), everyDays: () => ({ atHour: () => ({ create: () => {} }) }), onWeekDay: () => ({ atHour: () => ({ create: () => {} }) }) }) }), WeekDay: { MONDAY: 1 } }
   };
   vm.createContext(ctx);
   const src = path.join(__dirname, "..", "src");
@@ -145,11 +155,12 @@ function creerEnvironnement() {
       if (!it.hasNext()) return out;
       (function parcourir(d, chemin) {
         d._fichiers.filter((f) => !f._corbeille && f._blob.getContentType() !== "sheet").forEach((f) => out.push(chemin + "/" + f._nom));
-        d._dossiers.forEach((s) => parcourir(s, chemin + "/" + s._nom));
+        d._dossiers.filter((s) => !s._corbeille).forEach((s) => parcourir(s, chemin + "/" + s._nom));
       })(it.next(), "");
       return out.sort();
     },
-    feuille: (nom) => { const c = Object.values(classeurs)[0]; return c ? c.getSheetByName(nom)._lignes.slice(1) : []; }
+    feuille: (nom) => { const c = Object.values(classeurs).find((x) => x._nom === "Journal factures"); return c ? c.getSheetByName(nom)._lignes.slice(1) : []; },
+    fournisseurs: () => { const c = Object.values(classeurs).find((x) => x._nom === "Fournisseurs iFratelli"); return c ? c.getSheets()[0]._lignes.slice(1) : []; }
   };
   return aides;
 }

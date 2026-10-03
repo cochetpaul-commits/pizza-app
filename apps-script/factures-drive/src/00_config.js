@@ -1,23 +1,40 @@
 // ============================================================================
 // Configuration de la chaîne des factures iFratelli (Bello Mio / Piccola Mia)
-// Tout ce qui est « réglage » vit ici : dossiers Drive, adresses, tables de
-// fournisseurs, marqueurs d'établissement. Aucun appel Apps Script dans ce fichier
-// (il est aussi chargé par les tests Node).
+// Tout ce qui est « réglage » vit ici : dossiers Drive, adresses, liste de
+// référence initiale des fournisseurs, marqueurs d'établissement.
+// Aucun appel Apps Script dans ce fichier (il est aussi chargé par les tests Node).
 // ============================================================================
 
 var CONFIG = {
-  // Arborescence Drive. Pennylane synchronise « Bello Mio » et « Piccola Mia » :
-  // tout ce qui y entre devient une pièce comptable.
+  // Arborescence Drive (complément du 03/10/2026) :
+  //   Factures iFratelli/
+  //     Envoi Pennylane/<Établissement>/   seuls dossiers surveillés par Pennylane, à plat
+  //     <Établissement>/<Fournisseur>/<Année>/   archive, plus lue par Pennylane
+  //     _Hors Pennylane/<Établissement>/<Fournisseur>/<Année>/   relevés, mandats (dossier existant, gardé tel quel)
+  //     À vérifier/                        douteux : OCR raté, établissement ou fournisseur inconnu, montant introuvable…
   dossierRacine: "Factures iFratelli",
   dossiers: {
-    horsPennylane: "_Hors Pennylane",   // relevés, mandats : jamais synchronisés
-    aVerifier: "_À vérifier",           // douteux : OCR raté, établissement inconnu, montant introuvable…
-    fixtures: "_Fixtures OCR"           // PDF déposés à la main pour produire les textes de test (ocrDump)
+    envoi: "Envoi Pennylane",
+    horsPennylane: "_Hors Pennylane",         // existe déjà à la racine avec Bello Mio et Piccola Mia : utilisé tel quel
+    aVerifier: "À vérifier",
+    ancienAVerifier: "_À vérifier",           // ancien nom (v4.0), lu par l'alerte et l'indexation s'il existe
+    fixtures: "_Fixtures OCR",                // PDF déposés à la main pour produire les textes de test (ocrDump)
+    journauxCloture: "Journaux de clôture",   // sous Piccola Mia : journaux de caisse, pas des factures
+    journauxCaisse: "Journaux de caisse iFratelli"   // dossier à part, hors « Factures iFratelli »
   },
+  // Dossiers « Envoi Pennylane » déjà créés par Paul (identifiants Drive) ; repli par nom si l'identifiant ne répond plus
+  envoiIds: { "Bello Mio": "180pZHqP2rRX1x281S7QXBREpc4VPROzS", "Piccola Mia": "1JCPrEpMPlVeWm9gjLZDR1bU-l38cYEH8" },
   etablissements: ["Bello Mio", "Piccola Mia"],
 
-  // Journal (Google Sheet) et libellé Gmail de lecture humaine
+  // Parcours d'une facture sûre : Envoi Pennylane, puis archive après 3 jours ; alerte si encore là après 7 jours
+  archiveApresJours: 3,
+  envoiAlerteJours: 7,
+  // Pennylane ne lit plus l'ancien rangement depuis le 03/10/2026 au soir
+  dateBascule: "2026-10-03T18:00:00+02:00",
+
+  // Journal (Google Sheet), liste de référence des fournisseurs (Google Sheet) et libellé Gmail de lecture humaine
   journalNom: "Journal factures",
+  fournisseursNom: "Fournisseurs iFratelli",
   etiquetteTraite: "traite",
 
   // Adresses qui aboutissent toutes dans la même boîte Gmail
@@ -26,16 +43,15 @@ var CONFIG = {
     "contact@bellomio.fr", "contact@piccolamia.fr",
     "cochetpaul@bellomio.fr", "cochetpaulbellomio@gmail.com"
   ],
-  // Adresses de transfert : un mail envoyé par Pierre ou Paul n'est traité que s'il est adressé à facture@
+  // Un mail envoyé par Pierre ou Paul n'est traité que s'il est adressé à facture@
   adressesFacture: ["facture@bellomio.fr", "facture@piccolamia.fr"],
   transfertsAutorises: ["cochet"],
 
-  // Alerte hebdomadaire sur « _À vérifier »
+  // Alerte hebdomadaire
   alerteDestinataire: "cochetpaul@bellomio.fr",
   alerteAgeJours: 3,
 
-  // Passe horaire : on relit les messages des 3 derniers jours, le journal des
-  // identifiants évite tout retraitement
+  // Passe horaire : on relit les messages des 3 derniers jours, le journal des identifiants évite tout retraitement
   fenetreHeures: 72,
   // Limite Apps Script : 6 min. On s'arrête à 5 et on reprend à la passe suivante.
   limiteMs: 5 * 60 * 1000,
@@ -54,72 +70,96 @@ var CONFIG = {
   montantMax: 10000000,                               // en centimes
   tauxTva: [550, 1000, 2000, 210, 55, 196, 700],      // en centimes
 
-  // Fournisseur par morceau d'adresse ou d'objet (table historique, l'ordre compte)
-  fournisseurs: {
-    "carniato.com": "Carniato",
-    "cheville": "Cheville 35",
-    "hardy": "Cheville 35",
-    "maisonhardy": "Cheville 35",
-    "vif.fr": "Cheville 35",
-    "groupe-pomona.fr": "TerreAzur",
-    "terreazur": "TerreAzur",
-    "armor-emballages.fr": "Armor Emballages",
-    "emulsion": "Emulsion",
-    "lequertiersa.fr": "Lequertier",
-    "lequertier": "Lequertier",
-    "elj": "Lequertier",
-    "metro.fr": "Metro",
-    "sysco.fr": "Sysco",
-    "maeldistribution": "Maeldistribution",
-    "mael.fr": "Maeldistribution",
-    "masse.fr": "Masse",
-    "barspirits": "Bar Spirits",
-    "vinoflo": "Vinoflo",
-    "cozigou": "Cozigou",
-    "sdpf": "SDPF",
-    "elien": "Elien",
-    "lmdw": "LMDW",
-    "headsup.pennylane.com": "Pennylane",
-    "mailjet.com": "Mailjet",
-    "sinch": "Mailjet",
-    "ggmgastro.com": "GGM Gastro",
-    "apactionproprete": "Alain Pedron Nettoyage",
-    "freepro.fr": "Free Pro",
-    "vf-entreprise.fr": "Disgroup BVF",
-    "ca-illeetvilaine.fr": "Credit Agricole",
-    "interaction-interim.com": "Interaction Interim",
-    "combohr": "Combo",
-    "combo.fr": "Combo",
-    "anthropic.com": "Anthropic",
-    "zenchef.com": "Zenchef",
-    "getalma.eu": "Alma",
-    "alan.eu": "Alan",
-    "alan.com": "Alan",
-    "elis": "Elis",
-    "efc-marquet": "Daniel Marquet",
-    "efcmarquet": "Daniel Marquet",
-    "danielmarquet": "Daniel Marquet",
-    "hygup": "Hyg-up",
-    "hyg-up": "Hyg-up",
-    "leroymerlin": "Leroymerlin",
-    "leroy merlin": "Leroymerlin",
-    "beezign": "Beezign",
-    "prophyl": "Prophyl"
-  },
+  // Anciens dossiers « fourre-tout » de l'archive : leur contenu est reclassé d'après le PDF (reorganiserArchive)
+  dossiersFourreTout: ["Facture", "Factures", "Invoicing", "Invoice", "Transfert Pierre", "Yahoo", "Wanadoo", "Gmail", "Mail", "Indy", "Bellomio", "Bello Mio",
+    "Piccola Mia", "Piccolamia", "A-TRIER", "Divers", "Autres", "2026", "Receipt", "Cm", "Via", "Orange", "Agence"],
 
-  // Fournisseur par numéro de TVA intracommunautaire ou SIREN lu sur le document.
-  // Les noms sont ceux des dossiers Drive existants (ne pas les changer : Pennylane les a déjà importés).
-  fournisseursParTva: {
-    "FR36828779454": "Maeldistribution",   // SAS MAEL
-    "FR14340783828": "Carniato",
-    "FR65062201009": "Elis",
-    "FR38829192319": "Cheville 35",
-    "FR56552044992": "TerreAzur",          // Pomona
-    "FR16911617124": "Hyg-up",
-    "FR48451251128": "Prophyl"
-  },
+  // Liste de référence INITIALE des fournisseurs : sert à générer le Google Sheet « Fournisseurs iFratelli »
+  // (genererListeFournisseurs) et aux tests. En production, c'est le Sheet qui fait foi.
+  //   nom : nom propre affiché (dossier d'archive, nom de fichier)
+  //   variantes : anciens noms de dossiers et noms lus sur les factures
+  //   domaines : domaines des adresses d'envoi
+  //   identifiants : SIRET, SIREN ou TVA intracommunautaire lus sur les factures
+  //   etab : "Bello", "Piccola" ou "Les deux"
+  fournisseursReference: [
+    { nom: "Maël Distribution", variantes: ["Maeldistribution", "Mael Distribution", "Mael", "SAS MAEL"], domaines: ["maeldistribution.fr", "maeldistribution.com", "mael.fr"], identifiants: ["FR36828779454", "82877945400036"], etab: "Les deux" },
+    { nom: "Carniato", variantes: ["Carniato Europe"], domaines: ["carniato.com"], identifiants: ["FR14340783828", "34078382800015"], etab: "Les deux" },
+    { nom: "Cheville 35", variantes: ["Maison Hardy", "Maisonhardy", "Hardy", "Cheville"], domaines: ["vif.fr", "maison-hardy.fr"], identifiants: ["FR38829192319", "82919231900020"], etab: "Bello" },
+    { nom: "TerreAzur", variantes: ["Terre Azur", "Pomona", "TA Bretagne"], domaines: ["groupe-pomona.fr", "terreazur.fr"], identifiants: ["FR56552044992", "55204499202861"], etab: "Les deux" },
+    { nom: "Elis", variantes: ["Esker", "Elis Bretagne", "Les Lavandières"], domaines: ["elis.com", "elis.fr", "esker.com"], identifiants: ["FR65062201009", "06220100900388"], etab: "Les deux" },
+    { nom: "Hyg'Up", variantes: ["Hyg-up", "Hyg Up", "Hygup", "TLD PRO"], domaines: ["hygup.fr", "hyg-up.fr"], identifiants: ["FR16911617124", "91161712400019"], etab: "Les deux" },
+    { nom: "Leroy Merlin", variantes: ["Leroymerlin"], domaines: ["leroymerlin.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Prophyl", variantes: [], domaines: ["prophyl.fr"], identifiants: ["FR48451251128"], etab: "Bello" },
+    { nom: "Lequertier", variantes: ["Lequertiersa", "ELJ", "Lequertier SA"], domaines: ["lequertiersa.fr", "lequertier.fr"], identifiants: [], etab: "Bello" },
+    { nom: "Armor Emballages", variantes: ["Armor-emballages"], domaines: ["armor-emballages.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Emulsion", variantes: ["Emulsion Boulangerie"], domaines: ["emulsion.boulangerie@gmail.com"], identifiants: [], etab: "Bello" },
+    { nom: "Metro", variantes: ["Metro-gsc", "Metro GSC", "METRO Cash & Carry"], domaines: ["metro.fr", "metro-gsc.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Sysco", variantes: [], domaines: ["sysco.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Masse", variantes: [], domaines: ["masse.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Bar Spirits", variantes: ["Barspirits"], domaines: ["barspirits.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Vinoflo", variantes: [], domaines: ["vinoflo.fr", "vinoflo.com"], identifiants: [], etab: "Les deux" },
+    { nom: "Cozigou", variantes: [], domaines: ["cozigou.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "SDPF", variantes: [], domaines: ["sdpf.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Elien", variantes: [], domaines: ["elien.fr"], identifiants: [], etab: "Bello" },
+    { nom: "LMDW", variantes: ["La Maison du Whisky"], domaines: ["lmdw.fr", "lmdw.com"], identifiants: [], etab: "Les deux" },
+    { nom: "Pennylane", variantes: [], domaines: ["headsup.pennylane.com", "pennylane.com"], identifiants: [], etab: "Les deux" },
+    { nom: "Mailjet", variantes: ["Sinch"], domaines: ["mailjet.com", "sinch.com"], identifiants: [], etab: "Bello" },
+    { nom: "GGM Gastro", variantes: ["Ggmgastro"], domaines: ["ggmgastro.com"], identifiants: [], etab: "Les deux" },
+    { nom: "Alain Pedron Nettoyage", variantes: ["Apactionproprete", "AP Action Propreté"], domaines: ["apactionproprete.fr"], identifiants: [], etab: "Bello" },
+    { nom: "Free Pro", variantes: ["Freepro"], domaines: ["freepro.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Disgroup BVF", variantes: ["VF Entreprise", "Vf-entreprise"], domaines: ["vf-entreprise.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Crédit Agricole", variantes: ["Credit Agricole", "CA Ille-et-Vilaine"], domaines: ["ca-illeetvilaine.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Interaction Intérim", variantes: ["Interaction Interim", "Interaction-interim"], domaines: ["interaction-interim.com"], identifiants: [], etab: "Les deux" },
+    { nom: "Combo", variantes: ["Combohr", "Combo HR"], domaines: ["combohr.com", "combo.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Anthropic", variantes: [], domaines: ["anthropic.com", "mail.anthropic.com"], identifiants: [], etab: "Bello" },
+    { nom: "Zenchef", variantes: [], domaines: ["zenchef.com"], identifiants: [], etab: "Les deux" },
+    { nom: "Alma", variantes: ["Getalma"], domaines: ["getalma.eu"], identifiants: [], etab: "Les deux" },
+    { nom: "Alan", variantes: [], domaines: ["alan.eu", "alan.com"], identifiants: [], etab: "Les deux" },
+    { nom: "Daniel Marquet", variantes: ["EFC Marquet", "EFCMarquet", "Efc-marquet", "Danielmarquet"], domaines: ["efc-marquet.fr", "efcmarquet.fr"], identifiants: [], etab: "Bello" },
+    { nom: "Beezign", variantes: [], domaines: ["beezign.com", "beezign.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "Jehanno", variantes: [], domaines: ["jehanno.fr"], identifiants: [], etab: "Bello" },
+    { nom: "Cafés Celtik", variantes: ["Cafes-celtik", "Cafes Celtik"], domaines: ["cafes-celtik.fr", "cafes-celtik.com"], identifiants: [], etab: "Les deux" },
+    { nom: "Engie", variantes: [], domaines: ["engie.fr", "engie.com"], identifiants: [], etab: "Les deux" },
+    { nom: "Axenergie", variantes: [], domaines: ["axenergie.fr"], identifiants: [], etab: "Bello" },
+    { nom: "Generali", variantes: ["Generali-Assurance", "Generali Assurance"], domaines: ["generali.fr", "generali.com"], identifiants: [], etab: "Les deux" },
+    { nom: "Hiboutik", variantes: [], domaines: ["hiboutik.com"], identifiants: [], etab: "Piccola" },
+    { nom: "Bureau Vallée", variantes: ["Bureau-vallee", "Bureau Vallee"], domaines: ["bureau-vallee.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "UP Coop", variantes: ["UP-COOP", "Up"], domaines: ["up.coop", "up-coop.fr"], identifiants: [], etab: "Bello" },
+    { nom: "Thermifroid", variantes: [], domaines: ["thermifroid.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Orange", variantes: [], domaines: ["orange.com", "orange.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Apple", variantes: [], domaines: ["apple.com", "email.apple.com"], identifiants: [], etab: "Bello" },
+    { nom: "PayByPhone", variantes: [], domaines: ["paybyphone.fr", "paybyphone.com"], identifiants: [], etab: "Bello" },
+    { nom: "Maison Dreux", variantes: ["Maison-Dreux"], domaines: ["maison-dreux.fr", "maisondreux.fr"], identifiants: [], etab: "Bello" },
+    { nom: "Ubefone", variantes: [], domaines: ["ubefone.com"], identifiants: [], etab: "Bello" },
+    { nom: "Verisure", variantes: [], domaines: ["verisure.fr", "verisure.com"], identifiants: [], etab: "Les deux" },
+    { nom: "Bimpli", variantes: [], domaines: ["bimpli.com", "bimpli.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "SC M2", variantes: ["SC-M2", "Sc-m2", "SCM2"], domaines: ["sc-m2.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Mon Expert en Gestion", variantes: ["Mon-expert-en-gestion", "MEG"], domaines: ["mon-expert-en-gestion.fr", "monexpertengestion.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Distrimalo", variantes: [], domaines: ["distrimalo.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "Buffet Plus", variantes: ["Buffetplus"], domaines: ["buffetplus.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "Flamigni", variantes: [], domaines: ["flamigni.it", "flamigni.com"], identifiants: [], etab: "Piccola" },
+    { nom: "La Via del Te", variantes: ["Laviadelte"], domaines: ["laviadelte.it", "laviadelte.com"], identifiants: [], etab: "Piccola" },
+    { nom: "Labovida", variantes: [], domaines: ["labovida.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "Lucangeli", variantes: [], domaines: ["lucangeli.it"], identifiants: [], etab: "Piccola" },
+    { nom: "Vinoegusto", variantes: ["Vino e Gusto"], domaines: ["vinoegusto.fr", "vinoegusto.it"], identifiants: [], etab: "Piccola" },
+    { nom: "Mon Emballage", variantes: ["Mon-emballage", "Monemballage"], domaines: ["mon-emballage.com", "monemballage.com"], identifiants: [], etab: "Piccola" },
+    { nom: "Papiers Service", variantes: ["Papiers-service"], domaines: ["papiers-service.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "Gastrotiger", variantes: [], domaines: ["gastrotiger.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "Deuba24", variantes: ["Deuba"], domaines: ["deuba24.fr", "deuba.de"], identifiants: [], etab: "Piccola" },
+    { nom: "SUM Online", variantes: ["Sum", "Sumonline"], domaines: ["sum-online.fr", "sumonline.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "EDF", variantes: [], domaines: ["edf.fr", "edf.com"], identifiants: [], etab: "Piccola" },
+    { nom: "Groupe GCA", variantes: ["GCA"], domaines: ["groupe-gca.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "Inforegistre", variantes: [], domaines: ["inforegistre.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "Restoflash", variantes: [], domaines: ["restoflash.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "PST35", variantes: ["PST 35"], domaines: ["pst35.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "RME", variantes: [], domaines: ["rme.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "Storycie", variantes: [], domaines: ["storycie.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "APR35", variantes: ["APR 35"], domaines: ["apr35.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "AME Hasle", variantes: ["AME-Hasle"], domaines: ["ame-hasle.fr"], identifiants: [], etab: "Piccola" },
+    { nom: "Pack Prélèvements", variantes: ["Pack Prelevements"], domaines: [], identifiants: [], etab: "Piccola" }
+  ],
 
-  // Sous-domaines sans valeur pour nommer un fournisseur ("facture@mail.sumup.com" -> "Sumup")
+  // Sous-domaines sans valeur pour proposer un nom à un fournisseur inconnu ("facture@mail.sumup.com" -> "sumup")
   sousDomainesGeneriques: ["mail", "email", "e-mail", "mailer", "mailing", "mg", "em", "m", "e", "send", "smtp", "bounce", "bounces",
     "news", "newsletter", "facture", "factures", "facturation", "invoice", "invoices", "invoicing", "billing", "receipt", "receipts",
     "paiement", "payment", "noreply", "no-reply", "notification", "notifications", "info", "contact", "compta", "comptabilite",
@@ -131,7 +171,7 @@ var MOIS_FR_NOMS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juil
 
 function obtenirNomMois(index) { return MOIS_FR_NOMS[index]; }
 
-/** "10 - Octobre 2026" à partir d'une Date */
+/** "10 - Octobre 2026" à partir d'une Date (ancien rangement par mois, encore lu par la réorganisation) */
 function nomDossierMois(date) {
   return ("0" + (date.getMonth() + 1)).slice(-2) + " - " + obtenirNomMois(date.getMonth()) + " " + date.getFullYear();
 }

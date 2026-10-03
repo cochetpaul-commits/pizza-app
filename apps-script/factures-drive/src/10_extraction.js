@@ -213,53 +213,15 @@ function detecterTypeDocument(texte, montant) {
 
 // ---------------------------------------------------------------- Fournisseur
 
-/** Numéros de TVA intracommunautaire FR présents dans le texte (sans espaces), hors ceux de nos deux sociétés */
-function listerTvaFournisseur(texte) {
-  var t = String(texte || "").replace(/ /g, " "), re = /\bFR\s?\d{2}(?:\s?\d{3}){3}\b/gi, m, out = [], notres = [];
-  CONFIG.etablissements.forEach(function(e) { notres.push(CONFIG.marqueurs[e].tva); });
-  while ((m = re.exec(t)) !== null) {
-    var tva = m[0].replace(/\s/g, "").toUpperCase();
-    if (notres.indexOf(tva) === -1 && out.indexOf(tva) === -1) out.push(tva);
-  }
-  return out;
-}
-
-/** Nom tiré du domaine de l'expéditeur, en sautant les sous-domaines génériques : "facture@mail.sumup.com" -> "Sumup" */
-function fournisseurParDomaine(from) {
-  var dm = String(from || "").match(/@([^>\s]+)/);
-  if (!dm) return null;
-  var parts = dm[1].toLowerCase().split(".");
-  if (/^\d+$/.test(parts[0])) return null;
-  var nom = parts[parts.length - 2] || parts[0];
-  for (var k = 0; k < parts.length - 1; k++) {
-    if (CONFIG.sousDomainesGeneriques.indexOf(parts[k]) === -1) { nom = parts[k]; break; }
-  }
-  return nom.charAt(0).toUpperCase() + nom.slice(1);
-}
-
 /**
- * Fournisseur : 1) table de correspondance sur l'expéditeur et l'objet, 2) TVA/SIREN lu sur le document,
- * 3) domaine de l'expéditeur, 4) "Transfert Pierre" pour un transfert interne non reconnu, sinon "Divers".
- * Renvoie { nom, source }.
+ * Fournisseur d'après la liste de référence (15_fournisseurs.js) : { nom, source, entree } ou, inconnu,
+ * { nom: null, source: "inconnu", propose } où `propose` est le nom tiré du domaine (pour la ligne « à compléter »).
+ * Le nom n'est JAMAIS inventé à partir du domaine.
  */
-function extraireFournisseur(from, subject, texte) {
-  var f = String(from || "").toLowerCase(), s = String(subject || "").toLowerCase();
-  for (var cle in CONFIG.fournisseurs) {
-    if (f.indexOf(cle) !== -1 || s.indexOf(cle) !== -1) return { nom: CONFIG.fournisseurs[cle], source: "table" };
-  }
-  var tvas = listerTvaFournisseur(texte);
-  for (var i = 0; i < tvas.length; i++) {
-    if (CONFIG.fournisseursParTva[tvas[i]]) return { nom: CONFIG.fournisseursParTva[tvas[i]], source: "tva" };
-  }
-  var interne = CONFIG.transfertsAutorises.some(function(x) { return f.indexOf(x) !== -1; });
-  if (interne) {
-    // Transfert de Pierre ou Paul : on lit l'objet du mail d'origine
-    for (var cle2 in CONFIG.fournisseurs) if (s.indexOf(cle2) !== -1) return { nom: CONFIG.fournisseurs[cle2], source: "table" };
-    return { nom: "Transfert Pierre", source: "transfert" };
-  }
-  var dom = fournisseurParDomaine(from);
-  if (dom) return { nom: dom, source: "domaine" };
-  return { nom: "Divers", source: "defaut" };
+function extraireFournisseur(idx, from, subject, texte) {
+  var r = resoudreFournisseur(idx, { from: from, subject: subject, texte: texte });
+  if (r) return { nom: r.entree.nom, source: r.source, entree: r.entree };
+  return { nom: null, source: "inconnu", propose: nomProposeDepuisDomaine(from) };
 }
 
 // ---------------------------------------------------------------- Nom de fichier
@@ -272,7 +234,7 @@ function extraireFournisseur(from, subject, texte) {
 function construireNom(a, extension) {
   var date = a.date || a.dateSecours;
   var libelle = a.type === "releve" ? "Relevé" : a.type === "mandat" ? "Mandat" : a.type === "devis" ? "Devis" : a.type === "attestation" ? "Attestation" : "Facture";
-  var morceaux = [date, a.fournisseur, a.numero ? libelle + " n° " + a.numero : libelle];
+  var morceaux = [date, a.fournisseur || "Fournisseur inconnu", a.numero ? libelle + " n° " + a.numero : libelle];
   if (a.montant && a.type !== "mandat" && a.type !== "attestation") morceaux.push(a.montant + " EUR");
   return morceaux.join(" — ") + extension;
 }
@@ -281,15 +243,15 @@ function construireNom(a, extension) {
 
 /**
  * Analyse pure d'une pièce. Entrée :
- *   { texte, from, subject, nomPiece, dateMail (AAAA-MM-JJ), extension }
+ *   { idx (index des fournisseurs), texte, from, subject, nomPiece, dateMail (AAAA-MM-JJ), extension }
  * Sortie :
- *   { type, etablissement, fournisseur, sourceFournisseur, numero, date, dateSecours, montant, nom, texteLu, raisons[] }
+ *   { type, etablissement, fournisseur, sourceFournisseur, fournisseurPropose, numero, date, dateSecours, montant, nom, texteLu, raisons[] }
  * `raisons` liste ce qui empêche un classement sûr (vide = pièce sûre).
  */
 function analyserDocument(e) {
   var texte = e.texte || "";
   var texteLu = texte.replace(/\s+/g, "").length >= 40;
-  var f = extraireFournisseur(e.from, e.subject, texte);
+  var f = extraireFournisseur(e.idx || indexerFournisseurs(listeFournisseursParDefaut()), e.from, e.subject, texte);
   var montant = texteLu ? trouverMontantTTC(texte) : null;
   var type = texteLu ? detecterTypeDocument(texte, montant) : "autre";
   var a = {
@@ -297,6 +259,7 @@ function analyserDocument(e) {
     etablissement: texteLu ? detecterEtablissement(texte) : null,
     fournisseur: f.nom,
     sourceFournisseur: f.source,
+    fournisseurPropose: f.propose || null,
     numero: texteLu ? (type === "releve" ? trouverNumeroReleve(texte) || trouverNumeroFacture(texte) : trouverNumeroFacture(texte)) : null,
     date: texteLu ? trouverDateFacture(texte) : null,
     dateSecours: e.dateMail,
@@ -310,42 +273,51 @@ function analyserDocument(e) {
   if (texteLu && !a.etablissement) a.raisons.push("établissement inconnu");
   if ((type === "facture" || type === "avoir" || type === "ticket") && !a.montant) a.raisons.push("montant introuvable");
   if (type === "autre" && texteLu) a.raisons.push("type de document incertain");
-  if (f.source === "defaut") a.raisons.push("fournisseur inconnu");
+  if (!f.nom) a.raisons.push("fournisseur inconnu" + (f.propose ? " (" + f.propose + " ?)" : ""));
   a.nom = construireNom(a, e.extension || ".pdf");
   return a;
 }
 
+/** Année d'archivage d'une pièce : celle de la date de facture, sinon du mail */
+function anneeDe(a) { return String(a.date || a.dateSecours || "").slice(0, 4) || "Sans date"; }
+
 /**
  * Destination d'une pièce analysée. Pure.
- *   { destination: "sync" | "hors_pennylane" | "journal" | "a_verifier", chemin: [...dossiers sous la racine], raison }
- * Règle d'or : seules les vraies factures, avoirs et tickets, avec établissement sûr et montant lu,
- * entrent dans les dossiers synchronisés avec Pennylane.
+ *   { destination: "envoi" | "hors_pennylane" | "journal" | "a_verifier", chemin: [...dossiers sous la racine], archive: [...], raison }
+ *   - envoi : à plat dans « Envoi Pennylane/<Établissement> » (seuls dossiers lus par Pennylane) ; `archive` est le dossier
+ *     <Établissement>/<Fournisseur>/<Année> où le fichier sera déplacé après 3 jours ;
+ *   - hors_pennylane : relevés et mandats, « _Hors Pennylane/<Établissement>/<Fournisseur>/<Année> » ;
+ *   - journal : devis, bon de commande, attestation, rien n'est rangé ;
+ *   - a_verifier : « À vérifier », à plat, la raison dans la description du fichier.
+ * Règle d'or : seules les vraies factures, avoirs et tickets, avec établissement sûr, montant lu et fournisseur
+ * de la liste de référence, partent vers Pennylane.
  */
-function decider(a, dateMois) {
-  var mois = nomDossierMois(dateMois);
+function decider(a) {
+  var annee = anneeDe(a);
   if (a.type === "devis" || a.type === "bon_commande" || a.type === "attestation") {
-    return { destination: "journal", chemin: [], raison: a.type + " : rien à ranger" };
+    return { destination: "journal", chemin: [], archive: [], raison: a.type + " : rien à ranger" };
   }
-  if ((a.type === "releve" || a.type === "mandat") && a.texteLu) {
+  if ((a.type === "releve" || a.type === "mandat") && a.texteLu && a.fournisseur) {
     var etabHp = a.etablissement || "Etablissement inconnu";
-    return { destination: "hors_pennylane", chemin: [CONFIG.dossiers.horsPennylane, etabHp, a.fournisseur, mois], raison: "" };
+    var cheminHp = [CONFIG.dossiers.horsPennylane, etabHp, a.fournisseur, annee];
+    return { destination: "hors_pennylane", chemin: cheminHp, archive: cheminHp, raison: "" };
   }
   var piece = a.type === "facture" || a.type === "avoir" || a.type === "ticket";
-  if (piece && a.etablissement && a.montant && a.raisons.length === 0) {
-    return { destination: "sync", chemin: [a.etablissement, a.fournisseur, mois], raison: "" };
+  if (piece && a.etablissement && a.montant && a.fournisseur && a.raisons.length === 0) {
+    return { destination: "envoi", chemin: [CONFIG.dossiers.envoi, a.etablissement], archive: [a.etablissement, a.fournisseur, annee], raison: "" };
   }
   var raison = a.raisons.length ? a.raisons.join(", ") : "type " + a.type;
-  return { destination: "a_verifier", chemin: [CONFIG.dossiers.aVerifier, mois], raison: raison };
+  return { destination: "a_verifier", chemin: [CONFIG.dossiers.aVerifier], archive: [], raison: raison };
 }
 
 // ---------------------------------------------------------------- Anti-doublon (pure)
 
 /** Clés de rapprochement d'une pièce : empreinte, fournisseur+numéro, fournisseur+date+montant */
 function clesDoublon(a, md5) {
-  var cles = [];
+  var cles = [], f = cleFournisseur(a.fournisseur || "");
   if (md5) cles.push("md5:" + md5);
-  if (a.numero) cles.push("num:" + normaliser(a.fournisseur) + "|" + String(a.numero).toUpperCase());
-  if (a.montant && (a.date || a.dateSecours)) cles.push("dm:" + normaliser(a.fournisseur) + "|" + (a.date || a.dateSecours) + "|" + a.montant);
+  if (a.numero && f) cles.push("num:" + f + "|" + String(a.numero).toUpperCase());
+  if (a.montant && f && (a.date || a.dateSecours)) cles.push("dm:" + f + "|" + (a.date || a.dateSecours) + "|" + a.montant);
   return cles;
 }
 
@@ -364,10 +336,3 @@ function analyserNomFichier(nom) {
   return { date: m[1], fournisseur: m[2], type: /relev/i.test(m[3]) ? "releve" : m[3].toLowerCase(), numero: numero, montant: m[5] || null };
 }
 
-if (typeof module !== "undefined") {
-  module.exports = { sansAccents: sansAccents, normaliser: normaliser, listerMontants: listerMontants, trouverMontantTTC: trouverMontantTTC,
-    trouverNumeroFacture: trouverNumeroFacture, trouverDateFacture: trouverDateFacture, lireDate: lireDate, detecterEtablissement: detecterEtablissement,
-    detecterTypeDocument: detecterTypeDocument, extraireFournisseur: extraireFournisseur, fournisseurParDomaine: fournisseurParDomaine,
-    construireNom: construireNom, analyserDocument: analyserDocument, decider: decider, clesDoublon: clesDoublon, trouverDoublon: trouverDoublon,
-    analyserNomFichier: analyserNomFichier };
-}

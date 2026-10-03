@@ -1,74 +1,75 @@
 {
-  "_note": "Un objet par fichier .txt du dossier. Les textes réels ont été tirés des PDF du Drive (extraction de texte Google) ; les trois marqués `synthetique` sont des textes plausibles à remplacer par la sortie de ocrDump dès que Paul fournit les PDF. `mail` reproduit le mail d'origine ; `attendu` est ce que analyserDocument() et decider() doivent produire.",
+  "_note": "Un objet par fichier .txt du dossier. Les textes réels ont été tirés des PDF du Drive (extraction de texte Google) ; les trois marqués `synthetique` sont des textes plausibles à remplacer par la sortie de ocrDump dès que Paul fournit les PDF. `mail` reproduit le mail d'origine ; `attendu` est ce que analyserDocument() et decider() doivent produire : `chemin` est le dossier de création, `archive` le dossier d'archive après 3 jours dans Envoi Pennylane. Les noms de fournisseurs sont ceux de la liste de référence.",
 
   "mael_facture_piccola": {
     "mail": { "from": "comptabilite@maeldistribution.fr", "subject": "Facture FC0140", "nomPiece": "FC0140.pdf", "dateMail": "2026-10-02" },
-    "attendu": { "type": "facture", "etablissement": "Piccola Mia", "fournisseur": "Maeldistribution", "numero": "FC0140", "date": "2026-10-02", "montant": "906.39",
-                 "nom": "2026-10-02 — Maeldistribution — Facture n° FC0140 — 906.39 EUR.pdf", "destination": "sync", "chemin": ["Piccola Mia", "Maeldistribution", "10 - Octobre 2026"] }
+    "attendu": { "type": "facture", "etablissement": "Piccola Mia", "fournisseur": "Maël Distribution", "numero": "FC0140", "date": "2026-10-02", "montant": "906.39",
+                 "nom": "2026-10-02 — Maël Distribution — Facture n° FC0140 — 906.39 EUR.pdf", "destination": "envoi", "chemin": ["Envoi Pennylane", "Piccola Mia"], "archive": ["Piccola Mia", "Maël Distribution", "2026"] }
   },
   "mael_avoir_bello": {
     "mail": { "from": "comptabilite@maeldistribution.fr", "subject": "Facture FC0126", "nomPiece": "FC0126.pdf", "dateMail": "2026-10-02" },
-    "attendu": { "type": "avoir", "etablissement": "Bello Mio", "fournisseur": "Maeldistribution", "numero": "FC0126", "date": "2026-10-02", "montant": "-4.92",
-                 "nom": "2026-10-02 — Maeldistribution — Facture n° FC0126 — -4.92 EUR.pdf", "destination": "sync", "chemin": ["Bello Mio", "Maeldistribution", "10 - Octobre 2026"] }
+    "attendu": { "type": "avoir", "etablissement": "Bello Mio", "fournisseur": "Maël Distribution", "numero": "FC0126", "date": "2026-10-02", "montant": "-4.92",
+                 "nom": "2026-10-02 — Maël Distribution — Facture n° FC0126 — -4.92 EUR.pdf", "destination": "envoi", "chemin": ["Envoi Pennylane", "Bello Mio"], "archive": ["Bello Mio", "Maël Distribution", "2026"] }
   },
   "carniato_facture_bello": {
     "mail": { "from": "noreply@carniato.com", "subject": "Facture 201018858", "nomPiece": "201018858.pdf", "dateMail": "2026-09-30" },
     "attendu": { "type": "facture", "etablissement": "Bello Mio", "fournisseur": "Carniato", "numero": "201018858", "date": "2026-09-29", "montant": "347.59",
-                 "nom": "2026-09-29 — Carniato — Facture n° 201018858 — 347.59 EUR.pdf", "destination": "sync", "chemin": ["Bello Mio", "Carniato", "09 - Septembre 2026"] }
+                 "nom": "2026-09-29 — Carniato — Facture n° 201018858 — 347.59 EUR.pdf", "destination": "envoi", "chemin": ["Envoi Pennylane", "Bello Mio"], "archive": ["Bello Mio", "Carniato", "2026"] }
   },
   "carniato_releve_bello": {
     "mail": { "from": "noreply@carniato.com", "subject": "Relevé LCR", "nomPiece": "14054490.pdf", "dateMail": "2026-10-01" },
     "attendu": { "type": "releve", "etablissement": "Bello Mio", "fournisseur": "Carniato", "numero": "14054490", "montant": "790.04", "nom": "2026-10-01 — Carniato — Relevé n° 14054490 — 790.04 EUR.pdf",
-                 "destination": "hors_pennylane", "chemin": ["_Hors Pennylane", "Bello Mio", "Carniato", "10 - Octobre 2026"] }
+                 "destination": "hors_pennylane", "chemin": ["_Hors Pennylane", "Bello Mio", "Carniato", "2026"], "archive": ["_Hors Pennylane", "Bello Mio", "Carniato", "2026"] }
   },
   "carniato_releve_piccola": {
     "_cas_piege": "relevé Piccola reçu sur l'adresse Bello : l'établissement vient du document, pas du mail",
     "mail": { "from": "noreply@carniato.com", "subject": "Relevé LCR", "nomPiece": "14054661.pdf", "dateMail": "2026-10-01", "adresseReception": "facture@bellomio.fr" },
     "attendu": { "type": "releve", "etablissement": "Piccola Mia", "fournisseur": "Carniato", "numero": "14054661", "montant": "138.80", "nom": "2026-10-01 — Carniato — Relevé n° 14054661 — 138.80 EUR.pdf",
-                 "destination": "hors_pennylane", "chemin": ["_Hors Pennylane", "Piccola Mia", "Carniato", "10 - Octobre 2026"] }
+                 "destination": "hors_pennylane", "chemin": ["_Hors Pennylane", "Piccola Mia", "Carniato", "2026"], "archive": ["_Hors Pennylane", "Piccola Mia", "Carniato", "2026"] }
   },
   "elis_facture_bello": {
     "_cas_piege": "le capital social 448 544,00 n'est pas le montant",
     "mail": { "from": "facturation@elis.com", "subject": "Votre facture Elis", "nomPiece": "F2610301-982324.pdf", "dateMail": "2026-10-03" },
     "attendu": { "type": "facture", "etablissement": "Bello Mio", "fournisseur": "Elis", "numero": "2610301-982324", "date": "2026-09-30", "montant": "291.23",
-                 "nom": "2026-09-30 — Elis — Facture n° 2610301-982324 — 291.23 EUR.pdf", "destination": "sync", "chemin": ["Bello Mio", "Elis", "10 - Octobre 2026"] }
+                 "nom": "2026-09-30 — Elis — Facture n° 2610301-982324 — 291.23 EUR.pdf", "destination": "envoi", "chemin": ["Envoi Pennylane", "Bello Mio"], "archive": ["Bello Mio", "Elis", "2026"] }
   },
   "cheville35_facture_bello": {
-    "_cas_piege": "envoyée sur contact@ par noreply@vif.fr ; le fournisseur vient de l'objet",
+    "_cas_piege": "envoyée sur contact@ par noreply@vif.fr ; le fournisseur vient du domaine vif.fr de la liste (et de la TVA lue)",
     "mail": { "from": "noreply@vif.fr", "subject": "Facture CHEVILLE 35", "nomPiece": "CHEVI35 Chev35 00113789.pdf", "dateMail": "2026-09-01" },
     "attendu": { "type": "facture", "etablissement": "Bello Mio", "fournisseur": "Cheville 35", "numero": "00113789", "date": "2026-08-31", "montant": "375.64",
-                 "nom": "2026-08-31 — Cheville 35 — Facture n° 00113789 — 375.64 EUR.pdf", "destination": "sync", "chemin": ["Bello Mio", "Cheville 35", "09 - Septembre 2026"] }
+                 "nom": "2026-08-31 — Cheville 35 — Facture n° 00113789 — 375.64 EUR.pdf", "destination": "envoi", "chemin": ["Envoi Pennylane", "Bello Mio"], "archive": ["Bello Mio", "Cheville 35", "2026"] }
   },
   "terreazur_facture_bello": {
     "mail": { "from": "no-reply@groupe-pomona.fr", "subject": "Votre facture TerreAzur", "nomPiece": "8801805886.pdf", "dateMail": "2026-10-02" },
     "attendu": { "type": "facture", "etablissement": "Bello Mio", "fournisseur": "TerreAzur", "numero": "8801805886", "date": "2026-10-02", "montant": "139.25",
-                 "nom": "2026-10-02 — TerreAzur — Facture n° 8801805886 — 139.25 EUR.pdf", "destination": "sync", "chemin": ["Bello Mio", "TerreAzur", "10 - Octobre 2026"] }
+                 "nom": "2026-10-02 — TerreAzur — Facture n° 8801805886 — 139.25 EUR.pdf", "destination": "envoi", "chemin": ["Envoi Pennylane", "Bello Mio"], "archive": ["Bello Mio", "TerreAzur", "2026"] }
   },
   "leroymerlin_ticket_bello": {
-    "_cas_piege": "ticket de caisse sans numéro de facture : rangé quand même (pièce comptable), nommé « Facture » comme avant",
+    "_cas_piege": "ticket de caisse sans numéro de facture, transféré par Paul : le fournisseur vient de l'objet ; nommé « Facture » comme avant",
     "mail": { "from": "cochetpaul@bellomio.fr", "subject": "Fwd: Votre ticket Leroy Merlin", "nomPiece": "ticket.pdf", "dateMail": "2026-10-02" },
-    "attendu": { "type": "ticket", "etablissement": "Bello Mio", "fournisseur": "Leroymerlin", "numero": null, "date": "2026-10-02", "montant": "38.79",
-                 "nom": "2026-10-02 — Leroymerlin — Facture — 38.79 EUR.pdf", "destination": "sync", "chemin": ["Bello Mio", "Leroymerlin", "10 - Octobre 2026"] }
+    "attendu": { "type": "ticket", "etablissement": "Bello Mio", "fournisseur": "Leroy Merlin", "numero": null, "date": "2026-10-02", "montant": "38.79",
+                 "nom": "2026-10-02 — Leroy Merlin — Facture — 38.79 EUR.pdf", "destination": "envoi", "chemin": ["Envoi Pennylane", "Bello Mio"], "archive": ["Bello Mio", "Leroy Merlin", "2026"] }
   },
   "hygup_facture_bello": {
     "mail": { "from": "compta@hygup.fr", "subject": "Facture 127999", "nomPiece": "127999.pdf", "dateMail": "2026-10-01" },
-    "attendu": { "type": "facture", "etablissement": "Bello Mio", "fournisseur": "Hyg-up", "numero": "127999", "date": "2026-09-30", "montant": "1155.24",
-                 "nom": "2026-09-30 — Hyg-up — Facture n° 127999 — 1155.24 EUR.pdf", "destination": "sync", "chemin": ["Bello Mio", "Hyg-up", "10 - Octobre 2026"] }
+    "attendu": { "type": "facture", "etablissement": "Bello Mio", "fournisseur": "Hyg'Up", "numero": "127999", "date": "2026-09-30", "montant": "1155.24",
+                 "nom": "2026-09-30 — Hyg'Up — Facture n° 127999 — 1155.24 EUR.pdf", "destination": "envoi", "chemin": ["Envoi Pennylane", "Bello Mio"], "archive": ["Bello Mio", "Hyg'Up", "2026"] }
   },
   "prophyl_mandat_bello": {
     "synthetique": true,
     "mail": { "from": "contrats@prophyl.fr", "subject": "Mandat SEPA", "nomPiece": "mandat.pdf", "dateMail": "2026-09-15" },
     "attendu": { "type": "mandat", "etablissement": "Bello Mio", "fournisseur": "Prophyl",
-                 "destination": "hors_pennylane", "chemin": ["_Hors Pennylane", "Bello Mio", "Prophyl", "09 - Septembre 2026"] }
+                 "destination": "hors_pennylane", "chemin": ["_Hors Pennylane", "Bello Mio", "Prophyl", "2026"], "archive": ["_Hors Pennylane", "Bello Mio", "Prophyl", "2026"] }
   },
   "devis_piccola": {
     "synthetique": true,
     "mail": { "from": "contact@thermifroid.fr", "subject": "Devis groupe froid", "nomPiece": "devis.pdf", "dateMail": "2026-09-22" },
-    "attendu": { "type": "devis", "etablissement": "Piccola Mia", "fournisseur": "Thermifroid", "destination": "journal", "chemin": [] }
+    "attendu": { "type": "devis", "etablissement": "Piccola Mia", "fournisseur": "Thermifroid", "destination": "journal", "chemin": [], "archive": [] }
   },
   "attestation_dsn_bello": {
     "synthetique": true,
+    "_cas_piege": "expéditeur inconnu de la liste : fournisseur null, mais une attestation ne se range pas de toute façon",
     "mail": { "from": "ne-pas-repondre@urssaf.fr", "subject": "Attestation de dépôt DSN", "nomPiece": "attestation.pdf", "dateMail": "2026-10-05" },
-    "attendu": { "type": "attestation", "etablissement": "Bello Mio", "destination": "journal", "chemin": [] }
+    "attendu": { "type": "attestation", "etablissement": "Bello Mio", "fournisseur": null, "destination": "journal", "chemin": [], "archive": [] }
   }
 }

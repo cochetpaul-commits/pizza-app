@@ -5,42 +5,52 @@ const { chargerContexte } = require("./charger");
 
 const ctx = chargerContexte();
 const plain = (x) => JSON.parse(JSON.stringify(x));
-const dateMois = new Date("2026-10-02T12:00:00");
 
 function analyse(extra) {
   return Object.assign({ type: "facture", etablissement: "Bello Mio", fournisseur: "Carniato", numero: "1", date: "2026-10-02", dateSecours: "2026-10-02",
     montant: "10.00", texteLu: true, raisons: [] }, extra);
 }
 
-describe("decider : seules les vraies pièces entrent dans les dossiers Pennylane", () => {
-  test("facture sûre -> dossier synchronisé", () => {
-    assert.deepEqual(plain(ctx.decider(analyse({}), dateMois)), { destination: "sync", chemin: ["Bello Mio", "Carniato", "10 - Octobre 2026"], raison: "" });
+describe("decider : seules les vraies pièces partent vers Pennylane", () => {
+  test("facture sûre -> Envoi Pennylane à plat, archive <Etab>/<Fournisseur>/<Année>", () => {
+    assert.deepEqual(plain(ctx.decider(analyse({}))), { destination: "envoi", chemin: ["Envoi Pennylane", "Bello Mio"], archive: ["Bello Mio", "Carniato", "2026"], raison: "" });
+  });
+  test("l'année vient de la date de facture, sinon du mail", () => {
+    assert.deepEqual(plain(ctx.decider(analyse({ date: "2025-12-30", dateSecours: "2026-01-02" })).archive), ["Bello Mio", "Carniato", "2025"]);
+    assert.deepEqual(plain(ctx.decider(analyse({ date: null, dateSecours: "2026-01-02" })).archive), ["Bello Mio", "Carniato", "2026"]);
   });
   test("établissement inconnu -> À vérifier", () => {
-    const d = ctx.decider(analyse({ etablissement: null, raisons: ["établissement inconnu"] }), dateMois);
+    const d = ctx.decider(analyse({ etablissement: null, raisons: ["établissement inconnu"] }));
     assert.equal(d.destination, "a_verifier");
-    assert.deepEqual(plain(d.chemin), ["_À vérifier", "10 - Octobre 2026"]);
+    assert.deepEqual(plain(d.chemin), ["À vérifier"]);
     assert.match(d.raison, /établissement inconnu/);
   });
+  test("fournisseur absent de la liste -> À vérifier, même avec tout le reste", () => {
+    const d = ctx.decider(analyse({ fournisseur: null, raisons: ["fournisseur inconnu (Castorama ?)"] }));
+    assert.equal(d.destination, "a_verifier");
+    assert.match(d.raison, /Castorama/);
+  });
   test("montant introuvable -> À vérifier", () => {
-    assert.equal(ctx.decider(analyse({ montant: null, raisons: ["montant introuvable"] }), dateMois).destination, "a_verifier");
+    assert.equal(ctx.decider(analyse({ montant: null, raisons: ["montant introuvable"] })).destination, "a_verifier");
   });
   test("OCR raté -> À vérifier, même si le mail vient d'un fournisseur connu", () => {
-    const d = ctx.decider(analyse({ type: "autre", texteLu: false, etablissement: null, montant: null, raisons: ["texte illisible (OCR)"] }), dateMois);
-    assert.equal(d.destination, "a_verifier");
+    assert.equal(ctx.decider(analyse({ type: "autre", texteLu: false, etablissement: null, montant: null, raisons: ["texte illisible (OCR)"] })).destination, "a_verifier");
   });
-  test("relevé -> _Hors Pennylane / établissement / fournisseur / mois", () => {
-    assert.deepEqual(plain(ctx.decider(analyse({ type: "releve" }), dateMois).chemin), ["_Hors Pennylane", "Bello Mio", "Carniato", "10 - Octobre 2026"]);
+  test("relevé -> _Hors Pennylane / établissement / fournisseur / année", () => {
+    assert.deepEqual(plain(ctx.decider(analyse({ type: "releve" })).chemin), ["_Hors Pennylane", "Bello Mio", "Carniato", "2026"]);
   });
   test("mandat sans établissement -> _Hors Pennylane / Etablissement inconnu", () => {
-    assert.deepEqual(plain(ctx.decider(analyse({ type: "mandat", etablissement: null, raisons: ["établissement inconnu"] }), dateMois).chemin),
-      ["_Hors Pennylane", "Etablissement inconnu", "Carniato", "10 - Octobre 2026"]);
+    assert.deepEqual(plain(ctx.decider(analyse({ type: "mandat", etablissement: null, raisons: ["établissement inconnu"] })).chemin),
+      ["_Hors Pennylane", "Etablissement inconnu", "Carniato", "2026"]);
+  });
+  test("relevé d'un fournisseur inconnu -> À vérifier", () => {
+    assert.equal(ctx.decider(analyse({ type: "releve", fournisseur: null, raisons: ["fournisseur inconnu"] })).destination, "a_verifier");
   });
   test("devis, bon de commande, attestation -> journal seul", () => {
-    for (const type of ["devis", "bon_commande", "attestation"]) assert.equal(ctx.decider(analyse({ type }), dateMois).destination, "journal");
+    for (const type of ["devis", "bon_commande", "attestation"]) assert.equal(ctx.decider(analyse({ type })).destination, "journal");
   });
-  test("tarifs et promos (type autre) -> À vérifier, jamais en synchro", () => {
-    assert.equal(ctx.decider(analyse({ type: "autre", raisons: ["type de document incertain"] }), dateMois).destination, "a_verifier");
+  test("tarifs et promos (type autre) -> À vérifier, jamais vers Pennylane", () => {
+    assert.equal(ctx.decider(analyse({ type: "autre", raisons: ["type de document incertain"] })).destination, "a_verifier");
   });
 });
 
@@ -52,8 +62,9 @@ describe("anti-doublon à l'échelle des deux établissements", () => {
   test("même empreinte", () => {
     assert.equal(ctx.trouverDoublon(index, analyse({ fournisseur: "Autre", numero: "9", montant: "1.00" }), "MD5X"), existante);
   });
-  test("même fournisseur + numéro, même si l'autre établissement", () => {
+  test("même fournisseur + numéro, même si l'autre établissement ou une ancienne graphie du nom", () => {
     assert.equal(ctx.trouverDoublon(index, analyse({ fournisseur: "cheville 35", etablissement: "Piccola Mia", numero: "00113789", montant: "1.00" }), "autre"), existante);
+    assert.equal(ctx.trouverDoublon(index, analyse({ fournisseur: "CHEVILLE35", numero: "00113789", montant: "1.00" }), "autre"), existante);
   });
   test("même fournisseur + date + montant sans numéro", () => {
     assert.equal(ctx.trouverDoublon(index, analyse({ fournisseur: "Cheville 35", numero: null, date: "2026-08-31", montant: "375.64" }), "autre"), existante);

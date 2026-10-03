@@ -1,10 +1,12 @@
 // ============================================================================
 // Traitement : passe horaire (extraireFactures), rattrapage (simulation puis réel),
-// alerte hebdomadaire, déclencheurs.
+// archivage des envois Pennylane, alerte hebdomadaire, déclencheurs.
 //
 // Pour chaque pièce jointe d'un message :
 //   texte (OCR) -> analyserDocument -> decider -> anti-doublon -> rangement -> journal
 // Un message n'est traité qu'une fois (onglet « Messages traités »), quel que soit le fil.
+// Une facture sûre est créée à plat dans « Envoi Pennylane/<Établissement> » ; après 3 jours,
+// archiverEnvoisPennylane la déplace dans <Établissement>/<Fournisseur>/<Année> (même identifiant Drive).
 // ============================================================================
 
 var DATE_RATTRAPAGE = "2026-07-01";
@@ -48,7 +50,8 @@ function traiterMessages(opts) {
   var traites = journalMessagesTraites();
   // En simulation on travaille sur une copie de l'index : les pièces « rangées » virtuellement ne doivent pas rester en mémoire
   var index = opts.simulation ? Object.assign({}, indexCharger()) : indexCharger();
-  var stats = { messages: 0, deja: 0, ignores: 0, pieces: 0, sync: 0, hors_pennylane: 0, a_verifier: 0, journal: 0, doublons: 0, corps: 0 };
+  var idxFournisseurs = fournisseursIndex();
+  var stats = { messages: 0, deja: 0, ignores: 0, pieces: 0, envoi: 0, hors_pennylane: 0, a_verifier: 0, journal: 0, doublons: 0, corps: 0, inconnus: 0 };
 
   var st = parcourirMessages(requeteGmail(opts.depuis), function(message, fil) {
     if (Date.now() - debut > CONFIG.limiteMs) return false;
@@ -58,7 +61,7 @@ function traiterMessages(opts) {
     if (!messageRecevable(message)) { stats.ignores++; return true; }
     stats.messages++;
     try {
-      traiterMessage(message, fil, opts, index, stats);
+      traiterMessage(message, fil, opts, index, idxFournisseurs, stats);
       if (!opts.simulation) journalMarquerTraite(id, "reel");
     } catch (e) {
       Logger.log("ERREUR message " + id + " (" + message.getSubject() + ") : " + e);
@@ -69,8 +72,9 @@ function traiterMessages(opts) {
   }, position);
 
   journalVider();
+  fournisseursVider();
   var resume = (opts.simulation ? "[SIMULATION] " : "") + "messages examinés : " + stats.messages + " (déjà traités : " + stats.deja + ", ignorés : " + stats.ignores + ") — pièces : " + stats.pieces
-    + " — rangées Pennylane : " + stats.sync + ", hors Pennylane : " + stats.hors_pennylane + ", à vérifier : " + stats.a_verifier + ", journal seul : " + stats.journal
+    + " — vers Pennylane : " + stats.envoi + ", hors Pennylane : " + stats.hors_pennylane + ", à vérifier : " + stats.a_verifier + " (dont fournisseurs inconnus : " + stats.inconnus + "), journal seul : " + stats.journal
     + ", doublons : " + stats.doublons + ", factures dans le corps du mail : " + stats.corps;
   if (st.arret) { props.setProperty(cle, String(st.position)); Logger.log(resume); Logger.log("PAS FINI — relancer la même fonction (reprise au fil n° " + st.position + ")"); }
   else { props.deleteProperty(cle); Logger.log(resume); Logger.log("TERMINÉ"); }
@@ -80,7 +84,7 @@ function traiterMessages(opts) {
 function lienMail(message) { return "https://mail.google.com/mail/u/0/#all/" + message.getId(); }
 
 /** Traite un message : chaque pièce jointe, ou le corps du mail s'il ressemble à une facture sans pièce jointe */
-function traiterMessage(message, fil, opts, index, stats) {
+function traiterMessage(message, fil, opts, index, idxFournisseurs, stats) {
   var pieces = piecesDuMessage(message);
   var base = { dateMail: dateIso(message.getDate()), expediteur: message.getFrom(), recuSur: adresseReception(message), objet: message.getSubject(),
                lienMail: lienMail(message), messageId: message.getId() };
@@ -97,11 +101,15 @@ function traiterMessage(message, fil, opts, index, stats) {
     stats.pieces++;
     var md5 = md5Blob(p);
     var texte = lireTexte(p, ext);
-    var a = analyserDocument({ texte: texte, from: message.getFrom(), subject: message.getSubject(), nomPiece: p.getName(), dateMail: base.dateMail,
+    var a = analyserDocument({ idx: idxFournisseurs, texte: texte, from: message.getFrom(), subject: message.getSubject(), nomPiece: p.getName(), dateMail: base.dateMail,
                                extension: "." + (ext === "jpeg" ? "jpg" : ext) });
-    var d = decider(a, message.getDate());
-    var ligne = Object.assign({}, base, { piece: p.getName(), type: a.type, etablissement: a.etablissement, fournisseur: a.fournisseur, numero: a.numero,
-      dateFacture: a.date, montant: a.montant, destination: d.destination, chemin: d.chemin.join("/"), raison: d.raison });
+    var d = decider(a);
+    var ligne = Object.assign({}, base, { piece: p.getName(), type: a.type, etablissement: a.etablissement, fournisseur: a.fournisseur || (a.fournisseurPropose ? a.fournisseurPropose + " ?" : ""),
+      numero: a.numero, dateFacture: a.date, montant: a.montant, destination: d.destination, chemin: d.chemin.join("/"), raison: d.raison });
+    if (a.sourceFournisseur === "inconnu" && a.type !== "autre") {
+      stats.inconnus++;
+      fournisseursProposer({ from: message.getFrom(), subject: message.getSubject(), texte: texte });
+    }
     var doublon = trouverDoublon(index, a, md5);
     if (doublon) {
       stats.doublons++;
@@ -112,10 +120,11 @@ function traiterMessage(message, fil, opts, index, stats) {
       stats.journal++;
     } else {
       stats[d.destination]++;
-      var infos = { md5: md5, etablissement: a.etablissement, fournisseur: a.fournisseur, numero: a.numero, date: a.date || a.dateSecours, montant: a.montant, nom: a.nom, fichierId: "" };
+      var infos = { md5: md5, etablissement: a.etablissement, fournisseur: a.fournisseur, numero: a.numero, date: a.date || a.dateSecours, montant: a.montant, nom: a.nom, fichierId: "",
+                    archive: d.archive.join("/") };
       if (opts.simulation) {
         indexInserer(index, infos);   // pour repérer les doublons à l'intérieur même de la simulation
-        ligne.chemin = d.chemin.join("/") + "/" + a.nom;
+        ligne.chemin = d.chemin.join("/") + "/" + a.nom + (d.destination === "envoi" ? "  -> archive " + d.archive.join("/") : "");
       } else {
         var description = d.destination === "a_verifier" ? "À vérifier : " + d.raison + " — mail : " + base.lienMail : "";
         var fichier = rangerPiece(p, a.nom, d.chemin, description, infos);
@@ -128,32 +137,76 @@ function traiterMessage(message, fil, opts, index, stats) {
   if (!opts.simulation) { try { fil.addLabel(etiquetteTraite()); } catch (e) { Logger.log("Libellé non posé : " + e); } }
 }
 
-/** Alerte hebdomadaire : fichiers de « _À vérifier » de plus de 3 jours -> mail récapitulatif à Paul */
-function alerteAVerifier() {
-  var anciens = fichiersAVerifierAnciens(CONFIG.alerteAgeJours);
-  if (!anciens.length) { Logger.log("Rien à signaler dans " + CONFIG.dossiers.aVerifier); return 0; }
-  var lignes = anciens.map(function(x) {
-    return "- " + x.chemin + "/" + x.fichier.getName() + " (" + Utilities.formatDate(x.fichier.getDateCreated(), "Europe/Paris", "dd/MM") + ")\n  "
-      + (x.fichier.getDescription() || "") + "\n  " + x.fichier.getUrl();
+/**
+ * Déplace vers l'archive <Établissement>/<Fournisseur>/<Année> les fichiers de « Envoi Pennylane » de plus de 3 jours
+ * (Pennylane les a importés ; le fichier garde son identifiant Drive). Le dossier d'archive vient de l'index, sinon du nom
+ * du fichier. Un fichier qui ne peut pas être archivé est laissé en place et signalé (journal, mail hebdomadaire).
+ */
+function archiverEnvoisPennylane() {
+  var idxF = fournisseursIndex(), st = { archives: 0, bloques: 0 };
+  fichiersEnvoiAnciens(CONFIG.archiveApresJours).forEach(function(x) {
+    var f = x.fichier, e = indexParId(f.getId()), chemin = null, raison = "";
+    if (e && e.archive) chemin = e.archive.split("/");
+    else {
+      var n = analyserNomFichier(f.getName());
+      var fournisseur = n && n.fournisseur ? nomCanonique(idxF, n.fournisseur) : null;
+      if (n && fournisseur) chemin = [x.etablissement, fournisseur, n.date.slice(0, 4)];
+      else raison = n ? "fournisseur « " + n.fournisseur + " » absent de la liste de référence" : "nom de fichier non reconnu";
+    }
+    if (chemin) {
+      deplacerFichier(f, chemin);
+      st.archives++;
+      journalAjouter({ piece: f.getName(), destination: "archive", chemin: chemin.join("/") + "/" + f.getName(), lienFichier: f.getUrl(), raison: "déplacé depuis " + x.chemin }, false);
+    } else {
+      st.bloques++;
+      journalAjouter({ piece: f.getName(), destination: "envoi_bloque", chemin: x.chemin + "/" + f.getName(), lienFichier: f.getUrl(), raison: raison }, false);
+    }
   });
-  MailApp.sendEmail({
-    to: CONFIG.alerteDestinataire,
-    subject: "Factures à vérifier : " + anciens.length + " document(s) en attente depuis plus de " + CONFIG.alerteAgeJours + " jours",
-    body: "Bonjour Paul,\n\nCes documents sont dans « Factures iFratelli/" + CONFIG.dossiers.aVerifier + " » et n'ont pas été classés :\n\n" + lignes.join("\n\n")
-      + "\n\nPour chacun : le déplacer à la main dans le bon dossier (Bello Mio ou Piccola Mia, fournisseur, mois) s'il s'agit d'une vraie facture, sinon le laisser ou le mettre à la corbeille.\n"
-  });
-  Logger.log("Alerte envoyée : " + anciens.length + " fichier(s)");
-  return anciens.length;
+  journalVider();
+  Logger.log("Archivés : " + st.archives + ", restés dans Envoi Pennylane faute de dossier d'archive : " + st.bloques);
+  return st;
 }
 
-/** Déclencheurs : extraireFactures toutes les heures, alerteAVerifier le lundi matin. À lancer une fois après `clasp push`. */
+/**
+ * Alerte hebdomadaire (lundi 8 h) : fichiers de « À vérifier » de plus de 3 jours et fichiers restés plus de 7 jours
+ * dans « Envoi Pennylane » -> mail récapitulatif à Paul. Rien à signaler : pas de mail.
+ */
+function alerteHebdo() {
+  var aVerifier = fichiersAVerifierAnciens(CONFIG.alerteAgeJours);
+  var envois = fichiersEnvoiAnciens(CONFIG.envoiAlerteJours);
+  if (!aVerifier.length && !envois.length) { Logger.log("Rien à signaler"); return 0; }
+  var decrire = function(x) {
+    return "- " + x.chemin + "/" + x.fichier.getName() + " (" + Utilities.formatDate(x.fichier.getDateCreated(), "Europe/Paris", "dd/MM") + ")\n  "
+      + (x.fichier.getDescription() || "") + "\n  " + x.fichier.getUrl();
+  };
+  var corps = "Bonjour Paul,\n\n";
+  if (aVerifier.length) {
+    corps += aVerifier.length + " document(s) attendent dans « Factures iFratelli/" + CONFIG.dossiers.aVerifier + " » depuis plus de " + CONFIG.alerteAgeJours + " jours :\n\n" + aVerifier.map(decrire).join("\n\n")
+      + "\n\nPour chacun : s'il s'agit d'une vraie facture, la déplacer dans « Envoi Pennylane/<Établissement> » (elle sera archivée automatiquement), sinon la laisser ou la mettre à la corbeille. "
+      + "Si le fournisseur manque, compléter sa ligne dans « " + CONFIG.fournisseursNom + " ».\n\n";
+  }
+  if (envois.length) {
+    corps += envois.length + " fichier(s) sont restés plus de " + CONFIG.envoiAlerteJours + " jours dans « Envoi Pennylane » sans pouvoir être archivés :\n\n" + envois.map(decrire).join("\n\n") + "\n\n";
+    envois.forEach(function(x) { journalAjouter({ piece: x.fichier.getName(), destination: "envoi_bloque", chemin: x.chemin + "/" + x.fichier.getName(), lienFichier: x.fichier.getUrl(), raison: "plus de " + CONFIG.envoiAlerteJours + " jours dans Envoi Pennylane" }, false); });
+    journalVider();
+  }
+  MailApp.sendEmail({ to: CONFIG.alerteDestinataire, subject: "Factures : " + (aVerifier.length + envois.length) + " document(s) à regarder", body: corps });
+  Logger.log("Alerte envoyée : " + aVerifier.length + " à vérifier, " + envois.length + " bloqués dans Envoi Pennylane");
+  return aVerifier.length + envois.length;
+}
+
+/** Ancien nom, conservé pour le déclencheur existant */
+function alerteAVerifier() { return alerteHebdo(); }
+
+/** Déclencheurs : extraireFactures toutes les heures, archiverEnvoisPennylane chaque nuit, alerteHebdo le lundi matin. À lancer une fois après `clasp push`. */
 function installerDeclencheurs() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (["extraireFactures", "alerteAVerifier"].indexOf(t.getHandlerFunction()) !== -1) ScriptApp.deleteTrigger(t);
+    if (["extraireFactures", "alerteAVerifier", "alerteHebdo", "archiverEnvoisPennylane"].indexOf(t.getHandlerFunction()) !== -1) ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger("extraireFactures").timeBased().everyHours(1).create();
-  ScriptApp.newTrigger("alerteAVerifier").timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).create();
-  Logger.log("Déclencheurs installés : extraireFactures (toutes les heures), alerteAVerifier (lundi 8 h)");
+  ScriptApp.newTrigger("archiverEnvoisPennylane").timeBased().everyDays(1).atHour(5).create();
+  ScriptApp.newTrigger("alerteHebdo").timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).create();
+  Logger.log("Déclencheurs installés : extraireFactures (toutes les heures), archiverEnvoisPennylane (chaque nuit à 5 h), alerteHebdo (lundi 8 h)");
 }
 
 /** Oublie la position de reprise d'un rattrapage (pour recommencer une simulation de zéro) */

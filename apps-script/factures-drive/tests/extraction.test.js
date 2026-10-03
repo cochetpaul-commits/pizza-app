@@ -7,19 +7,22 @@ const ctx = chargerContexte();
 const cas = lireFixtures();
 // Les objets viennent d'un autre contexte VM : on les aplatit avant deepEqual (prototypes différents)
 const plain = (x) => JSON.parse(JSON.stringify(x));
+const idx = ctx.indexerFournisseurs(ctx.listeFournisseursParDefaut());
+const fournisseur = (from, subject, texte) => ctx.extraireFournisseur(idx, from, subject, texte);
 
 describe("analyserDocument + decider sur le jeu de factures", () => {
   for (const c of cas) {
     test(c.nom + (c.synthetique ? " (texte synthétique)" : ""), () => {
-      const a = ctx.analyserDocument({ texte: c.texte, from: c.mail.from, subject: c.mail.subject, nomPiece: c.mail.nomPiece, dateMail: c.mail.dateMail, extension: ".pdf" });
-      const d = ctx.decider(a, new Date(c.mail.dateMail + "T12:00:00"));
+      const a = ctx.analyserDocument({ idx, texte: c.texte, from: c.mail.from, subject: c.mail.subject, nomPiece: c.mail.nomPiece, dateMail: c.mail.dateMail, extension: ".pdf" });
+      const d = ctx.decider(a);
       const att = c.attendu;
       for (const champ of ["type", "etablissement", "fournisseur", "numero", "date", "montant", "nom"]) {
         if (champ in att) assert.equal(a[champ], att[champ], champ + " : " + JSON.stringify(a, null, 1));
       }
       assert.equal(d.destination, att.destination, "destination (" + d.raison + ") : " + JSON.stringify(a));
       assert.deepEqual(plain(d.chemin), att.chemin, "chemin");
-      if (att.destination === "sync") assert.deepEqual(plain(a.raisons), [], "aucune raison de douter : " + a.raisons.join(", "));
+      assert.deepEqual(plain(d.archive), att.archive, "archive");
+      if (att.destination === "envoi") assert.deepEqual(plain(a.raisons), [], "aucune raison de douter : " + a.raisons.join(", "));
     });
   }
 });
@@ -65,17 +68,53 @@ describe("établissement", () => {
   test("rien", () => assert.equal(ctx.detecterEtablissement("Facture n° 1"), null));
 });
 
-describe("fournisseur", () => {
-  test("table par expéditeur", () => assert.equal(ctx.extraireFournisseur("x@carniato.com", "", "").nom, "Carniato"));
-  test("table par objet (VIF -> Cheville 35)", () => assert.equal(ctx.extraireFournisseur("noreply@vif.fr", "Facture CHEVILLE 35", "").nom, "Cheville 35"));
-  test("Tom Martin reste Cheville 35 (mais ses mails ne sont pas des factures : type autre)", () => {
-    assert.equal(ctx.extraireFournisseur("tom.martin@maison-hardy.fr", "Maison Hardy : Tarif 40", "").nom, "Cheville 35");
+describe("fournisseur : liste de référence seulement", () => {
+  test("par domaine de l'expéditeur", () => assert.equal(fournisseur("x@carniato.com", "", "").nom, "Carniato"));
+  test("sous-domaine ramené au domaine", () => assert.equal(fournisseur("noreply@mail.zenchef.com", "", "").nom, "Zenchef"));
+  test("VIF -> Cheville 35 par le domaine vif.fr", () => assert.equal(fournisseur("noreply@vif.fr", "Facture CHEVILLE 35", "").nom, "Cheville 35"));
+  test("Tom Martin reste Cheville 35 (ses tarifs sont de type autre, jamais rangés)", () => {
+    assert.equal(fournisseur("tom.martin@maison-hardy.fr", "Maison Hardy : Tarif 40", "").nom, "Cheville 35");
     assert.equal(ctx.detecterTypeDocument("Tarif semaine 40 et promotions en cours", null), "autre");
   });
-  test("TVA sur le document", () => assert.equal(ctx.extraireFournisseur("inconnu@gmail.com", "", "SAS MAEL N.I.I. : FR36828779454").nom, "Maeldistribution"));
-  test("notre TVA n'identifie pas un fournisseur", () => assert.equal(ctx.extraireFournisseur("inconnu@societe-x.fr", "", "FR78913217386").nom, "Societe-x"));
-  test("domaine générique sauté", () => assert.equal(ctx.fournisseurParDomaine("facture@mail.sumup.com"), "Sumup"));
-  test("transfert interne non reconnu", () => assert.equal(ctx.extraireFournisseur("pierre.cochet@gmail.com", "Fwd: truc", "").nom, "Transfert Pierre"));
+  test("identifiant lu sur le document avant tout", () => {
+    assert.equal(fournisseur("inconnu@gmail.com", "", "SAS MAEL N.I.I. : FR36828779454").nom, "Maël Distribution");
+    assert.equal(fournisseur("inconnu@gmail.com", "", "SIRET: 829 192 319 00020").nom, "Cheville 35");
+  });
+  test("notre TVA n'identifie pas un fournisseur ; domaine inconnu -> null, nom proposé", () => {
+    const r = fournisseur("inconnu@societe-x.fr", "", "FR78913217386");
+    assert.equal(r.nom, null);
+    assert.equal(r.source, "inconnu");
+    assert.equal(r.propose, "Societe-x");
+  });
+  test("le domaine n'invente jamais un nom", () => assert.equal(fournisseur("facture@mail.sumup.com", "Reçu", "").nom, null));
+  test("transfert interne : nom ou variante dans l'objet", () => {
+    assert.equal(fournisseur("pierre.cochet@gmail.com", "Fwd: facture Leroy Merlin", "").nom, "Leroy Merlin");
+    assert.equal(fournisseur("Paul <cochetpaul@bellomio.fr>", "Fwd: Maeldistribution", "").nom, "Maël Distribution");
+    assert.equal(fournisseur("pierre.cochet@gmail.com", "Fwd: truc", "").nom, null);
+  });
+  test("une entrée inactive n'est pas retenue", () => {
+    const liste = ctx.listeFournisseursParDefaut();
+    liste.find((f) => f.nom === "Carniato").actif = "non";
+    assert.equal(ctx.extraireFournisseur(ctx.indexerFournisseurs(liste), "x@carniato.com", "", "").nom, null);
+  });
+  test("nom canonique d'un ancien dossier", () => {
+    assert.equal(ctx.nomCanonique(idx, "Maeldistribution"), "Maël Distribution");
+    assert.equal(ctx.nomCanonique(idx, "Hyg-up"), "Hyg'Up");
+    assert.equal(ctx.nomCanonique(idx, "Metro-gsc"), "Metro");
+    assert.equal(ctx.nomCanonique(idx, "Sc-m2"), "SC M2");
+    assert.equal(ctx.nomCanonique(idx, "Dossier inconnu"), null);
+  });
+  test("ligne « à compléter » pour un inconnu", () => {
+    const l = ctx.ligneACompleter({ from: "compta@castorama.fr", subject: "Ticket", texte: "TVA FR12345678901" });
+    assert.equal(l.nom, "Castorama");
+    assert.deepEqual(plain(l.domaines), ["castorama.fr"]);
+    assert.deepEqual(plain(l.identifiants), ["FR12345678901"]);
+    assert.equal(l.actif, "à compléter");
+  });
+  test("aller-retour ligne de Sheet", () => {
+    const e = ctx.entreeDepuisLigne(["Maël Distribution", "Maeldistribution; Mael", "maeldistribution.fr", "FR36828779454", "Les deux", "", "", "oui", ""]);
+    assert.deepEqual(plain(ctx.ligneDepuisEntree(e)), ["Maël Distribution", "Maeldistribution; Mael", "maeldistribution.fr", "FR36828779454", "Les deux", "", "", "oui", ""]);
+  });
 });
 
 describe("type de document", () => {
