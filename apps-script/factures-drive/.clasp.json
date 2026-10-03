@@ -1,0 +1,16 @@
+{
+  "scriptId": "1I9lQ1onLAkeo9jRwNq1Y4G-4MpbIxvMPHyVRi3sYtqw4_Wp32-X3nNLP",
+  "rootDir": "src",
+  "filePushOrder": [
+    "src/00_config.js",
+    "src/10_extraction.js",
+    "src/20_journal.js",
+    "src/30_gmail.js",
+    "src/40_ocr.js",
+    "src/50_rangement.js",
+    "src/60_traitement.js",
+    "src/70_outils.js",
+    "src/90_legacy.js",
+    "src/CouleursBelloMio.js"
+  ]
+}

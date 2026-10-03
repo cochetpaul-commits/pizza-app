@@ -21,6 +21,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Projet Apps Script (clasp) : code ES5 pour le moteur V8 de Google, testé avec node:test
+    "apps-script/**",
   ]),
 ]);
 

@@ -1,0 +1,65 @@
+Facture - FC0126
+
+Pensez à l'environnement ! N'imprimez cet email que si c'est nécessaire.
+
+Facture N° FC0126
+
+Date
+
+Client
+
+Page
+
+SAS MAEL 2 rue de la gare
+
+02/10/2026 177
+
+1/1
+
+35540 Miniac-Morvan Tél. : 0223172669
+
+SARL SASHA N.I.I. : FR36828779454 S.I.R.E.T. : 82877945400036
+
+3 place du Poncel
+
+R.C.S. : Saint-Malo N.A.F. : 4639B
+
+35400 Saint-Malo
+
+IBAN : FR7613606000344632077800043 BIC : AGRIFRPP836 N° TVA intracom :
+
+FR78913217386 Mode de règlement
+
+Echéance Prélèvement 02/10/2026 Réf DLC/DLUO + Désignation Quantité Unité P/HT Mt Tot HT TVA
+
+Erreur preparation - Livré en ail pelé Reprise du 30/09/26 ART2044 Pulpe d’ail 1 kg -1,000 U 4,75 -4,75 2
+
+Pénalités de retard (taux annuel) : 10,00% - Escompte pour paiement anticipé (taux mensuel) : %
+
+Indemnité forfaitaire pour frais de recouvrement en cas de retard de paiement : 40,00 €
+
+Bases HT
+
+Remise MT TVA
+
+% TVA
+
+Port Totaux
+
+Total TTC
+
+Acompte Net à payer 2
+
+-4,66 Tx:2,00 -0,26
+
+5,50 H.T. :
+
+-4,66 -0,09
+
+T.V.A. :
+
+-0,26
+
+-4,92
+
+-4,92

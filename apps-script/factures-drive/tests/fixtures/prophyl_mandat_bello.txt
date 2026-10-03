@@ -1,0 +1,27 @@
+PROPHYL SAS
+ZA de la Croix Rouge 35120 DOL-DE-BRETAGNE
+SIRET 451 251 128 00031 TVA FR48451251128
+
+MANDAT DE PRÉLÈVEMENT SEPA
+
+Référence Unique du Mandat (RUM) : PRO-2026-BM-0417
+Identifiant créancier SEPA (ICS) : FR12ZZZ482511
+
+En signant ce formulaire de mandat, vous autorisez PROPHYL à envoyer des instructions à votre banque pour débiter votre compte, et votre banque à débiter votre compte conformément aux instructions de PROPHYL.
+
+Type de paiement : paiement récurrent / répétitif
+
+Débiteur
+Nom : SARL SASHA - RESTAURANT BELLO MIO
+Adresse : 3 place du Poncel 35400 SAINT-MALO
+IBAN : FR76 1444 5202 0008 0045 6589 497
+BIC : CEPAFRPP444
+
+Créancier
+PROPHYL SAS - ZA de la Croix Rouge - 35120 DOL-DE-BRETAGNE - France
+
+Fait à Saint-Malo, le 15/09/2026
+Signature :
+
+Vos droits concernant le présent mandat sont expliqués dans un document que vous pouvez obtenir auprès de votre banque.
+Le montant mensuel indicatif du contrat de lutte contre les nuisibles est de 68,00 € HT soit 81,60 € TTC.

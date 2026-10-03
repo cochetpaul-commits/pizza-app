@@ -1,0 +1,67 @@
+FACTURER A
+
+RESTAURANT BELLO MIO 3 Place du Poncel SARL SASHA 35400 SAINT MALO France
+
+RESTAURANT BELLO MIO 3 Place du Poncel SARL SASHA 35400 SAINT MALO France
+
+B.L. 00108800 Commande 00123769 Client 2BELLO01 - BELLO MIO Tournée SAINT MALO Livré le 25/08/2026 Article DESIGNATION Vendeur TOM MARTIN
+
+T NOMBRE QUANTITE Lot P.U. H.T. P.U. Net TVA Montant (EUR)
+
+20111 COTES DE VEAU 24 P 7,820 Kg 262320396 25,5000 /Kg 25,9054 /Kg TR 199,41
+
+20162 ROND GITE DE VEAU 4 P 3,984 Kg 262360094 19,9500 /Kg 20,3564 /Kg TR 79,48
+
+TOTAL MARCHANDISES DU B.L. 00108800 : 28 P 11,804 Kg 278,89
+
+B.L. 00108978 Commande 00124002 Client 2BELLO01 - BELLO MIO Tournée SAINT MALO Livré le 27/08/2026 Article DESIGNATION Vendeur TOM MARTIN
+
+T NOMBRE QUANTITE Lot P.U. H.T. P.U. Net TVA Montant (EUR)
+
+10421 DESSUS DE PALETTE VIANDE
+
+PIECE 15 P 3,210 Kg 262360364 22,1000 /Kg 22,5483 /Kg TR 70,94
+
+TOTAL MARCHANDISES DU B.L. 00108978 : 15 P 3,210 Kg 70,94
+
+Contribution énergétique Trait. des déchets et env. Interbev veaux sans os FR Interbev boeuf sans os VBF 0,1800 /Kg TR 2,71 0,1500 /Kg TR 2,25 0,0749 /Kg TR 0,89 0,1197 /Kg TR 0,38
+
+TOTAL MARCHANDISES DE LA FACTURE : 43 P 15,014 Kg 356,06
+
+TOTAL HORS TAXES : 356,06
+
+Conditionnements expédiés
+
+2 CARTON 15,014 Kg
+
+BNP : 300040248300011109659 86 IBAN : FR76 3000402483000111 0965 986 BIC : BNPAFRPPXXX L'entreprise CHEVILLE 35 est certifiée FR-BIO-16 pour les articles BIO et est homologuée n°LA 16/93 (Boeuf), LA 22/89 (veau).
+
+T : Type de ligne - G : Gratuit, M : Manquant total, P : Manquant partiel, R : Retour, C : Complément, A : Avoir de prix, E : Echantillon
+
+ECHEANCE Date de Base 10/09/2026 31/08/2026 Traite non soumise à acceptati 10 jours
+
+31/08/2026 2BELLO01 00113789
+
+CH-01 375,64 EUR
+
+SAS CHEVILLE 35 Zone Actipôle - 6 Rue du Grand Rhinolophe 35 540 MINIAC MORVAN Tél : 02 99 21 91 10 SIRET: 829 192 319 00020 SIREN : 829 192 319 TVA FR 388 291 923 19 APE: 1011Z N° agrément 35 179 002 CE SAS au capital de 100 000 €
+
+Commandé par Réf. Cli. Livré à Facturé à
+
+2BELLO01 2BELLO01 2BELLO01 VOS REFERENCES
+
+LIVRER A
+
+Papillon à joindre au règlement |||||
+
+Facture 00113789
+
+TAUX 1/1 Livré par Facturé par N° document Date de facturation 3760300770016 3760300770016 00113789 31/08/2026
+
+NOS REFERENCES
+
+BASE T.V.A. MT T.V.A. 5,5 % TR 356,06 19,58
+
+TOTAL H.T. TOTAL TAXES TOTAL T.T.C.
+
+356,06 19,58 375,64 EUR

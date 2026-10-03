@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import path from 'path';
 
 export default defineConfig({
@@ -9,5 +9,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    // Le projet Apps Script a ses propres tests (node:test) : voir apps-script/factures-drive
+    exclude: [...configDefaults.exclude, 'apps-script/**'],
   },
 });
