@@ -1,24 +1,41 @@
 // ============================================================================
 // Lecture du texte d'une pièce : OCR Google Drive (PDF et images) ou XML brut.
+// Quota Drive (« User rate limit exceeded ») : trois nouveaux essais (2 s, 5 s, 15 s),
+// puis une ErreurOcrQuota est levée : le message n'est PAS marqué traité et sera repris.
 // ============================================================================
 
-/** Texte d'un blob PDF / image via l'OCR de Google Drive (document temporaire mis à la corbeille) ; null si échec */
+function ErreurOcrQuota(message) { this.name = "ErreurOcrQuota"; this.message = message; }
+ErreurOcrQuota.prototype = Object.create(Error.prototype);
+
+function estErreurDeQuota(e) {
+  return /rate\s*limit|quota|too\s*many\s*requests|backend\s*error|limit\s*exceeded/i.test(String(e && e.message || e));
+}
+
+/** Texte d'un blob PDF / image via l'OCR de Google Drive (document temporaire mis à la corbeille) ; null si le document est illisible */
 function lireTexteOcr(blob) {
-  var tmpId = null;
-  try {
-    var doc = Drive.Files.create(
-      { name: "tmp_ocr_facture", mimeType: "application/vnd.google-apps.document" },
-      blob,
-      { ocrLanguage: "fr" }
-    );
-    tmpId = doc.id;
-    return DocumentApp.openById(tmpId).getBody().getText();
-  } catch (e) {
-    Logger.log("Lecture OCR impossible : " + e);
-    return null;
-  } finally {
-    if (tmpId) { try { DriveApp.getFileById(tmpId).setTrashed(true); } catch (e2) {} }
+  var attentes = CONFIG.ocrAttentesMs, essai = 0, derniere = null;
+  while (true) {
+    var tmpId = null;
+    try {
+      var doc = Drive.Files.create(
+        { name: "tmp_ocr_facture", mimeType: "application/vnd.google-apps.document" },
+        blob,
+        { ocrLanguage: "fr" }
+      );
+      tmpId = doc.id;
+      return DocumentApp.openById(tmpId).getBody().getText();
+    } catch (e) {
+      derniere = e;
+      if (!estErreurDeQuota(e)) { Logger.log("Lecture OCR impossible : " + e); return null; }
+      if (essai >= attentes.length) break;
+      Logger.log("Quota OCR atteint, nouvel essai dans " + attentes[essai] / 1000 + " s (" + e + ")");
+      Utilities.sleep(attentes[essai]);
+      essai++;
+    } finally {
+      if (tmpId) { try { DriveApp.getFileById(tmpId).setTrashed(true); } catch (e2) {} }
+    }
   }
+  throw new ErreurOcrQuota("Quota OCR Drive dépassé après " + attentes.length + " nouveaux essais : " + derniere);
 }
 
 /** Texte d'une pièce selon son extension (pdf, image -> OCR ; xml -> texte brut) */

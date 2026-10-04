@@ -72,9 +72,11 @@ describe("fournisseur : liste de référence seulement", () => {
   test("par domaine de l'expéditeur", () => assert.equal(fournisseur("x@carniato.com", "", "").nom, "Carniato"));
   test("sous-domaine ramené au domaine", () => assert.equal(fournisseur("noreply@mail.zenchef.com", "", "").nom, "Zenchef"));
   test("VIF -> Cheville 35 par le domaine vif.fr", () => assert.equal(fournisseur("noreply@vif.fr", "Facture CHEVILLE 35", "").nom, "Cheville 35"));
-  test("Tom Martin reste Cheville 35 (ses tarifs sont de type autre, jamais rangés)", () => {
+  test("Tom Martin reste Cheville 35 (ses tarifs sont de type catalogue, journal seul)", () => {
     assert.equal(fournisseur("tom.martin@maison-hardy.fr", "Maison Hardy : Tarif 40", "").nom, "Cheville 35");
-    assert.equal(ctx.detecterTypeDocument("Tarif semaine 40 et promotions en cours", null), "autre");
+    assert.equal(ctx.detecterTypeDocument("Tarif semaine 40 et promotions en cours", null), "catalogue");
+    assert.equal(ctx.estCatalogueParObjet("Maison Hardy : Tarif 40 et promotions", "Tarif S40.pdf"), true);
+    assert.equal(ctx.estCatalogueParObjet("Votre facture et nos offres", "facture.pdf"), false);
   });
   test("identifiant lu sur le document avant tout", () => {
     assert.equal(fournisseur("inconnu@gmail.com", "", "SAS MAEL N.I.I. : FR36828779454").nom, "Maël Distribution");

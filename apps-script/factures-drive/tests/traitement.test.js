@@ -57,10 +57,11 @@ describe("passe réelle sur une boîte mêlant les cas du brief", () => {
   test("le relevé Piccola reçu sur l'adresse Bello va dans _Hors Pennylane / Piccola Mia / Carniato / 2026", () => {
     assert.ok(arbre.includes("/_Hors Pennylane/Piccola Mia/Carniato/2026/2026-10-01 — Carniato — Relevé n° 14054661 — 138.80 EUR.pdf"), arbre.join("\n"));
   });
-  test("tarifs Maison Hardy, OCR raté et fournisseur inconnu vont dans À vérifier, jamais vers Pennylane", () => {
+  test("OCR raté et fournisseur inconnu vont dans À vérifier, jamais vers Pennylane ; les tarifs Maison Hardy restent au journal", () => {
     const aVerifier = arbre.filter((x) => x.startsWith("/À vérifier/"));
-    assert.equal(aVerifier.length, 3, arbre.join("\n"));
-    assert.ok(aVerifier.some((x) => x.includes("Cheville 35 — Facture")), "tarif Hardy, fournisseur Cheville 35 par le domaine");
+    assert.equal(aVerifier.length, 2, arbre.join("\n"));
+    assert.ok(!arbre.some((x) => x.includes("Tarif")), "tarif Hardy : catalogue, rien de rangé");
+    assert.ok(env.feuille("Journal").some((l) => l[6] === "catalogue" && l[12] === "journal" && /Tarif/.test(l[5])), "catalogue au journal");
     assert.ok(aVerifier.some((x) => x.includes("Hyg'Up — Facture.pdf")), "OCR raté");
     assert.ok(aVerifier.some((x) => x.includes("Fournisseur inconnu — Facture — 38.79 EUR.pdf")), "Castorama absent de la liste");
     assert.equal(arbre.filter((x) => x.startsWith("/Envoi Pennylane/") && (x.includes("Tarif") || x.includes("Hyg'Up") || x.includes("inconnu"))).length, 0);
@@ -76,13 +77,13 @@ describe("passe réelle sur une boîte mêlant les cas du brief", () => {
   test("devis et mail interne : rien n'est rangé", () => {
     assert.equal(arbre.filter((x) => x.includes("Thermifroid") || x.includes("facture-client")).length, 0);
     assert.equal(stats.ignores, 1, "mail parti de contact@ sans être un transfert");
-    assert.equal(stats.journal, 1, "devis au journal seulement");
+    assert.equal(stats.journal, 2, "devis et catalogue au journal seulement");
   });
   test("journal : une ligne par pièce, doublons et corps de mail tracés", () => {
     const lignes = env.feuille("Journal");
     const colDestination = 12, colRaison = 14, colPiece = 5;
     assert.equal(lignes.filter((l) => l[colDestination] === "doublon").length, 2, "FC0140 deux fois en doublon");
-    assert.ok(lignes.some((l) => l[colPiece] === "(corps du mail)" && l[colDestination] === "a_verifier"), "facture Zenchef dans le corps");
+    assert.ok(lignes.some((l) => l[colPiece] === "(corps du mail)" && l[colDestination] === "corps_mail"), "facture Zenchef dans le corps, hors À vérifier");
     assert.ok(lignes.some((l) => l[colDestination] === "a_verifier" && /texte illisible/.test(l[colRaison])));
     assert.ok(lignes.some((l) => l[colDestination] === "a_verifier" && /fournisseur inconnu \(Castorama \?\)/.test(l[colRaison])));
     assert.ok(lignes.some((l) => l[colDestination] === "journal" && l[6] === "devis"));
@@ -155,7 +156,7 @@ describe("rattrapage en simulation puis en réel", () => {
   test("le réel qui suit range tout, et une pièce déjà rangée n'est pas réécrite", () => {
     const reel = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "reel" });
     assert.equal(reel.envoi, 5);
-    assert.equal(env.arbre().length, 5 + 1 + 3, "5 factures, 1 relevé, 3 à vérifier");
+    assert.equal(env.arbre().length, 5 + 1 + 2, "5 factures, 1 relevé, 2 à vérifier (les tarifs Hardy restent au journal)");
     assert.equal(env.fournisseurs().length, 1, "pas de seconde ligne Castorama");
   });
 });
@@ -179,13 +180,18 @@ describe("limite de temps et reprise", () => {
 describe("alerte hebdomadaire", () => {
   const env = boite();
   env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "al" });
-  test("rien de plus de 3 jours : pas de mail ; vieux fichiers : un mail récapitulatif à Paul", () => {
+  test("rien de plus de 3 jours : seule la section des factures reçues dans le corps d'un mail ; vieux fichiers : récapitulatif à Paul", () => {
     assert.equal(env.ctx.alerteHebdo(), 0);
-    assert.equal(env.mails.length, 0);
+    assert.equal(env.mails.length, 1, "le mail Zenchef sans pièce jointe est signalé dans sa propre section");
+    assert.match(env.mails[0].body, /corps d'un mail/);
+    assert.match(env.mails[0].body, /Votre facture Zenchef/);
+    assert.doesNotMatch(env.mails[0].body, /À vérifier » depuis/);
+    env.mails.length = 0;
     const racine = env.racine.getFoldersByName("Factures iFratelli").next();
     const av = racine.getFoldersByName("À vérifier").next();
     av.getFiles().next()._cree = new Date(Date.now() - 5 * 86400000);
     assert.equal(env.ctx.alerteHebdo(), 1);
+    assert.equal(env.mails.length, 1);
     assert.equal(env.mails[0].to, "cochetpaul@bellomio.fr");
     assert.match(env.mails[0].body, /À vérifier/);
     assert.match(env.mails[0].body, /Fournisseurs iFratelli/);
@@ -318,5 +324,74 @@ describe("génération de la liste de référence", () => {
     // relancer ne double rien
     env.ctx.genererListeFournisseurs();
     assert.equal(env.fournisseurs().length, lignes.length);
+  });
+});
+
+describe("v4.2 : quota OCR, transit du rattrapage, établissement par défaut, images de signature", () => {
+  test("quota OCR : nouvel essai après attente, puis exception : message non marqué traité, passe arrêtée et reprise", () => {
+    const env = creerEnvironnement();
+    env.fil([{ date: "2026-10-02T09:00:00", from: "comptabilite@maeldistribution.fr", to: "facture@piccolamia.fr", subject: "Facture FC0140", pieces: [{ nom: "FC0140.pdf", contenu: env.fixture("mael_facture_piccola") }] }]);
+    env.pannes.ocr = 2;   // deux refus puis succès
+    const s1 = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "q" });
+    assert.equal(s1.envoi, 1);
+    assert.deepEqual(plain(env.pannes.pauses), [2000, 5000], "attentes progressives");
+    assert.equal(env.feuille("Messages traités").length, 1);
+    env.fil([{ date: "2026-10-02T10:00:00", from: "noreply@carniato.com", to: "facture@bellomio.fr", subject: "Facture", pieces: [{ nom: "201018858.pdf", contenu: env.fixture("carniato_facture_bello") }] }]);
+    env.pannes.ocr = 99;  // quota durable
+    const s2 = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "q" });
+    assert.equal(s2.quota, 1);
+    assert.equal(s2.envoi, 0);
+    assert.equal(env.feuille("Messages traités").length, 1, "le message Carniato n'est pas marqué traité");
+    assert.ok(env.journalLog.some((l) => /ARRÊT SUR QUOTA OCR/.test(l)));
+    assert.ok(Object.keys(env.props).some((k) => k.startsWith("reprise.q.")), "position de reprise mémorisée");
+    env.pannes.ocr = 0;
+    const s3 = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "q" });
+    assert.equal(s3.envoi, 1, "repris au passage suivant");
+    assert.ok(env.arbre().some((x) => x.includes("Carniato — Facture n° 201018858")));
+  });
+  test("rattrapageReel écrit dans « Rattrapage à valider », jamais dans Envoi Pennylane, avec une pause entre deux OCR", () => {
+    const env = creerEnvironnement();
+    env.fil([{ date: "2026-10-02T09:00:00", from: "comptabilite@maeldistribution.fr", to: "facture@piccolamia.fr", subject: "Facture FC0140", pieces: [{ nom: "FC0140.pdf", contenu: env.fixture("mael_facture_piccola") }] }]);
+    env.fil([{ date: "2026-10-01T09:00:00", from: "noreply@carniato.com", to: "facture@bellomio.fr", subject: "Relevé", pieces: [{ nom: "14054490.pdf", contenu: env.fixture("carniato_releve_bello") }] }]);
+    const sim = env.ctx.rattrapage("2026-07-01");
+    assert.equal(sim.transit, 1);
+    assert.ok(env.feuille("Simulation").some((l) => l[12] === "transit" && /^Rattrapage à valider\/Piccola Mia\//.test(l[13]) && /-> archive Piccola Mia\/Maël Distribution\/2026/.test(l[13])));
+    const reel = env.ctx.rattrapageReel("2026-07-01");
+    assert.equal(reel.transit, 1);
+    assert.equal(reel.envoi, 0);
+    const arbre = env.arbre();
+    assert.ok(arbre.includes("/Rattrapage à valider/Piccola Mia/2026-10-02 — Maël Distribution — Facture n° FC0140 — 906.39 EUR.pdf"), arbre.join("\n"));
+    assert.ok(!arbre.some((x) => x.startsWith("/Envoi Pennylane/")));
+    assert.ok(arbre.includes("/_Hors Pennylane/Bello Mio/Carniato/2026/2026-10-01 — Carniato — Relevé n° 14054490 — 790.04 EUR.pdf"), "les relevés vont directement hors Pennylane");
+    assert.ok(env.pannes.pauses.filter((ms) => ms === 1000).length >= 2, "pause d'une seconde avant chaque OCR");
+    assert.ok(env.feuille("Index").some((l) => /^Rattrapage à valider/.test(l[8]) && l[10] === "Piccola Mia/Maël Distribution/2026"), "l'archive prévue est connue : après validation et déplacement vers Envoi Pennylane, l'archivage suit");
+    // la passe horaire, elle, va toujours directement dans Envoi Pennylane
+    env.fil([{ date: "2026-10-02T10:00:00", from: "noreply@carniato.com", to: "facture@bellomio.fr", subject: "Facture", pieces: [{ nom: "201018858.pdf", contenu: env.fixture("carniato_facture_bello") }] }]);
+    env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "h" });
+    assert.ok(env.arbre().includes("/Envoi Pennylane/Bello Mio/2026-09-29 — Carniato — Facture n° 201018858 — 347.59 EUR.pdf"));
+  });
+  test("établissement absent de la facture : colonne « Établissement par défaut » du Sheet (source : liste)", () => {
+    const env = creerEnvironnement();
+    const zenchef = "Facture ZCINV-FEE-2026-09-0042\nZenchef SAS 20 rue des Petits Hotels 75010 Paris TVA FR12798475101\nAbonnement Zenchef Essentiel septembre 2026\nTotal HT 49,17 €\nTVA 20 % 9,83 €\nTotal TTC 59,00 €\nDate de facture : 30/09/2026";
+    env.fil([{ date: "2026-10-01T09:00:00", from: "billing@zenchef.com", to: "contact@bellomio.fr", subject: "Votre facture Zenchef", pieces: [{ nom: "invoice_ZCINV-FEE-2026-09-0042.pdf", contenu: zenchef }] }]);
+    const s1 = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "z1" });
+    assert.equal(s1.a_verifier, 1, "« Les deux » ne décide pas");
+    const env2 = creerEnvironnement();
+    env2.ctx.CONFIG.fournisseursReference.find((f) => f.nom === "Zenchef").etab = "Bello";
+    env2.fil([{ date: "2026-10-01T09:00:00", from: "billing@zenchef.com", to: "contact@bellomio.fr", subject: "Votre facture Zenchef", pieces: [{ nom: "invoice_ZCINV-FEE-2026-09-0042.pdf", contenu: zenchef }] }]);
+    const s2 = env2.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "z2" });
+    assert.equal(s2.envoi, 1);
+    assert.ok(env2.arbre().includes("/Envoi Pennylane/Bello Mio/2026-09-30 — Zenchef — Facture n° ZCINV-FEE-2026-09-0042 — 59.00 EUR.pdf"), env2.arbre().join("\n"));
+    assert.ok(env2.feuille("Journal").some((l) => l[7] === "Bello Mio (liste)"), "le journal indique la source");
+  });
+  test("images de signature ignorées, photos de factures gardées", () => {
+    const env = creerEnvironnement();
+    const gros = "x".repeat(30000);
+    env.fil([{ date: "2026-10-01T09:00:00", from: "compta@armor-emballages.fr", to: "facture@bellomio.fr", subject: "Facture", pieces: [
+      { nom: "image001.png", contenu: gros, type: "image/png" }, { nom: "Outlook-abc123.png", contenu: gros, type: "image/png" }, { nom: "logo.jpg", contenu: gros, type: "image/jpeg" },
+      { nom: "IMG_2041.jpg", contenu: env.fixture("terreazur_facture_bello").padEnd(25000, " "), type: "image/jpeg" }
+    ] }]);
+    const s = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "img" });
+    assert.equal(s.pieces, 1, "seule la photo IMG_2041 est examinée");
   });
 });

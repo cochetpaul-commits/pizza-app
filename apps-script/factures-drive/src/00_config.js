@@ -18,6 +18,7 @@ var CONFIG = {
     horsPennylane: "_Hors Pennylane",         // existe déjà à la racine avec Bello Mio et Piccola Mia : utilisé tel quel
     aVerifier: "À vérifier",
     ancienAVerifier: "_À vérifier",           // ancien nom (v4.0), lu par l'alerte et l'indexation s'il existe
+    transit: "Rattrapage à valider",          // rattrapageReel n'écrit JAMAIS dans Envoi Pennylane : Claude (Cowork) compare à Pennylane puis déplace
     fixtures: "_Fixtures OCR",                // PDF déposés à la main pour produire les textes de test (ocrDump)
     journauxCloture: "Journaux de clôture",   // sous Piccola Mia : journaux de caisse, pas des factures
     journauxCaisse: "Journaux de caisse iFratelli"   // dossier à part, hors « Factures iFratelli »
@@ -66,9 +67,26 @@ var CONFIG = {
     "Piccola Mia": { mots: ["fratelli", "ville pepin", "piccola", "piccolamia"], tva: "FR40909382640", siren: "909382640" }
   },
 
-  // Montants : un taux de TVA n'est jamais un total ; au delà de 100 000 € c'est un capital ou un SIREN
+  // Montants : un taux de TVA n'est jamais un total ; au delà de 100 000 € c'est un capital ou un SIREN ;
+  // entre 10 000 et 100 000 € un montant n'est retenu que s'il forme un triplet HT + TVA = TTC
   montantMax: 10000000,                               // en centimes
+  montantMaxSansTriplet: 1000000,                     // en centimes
   tauxTva: [550, 1000, 2000, 210, 55, 196, 700],      // en centimes
+  // Dates : une date de facture plus de 3 jours après le mail est une échéance ; une facture de plus de 90 jours va dans À vérifier
+  dateFutureJours: 3,
+  ancienneFactureJours: 90,
+  // Relevé : un document qui aligne au moins 4 lignes « numéro, date, montant » avec un total est un relevé
+  releveLignesMin: 4,
+
+  // Pièces jointes images au nom générique (signatures de mail) : ignorées quelle que soit leur taille
+  // (IMG_2041.jpg ou photo.jpg restent des photos de factures possibles)
+  imagesGeneriques: /^(image|logo|signature|outlook|banner|banniere|facebook|instagram|linkedin|twitter|icon|icone|pastedimage|unnamed|attachment|header|footer|entete|pied)[\s_\-]*\d*$/i,
+  // Catalogues, tarifs, promotions : dans l'objet ou le nom de la pièce -> journal seul, jamais À vérifier
+  motifsCatalogue: /\b(tarifs?|offres?|promos?|promotions?|catalogues?|mercuriales?|newsletters?|plaquette|brochure|nouveaut[ée]s?|selection|sélection)\b/i,
+
+  // OCR Drive : nouvel essai après 2 s, 5 s, 15 s sur « User rate limit exceeded » ; pause entre deux OCR en rattrapage
+  ocrAttentesMs: [2000, 5000, 15000],
+  ocrPauseRattrapageMs: 1000,
 
   // Anciens dossiers « fourre-tout » de l'archive : leur contenu est reclassé d'après le PDF (reorganiserArchive)
   dossiersFourreTout: ["Facture", "Factures", "Invoicing", "Invoice", "Transfert Pierre", "Yahoo", "Wanadoo", "Gmail", "Mail", "Indy", "Bellomio", "Bello Mio",
@@ -98,7 +116,7 @@ var CONFIG = {
     { nom: "Masse", variantes: [], domaines: ["masse.fr"], identifiants: [], etab: "Les deux" },
     { nom: "Bar Spirits", variantes: ["Barspirits"], domaines: ["barspirits.fr"], identifiants: [], etab: "Les deux" },
     { nom: "Vinoflo", variantes: [], domaines: ["vinoflo.fr", "vinoflo.com"], identifiants: [], etab: "Les deux" },
-    { nom: "Cozigou", variantes: [], domaines: ["cozigou.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Cozigou", variantes: ["SAS COZIGOU COTE D'EMERAUDE"], domaines: ["cozigou.fr", "cozigou.bzh"], identifiants: ["FR81950026212", "950026212"], etab: "Les deux" },
     { nom: "SDPF", variantes: [], domaines: ["sdpf.fr"], identifiants: [], etab: "Les deux" },
     { nom: "Elien", variantes: [], domaines: ["elien.fr"], identifiants: [], etab: "Bello" },
     { nom: "LMDW", variantes: ["La Maison du Whisky"], domaines: ["lmdw.fr", "lmdw.com"], identifiants: [], etab: "Les deux" },
@@ -114,7 +132,7 @@ var CONFIG = {
     { nom: "Anthropic", variantes: [], domaines: ["anthropic.com", "mail.anthropic.com"], identifiants: [], etab: "Bello" },
     { nom: "Zenchef", variantes: [], domaines: ["zenchef.com"], identifiants: [], etab: "Les deux" },
     { nom: "Alma", variantes: ["Getalma"], domaines: ["getalma.eu"], identifiants: [], etab: "Les deux" },
-    { nom: "Alan", variantes: [], domaines: ["alan.eu", "alan.com"], identifiants: [], etab: "Les deux" },
+    { nom: "Alan", variantes: ["Alan Insurance"], domaines: ["alan.eu", "alan.com"], identifiants: [], etab: "Les deux" },
     { nom: "Daniel Marquet", variantes: ["EFC Marquet", "EFCMarquet", "Efc-marquet", "Danielmarquet"], domaines: ["efc-marquet.fr", "efcmarquet.fr"], identifiants: [], etab: "Bello" },
     { nom: "Beezign", variantes: [], domaines: ["beezign.com", "beezign.fr"], identifiants: [], etab: "Piccola" },
     { nom: "Jehanno", variantes: [], domaines: ["jehanno.fr"], identifiants: [], etab: "Bello" },

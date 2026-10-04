@@ -42,8 +42,12 @@ function piecesDuMessage(message) {
   return pieces.filter(function(p) {
     var ext = extensionDe(p.getName());
     if (CONFIG.extensionsPieces.indexOf(ext) === -1) return false;
-    // une image de moins de 20 Ko est un logo, pas une facture photographiée
-    if (ext !== "pdf" && ext !== "xml" && p.getSize() < 20 * 1024) return false;
+    if (ext !== "pdf" && ext !== "xml") {
+      // une image de moins de 20 Ko est un logo, pas une facture photographiée
+      if (p.getSize() < 20 * 1024) return false;
+      // image au nom générique (image001.png, logo.jpg, Outlook-xxx.png…) : signature de mail, quelle que soit la taille
+      if (CONFIG.imagesGeneriques.test(String(p.getName()).replace(/\.[a-z0-9]+$/i, "")) || /^outlook/i.test(String(p.getName()))) return false;
+    }
     return true;
   });
 }

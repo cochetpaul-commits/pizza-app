@@ -19,12 +19,17 @@ function extraireFactures() {
 
 /** Rattrapage en SIMULATION : rien n'est écrit dans Drive, le rapport va dans l'onglet « Simulation » du journal */
 function rattrapage(dateDebut) {
-  return traiterMessages({ depuis: lireDateArgument(dateDebut), simulation: true, cleReprise: "rattrapage-simulation" });
+  return traiterMessages({ depuis: lireDateArgument(dateDebut), simulation: true, cleReprise: "rattrapage-simulation", transit: true, rattrapage: true });
 }
 
-/** Rattrapage RÉEL, à lancer seulement après validation du rapport de simulation par Paul */
+/**
+ * Rattrapage RÉEL, à lancer seulement après validation du rapport de simulation par Paul.
+ * Il n'écrit JAMAIS dans « Envoi Pennylane » : les factures sûres vont dans « Rattrapage à valider/<Établissement> »,
+ * que Pennylane ne surveille pas. Claude (Cowork) compare chaque fichier à Pennylane (numéro, montant, date) et ne déplace
+ * vers « Envoi Pennylane » que les absents ; l'archivage automatique suit ensuite grâce à l'index.
+ */
 function rattrapageReel(dateDebut) {
-  return traiterMessages({ depuis: lireDateArgument(dateDebut), simulation: false, cleReprise: "rattrapage-reel" });
+  return traiterMessages({ depuis: lireDateArgument(dateDebut), simulation: false, cleReprise: "rattrapage-reel", transit: true, rattrapage: true });
 }
 
 // L'éditeur Apps Script ne passe pas d'argument : raccourcis depuis le 01/07/2026
@@ -51,7 +56,7 @@ function traiterMessages(opts) {
   // En simulation on travaille sur une copie de l'index : les pièces « rangées » virtuellement ne doivent pas rester en mémoire
   var index = opts.simulation ? Object.assign({}, indexCharger()) : indexCharger();
   var idxFournisseurs = fournisseursIndex();
-  var stats = { messages: 0, deja: 0, ignores: 0, pieces: 0, envoi: 0, hors_pennylane: 0, a_verifier: 0, journal: 0, doublons: 0, corps: 0, inconnus: 0 };
+  var stats = { messages: 0, deja: 0, ignores: 0, pieces: 0, envoi: 0, transit: 0, hors_pennylane: 0, a_verifier: 0, journal: 0, doublons: 0, corps: 0, inconnus: 0, quota: 0 };
 
   var st = parcourirMessages(requeteGmail(opts.depuis), function(message, fil) {
     if (Date.now() - debut > CONFIG.limiteMs) return false;
@@ -64,6 +69,12 @@ function traiterMessages(opts) {
       traiterMessage(message, fil, opts, index, idxFournisseurs, stats);
       if (!opts.simulation) journalMarquerTraite(id, "reel");
     } catch (e) {
+      if (e && e.name === "ErreurOcrQuota") {
+        // Quota OCR : le message n'est pas marqué traité, la passe s'arrête ici et reprendra au prochain lancement
+        stats.quota++;
+        Logger.log("QUOTA OCR : " + e.message + " — message " + id + " (" + message.getSubject() + ") sera repris");
+        return false;
+      }
       Logger.log("ERREUR message " + id + " (" + message.getSubject() + ") : " + e);
       journalAjouter({ dateMail: dateIso(message.getDate()), expediteur: message.getFrom(), objet: message.getSubject(), destination: "erreur", raison: String(e),
                        lienMail: lienMail(message), messageId: id }, opts.simulation);
@@ -74,9 +85,9 @@ function traiterMessages(opts) {
   journalVider();
   fournisseursVider();
   var resume = (opts.simulation ? "[SIMULATION] " : "") + "messages examinés : " + stats.messages + " (déjà traités : " + stats.deja + ", ignorés : " + stats.ignores + ") — pièces : " + stats.pieces
-    + " — vers Pennylane : " + stats.envoi + ", hors Pennylane : " + stats.hors_pennylane + ", à vérifier : " + stats.a_verifier + " (dont fournisseurs inconnus : " + stats.inconnus + "), journal seul : " + stats.journal
+    + " — vers Pennylane : " + stats.envoi + (opts.transit ? ", en transit (Rattrapage à valider) : " + stats.transit : "") + ", hors Pennylane : " + stats.hors_pennylane + ", à vérifier : " + stats.a_verifier + " (dont fournisseurs inconnus : " + stats.inconnus + "), journal seul : " + stats.journal
     + ", doublons : " + stats.doublons + ", factures dans le corps du mail : " + stats.corps;
-  if (st.arret) { props.setProperty(cle, String(st.position)); Logger.log(resume); Logger.log("PAS FINI — relancer la même fonction (reprise au fil n° " + st.position + ")"); }
+  if (st.arret) { props.setProperty(cle, String(st.position)); Logger.log(resume); Logger.log((stats.quota ? "ARRÊT SUR QUOTA OCR — " : "PAS FINI — ") + "relancer la même fonction (reprise au fil n° " + st.position + ")"); }
   else { props.deleteProperty(cle); Logger.log(resume); Logger.log("TERMINÉ"); }
   return stats;
 }
@@ -91,7 +102,7 @@ function traiterMessage(message, fil, opts, index, idxFournisseurs, stats) {
   if (!pieces.length) {
     if (corpsRessembleAUneFacture(message)) {
       stats.corps++;
-      journalAjouter(Object.assign({}, base, { piece: "(corps du mail)", type: "facture ?", destination: "a_verifier",
+      journalAjouter(Object.assign({}, base, { piece: "(corps du mail)", type: "facture ?", destination: "corps_mail",
         raison: "facture dans le corps du mail, sans pièce jointe : à télécharger à la main" }), opts.simulation);
     }
     return;
@@ -100,11 +111,15 @@ function traiterMessage(message, fil, opts, index, idxFournisseurs, stats) {
     var p = pieces[i], ext = extensionDe(p.getName());
     stats.pieces++;
     var md5 = md5Blob(p);
+    if (opts.rattrapage && ext !== "xml") Utilities.sleep(CONFIG.ocrPauseRattrapageMs);   // ménage le quota OCR de Drive
     var texte = lireTexte(p, ext);
     var a = analyserDocument({ idx: idxFournisseurs, texte: texte, from: message.getFrom(), subject: message.getSubject(), nomPiece: p.getName(), dateMail: base.dateMail,
                                extension: "." + (ext === "jpeg" ? "jpg" : ext) });
     var d = decider(a);
-    var ligne = Object.assign({}, base, { piece: p.getName(), type: a.type, etablissement: a.etablissement, fournisseur: a.fournisseur || (a.fournisseurPropose ? a.fournisseurPropose + " ?" : ""),
+    // Rattrapage : jamais directement dans Envoi Pennylane, mais dans le dossier de transit « Rattrapage à valider »
+    if (opts.transit && d.destination === "envoi") { d.destination = "transit"; d.chemin = [CONFIG.dossiers.transit, a.etablissement]; }
+    var ligne = Object.assign({}, base, { piece: p.getName(), type: a.type, etablissement: a.etablissement ? a.etablissement + (a.sourceEtablissement === "liste" ? " (liste)" : "") : "",
+      fournisseur: a.fournisseur || (a.fournisseurPropose ? a.fournisseurPropose + " ?" : ""),
       numero: a.numero, dateFacture: a.date, montant: a.montant, destination: d.destination, chemin: d.chemin.join("/"), raison: d.raison });
     if (a.sourceFournisseur === "inconnu" && a.type !== "autre") {
       stats.inconnus++;
@@ -124,7 +139,7 @@ function traiterMessage(message, fil, opts, index, idxFournisseurs, stats) {
                     archive: d.archive.join("/") };
       if (opts.simulation) {
         indexInserer(index, infos);   // pour repérer les doublons à l'intérieur même de la simulation
-        ligne.chemin = d.chemin.join("/") + "/" + a.nom + (d.destination === "envoi" ? "  -> archive " + d.archive.join("/") : "");
+        ligne.chemin = d.chemin.join("/") + "/" + a.nom + (d.archive.length && d.destination !== "hors_pennylane" ? "  -> archive " + d.archive.join("/") : "");
       } else {
         var description = d.destination === "a_verifier" ? "À vérifier : " + d.raison + " — mail : " + base.lienMail : "";
         var fichier = rangerPiece(p, a.nom, d.chemin, description, infos);
@@ -174,7 +189,8 @@ function archiverEnvoisPennylane() {
 function alerteHebdo() {
   var aVerifier = fichiersAVerifierAnciens(CONFIG.alerteAgeJours);
   var envois = fichiersEnvoiAnciens(CONFIG.envoiAlerteJours);
-  if (!aVerifier.length && !envois.length) { Logger.log("Rien à signaler"); return 0; }
+  var corps7j = journalLignesRecentes(7).filter(function(l) { return l.destination === "corps_mail"; });
+  if (!aVerifier.length && !envois.length && !corps7j.length) { Logger.log("Rien à signaler"); return 0; }
   var decrire = function(x) {
     return "- " + x.chemin + "/" + x.fichier.getName() + " (" + Utilities.formatDate(x.fichier.getDateCreated(), "Europe/Paris", "dd/MM") + ")\n  "
       + (x.fichier.getDescription() || "") + "\n  " + x.fichier.getUrl();
@@ -190,8 +206,12 @@ function alerteHebdo() {
     envois.forEach(function(x) { journalAjouter({ piece: x.fichier.getName(), destination: "envoi_bloque", chemin: x.chemin + "/" + x.fichier.getName(), lienFichier: x.fichier.getUrl(), raison: "plus de " + CONFIG.envoiAlerteJours + " jours dans Envoi Pennylane" }, false); });
     journalVider();
   }
-  MailApp.sendEmail({ to: CONFIG.alerteDestinataire, subject: "Factures : " + (aVerifier.length + envois.length) + " document(s) à regarder", body: corps });
-  Logger.log("Alerte envoyée : " + aVerifier.length + " à vérifier, " + envois.length + " bloqués dans Envoi Pennylane");
+  if (corps7j.length) {
+    corps += "Factures reçues dans le corps d'un mail, sans pièce jointe, ces 7 derniers jours (" + corps7j.length + ") — à télécharger depuis l'espace client si besoin :\n\n"
+      + corps7j.map(function(l) { return "- " + l.dateMail + " " + l.expediteur + " : " + l.objet + "\n  " + l.lienMail; }).join("\n") + "\n\n";
+  }
+  MailApp.sendEmail({ to: CONFIG.alerteDestinataire, subject: "Factures : " + (aVerifier.length + envois.length) + " document(s) à regarder" + (corps7j.length ? ", " + corps7j.length + " mail(s) sans pièce jointe" : ""), body: corps });
+  Logger.log("Alerte envoyée : " + aVerifier.length + " à vérifier, " + envois.length + " bloqués dans Envoi Pennylane, " + corps7j.length + " factures dans le corps d'un mail");
   return aVerifier.length + envois.length;
 }
 

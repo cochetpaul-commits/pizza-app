@@ -27,6 +27,11 @@ Parcours d'une facture sûre : créée à plat dans `Envoi Pennylane/<Établisse
 toutes les 8 h) `archiverEnvoisPennylane` la déplace dans `<Établissement>/<Fournisseur>/<Année>` en gardant son
 identifiant Drive. Un fichier encore là après 7 jours est signalé dans le journal et dans le mail du lundi.
 
+**Rattrapage (v4.2)** : `rattrapageReel` n'écrit jamais dans `Envoi Pennylane`. Les factures sûres vont dans
+`Rattrapage à valider/<Établissement>/`, que Pennylane ne surveille pas. Claude, côté Cowork, compare chaque fichier à
+Pennylane (numéro, montant, date) et ne déplace vers `Envoi Pennylane` que les absents ; l'index connaît déjà leur dossier
+d'archive, l'archivage automatique suit. La passe horaire, elle, va directement dans `Envoi Pennylane`.
+
 ## Arborescence du code
 
 ```
@@ -62,13 +67,31 @@ Les tests Node rechargent `src/` de la même façon (`tests/charger.js`, `tests/
 4. **Destination** :
    - facture, avoir ou ticket, établissement sûr, montant lu, fournisseur connu : `Envoi Pennylane/<Établissement>/` ;
    - relevé ou mandat : `_Hors Pennylane/<Établissement>/<Fournisseur>/<Année>/` ;
-   - devis, bon de commande, attestation : rien n'est rangé, une ligne de journal ;
+   - devis, bon de commande, attestation (y compris attestation employeur France Travail), catalogue (tarifs, offres,
+     promotions, mercuriales, d'après l'objet du mail, le nom de la pièce ou le texte) : rien n'est rangé, une ligne de journal ;
    - tout le reste (OCR raté, établissement ou fournisseur inconnu, montant introuvable, type incertain) : `À vérifier/`.
      Un fournisseur inconnu ajoute aussi une ligne « à compléter » dans le Sheet des fournisseurs (nom proposé, domaine, identifiants lus).
 5. **Anti-doublon** sur les deux établissements (onglet `Index`) : même MD5, ou même fournisseur + numéro, ou même
    fournisseur + date + montant. Les anciennes graphies de nom (Maeldistribution) sont ramenées au nom de la liste.
-6. **Journal** : une ligne par pièce jointe, plus les archivages, les blocages et les factures reçues dans le corps d'un mail (Zenchef, Alan…).
-7. **Alerte** du lundi 8 h : `À vérifier` de plus de 3 jours et `Envoi Pennylane` de plus de 7 jours.
+6. **Journal** : une ligne par pièce jointe, plus les archivages, les blocages et les factures reçues dans le corps d'un mail
+   (destination `corps_mail`, hors `À vérifier`). L'établissement lu dans la liste de référence est marqué « (liste) ».
+7. **Alerte** du lundi 8 h : `À vérifier` de plus de 3 jours, `Envoi Pennylane` de plus de 7 jours, et une section à part
+   pour les factures reçues dans le corps d'un mail ces 7 derniers jours.
+
+Règles d'extraction notables (v4.2) :
+- relevé : « relevé client / mensuel / de factures », « récapitulatif de factures », « état récapitulatif », ou un tableau
+  d'au moins 4 lignes « numéro, date, montant » avec un total ; un relevé ne va jamais vers Pennylane ;
+- numéro : jamais un numéro de client (« client », « code client », « destinataire code ») ni une date ;
+- avoir : montant négatif, ou « avoir » dans le titre du document (« FACTURE/AVOIR » d'en-tête ne compte pas) ;
+- montant : HT + TVA = TTC dans le bloc des totaux, le total répété l'emporte sur TTC + consigne ; au delà de 10 000 € un
+  montant n'est retenu qu'avec un triplet cohérent ; jamais au delà de 100 000 € ;
+- date : « facture n° X du », « date de facture », « émise le », « L'équipe Alan, le » avant « date : » et « date » seuls ;
+  les dates qui suivent « échéance », « prélèvement », « à payer avant » sont ignorées, ainsi que toute date plus de 3 jours
+  après le mail ; une facture de plus de 90 jours va dans `À vérifier` (« ancienne facture ») ;
+- établissement : lu sur le document, sinon colonne « Établissement par défaut » du Sheet si elle vaut Bello ou Piccola ;
+- OCR : « User rate limit exceeded » -> nouveaux essais après 2 s, 5 s, 15 s ; si l'erreur persiste, le message n'est pas
+  marqué traité, la passe s'arrête et reprend au lancement suivant ; en rattrapage, 1 s de pause entre deux OCR ;
+- pièces jointes : les images au nom générique (image001.png, logo, signature, Outlook-…) sont ignorées, IMG_xxxx.jpg est gardé.
 
 Le nom des fichiers garde le format historique : `AAAA-MM-JJ — Fournisseur — Facture n° XXX — 123.45 EUR.pdf`
 (avoirs en négatif, tickets sans numéro, relevés `Relevé n° XXX`).
@@ -99,9 +122,11 @@ Puis, dans l'éditeur Apps Script (`npm run open`), dans cet ordre :
 1. **Bascule Pennylane** : `rattrapageBasculeSimulation` liste les fichiers créés dans `Bello Mio/` ou `Piccola Mia/`
    après le 03/10/2026 18 h et absents de `Envoi Pennylane` (même nom, ou même numéro + montant). Après validation,
    `rattrapageBasculeReel` les copie (l'original reste dans l'archive).
-2. **Mails depuis le 01/07/2026** : `rattrapageDepuisJuillet` (simulation, onglet `Simulation` du journal : ce qui serait
-   envoyé à Pennylane et où il sera archivé, ce qui irait en `À vérifier` avec la raison, les doublons ignorés). Paul valide,
-   puis `rattrapageReelDepuisJuillet`. Relancer chaque fonction jusqu'à « TERMINÉ ».
+2. **Mails depuis le 01/07/2026** : `rattrapageDepuisJuillet` (simulation, onglet `Simulation` du journal : ce qui irait en
+   transit `Rattrapage à valider` et où il sera archivé, ce qui irait en `À vérifier` avec la raison, les doublons ignorés).
+   Paul valide, puis `rattrapageReelDepuisJuillet`. Relancer chaque fonction jusqu'à « TERMINÉ » (un arrêt « QUOTA OCR »
+   se relance de la même façon). Claude (Cowork) vide ensuite `Rattrapage à valider` vers `Envoi Pennylane` après comparaison
+   avec Pennylane.
 3. **Réorganisation de l'archive** : `reorganiserArchive` (simulation) remplit l'onglet `Réorganisation` du journal :
    pour chaque fichier, ancien chemin, nouveau chemin `<Établissement>/<Fournisseur de la liste>/<Année>` et méthode.
    Les dossiers doublons sont fusionnés (Metro et Metro-gsc, SC M2 et Sc-m2…), les dossiers fourre-tout (Facture,
@@ -128,13 +153,16 @@ npm test
 - `tests/extraction.test.js` : chaque fixture de `tests/fixtures/*.txt` est analysée et comparée à `attendus.json`.
   Cas pièges : avoir Maël négatif, relevé Carniato Piccola reçu sur l'adresse Bello, capital social d'Elis,
   « Avoir de prix » dans une légende Cheville 35, « ATTESTATION FACTURE » sur une facture Carniato, devis avec total TTC,
-  mandat Prophyl, attestation DSN, ticket Leroy Merlin, fournisseur inconnu, entrée inactive, anciennes graphies.
+  mandat Prophyl, attestation DSN, ticket Leroy Merlin, fournisseur inconnu, entrée inactive, anciennes graphies,
+  relevé mensuel TerreAzur (13 factures, code client 329789), Alan (échéance future, capital social), Cozigou
+  (« FACTURE/AVOIR », consigne), Elien (facture de janvier reçue en juin), attestation employeur France Travail.
 - `tests/rangement.test.js` : règles de destination et clés d'anti-doublon.
 - `tests/traitement.test.js` : enchaînement complet sur de faux services Google : facture Maël Piccola dans un fil Bello,
   même pièce reçue deux fois, mail interne ignoré, transfert de Paul, tarifs Maison Hardy, OCR raté, devis, facture dans
   le corps d'un mail, photo de facture, fournisseur inconnu (ligne « à compléter »), simulation puis réel, limite de temps,
   archivage après 3 jours, blocage après 7 jours et alerte, indexation de l'existant, réorganisation simulée puis réelle,
-  journaux de clôture, rattrapage de la bascule, génération de la liste.
+  journaux de clôture, rattrapage de la bascule, génération de la liste, quota OCR (nouvel essai, arrêt, reprise),
+  transit du rattrapage, établissement par défaut, images de signature.
 
 ### Ajouter une facture au jeu de tests
 

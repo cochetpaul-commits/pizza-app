@@ -1,0 +1,65 @@
+2018 Facture HT avec En Tête & Pied de page
+
+Date : 30/01/2026
+
+TVA Montant HT P.U. HT Qté Description
+
+0,00 0,00 0,00 0,00 Transformé de : Commande N° CC0887 du 08/ 01/2026.
+
+5,50 92,00 23,00 4,00 4.5 L VANILLE (gousse naturelle infusée)
+
+5,50 14,60 14,60 1,00 2.5 L NOISETTE ITALIE ROMAINE
+
+0,00 0,00 0,00 0,00 Transformé de : Commande N° CC0997 du 22/ 01/2026.
+
+5,50 115,00 23,00 5,00 4.5 L VANILLE (gousse naturelle infusée)
+
+5,50 43,80 14,60 3,00 2.5 L NOISETTE ITALIE ROMAINE
+
+5,50 32,00 16,00 2,00 * BIO - 2.5 L CITRON
+
+0,00 0,00 0,00 0,00 Transformé de : Commande N° CC0922 du 15/ 01/2026.
+
+5,50 115,00 23,00 5,00 4.5 L VANILLE (gousse naturelle infusée)
+
+5,50 43,80 14,60 3,00 2.5 L NOISETTE ITALIE ROMAINE
+
+5,50 32,00 16,00 2,00 * BIO - 2.5 L CITRON
+
+0,00 0,00 0,00 0,00 Transformé de : Commande N° CC1037 du 29/ 01/2026.
+
+5,50 115,00 23,00 5,00 4.5 L VANILLE (gousse naturelle infusée)
+
+5,50 16,00 16,00 1,00 * BIO - 2.5 L CITRON
+
+5,50 29,20 14,60 2,00 2.5 L NOISETTE ITALIE ROMAINE
+
+Récapitulatif des échéances :
+
+Date d'échéance Solde dû Montant de
+
+l'échéance Mode de paiement 01/03/2026 0,00 € 684,06 € LCR
+
+Escompte pour règlement anticipé : 0% En cas de retard de paiement, une pénalité égale à 3 fois le taux d'intérêt légal sera exigible (Décret 2009-138 du 9 février 2009), ainsi qu’une indemnité forfaitaire pour frais de recouvrement d’un montant minimum de 40 euros pour les professionnels (Décret 2012-1115 du 9 octobre 2012)
+
+Coordonnées bancaires société : Banque : CCM LANGUEUX - TREGUEUX IBAN : FR76 1558 9228 7701 5009 3734 440 BIC : CMBRFR2BARK
+
+Facture N° D61755
+
+Total HT
+
+Total TVA
+
+Total TTC
+
+Net à payer
+
+BELLO MIO - SASHA 3 PLACE DU PONCEL 35400 ST MALO facture@bellomio.fr
+
+648,40
+
+35,66
+
+684,06
+
+684,06 €

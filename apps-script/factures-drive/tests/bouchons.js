@@ -62,8 +62,13 @@ function creerEnvironnement() {
     getFileById: (i) => { if (fichiers[i]) return fichiers[i]; if (String(i).startsWith("doc_")) return { setTrashed: () => {} }; throw new Error("fichier introuvable : " + i); },
     getFolderById: (i) => { if (dossiers[i]) return dossiers[i]; throw new Error("dossier introuvable : " + i); }
   };
+  const pannes = { ocr: 0, appelsOcr: 0, pauses: [] };
   const Drive = { Files: {
-    create: (meta, b) => { const i = id("doc"); docsOcr[i] = b._contenu; return { id: i }; },
+    create: (meta, b) => {
+      pannes.appelsOcr++;
+      if (pannes.ocr > 0) { pannes.ocr--; throw new Error("API call to drive.files.create failed with error: User rate limit exceeded"); }
+      const i = id("doc"); docsOcr[i] = b._contenu; return { id: i };
+    },
     get: (i) => ({ md5Checksum: fichiers[i] ? md5(fichiers[i]._blob) : null }),
     update: () => ({})
   } };
@@ -131,6 +136,7 @@ function creerEnvironnement() {
       return fmt.replace("yyyy", y).replace("MM", M).replace("dd", D);
     },
     DigestAlgorithm: { MD5: "md5" },
+    sleep: (ms) => { pannes.pauses.push(ms); },
     computeDigest: (alg, octets) => [...crypto.createHash("md5").update(Buffer.from(octets)).digest()].map((x) => (x > 127 ? x - 256 : x))
   };
   const ctx = {
@@ -146,7 +152,7 @@ function creerEnvironnement() {
 
   // Aides pour les tests
   const aides = {
-    ctx, racine, fils, fil, mails, journalLog, props,
+    ctx, racine, fils, fil, mails, journalLog, props, pannes,
     fixture: (nom) => fs.readFileSync(path.join(__dirname, "fixtures", nom + ".txt"), "utf8"),
     /** Liste "chemin/nom" de tous les fichiers sous « Factures iFratelli » (hors journal) */
     arbre: () => {

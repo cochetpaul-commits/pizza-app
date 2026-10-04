@@ -103,6 +103,19 @@ function journalAjouter(l, simulation) {
   _journal.tampon[simulation ? "Simulation" : "Journal"].push(ligne);
 }
 
+/** Lignes du journal des `jours` derniers jours : [{ horodatage, dateMail, expediteur, objet, destination, lienMail }] */
+function journalLignesRecentes(jours) {
+  var f = journalOnglet(journalClasseur(), "Journal", COLONNES_JOURNAL), n = f.getLastRow(), limite = Date.now() - jours * 86400000, out = [];
+  if (n < 2) return out;
+  var depart = Math.max(2, n - 2000);
+  f.getRange(depart, 1, n - depart + 1, COLONNES_JOURNAL.length).getValues().forEach(function(r) {
+    var h = r[0] && typeof r[0].getTime === "function" ? r[0].getTime() : Date.parse(r[0]);
+    if (!h || h < limite) return;
+    out.push({ horodatage: r[0], dateMail: dateIso(r[1]), expediteur: r[2], objet: r[4], destination: r[12], lienMail: r[16] });
+  });
+  return out;
+}
+
 /** Ligne du plan de réorganisation : { fichierId, ancien, nouveau, nom, methode, statut } */
 function reorgAjouter(r) {
   _journal.tampon["Réorganisation"].push([r.fichierId, r.ancien, r.nouveau, r.nom, r.methode, r.statut, new Date()]);
@@ -142,8 +155,9 @@ function journalViderSimulation() {
   if (f.getLastRow() > 1) f.deleteRows(2, f.getLastRow() - 1);
 }
 
+/** AAAA-MM-JJ d'une Date (ou d'une chaîne qui commence par une date ISO) */
 function dateIso(v) {
-  if (v instanceof Date) return Utilities.formatDate(v, "Europe/Paris", "yyyy-MM-dd");
+  if (v && typeof v.getTime === "function") return Utilities.formatDate(v, "Europe/Paris", "yyyy-MM-dd");
   return String(v).slice(0, 10);
 }
 
