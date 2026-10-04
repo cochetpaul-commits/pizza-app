@@ -470,6 +470,38 @@ describe("v4.5 : liste de fournisseurs nettoyée, renommage de l'archive, averti
     assert.ok(env.feuille("Réorganisation").some((l) => /^ignoré/.test(l[5])), "la ligne ignorée reste ignorée");
   });
 
+  test("v4.5.1 : un fichier déjà déplacé hier (ligne « fait » sans nouveau nom) et encore à l'ancien nom est planifié en renommage", () => {
+    const env = creerEnvironnement();
+    ecrireSheet(env, LIGNES);
+    const f = env.ctx.dossierDuChemin(["Bello Mio", "Self Stockage", "2026"]).createFile("2026-09-01 — Wanadoo — Facture n° 2026-091 — 120.00 EUR.pdf", "x", "application/pdf");
+    const g = env.ctx.dossierDuChemin(["Bello Mio", "Self Stockage", "2026"]).createFile("2026-08-01 — Self Stockage — Facture n° 2026-081 — 120.00 EUR.pdf", "y", "application/pdf");
+    // lignes « fait » de la réorganisation v4.4 (déplacement seul, colonne « Nouveau nom » vide)
+    env.ctx.reorgAjouter({ fichierId: f.getId(), ancien: "Bello Mio/Wanadoo/09 - Septembre 2026", nouveau: "Bello Mio/Self Stockage/2026", nom: f.getName(), methode: "dossier Wanadoo", statut: "fait" });
+    env.ctx.reorgAjouter({ fichierId: g.getId(), ancien: "Bello Mio/Wanadoo/08 - Août 2026", nouveau: "Bello Mio/Self Stockage/2026", nom: g.getName(), methode: "dossier Wanadoo", statut: "fait" });
+    env.ctx.journalVider();
+    const st = env.ctx.renommerArchive();
+    assert.equal(st.renommages, 1, "le fichier déjà déplacé mais à l'ancien nom est planifié");
+    assert.equal(st.enPlace, 1);
+    const plan = env.feuille("Réorganisation");
+    assert.equal(plan.length, 3, "deux anciennes lignes « fait » + une ligne « renommage »");
+    const r = plan.find((l) => l[4] === "renommage");
+    assert.equal(r[0], f.getId());
+    assert.equal(r[5], "simulation");
+    assert.equal(r[7], "2026-09-01 — Self Stockage — Facture n° 2026-091 — 120.00 EUR.pdf");
+    env.ctx.renommerArchive();
+    assert.equal(env.feuille("Réorganisation").length, 3, "relancer ne redouble pas");
+    const reel = env.ctx.renommerArchiveReel();
+    assert.equal(reel.faits, 1, "les anciennes lignes « fait » ne sont pas rejouées");
+    assert.equal(reel.renommes, 1);
+    assert.equal(reel.deplaces, 0);
+    assert.equal(f.getName(), "2026-09-01 — Self Stockage — Facture n° 2026-091 — 120.00 EUR.pdf");
+    assert.deepEqual(plain(env.feuille("Réorganisation").map((l) => l[5])), ["fait", "fait", "fait"]);
+    assert.ok(env.arbre().every((x) => x.startsWith("/Bello Mio/Self Stockage/2026/")), "rien n'a été déplacé");
+    // reorganiserArchiveReel non plus ne rejoue pas les lignes « fait »
+    const re = env.ctx.reorganiserArchiveReel();
+    assert.equal(re.faits, 0);
+  });
+
   test("les avertissements de la liste sont écrits dans le journal ; l'adresse complète hotmail est reconnue, wanadoo.fr seul non", () => {
     const env = creerEnvironnement();
     ecrireSheet(env, LIGNES);

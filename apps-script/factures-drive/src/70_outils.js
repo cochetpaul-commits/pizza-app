@@ -141,8 +141,14 @@ function executerPlanReorganisation(avecDeplacements) {
 function planifierReorganisation(opts) {
   opts = opts || {};
   var debut = Date.now(), racine = obtenirOuCreerDossier(null, CONFIG.dossierRacine), idxF = fournisseursIndex();
+  // Fichiers déjà planifiés, à ne pas relire. En renommage seul, les lignes « fait » de la réorganisation (déplacements)
+  // ne comptent pas : un fichier déjà déplacé mais encore à l'ancien nom doit apparaître ; seule une ligne « renommage »
+  // (simulation ou fait) ou « ignoré » le dispense.
   var deja = {};
-  reorgLire().forEach(function(r) { deja[r.fichierId] = true; });
+  reorgLire().forEach(function(r) {
+    if (opts.renommageSeul && r.methode !== "renommage" && !/^ignoré/.test(String(r.statut))) return;
+    deja[r.fichierId] = true;
+  });
   var st = { vus: 0, planifies: 0, renommages: 0, enPlace: 0, aVerifier: 0, ignores: 0, arret: false };
   var tetes = CONFIG.etablissements.concat([CONFIG.dossiers.horsPennylane]);
   for (var i = 0; i < tetes.length && !st.arret; i++) {

@@ -175,7 +175,8 @@ Puis, dans l'éditeur Apps Script (`npm run open`), dans cet ordre :
 5. **Renommage de l'archive déjà réorganisée** (v4.5) : `renommerArchive` (simulation, aucun OCR) parcourt `Bello Mio`,
    `Piccola Mia` et `_Hors Pennylane` et écrit dans l'onglet `Réorganisation`, méthode « renommage », les fichiers dont le
    nom porte un ancien fournisseur (« Wanadoo » dans `Self Stockage`, « Indy » dans `Alain Pedron Nettoyage`, « Hyg-up »…),
-   avec le nouveau nom. Les dossiers d'un fournisseur inactif de la liste donnent une ligne « ignoré ». Paul relit l'onglet,
+   avec le nouveau nom. Les lignes « fait » de la réorganisation (déplacements) ne dispensent pas un fichier d'être relu :
+   seule une ligne « renommage » ou « ignoré » le fait (v4.5.1). Les dossiers d'un fournisseur inactif de la liste donnent une ligne « ignoré ». Paul relit l'onglet,
    puis `renommerArchiveReel` ne fait que renommer (rien n'est déplacé ni supprimé, identifiants conservés, index mis à jour).
 
 `reinitialiserReprises` efface les positions de reprise pour recommencer une simulation de zéro.
