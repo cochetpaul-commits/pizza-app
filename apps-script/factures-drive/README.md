@@ -93,6 +93,18 @@ Règles d'extraction notables (v4.2) :
   marqué traité, la passe s'arrête et reprend au lancement suivant ; en rattrapage, 1 s de pause entre deux OCR ;
 - pièces jointes : les images au nom générique (image001.png, logo, signature, Outlook-…) sont ignorées, IMG_xxxx.jpg est gardé.
 
+Règles ajoutées en v4.3 :
+- consigne : un total qui vaut un autre total + une consigne (fûts, emballages, caution) est écarté (Cozigou : 506,65 et non 536,65) ;
+- mots clés de total supplémentaires : « TTC à payer », « net à payer en EUR », « à payer : » (Elis via Esker) ;
+- colonne « Établissement par défaut » : bello, bello mio, sasha, bm / piccola, piccola mia, fratelli, pm ; « Les deux » ou vide
+  laisse la pièce à vérifier, et la raison affiche la valeur lue (« établissement inconnu (liste : « Les deux ») ») ;
+- expéditeurs qui n'envoient jamais de factures (`CONFIG.expediteursJournalSeul`) : DocuSign -> contrat, notifications Pennylane,
+  Vinted, La Poste, JDC -> notification, Up Coop -> bon de commande : journal seul ;
+- contrats signés (DocuSign, signature électronique) et épreuves d'imprimeur (PDF de contrôle, bon à tirer : Diazo) reconnus
+  dans le texte : journal seul ;
+- messageries de particuliers (gmail, hotmail, icloud, wanadoo, live…) : sans SIRET, ni TVA, ni montant, la pièce est un
+  « courrier » (devis client, CV, réservation) au journal seul ; avec un montant ou un identifiant, traitement normal.
+
 Le nom des fichiers garde le format historique : `AAAA-MM-JJ — Fournisseur — Facture n° XXX — 123.45 EUR.pdf`
 (avoirs en négatif, tickets sans numéro, relevés `Relevé n° XXX`).
 

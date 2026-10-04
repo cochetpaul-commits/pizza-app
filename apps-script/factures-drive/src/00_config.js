@@ -84,6 +84,23 @@ var CONFIG = {
   // Catalogues, tarifs, promotions : dans l'objet ou le nom de la pièce -> journal seul, jamais À vérifier
   motifsCatalogue: /\b(tarifs?|offres?|promos?|promotions?|catalogues?|mercuriales?|newsletters?|plaquette|brochure|nouveaut[ée]s?|selection|sélection)\b/i,
 
+  // Expéditeurs dont les pièces ne sont jamais des factures : journal seul, avec le type indiqué
+  expediteursJournalSeul: {
+    "docusign.net": "contrat",                 // contrats et avenants signés (Elis, JDC…)
+    "docusign.com": "contrat",
+    "notifications.pennylane.com": "notification",   // notifications de Pennylane lui-même (les factures d'abonnement viennent d'une autre adresse)
+    "vinted.fr": "notification",
+    "laposte.fr": "notification",
+    "laposte.net": "notification",
+    "jdc.fr": "notification",                  // récapitulatifs de dépannage
+    "up.coop": "bon_commande"                  // bons de commande et relevés de titres Cadhoc
+  },
+  // Messageries de particuliers : sans SIRET, TVA ni montant, la pièce (devis, CV, réservation) va au journal seul
+  domainesParticuliers: ["gmail.com", "googlemail.com", "hotmail.com", "hotmail.fr", "outlook.com", "outlook.fr", "live.com", "live.fr", "msn.com",
+    "icloud.com", "me.com", "mac.com", "yahoo.com", "yahoo.fr", "wanadoo.fr", "orange.fr", "free.fr", "sfr.fr", "laposte.net", "bbox.fr", "neuf.fr", "aol.com", "protonmail.com", "proton.me"],
+  // Consigne, emballages, caution : un total qui vaut TTC + consigne n'est pas le montant de la facture
+  motifsConsigne: /consign\w*|emballages?\s*(?:consign|factur)|caution|d[ée]p[ôo]t\s*de\s*garantie/i,
+
   // OCR Drive : nouvel essai après 2 s, 5 s, 15 s sur « User rate limit exceeded » ; pause entre deux OCR en rattrapage
   ocrAttentesMs: [2000, 5000, 15000],
   ocrPauseRattrapageMs: 1000,

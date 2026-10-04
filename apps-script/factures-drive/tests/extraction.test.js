@@ -144,3 +144,59 @@ describe("nom de fichier (format historique)", () => {
     assert.equal(ctx.analyserNomFichier("Fournisseur_01102026.pdf"), null);
   });
 });
+
+describe("v4.3 : consigne, variantes d'établissement, expéditeurs journal seul, particuliers", () => {
+  test("un total qui vaut TTC + consigne est écarté, même s'il est cohérent et répété", () => {
+    const t = "Total HT 422,21 TVA 84,44 TOTAL TTC 506,65 CONSIGNE 30,00 TOTAL NET A PAYER 536,65 A payer 536,65";
+    assert.equal(ctx.trouverMontantTTC(t), "506.65");
+    const t2 = "Montant HT 494,81 TVA 98,96 Total TTC 593,77 Emballages consignés 30,00 Net à payer 623,77";
+    assert.equal(ctx.trouverMontantTTC(t2), "593.77");
+  });
+  test("sans consigne, rien ne change", () => {
+    assert.equal(ctx.trouverMontantTTC("Total HT 100,00 TVA 20,00 Total TTC 120,00 Net à payer 120,00 Caution 0,00"), "120.00");
+  });
+  test("montant après « TTC à payer » ou « en EUR »", () => {
+    assert.equal(ctx.trouverMontantTTC("293,34 20,00 58,67 352,01 NET A PAYER EN EUR 352,01 10301"), "352.01");
+    assert.equal(ctx.trouverMontantTTC("Montant TTC à payer 245,10 €"), "245.10");
+  });
+  test("variantes de la colonne Établissement par défaut", () => {
+    for (const v of ["Bello", "bello mio", "BELLO MIO", "Sasha", "BM", "bm", "Bello Mio (SARL SASHA)"]) assert.equal(ctx.etablissementParDefaut(v), "Bello Mio", v);
+    for (const v of ["Piccola", "piccola mia", "Fratelli", "I Fratelli", "PM", "pm"]) assert.equal(ctx.etablissementParDefaut(v), "Piccola Mia", v);
+    for (const v of ["Les deux", "", "  ", "?", "les 2"]) assert.equal(ctx.etablissementParDefaut(v), null, v);
+  });
+  test("la raison « établissement inconnu » montre la valeur de la liste", () => {
+    const liste = ctx.listeFournisseursParDefaut();
+    liste.find((f) => f.nom === "Zenchef").etab = "Les deux";
+    const a = ctx.analyserDocument({ idx: ctx.indexerFournisseurs(liste), texte: "Facture ZCINV-FEE-67691 Zenchef Total TTC 7,68 € HT 6,40 TVA 1,28 Date de facture : 02/10/2026", from: "billing@zenchef.com", subject: "Facture", nomPiece: "x.pdf", dateMail: "2026-10-02", extension: ".pdf" });
+    assert.match(a.raisons.join(","), /établissement inconnu \(liste : « Les deux »\)/);
+    liste.find((f) => f.nom === "Zenchef").etab = "BM";
+    const b = ctx.analyserDocument({ idx: ctx.indexerFournisseurs(liste), texte: "Facture ZCINV-FEE-67691 Zenchef Total TTC 7,68 € HT 6,40 TVA 1,28 Date de facture : 02/10/2026", from: "billing@zenchef.com", subject: "Facture", nomPiece: "x.pdf", dateMail: "2026-10-02", extension: ".pdf" });
+    assert.equal(b.etablissement, "Bello Mio");
+    assert.equal(b.sourceEtablissement, "liste");
+    assert.deepEqual(plain(b.raisons), []);
+  });
+  test("DocuSign, notifications Pennylane, Vinted, La Poste, JDC, Up Coop : journal seul", () => {
+    const cas = [["dse@eumail.docusign.net", "contrat"], ["no-reply-support@notifications.pennylane.com", "notification"], ["noreply@vinted.fr", "notification"],
+                 ["system@jdc.fr", "notification"], ["emilie.tremblais@up.coop", "bon_commande"], ["lettre@laposte.net", "notification"]];
+    for (const [from, type] of cas) {
+      const a = ctx.analyserDocument({ idx, texte: "Toutes les parties ont complété « JDC SA - CONTRAT Q-485528 SASHA » Total TTC 2 400,00 € HT 2 000,00 TVA 400,00 Facture n° 12345", from, subject: "Complétée", nomPiece: "doc.pdf", dateMail: "2026-09-30", extension: ".pdf" });
+      assert.equal(a.type, type, from);
+      assert.equal(ctx.decider(a).destination, "journal", from);
+    }
+    assert.equal(ctx.typeParExpediteur("facturation@pennylane.com"), null, "les factures d'abonnement Pennylane restent traitées");
+  });
+  test("contrat signé et épreuve d'imprimeur reconnus dans le texte", () => {
+    assert.equal(ctx.detecterTypeDocument("Enveloppe complétée via DocuSign. Signature électronique de l'avenant.", null), "contrat");
+    assert.equal(ctx.detecterTypeDocument("Diazo Communication - PDF de contrôle pour validation avant impression. Menus été 2026.", null), "epreuve");
+  });
+  test("particulier sans SIRET, ni TVA, ni montant : courrier au journal ; avec un montant ou un identifiant : traitement normal", () => {
+    const sans = ctx.analyserDocument({ idx, texte: "Bonjour, ci-joint mon CV et ma lettre de motivation pour le poste de serveur. Cordialement, Julie", from: "julie.m@gmail.com", subject: "Candidature", nomPiece: "CV.pdf", dateMail: "2026-09-10", extension: ".pdf" });
+    assert.equal(sans.type, "courrier");
+    assert.equal(ctx.decider(sans).destination, "journal");
+    const avec = ctx.analyserDocument({ idx, texte: "Facture n° 2026-18 Prestation DJ soirée du 12/09 Total TTC 450,00 € HT 375,00 TVA 75,00 SIRET 123 456 789 00012", from: "dj.bob@hotmail.fr", subject: "Facture", nomPiece: "f.pdf", dateMail: "2026-09-15", extension: ".pdf" });
+    assert.equal(avec.type, "facture");
+    assert.equal(ctx.decider(avec).destination, "a_verifier", "fournisseur inconnu : à vérifier, comme avant");
+    const devis = ctx.analyserDocument({ idx, texte: "Devis n° 42 pour le mariage du 20 juin : 25 personnes, menu à 45 € par personne", from: "cliente@icloud.com", subject: "Mariage", nomPiece: "devis.pdf", dateMail: "2026-05-10", extension: ".pdf" });
+    assert.equal(ctx.decider(devis).destination, "journal");
+  });
+});

@@ -72,7 +72,19 @@ function trouverMontantTTC(texte) {
   };
   var cles = [/net\s*[àa]\s*payer/gi, /total\s*t\.?\s*t\.?\s*c\.?/gi, /montant\s*t\.?\s*t\.?\s*c\.?/gi,
               /total\s*[àa]\s*payer/gi, /montant\s*d[ûu]/gi, /total\s*due|amount\s*due/gi, /grand\s*total/gi, /total\s*[àa]\s*r[ée]gler/gi,
-              /montant\s*(?:[àa]|a)\s*payer/gi, /montant\s*de\s*la\s*facture/gi, /montant\s*total/gi, /total\s*\(eur\)/gi, /total\s*global/gi];
+              /montant\s*(?:[àa]|a)\s*payer/gi, /montant\s*de\s*la\s*facture/gi, /montant\s*total/gi, /total\s*\(eur\)/gi, /total\s*global/gi,
+              /ttc\s*[àa]\s*payer/gi, /total\s*(?:ttc\s*)?en\s*eur/gi, /[àa]\s*payer\s*:/gi];
+  // Consignes (fûts, emballages, cautions) : un candidat qui vaut un autre candidat + une consigne est écarté
+  var consignes = [];
+  var reC = new RegExp("(?:" + CONFIG.motifsConsigne.source + ")[^\\d\\-]{0,40}(\\d{1,3}(?:[ .]\\d{3})*[,.]\\d{2})", "gi"), mc;
+  while ((mc = reC.exec(t)) !== null) { var cc = Math.round(parseFloat(mc[1].replace(/[ ]/g, "").replace(/\.(?=\d{3})/g, "").replace(",", ".")) * 100); if (cc > 0 && consignes.indexOf(cc) === -1) consignes.push(cc); }
+  var sansConsigne = function(liste) {
+    if (!consignes.length) return liste;
+    var valeurs = liste.map(function(m) { return m.c; });
+    return liste.filter(function(m) {
+      return !consignes.some(function(k) { return valeurs.indexOf(m.c - k) !== -1 && tous.some(function(x) { return x.c === m.c - k; }); });
+    });
+  };
   var cand = [];
   for (var i = 0; i < cles.length; i++) {
     var re = cles[i], m;
@@ -82,14 +94,14 @@ function trouverMontantTTC(texte) {
       listerMontants(t.substr(debutFen, 150)).filter(pasUnTaux).forEach(function(x) { cand.push({ c: x.c, pos: debutFen + x.pos }); });
     }
   }
-  // 1) après un mot clé ET cohérent HT + TVA = TTC (le plus répété, puis le plus grand)
-  var coherentsCles = cand.filter(estSomme);
+  // 1) après un mot clé ET cohérent HT + TVA = TTC (le plus répété, puis le plus grand), hors TTC + consigne
+  var coherentsCles = sansConsigne(cand.filter(estSomme));
   if (coherentsCles.length) return (meilleur(coherentsCles).c / 100).toFixed(2);
   // 2) n'importe où dans le bloc des totaux : triplet HT + TVA = TTC, le plus grand (un total HT peut aussi être une somme de bases)
-  var coherents = tous.filter(estSomme);
+  var coherents = sansConsigne(tous.filter(estSomme));
   if (coherents.length) return (coherents.reduce(function(p, m) { return Math.abs(m.c) > Math.abs(p.c) ? m : p; }).c / 100).toFixed(2);
   // 3) plus grand montant après un mot clé, mais jamais au delà de 10 000 € sans triplet (capital, code, SIREN)
-  var plafonnes = cand.filter(function(m) { return Math.abs(m.c) <= CONFIG.montantMaxSansTriplet; });
+  var plafonnes = sansConsigne(cand.filter(function(m) { return Math.abs(m.c) <= CONFIG.montantMaxSansTriplet; }));
   if (plafonnes.length) return (meilleur(plafonnes).c / 100).toFixed(2);
   return null;
 }
@@ -283,6 +295,9 @@ function detecterTypeDocument(texte, montant) {
   if (/\bdevis\s*(?:n\s*[°o]|num|:)|ce\s*devis|validite\s*(?:du\s*)?devis|bon\s*pour\s*accord|pro\s*-?\s*forma/.test(t) && !numeroFacture) return "devis";
   if (/\bdevis\b/.test(t) && !signauxFacture) return "devis";
   if (/bon\s*de\s*commande|confirmation\s*de\s*commande|purchase\s*order|accuse\s*de\s*reception\s*de\s*commande/.test(t) && !signauxFacture) return "bon_commande";
+  // Épreuves d'imprimeur (Diazo : PDF de contrôle, bon à tirer) et contrats signés électroniquement
+  if (/pdf\s*de\s*controle|bon\s*a\s*tirer|\bbat\b|epreuve\s*(?:de\s*)?(?:controle|validation)|validation\s*avant\s*impression/.test(t) && !signauxFacture) return "epreuve";
+  if (/docusign|signature\s*electronique|enveloppe\s*(?:completee|signee)|toutes\s*les\s*parties\s*ont\s*(?:complete|signe)/.test(t) && !signauxFacture) return "contrat";
   // Avoir : montant négatif, ou « avoir » dans le TITRE du document (600 premiers caractères), jamais « facture/avoir »
   // (en-tête générique Cozigou) ni « avoir de prix » dans une légende (Cheville 35)
   var titre = t.slice(0, 600).replace(/facture\s*(?:\/|ou|-)\s*avoir/g, "").replace(/avoir\s*de\s*prix/g, "");
@@ -292,6 +307,19 @@ function detecterTypeDocument(texte, montant) {
   if (signauxFacture || /\bfacture\b|\binvoice\b|\brecu\b|\breceipt\b/.test(t)) return "facture";
   if (/\b(?:tarifs?|promotions?|promos?|catalogue|newsletter|mercuriale|offre\s*speciale|offres?\s*(?:du\s*moment|de\s*la\s*semaine))\b/.test(t)) return "catalogue";
   return "autre";
+}
+
+/** Type imposé par le domaine de l'expéditeur (DocuSign -> contrat, notifications Pennylane…), ou null */
+function typeParExpediteur(from) {
+  var cands = domainesCandidats(domaineDe(from));
+  for (var i = 0; i < cands.length; i++) if (CONFIG.expediteursJournalSeul[cands[i]]) return CONFIG.expediteursJournalSeul[cands[i]];
+  return null;
+}
+
+/** Vrai si l'expéditeur écrit depuis une messagerie de particulier (gmail, hotmail, icloud, wanadoo…) */
+function estParticulier(from) {
+  var d = domaineDe(from);
+  return !!d && CONFIG.domainesParticuliers.indexOf(d) !== -1;
 }
 
 /** Catalogue, tarif, promotion d'après l'objet du mail ou le nom de la pièce (pas d'après le texte) */
@@ -344,6 +372,12 @@ function analyserDocument(e) {
   var f = extraireFournisseur(e.idx || indexerFournisseurs(listeFournisseursParDefaut()), e.from, e.subject, texte);
   var montant = texteLu ? trouverMontantTTC(texte) : null;
   var type = texteLu ? detecterTypeDocument(texte, montant) : "autre";
+  // Expéditeurs qui n'envoient jamais de factures (DocuSign, notifications Pennylane, Vinted, La Poste, JDC, Up Coop)
+  var typeForce = typeParExpediteur(e.from);
+  if (typeForce) type = typeForce;
+  // Mail de particulier (gmail, hotmail…) sans SIRET, ni TVA, ni montant : devis, CV, réservation -> journal seul
+  var particulier = estParticulier(e.from) && f.source !== "identifiant";
+  if (particulier && type === "autre" && !montant && !listerIdentifiants(texte).length) type = "courrier";
   // Tarifs, promotions, catalogues annoncés par l'objet du mail ou le nom de la pièce : journal seul
   if (type !== "facture" && type !== "avoir" && type !== "releve" && type !== "mandat" && estCatalogueParObjet(e.subject, e.nomPiece)) type = "catalogue";
   if (type === "autre" && texteLu && estCatalogueParObjet(e.subject, e.nomPiece)) type = "catalogue";
@@ -367,13 +401,14 @@ function analyserDocument(e) {
     var defaut = etablissementParDefaut(f.entree.etab);
     if (defaut) { a.etablissement = defaut; a.sourceEtablissement = "liste"; }
   }
+  a.etabParDefaut = f.entree ? String(f.entree.etab || "") : "";
   // Numéro de secours : dans le nom de la pièce jointe ("CHEVI35 Chev35 00113789.pdf")
   if (!a.numero && e.nomPiece) { var m = String(e.nomPiece).match(/\d{6,}/); if (m) a.numero = m[0]; }
   if (!texteLu) a.raisons.push("texte illisible (OCR)");
-  if (texteLu && !a.etablissement) a.raisons.push("établissement inconnu");
+  if (texteLu && !a.etablissement) a.raisons.push("établissement inconnu" + (f.entree ? " (liste : « " + (a.etabParDefaut || "vide") + " »)" : ""));
   if ((type === "facture" || type === "avoir" || type === "ticket") && !a.montant) a.raisons.push("montant introuvable");
   if (type === "autre" && texteLu) a.raisons.push("type de document incertain");
-  if (!f.nom && type !== "catalogue") a.raisons.push("fournisseur inconnu" + (f.propose ? " (" + f.propose + " ?)" : ""));
+  if (!f.nom && ["catalogue", "contrat", "notification", "courrier", "epreuve"].indexOf(type) === -1) a.raisons.push("fournisseur inconnu" + (f.propose ? " (" + f.propose + " ?)" : ""));
   // Une facture de plus de 90 jours reçue aujourd'hui est suspecte (facture de 2025 dans un mail de 2026)
   if (a.date && e.dateMail && (type === "facture" || type === "avoir" || type === "ticket") && joursEntre(a.date, e.dateMail) > CONFIG.ancienneFactureJours) {
     a.raisons.push("ancienne facture (" + a.date + ")");
@@ -382,11 +417,15 @@ function analyserDocument(e) {
   return a;
 }
 
-/** « Bello » / « Piccola » (colonne Établissement par défaut du Sheet) -> nom d'établissement ; « Les deux » ou vide -> null */
+/**
+ * Colonne « Établissement par défaut » du Sheet -> nom d'établissement.
+ * Variantes acceptées : bello, bello mio, sasha, bm / piccola, piccola mia, fratelli, pm. « Les deux », vide ou autre -> null.
+ */
 function etablissementParDefaut(valeur) {
-  var v = normaliser(valeur);
-  if (/^bello/.test(v)) return "Bello Mio";
-  if (/^piccola/.test(v)) return "Piccola Mia";
+  var v = normaliser(valeur).replace(/[^a-z]/g, " ").trim();
+  if (!v || /les\s*deux|both|tous/.test(v)) return null;
+  if (/^(bello(\s*mio)?|sasha|bm)$/.test(v) || /^bello\b/.test(v)) return "Bello Mio";
+  if (/^(piccola(\s*mia)?|fratelli|i\s*fratelli|pm)$/.test(v) || /^piccola\b/.test(v)) return "Piccola Mia";
   return null;
 }
 
@@ -406,7 +445,7 @@ function anneeDe(a) { return String(a.date || a.dateSecours || "").slice(0, 4) |
  */
 function decider(a) {
   var annee = anneeDe(a);
-  if (a.type === "devis" || a.type === "bon_commande" || a.type === "attestation" || a.type === "catalogue") {
+  if (["devis", "bon_commande", "attestation", "catalogue", "contrat", "notification", "courrier", "epreuve"].indexOf(a.type) !== -1) {
     return { destination: "journal", chemin: [], archive: [], raison: a.type + " : rien à ranger" };
   }
   if ((a.type === "releve" || a.type === "mandat") && a.texteLu && a.fournisseur) {
