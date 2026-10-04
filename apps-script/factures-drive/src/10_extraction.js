@@ -136,12 +136,27 @@ function numeroDeClient(t, pos) {
       || /client\s*(?:facture|facturé)?\s*(?:n\s*[°o]\.?|:)?\s*$/.test(avant);
 }
 
+/**
+ * Vrai si le candidat est un identifiant fiscal et non un numéro de facture : TVA intracommunautaire (FR + 11 chiffres,
+ * « FR53922735535 » chez Self Stockage), ou SIRET (14 chiffres) / SIREN (9 chiffres) présent dans les identifiants du texte.
+ */
+function estIdentifiantFiscal(candidat, texte) {
+  var k = cleIdentifiant(candidat);
+  if (/^FR\d{11}$/.test(k)) return true;
+  if (!/^\d{9}$|^\d{14}$/.test(k)) return false;
+  var ids = listerIdentifiants(texte);
+  if (ids.indexOf(k) !== -1) return true;
+  // SIRET dont le SIREN est connu, ou SIREN d'un SIRET connu
+  return ids.some(function(i) { return /^\d{14}$/.test(i) && i.slice(0, 9) === k || k.length === 14 && i === k.slice(0, 9); });
+}
+
 /** Première occurrence d'un motif dont le numéro n'est pas un numéro de client */
 function chercherNumero(t, motif) {
   var re = new RegExp(motif.source, motif.flags.indexOf("g") === -1 ? motif.flags + "g" : motif.flags), m;
   while ((m = re.exec(t)) !== null) {
     var pos = m.index + m[0].lastIndexOf(m[1]);
     if (/^\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}$/.test(m[1])) continue;   // « Date de facture : 30/09/2026 »
+    if (estIdentifiantFiscal(m[1], t)) continue;                             // « TVA FR53922735535 », SIRET, SIREN
     if (!numeroDeClient(t, pos)) return m[1];
   }
   return null;
@@ -169,6 +184,7 @@ function trouverNumeroFacture(texte) {
       var jeton = jm[0], chiffres = (jeton.match(/\d/g) || []).length;
       if (/^\d{1,2}[.\/-]\d{1,2}[.\/-]\d{2,4}/.test(jeton)) continue;           // une date
       if (numeroDeClient(fen, jm.index)) continue;
+      if (estIdentifiantFiscal(jeton, t)) continue;
       if (chiffres >= 5 && chiffres > score) { score = chiffres; meilleur = jeton; }
     }
     if (meilleur) return nettoyerNumero(meilleur);
@@ -310,7 +326,8 @@ function detecterTypeDocument(texte, montant) {
   if (/attestation\s+(?:de|d['’])\s*(?:depot|vigilance|regularite|conformite|dsn|assurance|paiement|versement)|attestation\s+employeur|attestation\s+(?:destinee|pour)\s+(?:a\s+)?(?:france\s*travail|pole\s*emploi)|declaration\s*sociale\s*nominative|\bdsn\b/.test(t) && !signauxFacture) return "attestation";
   // Un devis ou un bon de commande affiche un total TTC : seul un vrai numéro de facture l'emporte
   if (/\bdevis\s*(?:n\s*[°o]|num|:)|ce\s*devis|validite\s*(?:du\s*)?devis|bon\s*pour\s*accord|pro\s*-?\s*forma/.test(t) && !numeroFacture) return "devis";
-  if (/bon\s*de\s*commande\s*(?:n\s*[°o]|num[ée]ro|:)/.test(t.slice(0, 800)) && !numeroFacture) return "bon_commande";
+  // « Bon de commande », « BC n° », « purchase order » dans le titre : bon de commande, même si « facture » apparaît plus loin
+  if (/bon\s*de\s*commande|\bbc\s*n\s*[°o]|purchase\s*order/.test(t.slice(0, 800)) && !/facture\s*n\s*[°o]|n\s*[°o]\.?\s*(?:de\s*)?facture/.test(t.slice(0, 800))) return "bon_commande";
   if (/\bdevis\b/.test(t) && !signauxFacture) return "devis";
   if (/bon\s*de\s*commande|confirmation\s*de\s*commande|purchase\s*order|accuse\s*de\s*reception\s*de\s*commande/.test(t) && !signauxFacture) return "bon_commande";
   // Épreuves d'imprimeur (Diazo : PDF de contrôle, bon à tirer) et contrats signés électroniquement
@@ -390,8 +407,9 @@ function analyserDocument(e) {
   var f = extraireFournisseur(e.idx || indexerFournisseurs(listeFournisseursParDefaut()), e.from, e.subject, texte);
   var montant = texteLu ? trouverMontantTTC(texte) : null;
   var type = texteLu ? detecterTypeDocument(texte, montant) : "autre";
-  // Expéditeurs qui n'envoient jamais de factures (DocuSign, notifications Pennylane, Vinted, La Poste, JDC, Up Coop)
-  var typeForce = typeParExpediteur(e.from);
+  // Expéditeurs qui n'envoient jamais de factures (DocuSign, notifications Pennylane, Vinted, La Poste, JDC, Up Coop),
+  // et fournisseurs dont la colonne « Établissement par défaut » dit « bon de commande »
+  var typeForce = typeParExpediteur(e.from) || (f.entree && f.entree.typeForce) || null;
   if (typeForce) type = typeForce;
   // Mail de particulier (gmail, hotmail…) sans SIRET, ni TVA, ni montant : devis, CV, réservation -> journal seul
   var particulier = estParticulier(e.from) && f.source !== "identifiant";
@@ -440,11 +458,7 @@ function analyserDocument(e) {
  * Variantes acceptées : bello, bello mio, sasha, bm / piccola, piccola mia, fratelli, pm. « Les deux », vide ou autre -> null.
  */
 function etablissementParDefaut(valeur) {
-  var v = normaliser(valeur).replace(/[^a-z]/g, " ").trim();
-  if (!v || /les\s*deux|both|tous/.test(v)) return null;
-  if (/^(bello(\s*mio)?|sasha|bm)$/.test(v) || /^bello\b/.test(v)) return "Bello Mio";
-  if (/^(piccola(\s*mia)?|fratelli|i\s*fratelli|pm)$/.test(v) || /^piccola\b/.test(v)) return "Piccola Mia";
-  return null;
+  return interpreterEtablissement(valeur).etab;
 }
 
 /** Année d'archivage d'une pièce : celle de la date de facture, sinon du mail */

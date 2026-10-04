@@ -45,7 +45,7 @@ src/
   40_ocr.js               OCR Google Drive (PDF, photos), XML, empreinte MD5
   50_rangement.js         dossiers Drive, écriture et déplacement des fichiers
   60_traitement.js        extraireFactures, rattrapage, archiverEnvoisPennylane, alerteHebdo, installerDeclencheurs
-  70_outils.js            indexerExistant, ocrDump, reorganiserArchive, deplacerJournauxDeCloture, rattrapageBascule
+  70_outils.js            indexerExistant, ocrDump, reorganiserArchive, renommerArchive, deplacerJournauxDeCloture, rattrapageBascule
   90_legacy.js            anciennes fonctions de maintenance (renommage, couleurs…)
   CouleursBelloMio.js     inchangé
 tests/                    tests Node (node:test) : fixtures réelles + enchaînement complet sur de faux services Google
@@ -112,6 +112,23 @@ Règles ajoutées en v4.4 :
 - « Bon de commande n° » en tête de document (Hyg'Up) : bon de commande, journal seul, même avec un total TTC ; une facture
   qui cite un numéro de commande reste une facture.
 
+Règles ajoutées en v4.5 (nettoyage du Sheet « Fournisseurs iFratelli ») :
+- index des fournisseurs : une ligne active l'emporte toujours sur une ligne inactive de même clé (nom, variante, domaine,
+  identifiant), quel que soit l'ordre des lignes ; deux lignes actives de même clé : la première est gardée et un
+  avertissement est écrit dans le journal (destination `avertissement`) ; une ligne inactive ne donne plus de nom canonique ;
+- colonne « Établissement par défaut », valeurs libres : `perso`, `pas besoin` -> ligne inactive (quoi que dise la colonne Actif) ;
+  `bon de commande` -> toutes les pièces du fournisseur vont au journal seul ; autre valeur non reconnue -> avertissement et
+  établissement vide ; variantes `bello`, `bello mio`, `sasha`, `bm` / `piccola`, `piccola mia`, `fratelli`, `pm` / `les deux` ;
+- messageries grand public (`CONFIG.domainesParticuliers` : gmail, hotmail, outlook, live, yahoo, wanadoo, orange, free, icloud,
+  laposte.net, sfr…) : seule une adresse complète (`sdpfcompta@hotmail.com`) identifie un fournisseur ; un tel domaine seul dans
+  le Sheet est ignoré avec un avertissement ; la ligne « à compléter » proposée pour un inconnu porte l'adresse complète ;
+  une variante égale au domaine (« Wanadoo ») n'est plus cherchée dans l'adresse de l'expéditeur ;
+- numéro de facture : jamais un numéro de TVA (`FR` + 11 chiffres), ni un SIRET ou un SIREN présent sur le document ;
+- « BC n° » et « Purchase order » en tête de document comptent comme « Bon de commande n° » ;
+- réorganisation : la cible d'un fichier comprend son nouveau nom (fournisseur canonique, même format), écrit dans la colonne
+  « Nouveau nom » de l'onglet `Réorganisation` ; `reorganiserArchiveReel` renomme en plus de déplacer ; les dossiers d'un
+  fournisseur inactif sont laissés en place (ligne « ignoré (fournisseur inactif) ») en attendant la décision sur `_Perso`.
+
 Le nom des fichiers garde le format historique : `AAAA-MM-JJ — Fournisseur — Facture n° XXX — 123.45 EUR.pdf`
 (avoirs en négatif, tickets sans numéro, relevés `Relevé n° XXX`).
 
@@ -152,11 +169,17 @@ Puis, dans l'éditeur Apps Script (`npm run open`), dans cet ordre :
    Invoicing, Transfert Pierre, Yahoo, Wanadoo, Indy, Bellomio…) sont vidés d'après le contenu des PDF (OCR), les relevés
    égarés dans l'archive repartent vers `_Hors Pennylane`, l'illisible va en `À vérifier`. Relancer jusqu'à « TERMINÉ »
    (les fichiers déjà planifiés ne sont pas relus). Paul valide l'onglet, puis `reorganiserArchiveReel` exécute les
-   lignes « simulation », les marque « fait » et met les dossiers vides à la corbeille.
+   lignes « simulation » (déplacement, et renommage si la colonne « Nouveau nom » diffère), les marque « fait » et met les
+   dossiers vides à la corbeille.
 4. `deplacerJournauxDeCloture` : `Piccola Mia/Journaux de clôture` part dans `Journaux de caisse iFratelli/Piccola Mia`.
+5. **Renommage de l'archive déjà réorganisée** (v4.5) : `renommerArchive` (simulation, aucun OCR) parcourt `Bello Mio`,
+   `Piccola Mia` et `_Hors Pennylane` et écrit dans l'onglet `Réorganisation`, méthode « renommage », les fichiers dont le
+   nom porte un ancien fournisseur (« Wanadoo » dans `Self Stockage`, « Indy » dans `Alain Pedron Nettoyage`, « Hyg-up »…),
+   avec le nouveau nom. Les dossiers d'un fournisseur inactif de la liste donnent une ligne « ignoré ». Paul relit l'onglet,
+   puis `renommerArchiveReel` ne fait que renommer (rien n'est déplacé ni supprimé, identifiants conservés, index mis à jour).
 
 `reinitialiserReprises` efface les positions de reprise pour recommencer une simulation de zéro.
-Les fichiers ne sont jamais renommés ni supprimés par ces fonctions (déplacés seulement, identifiant conservé).
+Les fichiers ne sont jamais supprimés par ces fonctions (déplacés ou renommés seulement, identifiant conservé).
 
 ### Elis
 

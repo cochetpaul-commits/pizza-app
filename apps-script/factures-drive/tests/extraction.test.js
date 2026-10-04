@@ -214,3 +214,85 @@ describe("v4.4 : net à payer et bon de commande", () => {
     assert.equal(ctx.detecterTypeDocument("Facture N° 127999 Cde N°99000908 du 25/09/2026 Total TTC 1 155,24 €", "1155.24"), "facture", "une facture qui cite une commande reste une facture");
   });
 });
+
+describe("v4.5 : index des fournisseurs, valeurs libres, domaines grand public, identifiants fiscaux", () => {
+  const ligne = (nom, opts) => Object.assign({ nom, variantes: [], domaines: [], identifiants: [], etab: "Bello", pennylaneBello: "", pennylanePiccola: "", actif: "oui" }, opts || {});
+  test("une ligne active l'emporte toujours sur une ligne inactive de même clé, quel que soit l'ordre", () => {
+    const inactive = ligne("Hyg-up", { actif: "non", identifiants: ["FR16911617124"], domaines: ["hygup.fr"], variantes: ["Hygup SAS"] });
+    const active = ligne("Hyg'Up", { identifiants: ["FR16911617124"], domaines: ["hygup.fr"], variantes: ["Hygup SAS"] });
+    for (const liste of [[inactive, active], [active, inactive]]) {
+      const i = ctx.indexerFournisseurs(liste.map((l) => Object.assign({}, l)));
+      assert.equal(ctx.nomCanonique(i, "Hyg-up"), "Hyg'Up");
+      assert.equal(ctx.nomCanonique(i, "Hygup SAS"), "Hyg'Up");
+      assert.equal(i.parIdentifiant.FR16911617124.nom, "Hyg'Up");
+      assert.equal(i.parDomaine["hygup.fr"].nom, "Hyg'Up");
+      assert.equal(ctx.extraireFournisseur(i, "x@hygup.fr", "", "").nom, "Hyg'Up");
+      assert.deepEqual(plain(i.avertissements), []);
+    }
+    const seule = ctx.indexerFournisseurs([Object.assign({}, inactive)]);
+    assert.equal(ctx.nomCanonique(seule, "Hyg-up"), null, "inactive seule : pas de nom canonique");
+    assert.equal(ctx.entreeParNom(seule, "Hyg-up").nom, "Hyg-up", "mais l'entrée reste repérable");
+  });
+  test("deux lignes actives de même clé : la première est gardée, avertissement", () => {
+    const i = ctx.indexerFournisseurs([ligne("SC M2", { domaines: ["scm2.fr"] }), ligne("Sc-m2", { domaines: ["sc-m2.fr"] })]);
+    assert.equal(ctx.nomCanonique(i, "sc m2"), "SC M2");
+    assert.equal(i.avertissements.length, 1);
+    assert.match(i.avertissements[0], /nom « scm2 ».*SC M2.*Sc-m2/);
+  });
+  test("valeurs libres de la colonne établissement", () => {
+    const inter = (v) => plain(ctx.interpreterEtablissement(v));
+    assert.equal(inter("Bello Mio").etab, "Bello Mio");
+    assert.equal(inter("sasha").etab, "Bello Mio");
+    assert.equal(inter("PM").etab, "Piccola Mia");
+    assert.equal(inter("fratelli").etab, "Piccola Mia");
+    assert.ok(inter("les deux").lesDeux);
+    assert.ok(inter("perso").inactif);
+    assert.ok(inter("Pas besoin").inactif);
+    assert.equal(inter("bon de commande").typeForce, "bon_commande");
+    assert.ok(inter("je sais pas").inconnu);
+    assert.equal(inter("").etab, null);
+    const i = ctx.indexerFournisseurs([ligne("Cmb", { etab: "perso", domaines: ["cmb.fr"] }), ligne("Up Coop", { etab: "bon de commande", domaines: ["up.coop"] }), ligne("Metro", { etab: "je sais pas", domaines: ["metro.fr"] })]);
+    assert.equal(ctx.nomCanonique(i, "Cmb"), null, "perso = inactif");
+    assert.equal(ctx.extraireFournisseur(i, "x@cmb.fr", "", "").nom, null);
+    assert.equal(i.parDomaine["up.coop"].typeForce, "bon_commande");
+    assert.equal(ctx.extraireFournisseur(i, "x@metro.fr", "", "").nom, "Metro", "valeur inconnue : la ligne reste active");
+    assert.equal(ctx.etablissementParDefaut("je sais pas"), null);
+    assert.equal(i.avertissements.length, 1);
+    assert.match(i.avertissements[0], /Metro.*je sais pas/);
+    const a = ctx.analyserDocument({ idx: i, texte: "Facture n° 4455 Total TTC 120,00 € SARL SASHA Date : 01/10/2026", from: "x@up.coop", subject: "", nomPiece: "c.pdf", dateMail: "2026-10-02", extension: ".pdf" });
+    assert.equal(a.type, "bon_commande");
+    assert.equal(ctx.decider(a).destination, "journal");
+  });
+  test("messagerie grand public : adresse complète reconnue, domaine seul ignoré avec avertissement", () => {
+    const i = ctx.indexerFournisseurs([ligne("Self Stockage", { domaines: ["wanadoo.fr", "selfstockage@wanadoo.fr"] }), ligne("SDPF", { domaines: ["sdpfcompta@hotmail.com"] })]);
+    assert.equal(i.parDomaine["wanadoo.fr"], undefined);
+    assert.equal(i.avertissements.length, 1);
+    assert.match(i.avertissements[0], /Self Stockage.*wanadoo\.fr/);
+    assert.equal(ctx.extraireFournisseur(i, "Compta <sdpfcompta@hotmail.com>", "Facture", "").nom, "SDPF");
+    assert.equal(ctx.extraireFournisseur(i, "selfstockage@wanadoo.fr", "", "").nom, "Self Stockage");
+    assert.equal(ctx.extraireFournisseur(i, "autre@wanadoo.fr", "", "").nom, null);
+    assert.equal(ctx.extraireFournisseur(i, "autre@hotmail.com", "", "").nom, null);
+    const l = ctx.ligneACompleter({ from: "Jean <jean.dupont@orange.fr>", subject: "Facture", texte: "" });
+    assert.deepEqual(plain(l.domaines), ["jean.dupont@orange.fr"]);
+    assert.equal(l.nom, "jean.dupont");
+  });
+  test("numéro de facture : jamais un numéro de TVA, un SIRET ou un SIREN", () => {
+    assert.equal(ctx.trouverNumeroFacture("SELF STOCKAGE SAS\nN° TVA FR53922735535\nFacture n° 2026-0912\nTotal TTC 120,00"), "2026-0912");
+    assert.equal(ctx.trouverNumeroFacture("Facture N° FR53922735535 Total TTC 120,00"), null);
+    assert.equal(ctx.trouverNumeroFacture("SIRET 922 735 535 00014\nNuméro : 92273553500014\nTotal TTC 120,00"), null, "SIRET");
+    assert.equal(ctx.trouverNumeroFacture("SIREN 922735535\nFacture n° 922735535\nTotal TTC 120,00"), null, "SIREN");
+    assert.equal(ctx.trouverNumeroFacture("SIREN 922735535\nFacture n° 922735536\nTotal TTC 120,00"), "922735536", "neuf chiffres différents du SIREN : numéro valable");
+    assert.ok(ctx.estIdentifiantFiscal("FR 53 922735535", ""));
+    assert.ok(!ctx.estIdentifiantFiscal("FC0140", ""));
+  });
+  test("titre « BC n° » ou « Purchase order » : bon de commande", () => {
+    assert.equal(ctx.detecterTypeDocument("BC N° 99000858 du 20/09/2026 Fournisseur Hyg'Up Total TTC 1 029,77 €", "1029.77"), "bon_commande");
+    assert.equal(ctx.detecterTypeDocument("PURCHASE ORDER PO-2026-18 Total 1 029,77 €", "1029.77"), "bon_commande");
+  });
+  test("nouveau nom de fichier au fournisseur canonique", () => {
+    assert.equal(ctx.nomAvecFournisseur("2026-09-12 — Metro-gsc — Facture n° 123 — 50.00 EUR.pdf", "Metro"), "2026-09-12 — Metro — Facture n° 123 — 50.00 EUR.pdf");
+    assert.equal(ctx.nomAvecFournisseur("2026-10-01 — Carniato — Relevé LCR 14054661 — 138.80 EUR.pdf", "Carniato SA"), "2026-10-01 — Carniato SA — Relevé LCR 14054661 — 138.80 EUR.pdf");
+    assert.equal(ctx.nomAvecFournisseur("facture_scan.pdf", "Metro"), "facture_scan.pdf", "format inconnu : inchangé");
+    assert.equal(ctx.nomAvecFournisseur("2026-09-15 — Transfert Pierre — Facture.pdf", "Metro"), "2026-09-15 — Metro — Facture.pdf");
+  });
+});

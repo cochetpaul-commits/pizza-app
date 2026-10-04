@@ -21,23 +21,82 @@ function listeFournisseursParDefaut() {
   });
 }
 
-/** Index de recherche construit une fois par liste : clés -> entrée */
+/**
+ * Colonne « Établissement par défaut » du Sheet, valeurs libres comprises :
+ *   { etab: "Bello Mio" | "Piccola Mia" | null, lesDeux, inactif ("perso", "pas besoin"), typeForce ("bon de commande" -> "bon_commande"), inconnu }
+ */
+function interpreterEtablissement(valeur) {
+  var v = normaliser(valeur).replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
+  var r = { etab: null, lesDeux: false, inactif: false, typeForce: null, inconnu: false, brut: String(valeur || "") };
+  if (!v) return r;
+  if (/^(les deux|les 2|both|tous|tous les deux|deux)$/.test(v)) { r.lesDeux = true; return r; }
+  if (/^(bello( mio)?|sasha|bm)$/.test(v) || /^bello mio\b/.test(v)) { r.etab = "Bello Mio"; return r; }
+  if (/^(piccola( mia)?|fratelli|i fratelli|pm)$/.test(v) || /^piccola mia\b/.test(v)) { r.etab = "Piccola Mia"; return r; }
+  if (/^(perso|personnel|pas besoin|inutile|ignorer|non)$/.test(v)) { r.inactif = true; return r; }
+  if (/^(bon de commande|bons de commande|bdc|commande|commandes)$/.test(v)) { r.typeForce = "bon_commande"; return r; }
+  r.inconnu = true;
+  return r;
+}
+
+/** Vrai si la ligne est active (colonne Actif, et colonne Établissement « perso » / « pas besoin ») */
+function ligneActive(f) {
+  if (!f) return false;
+  if (String(f.actif || "oui").toLowerCase().trim() === "non") return false;
+  return !interpreterEtablissement(f.etab).inactif;
+}
+
+/** Vrai pour une messagerie grand public (gmail, hotmail, wanadoo…) : seule une adresse complète identifie un fournisseur */
+function estDomaineGrandPublic(domaine) {
+  return CONFIG.domainesParticuliers.indexOf(String(domaine || "").toLowerCase().trim()) !== -1;
+}
+
+/**
+ * Index de recherche construit une fois par liste : clés -> entrée.
+ *   parCle (nom et variantes), parDomaine, parAdresse (adresses complètes), parIdentifiant.
+ * Une ligne active l'emporte toujours sur une ligne inactive ; deux lignes actives avec la même clé : la première
+ * gagne et un avertissement est consigné dans idx.avertissements (écrit dans le journal par fournisseursIndex()).
+ * Un domaine grand public seul (wanadoo.fr) est ignoré avec un avertissement : il attribuerait tout expéditeur à ce fournisseur.
+ */
 function indexerFournisseurs(liste) {
-  var idx = { parCle: {}, parDomaine: {}, parIdentifiant: {}, liste: liste };
+  var idx = { parCle: {}, parDomaine: {}, parAdresse: {}, parIdentifiant: {}, liste: liste, avertissements: [] };
+  var poser = function(table, cle, f, libelle) {
+    if (!cle) return;
+    var actuel = table[cle];
+    if (!actuel) { table[cle] = f; return; }
+    if (actuel === f) return;
+    var aActif = ligneActive(actuel), fActif = ligneActive(f);
+    if (fActif && !aActif) { table[cle] = f; return; }           // l'actif remplace l'inactif
+    if (fActif && aActif) idx.avertissements.push("Fournisseurs : " + libelle + " « " + cle + " » partagé par « " + actuel.nom + " » et « " + f.nom + "» : la première ligne est gardée");
+  };
   liste.forEach(function(f) {
-    if (!f.nom) return;
-    idx.parCle[cleFournisseur(f.nom)] = f;
-    (f.variantes || []).forEach(function(v) { var k = cleFournisseur(v); if (k && !idx.parCle[k]) idx.parCle[k] = f; });
-    (f.domaines || []).forEach(function(d) { var k = String(d).toLowerCase().trim(); if (k) idx.parDomaine[k] = f; });
-    (f.identifiants || []).forEach(function(i) { var k = cleIdentifiant(i); if (k) idx.parIdentifiant[k] = f; });
+    if (!f || !f.nom) return;
+    var inter = interpreterEtablissement(f.etab);
+    f.typeForce = inter.typeForce;
+    if (inter.inactif) f.actif = "non";
+    if (inter.inconnu) idx.avertissements.push("Fournisseurs : « " + f.nom + " » a une valeur d'établissement non reconnue (« " + inter.brut + " »), traitée comme vide");
+    poser(idx.parCle, cleFournisseur(f.nom), f, "nom");
+    (f.variantes || []).forEach(function(v) { poser(idx.parCle, cleFournisseur(v), f, "variante"); });
+    (f.domaines || []).forEach(function(d) {
+      var k = String(d).toLowerCase().trim();
+      if (!k) return;
+      if (k.indexOf("@") !== -1) { poser(idx.parAdresse, k, f, "adresse"); return; }
+      if (estDomaineGrandPublic(k)) { idx.avertissements.push("Fournisseurs : « " + f.nom + " » utilise le domaine grand public « " + k + "» seul : ignoré, mettre l'adresse complète"); return; }
+      poser(idx.parDomaine, k, f, "domaine");
+    });
+    (f.identifiants || []).forEach(function(i) { poser(idx.parIdentifiant, cleIdentifiant(i), f, "identifiant"); });
   });
   return idx;
 }
 
-/** Nom canonique d'un ancien nom de dossier ou d'une variante ("Maeldistribution" -> "Maël Distribution"), ou null */
+/** Nom canonique d'un ancien nom de dossier ou d'une variante ("Maeldistribution" -> "Maël Distribution"), ou null (inconnu ou inactif) */
 function nomCanonique(idx, nom) {
   var f = idx.parCle[cleFournisseur(nom)];
-  return f ? f.nom : null;
+  return f && ligneActive(f) ? f.nom : null;
+}
+
+/** Entrée (active ou non) correspondant à un nom de dossier, ou null : sert à repérer les fournisseurs inactifs de l'archive */
+function entreeParNom(idx, nom) {
+  return idx.parCle[cleFournisseur(nom)] || null;
 }
 
 /** Domaine d'une adresse ("Paul <x@mail.sumup.com>" -> "mail.sumup.com") */
@@ -88,18 +147,28 @@ function listerIdentifiants(texte) {
  * Les entrées « non » (inactives) ne sont jamais retenues.
  */
 function resoudreFournisseur(idx, e) {
-  var actif = function(f) { return f && String(f.actif || "oui").toLowerCase() !== "non"; };
+  var actif = function(f) { return ligneActive(f); };
   var ids = listerIdentifiants(e.texte);
   for (var i = 0; i < ids.length; i++) { var fi = idx.parIdentifiant[ids[i]]; if (actif(fi)) return { entree: fi, source: "identifiant" }; }
   var from = String(e.from || "").toLowerCase();
+  var adresse = (from.match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+/) || [""])[0];
   var interne = CONFIG.transfertsAutorises.some(function(x) { return from.indexOf(x) !== -1; }) || CONFIG.adressesInternes.some(function(x) { return from.indexOf(x) !== -1; });
   if (!interne) {
-    var cands = domainesCandidats(domaineDe(from));
-    for (var j = 0; j < cands.length; j++) { var fd = idx.parDomaine[cands[j]]; if (actif(fd)) return { entree: fd, source: "domaine" }; }
-    if (idx.parDomaine[from.replace(/^.*<|>.*$/g, "")] && actif(idx.parDomaine[from.replace(/^.*<|>.*$/g, "")])) return { entree: idx.parDomaine[from.replace(/^.*<|>.*$/g, "")], source: "domaine" };
+    // adresse complète (obligatoire pour gmail, hotmail, wanadoo… : SDPF écrit depuis sdpfcompta@hotmail.com)
+    var fa = adresse && (idx.parAdresse[adresse] || idx.parDomaine[adresse]);
+    if (actif(fa)) return { entree: fa, source: "adresse" };
+    var domaine = domaineDe(from);
+    if (!estDomaineGrandPublic(domaine)) {
+      var cands = domainesCandidats(domaine);
+      for (var j = 0; j < cands.length; j++) { var fd = idx.parDomaine[cands[j]]; if (actif(fd) && !estDomaineGrandPublic(cands[j])) return { entree: fd, source: "domaine" }; }
+    }
   }
-  var champ = cleFournisseur(" " + (e.subject || "") + " " + (interne ? "" : (e.from || "")) + " ");
-  var texteNorm = " " + normaliser((e.subject || "") + " " + (interne ? "" : (e.from || ""))).replace(/[^a-z0-9]+/g, " ") + " ";
+  // expéditeur pris en compte pour la recherche par nom, sans le domaine grand public (« Wanadoo » est une variante de Self Stockage,
+  // mais quelqun@wanadoo.fr n'est pas Self Stockage)
+  var fromNom = interne ? "" : String(e.from || "");
+  if (!interne && estDomaineGrandPublic(domaineDe(from))) fromNom = fromNom.replace(/@[a-z0-9.\-]+/gi, " ");
+  var champ = cleFournisseur(" " + (e.subject || "") + " " + fromNom + " ");
+  var texteNorm = " " + normaliser((e.subject || "") + " " + fromNom).replace(/[^a-z0-9]+/g, " ") + " ";
   var meilleur = null, longueur = 0;
   for (var k in idx.parCle) {
     if (k.length < 4) continue;
@@ -116,8 +185,12 @@ function resoudreFournisseur(idx, e) {
 
 /** Ligne « à compléter » pour un fournisseur inconnu (proposition de nom, domaine, identifiants lus) */
 function ligneACompleter(e) {
-  var ids = listerIdentifiants(e.texte);
-  return { nom: nomProposeDepuisDomaine(e.from) || "?", variantes: [], domaines: domaineDe(e.from) ? [domaineDe(e.from)] : [], identifiants: ids, etab: "",
+  var ids = listerIdentifiants(e.texte), domaine = domaineDe(e.from);
+  // messagerie grand public : on propose l'adresse complète, jamais le domaine seul
+  var adresse = (String(e.from || "").toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+/) || [""])[0];
+  var domaines = !domaine ? [] : estDomaineGrandPublic(domaine) ? (adresse ? [adresse] : []) : [domaine];
+  var nom = estDomaineGrandPublic(domaine) ? (adresse ? adresse.split("@")[0] : "?") : (nomProposeDepuisDomaine(e.from) || "?");
+  return { nom: nom, variantes: [], domaines: domaines, identifiants: ids, etab: "",
            pennylaneBello: "", pennylanePiccola: "", actif: "à compléter", remarque: "objet : " + (e.subject || "") };
 }
 

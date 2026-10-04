@@ -35,6 +35,7 @@ function fournisseursIndex() {
     liste = n > 1 ? f.getRange(2, 1, n - 1, COLONNES_FOURNISSEURS.length).getValues().map(entreeDepuisLigne).filter(function(e) { return e.nom; }) : [];
   }
   _fournisseurs.idx = indexerFournisseurs(liste);
+  _fournisseurs.idx.avertissements.forEach(function(a) { Logger.log("AVERTISSEMENT " + a); journalAvertir(a); });
   return _fournisseurs.idx;
 }
 
@@ -43,13 +44,14 @@ function fournisseursProposer(e) {
   var ligne = ligneACompleter(e);
   var cle = (ligne.domaines[0] || "") + "|" + ligne.nom;
   var idx = fournisseursIndex();
+  var d0 = ligne.domaines[0] || "";
   // déjà dans le Sheet (même « à compléter ») : on ne redouble pas
-  if (ligne.domaines[0] && idx.parDomaine[ligne.domaines[0]]) return;
+  if (d0 && (idx.parDomaine[d0] || idx.parAdresse[d0])) return;
   if (_fournisseurs.dejaProposes[cle]) return;
   _fournisseurs.dejaProposes[cle] = true;
   _fournisseurs.aAjouter.push(ligneDepuisEntree(ligne));
-  // dans la même passe, le domaine est connu comme « à compléter » (inactif : la pièce reste « À vérifier »)
-  if (ligne.domaines[0]) idx.parDomaine[ligne.domaines[0]] = Object.assign({}, ligne, { actif: "non" });
+  // dans la même passe, le domaine (ou l'adresse complète) est connu comme « à compléter » (inactif : la pièce reste « À vérifier »)
+  if (d0) (d0.indexOf("@") !== -1 ? idx.parAdresse : idx.parDomaine)[d0] = Object.assign({}, ligne, { actif: "non" });
 }
 
 function fournisseursVider() {

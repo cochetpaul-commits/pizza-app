@@ -10,7 +10,7 @@
 
 var COLONNES_JOURNAL = ["Horodatage", "Date mail", "Expéditeur", "Reçu sur", "Objet", "Pièce", "Type", "Établissement", "Fournisseur", "Numéro", "Date facture", "Montant", "Destination", "Chemin", "Raison", "Lien fichier", "Lien mail", "Message id", "Mode"];
 var COLONNES_INDEX = ["Fichier id", "MD5", "Établissement", "Fournisseur", "Numéro", "Date", "Montant", "Nom", "Chemin", "Ajouté le", "Archive prévue"];
-var COLONNES_REORG = ["Fichier id", "Ancien chemin", "Nouveau chemin", "Nom", "Méthode", "Statut", "Horodatage"];
+var COLONNES_REORG = ["Fichier id", "Ancien chemin", "Nouveau chemin", "Nom", "Méthode", "Statut", "Horodatage", "Nouveau nom"];
 
 var _journal = { classeur: null, tampon: { Journal: [], "Messages traités": [], Index: [], Simulation: [], "Réorganisation": [] }, traites: null, index: null, parId: null, lignesIndex: {} };
 
@@ -95,6 +95,14 @@ function indexDeplacer(fichierId, chemin) {
   if (ligne) journalOnglet(journalClasseur(), "Index", COLONNES_INDEX).getRange(ligne, 9).setValue(chemin);
 }
 
+/** Met à jour le nom d'un fichier renommé (mémoire, et Sheet si la ligne est connue) */
+function indexRenommer(fichierId, nom) {
+  var e = indexParId(fichierId);
+  if (e) e.nom = nom;
+  var ligne = _journal.lignesIndex[fichierId];
+  if (ligne) journalOnglet(journalClasseur(), "Index", COLONNES_INDEX).getRange(ligne, 8).setValue(nom);
+}
+
 /** Une ligne de journal (objet avec les clés de COLONNES_JOURNAL, en minuscules sans accents) */
 function journalAjouter(l, simulation) {
   var ligne = [new Date(), l.dateMail || "", l.expediteur || "", l.recuSur || "", l.objet || "", l.piece || "", l.type || "", l.etablissement || "", l.fournisseur || "",
@@ -116,17 +124,24 @@ function journalLignesRecentes(jours) {
   return out;
 }
 
-/** Ligne du plan de réorganisation : { fichierId, ancien, nouveau, nom, methode, statut } */
+/** Avertissement (liste de référence incohérente, valeur non reconnue…) : une ligne de journal, destination « avertissement » */
+function journalAvertir(texte) {
+  journalAjouter({ destination: "avertissement", raison: texte }, false);
+}
+
+/** Ligne du plan de réorganisation : { fichierId, ancien, nouveau, nom, methode, statut, nouveauNom } */
 function reorgAjouter(r) {
-  _journal.tampon["Réorganisation"].push([r.fichierId, r.ancien, r.nouveau, r.nom, r.methode, r.statut, new Date()]);
+  _journal.tampon["Réorganisation"].push([r.fichierId, r.ancien, r.nouveau, r.nom, r.methode, r.statut, new Date(), r.nouveauNom || ""]);
 }
 
 /** Lignes du plan de réorganisation : [{ ligne, fichierId, ancien, nouveau, nom, methode, statut }] */
 function reorgLire() {
   var f = journalOnglet(journalClasseur(), "Réorganisation", COLONNES_REORG), n = f.getLastRow();
   if (n < 2) return [];
+  // L'onglet a pu être créé en v4.1 sans la colonne « Nouveau nom » : on l'ajoute au besoin
+  if (f.getLastColumn && f.getLastColumn() < COLONNES_REORG.length) f.getRange(1, COLONNES_REORG.length).setValue(COLONNES_REORG[COLONNES_REORG.length - 1]);
   return f.getRange(2, 1, n - 1, COLONNES_REORG.length).getValues().map(function(r, i) {
-    return { ligne: i + 2, fichierId: r[0], ancien: r[1], nouveau: r[2], nom: r[3], methode: r[4], statut: r[5] };
+    return { ligne: i + 2, fichierId: r[0], ancien: r[1], nouveau: r[2], nom: r[3], methode: r[4], statut: r[5], nouveauNom: r[7] || "" };
   });
 }
 

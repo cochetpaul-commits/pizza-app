@@ -245,6 +245,14 @@ describe("réorganisation de l'archive : simulation puis réel", () => {
     assert.equal(par("_Hors Pennylane/Bello Mio/Carniato/10 - Octobre 2026").nouveau, "_Hors Pennylane/Bello Mio/Carniato/2026");
     assert.equal(par("Bello Mio/Carniato/2026"), undefined, "déjà en place");
     assert.equal(st.enPlace, 1);
+    // v4.5 : colonne « Nouveau nom » au fournisseur canonique, même format que extraireFactures
+    const nomsPrevus = env.feuille("Réorganisation").map((l) => [l[1], l[3], l[7]]);
+    const nouveauNom = (ancien) => nomsPrevus.find((x) => x[0] === ancien)[2];
+    assert.equal(nouveauNom("Bello Mio/Maeldistribution/10 - Octobre 2026"), "2026-10-02 — Maël Distribution — Facture n° FC0126 — -4.92 EUR.pdf");
+    assert.equal(nouveauNom("Bello Mio/Metro-gsc/09 - Septembre 2026"), "2026-09-12 — Metro — Facture n° 123 — 50.00 EUR.pdf");
+    assert.equal(nouveauNom("Bello Mio/Facture/09 - Septembre 2026"), "2026-09-30 — Carniato — Facture n° 201018858 — 347.59 EUR.pdf", "fourre-tout : fournisseur lu dans le PDF");
+    assert.equal(nouveauNom("Bello Mio/Transfert Pierre/09 - Septembre 2026"), "2026-09-15 — Transfert Pierre — Facture.pdf", "illisible : nom gardé");
+    assert.equal(nouveauNom("Piccola Mia/Carniato/10 - Octobre 2026"), "2026-10-01 — Carniato — Relevé LCR 14054661 — 138.80 EUR.pdf", "déjà au bon nom");
     assert.ok(!plan.some((p) => /Journaux de clôture/.test(p.ancien)), "journaux de caisse laissés à deplacerJournauxDeCloture");
     assert.ok(plan.every((p) => p.statut === "simulation"));
     // relancer la simulation ne redouble pas le plan
@@ -256,15 +264,17 @@ describe("réorganisation de l'archive : simulation puis réel", () => {
     const st = env.ctx.reorganiserArchiveReel();
     assert.equal(st.erreurs, 0);
     assert.equal(st.faits, 7);
+    assert.equal(st.deplaces, 7);
+    assert.equal(st.renommes, 3, "Maeldistribution, Metro-gsc, Facture (Carniato)");
     const apres = env.arbre();
-    assert.ok(apres.includes("/Bello Mio/Maël Distribution/2026/2026-10-02 — Maeldistribution — Facture n° FC0126 — -4.92 EUR.pdf"), apres.join("\n"));
-    assert.ok(apres.includes("/Bello Mio/Metro/2026/2026-09-12 — Metro-gsc — Facture n° 123 — 50.00 EUR.pdf"));
+    assert.ok(apres.includes("/Bello Mio/Maël Distribution/2026/2026-10-02 — Maël Distribution — Facture n° FC0126 — -4.92 EUR.pdf"), apres.join("\n"));
+    assert.ok(apres.includes("/Bello Mio/Metro/2026/2026-09-12 — Metro — Facture n° 123 — 50.00 EUR.pdf"));
     assert.ok(apres.includes("/Bello Mio/Metro/2026/2026-08-12 — Metro — Facture n° 122 — 40.00 EUR.pdf"));
-    assert.ok(apres.includes("/Bello Mio/Carniato/2026/2026-09-30 — Facture — Facture n° 201018858 — 347.59 EUR.pdf"));
+    assert.ok(apres.includes("/Bello Mio/Carniato/2026/2026-09-30 — Carniato — Facture n° 201018858 — 347.59 EUR.pdf"), "déplacé ET renommé");
     assert.ok(apres.includes("/À vérifier/2026-09-15 — Transfert Pierre — Facture.pdf"));
     assert.ok(apres.includes("/_Hors Pennylane/Piccola Mia/Carniato/2026/2026-10-01 — Carniato — Relevé LCR 14054661 — 138.80 EUR.pdf"));
     assert.ok(!apres.some((x) => /Metro-gsc\/|\/Facture\/|Maeldistribution\/|10 - Octobre|09 - Septembre|08 - Août/.test(x)), "anciens dossiers vides disparus");
-    assert.equal(env.ctx.dossierDuChemin(["Bello Mio", "Carniato", "2026"]).getFilesByName("2026-09-30 — Facture — Facture n° 201018858 — 347.59 EUR.pdf").next().getId(), idCarniato);
+    assert.equal(env.ctx.dossierDuChemin(["Bello Mio", "Carniato", "2026"]).getFilesByName("2026-09-30 — Carniato — Facture n° 201018858 — 347.59 EUR.pdf").next().getId(), idCarniato);
     assert.ok(env.feuille("Réorganisation").every((l) => l[5] === "fait"));
   });
   test("les journaux de clôture sortent de Factures iFratelli", () => {
@@ -393,5 +403,102 @@ describe("v4.2 : quota OCR, transit du rattrapage, établissement par défaut, i
     ] }]);
     const s = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "img" });
     assert.equal(s.pieces, 1, "seule la photo IMG_2041 est examinée");
+  });
+});
+
+describe("v4.5 : liste de fournisseurs nettoyée, renommage de l'archive, avertissements", () => {
+  /** Sheet « Fournisseurs iFratelli » écrit à la main dans le faux Drive */
+  function ecrireSheet(env, lignes) {
+    const c = env.ctx.fournisseursClasseur(true);
+    const f = c.getSheetByName("Fournisseurs");
+    lignes.forEach((l) => f.appendRow(l));
+  }
+  const LIGNES = [
+    ["Self Stockage", "Wanadoo", "wanadoo.fr; selfstockage@wanadoo.fr", "FR53922735535", "Bello", "", "", "oui", ""],
+    ["Hyg'Up", "", "hygup.fr", "FR16911617124", "Bello", "", "", "oui", ""],
+    ["Hyg-up", "", "", "", "", "", "", "non", "fusionné avec Hyg'Up"],
+    ["Cmb", "", "cmb.fr", "", "perso", "", "", "oui", "banque perso de Pierre"],
+    ["SDPF", "Progourmands", "sdpfcompta@hotmail.com", "", "Bello", "", "", "oui", ""],
+    ["Up Coop", "", "up.coop", "", "bon de commande", "", "", "oui", ""],
+    ["Metro", "Metro-gsc", "metro.fr", "", "je sais pas", "", "", "oui", ""],
+    ["Carniato", "", "carniato.com", "FR14340783828", "Bello", "", "", "oui", ""],
+    ["Carniato bis", "Carniato", "", "", "Piccola", "", "", "oui", "doublon actif"]
+  ];
+
+  test("renommerArchive : simulation puis réel, sans déplacer, fournisseurs inactifs laissés en place", () => {
+    const env = creerEnvironnement();
+    ecrireSheet(env, LIGNES);
+    const fWanadoo = env.ctx.dossierDuChemin(["Bello Mio", "Self Stockage", "2026"]).createFile("2026-09-01 — Wanadoo — Facture n° 2026-091 — 120.00 EUR.pdf", "x", "application/pdf");
+    env.ctx.dossierDuChemin(["Bello Mio", "Self Stockage", "2026"]).createFile("2026-08-01 — Self Stockage — Facture n° 2026-081 — 120.00 EUR.pdf", "y", "application/pdf");
+    env.ctx.dossierDuChemin(["Bello Mio", "Hyg'Up", "2026"]).createFile("2026-09-10 — Hyg-up — Facture n° 127999 — 1155.24 EUR.pdf", "z", "application/pdf");
+    env.ctx.dossierDuChemin(["Bello Mio", "Cmb", "2026"]).createFile("2026-09-05 — Cmb — Facture n° 1 — 9.90 EUR.pdf", "w", "application/pdf");
+    env.ctx.dossierDuChemin(["Bello Mio", "Dossier mystère", "2026"]).createFile("2026-09-05 — Dossier mystère — Facture n° 2 — 9.90 EUR.pdf", "v", "application/pdf");
+    env.ctx.dossierDuChemin(["_Hors Pennylane", "Bello Mio", "Carniato", "2026"]).createFile("2026-10-01 — Carniato — Relevé LCR 14054490 — 790.04 EUR.pdf", "u", "application/pdf");
+    const avant = env.arbre();
+    const st = env.ctx.renommerArchive();
+    assert.deepEqual(env.arbre(), avant, "rien n'a bougé");
+    assert.equal(env.pannes.appelsOcr, 0, "renommerArchive ne lit aucun PDF");
+    assert.equal(st.renommages, 2);
+    assert.equal(st.planifies, 0);
+    assert.equal(st.ignores, 1);
+    const plan = env.feuille("Réorganisation").map((l) => ({ ancien: l[1], nouveau: l[2], nom: l[3], methode: l[4], statut: l[5], nouveauNom: l[7] }));
+    const w = plan.find((p) => p.nom.startsWith("2026-09-01 — Wanadoo"));
+    assert.equal(w.nouveauNom, "2026-09-01 — Self Stockage — Facture n° 2026-091 — 120.00 EUR.pdf");
+    assert.equal(w.methode, "renommage");
+    assert.equal(w.statut, "simulation");
+    assert.equal(w.ancien, w.nouveau, "même dossier");
+    assert.equal(plan.find((p) => p.nom.startsWith("2026-09-10 — Hyg-up")).nouveauNom, "2026-09-10 — Hyg'Up — Facture n° 127999 — 1155.24 EUR.pdf");
+    const cmb = plan.find((p) => p.nom.startsWith("2026-09-05 — Cmb"));
+    assert.match(cmb.statut, /^ignoré \(fournisseur inactif\)/);
+    assert.ok(!plan.some((p) => p.nom.startsWith("2026-08-01 — Self Stockage")), "déjà au bon nom : pas de ligne");
+    assert.ok(!plan.some((p) => p.nom.startsWith("2026-09-05 — Dossier mystère")), "dossier hors liste : laissé tel quel sans OCR");
+    assert.ok(!plan.some((p) => /Relevé LCR/.test(p.nom)), "relevé déjà bien nommé et bien rangé");
+    // relancer ne redouble pas
+    env.ctx.renommerArchive();
+    assert.equal(env.feuille("Réorganisation").length, plan.length);
+    // réel
+    const reel = env.ctx.renommerArchiveReel();
+    assert.equal(reel.erreurs, 0);
+    assert.equal(reel.renommes, 2);
+    assert.equal(reel.deplaces, 0);
+    const apres = env.arbre();
+    assert.ok(apres.includes("/Bello Mio/Self Stockage/2026/2026-09-01 — Self Stockage — Facture n° 2026-091 — 120.00 EUR.pdf"), apres.join("\n"));
+    assert.ok(apres.includes("/Bello Mio/Hyg'Up/2026/2026-09-10 — Hyg'Up — Facture n° 127999 — 1155.24 EUR.pdf"));
+    assert.ok(apres.includes("/Bello Mio/Cmb/2026/2026-09-05 — Cmb — Facture n° 1 — 9.90 EUR.pdf"), "inactif : intact");
+    assert.equal(fWanadoo.getName(), "2026-09-01 — Self Stockage — Facture n° 2026-091 — 120.00 EUR.pdf", "même fichier, même identifiant");
+    assert.ok(env.feuille("Réorganisation").filter((l) => l[4] === "renommage").every((l) => l[5] === "fait"));
+    assert.ok(env.feuille("Réorganisation").some((l) => /^ignoré/.test(l[5])), "la ligne ignorée reste ignorée");
+  });
+
+  test("les avertissements de la liste sont écrits dans le journal ; l'adresse complète hotmail est reconnue, wanadoo.fr seul non", () => {
+    const env = creerEnvironnement();
+    ecrireSheet(env, LIGNES);
+    const texteSdpf = "SDPF Progourmands\nFacture N° 813\nSIRET 123 456 789 00012\nTotal HT 100,00\nTVA 5,5 % 5,50\nNet à payer 105,50 €\nSARL SASHA 2 rue de la Pierre 35400 Saint-Malo\nDate : 01/10/2026";
+    env.fil([{ date: "2026-10-02T09:00:00", from: "sdpfcompta@hotmail.com", to: "facture@bellomio.fr", subject: "Facture 813", pieces: [{ nom: "813.pdf", contenu: texteSdpf }] }]);
+    env.fil([{ date: "2026-10-02T10:00:00", from: "quelqun@wanadoo.fr", to: "facture@bellomio.fr", subject: "Facture", pieces: [{ nom: "f.pdf", contenu: texteSdpf.replace(/SDPF Progourmands/, "AUTRE SOCIETE").replace(/N° 813/, "N° 814").replace(/123 456 789 00012/, "987 654 321 00019") }] }]);
+    const s = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "v45" });
+    assert.equal(s.envoi, 1, "SDPF reconnu par son adresse complète");
+    assert.ok(env.arbre().includes("/Envoi Pennylane/Bello Mio/2026-10-01 — SDPF — Facture n° 813 — 105.50 EUR.pdf"), env.arbre().join("\n"));
+    assert.equal(s.a_verifier, 1, "l'expéditeur wanadoo n'est pas Self Stockage");
+    const avert = env.feuille("Journal").filter((l) => l[12] === "avertissement").map((l) => l[14]);
+    assert.ok(avert.some((a) => /Self Stockage.*wanadoo\.fr/.test(a)), avert.join("\n"));
+    assert.ok(avert.some((a) => /Metro.*je sais pas/.test(a)));
+    assert.ok(avert.some((a) => /variante « carniato ».*Carniato.*Carniato bis/.test(a)), "deux lignes actives : avertissement");
+    assert.ok(!avert.some((a) => /hygup/.test(a)), "une ligne inactive ne provoque pas d'avertissement");
+    // la proposition pour l'inconnu wanadoo porte l'adresse complète, pas le domaine
+    const prop = env.fournisseurs().find((l) => l[7] === "à compléter");
+    assert.ok(prop, JSON.stringify(env.fournisseurs()));
+    assert.equal(prop[2], "quelqun@wanadoo.fr");
+    assert.equal(prop[0], "quelqun");
+  });
+
+  test("« bon de commande » dans la colonne établissement : pièces au journal seul", () => {
+    const env = creerEnvironnement();
+    ecrireSheet(env, LIGNES);
+    env.fil([{ date: "2026-10-02T09:00:00", from: "commandes@up.coop", to: "facture@bellomio.fr", subject: "Votre commande", pieces: [{ nom: "cmd.pdf", contenu: "Facture n° 4455\nUp Coop\nTotal HT 100,00\nTVA 20 % 20,00\nTotal TTC 120,00 €\nSARL SASHA\nDate : 01/10/2026" }] }]);
+    const s = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "bdc" });
+    assert.equal(s.envoi, 0);
+    assert.deepEqual(env.arbre(), []);
+    assert.ok(env.feuille("Journal").some((l) => l[6] === "bon_commande" && l[12] === "journal"));
   });
 });

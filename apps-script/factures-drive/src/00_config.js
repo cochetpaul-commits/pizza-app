@@ -161,7 +161,7 @@ var CONFIG = {
     { nom: "Bureau Vallée", variantes: ["Bureau-vallee", "Bureau Vallee"], domaines: ["bureau-vallee.fr"], identifiants: [], etab: "Les deux" },
     { nom: "UP Coop", variantes: ["UP-COOP", "Up"], domaines: ["up.coop", "up-coop.fr"], identifiants: [], etab: "Bello" },
     { nom: "Thermifroid", variantes: [], domaines: ["thermifroid.fr"], identifiants: [], etab: "Les deux" },
-    { nom: "Orange", variantes: [], domaines: ["orange.com", "orange.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Orange", variantes: [], domaines: ["orange.com"], identifiants: [], etab: "Les deux" },   // orange.fr seul = messagerie grand public, jamais
     { nom: "Apple", variantes: [], domaines: ["apple.com", "email.apple.com"], identifiants: [], etab: "Bello" },
     { nom: "PayByPhone", variantes: [], domaines: ["paybyphone.fr", "paybyphone.com"], identifiants: [], etab: "Bello" },
     { nom: "Maison Dreux", variantes: ["Maison-Dreux"], domaines: ["maison-dreux.fr", "maisondreux.fr"], identifiants: [], etab: "Bello" },
