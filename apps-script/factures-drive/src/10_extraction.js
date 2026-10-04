@@ -20,7 +20,7 @@ function listerMontants(s) {
   while ((a = re.exec(s)) !== null) {
     var c = parseInt(a[2].replace(/[ .]/g, ""), 10) * 100 + parseInt(a[3], 10);
     if (a[1] || a[4]) c = -c;
-    if (Math.abs(c) < CONFIG.montantMax) out.push({ c: c, pos: a.index });
+    if (c !== 0 && Math.abs(c) < CONFIG.montantMax) out.push({ c: c, pos: a.index });   // « 0,00 » n'est jamais un total
   }
   return out;
 }
@@ -80,9 +80,8 @@ function trouverMontantTTC(texte) {
   while ((mc = reC.exec(t)) !== null) { var cc = Math.round(parseFloat(mc[1].replace(/[ ]/g, "").replace(/\.(?=\d{3})/g, "").replace(",", ".")) * 100); if (cc > 0 && consignes.indexOf(cc) === -1) consignes.push(cc); }
   var sansConsigne = function(liste) {
     if (!consignes.length) return liste;
-    var valeurs = liste.map(function(m) { return m.c; });
     return liste.filter(function(m) {
-      return !consignes.some(function(k) { return valeurs.indexOf(m.c - k) !== -1 && tous.some(function(x) { return x.c === m.c - k; }); });
+      return !consignes.some(function(k) { return tous.some(function(x) { return x.c === m.c - k; }); });
     });
   };
   var cand = [];
@@ -94,6 +93,24 @@ function trouverMontantTTC(texte) {
       listerMontants(t.substr(debutFen, 150)).filter(pasUnTaux).forEach(function(x) { cand.push({ c: x.c, pos: debutFen + x.pos }); });
     }
   }
+  // 0) « net à payer » : c'est le montant que Pennylane retient. Il peut différer du TTC quand des consignes et des
+  //    déconsignes s'ajoutent (Cozigou : TTC 729,25, consigne +30, déconsigne -64,20, net à payer 695,05).
+  //    Dans sa fenêtre : d'abord un montant cohérent HT + TVA, sinon un montant répété ailleurs sur le document.
+  var clesNet = [/(?:total\s*)?net\s*[àa]\s*payer/gi, /[àa]\s*payer\s*:/gi];
+  var candNet = [];
+  for (var n0 = 0; n0 < clesNet.length; n0++) {
+    var reN = clesNet[n0], mN;
+    reN.lastIndex = 0;
+    while ((mN = reN.exec(t)) !== null) {
+      var debutN = mN.index + mN[0].length;
+      listerMontants(t.substr(debutN, 150)).filter(pasUnTaux).forEach(function(x) { candNet.push({ c: x.c, pos: debutN + x.pos }); });
+    }
+  }
+  candNet = sansConsigne(candNet.filter(function(m) { return Math.abs(m.c) <= CONFIG.montantMaxSansTriplet; }));
+  var netCoherents = candNet.filter(estSomme);
+  if (netCoherents.length) return (meilleur(netCoherents).c / 100).toFixed(2);
+  var netRepetes = candNet.filter(function(m) { return (freq[m.c] || 0) >= 2; });
+  if (netRepetes.length) return (meilleur(netRepetes).c / 100).toFixed(2);
   // 1) après un mot clé ET cohérent HT + TVA = TTC (le plus répété, puis le plus grand), hors TTC + consigne
   var coherentsCles = sansConsigne(cand.filter(estSomme));
   if (coherentsCles.length) return (meilleur(coherentsCles).c / 100).toFixed(2);
@@ -291,8 +308,9 @@ function detecterTypeDocument(texte, montant) {
   if (/mandat\s*(?:de\s*prelevement\s*)?sepa|autorisation\s*de\s*prelevement|reference\s*unique\s*d[eu]\s*mandat|\brum\s*:/.test(t)) return "mandat";
   var numeroFacture = /facture\s*n\s*[°o]|n\s*[°o]\.?\s*(?:de\s*)?facture|invoice\s*(?:n|number|#)/.test(t);
   if (/attestation\s+(?:de|d['’])\s*(?:depot|vigilance|regularite|conformite|dsn|assurance|paiement|versement)|attestation\s+employeur|attestation\s+(?:destinee|pour)\s+(?:a\s+)?(?:france\s*travail|pole\s*emploi)|declaration\s*sociale\s*nominative|\bdsn\b/.test(t) && !signauxFacture) return "attestation";
-  // Un devis affiche un total TTC : seul un vrai numéro de facture l'emporte
+  // Un devis ou un bon de commande affiche un total TTC : seul un vrai numéro de facture l'emporte
   if (/\bdevis\s*(?:n\s*[°o]|num|:)|ce\s*devis|validite\s*(?:du\s*)?devis|bon\s*pour\s*accord|pro\s*-?\s*forma/.test(t) && !numeroFacture) return "devis";
+  if (/bon\s*de\s*commande\s*(?:n\s*[°o]|num[ée]ro|:)/.test(t.slice(0, 800)) && !numeroFacture) return "bon_commande";
   if (/\bdevis\b/.test(t) && !signauxFacture) return "devis";
   if (/bon\s*de\s*commande|confirmation\s*de\s*commande|purchase\s*order|accuse\s*de\s*reception\s*de\s*commande/.test(t) && !signauxFacture) return "bon_commande";
   // Épreuves d'imprimeur (Diazo : PDF de contrôle, bon à tirer) et contrats signés électroniquement

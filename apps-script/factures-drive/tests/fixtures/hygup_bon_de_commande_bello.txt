@@ -1,0 +1,57 @@
+Adresse de livraison:
+RESTAURANT BELLO MIO
+SARL SASHA
+3 PLACE DU PONCEL
+35400 ST MALO
+Adresse de facturation:
+RESTAURANT BELLO MIO
+SARL SASHA
+3 PLACE DU PONCEL
+35400 ST MALO
+Bon de commande n°99000908 du 25/09/2026 à 18h06
+Référence client: 6438
+Précommande n°2077
+Créée par PIERRE le 25/09/2026
+Qté Livré Ref Désignation TGAP P.U Rem P.NET Montant
+ISSUE DE LA PRÉCOMMANDE N°2077
+4 0 910982 / 11289 Eponge double-face récurente inox/2 2,21 € 2,21 € 8,84 €
+2 0
+1576 /
+2100021631 Lavette BioTiss Super bleue 50x35cm Macteep/25 6,42 € 6,42 € 12,84 €
+2 0 916331 / 222.05 Papier ingraissables (feuilles) 35x26cm/500 12,47 € 12,47 € 24,94 €
+1 0
+915691 /
+803106397 Sac poubelle 110L noir 55µ 700x1050 /200 35,90 € 35,90 € 35,90 €
+1 0 10105 / 5255 Raclette sol alimentaire mousse blanche 55cm à
+vis/1 17,05 € 17,05 € 17,05 €
+1 0 913748 / 5062 Manche aluminium anodisé à vis 1,40m poignée
+blanche/1 13,49 € 13,49 € 13,49 €
+2 0
+1211 /
+7500075310 Décapant four liquide sans odeur 5kg Macteep/1 21,58 € 21,58 € 43,16 €
+1 0 1234 / 803104831 Aluminium 200mx45cm boîte distributrice
+HYG'UP/1 30,74 € 30,74 € 30,74 €
+2 0 1207 / 803104793 Lavage vaisselle plonge haute concentration 5L
+Macteep/1 0,27 € 16,35 € 16,35 € 32,70 €
+4 0 1034 / 803104796 Dégraissant désinfectant alimentaire bac P9 5L
+Pragma/1 14,68 € 14,68 € 58,72 €
+4 0 10520 / 12091 Bobine DC 450Fts Eco 2 plis gaufré blanc
+Ecolabel AKO/6 11,55 € 11,55 € 46,20 €
+1 0 915228 / F420e Liquide lavage verres Winterhalter 12Kg/1 79,95 € 79,95 € 79,95 €
+1 0 915230 / F8500 Lavage vaiselle chloré Winterhalter 25Kg/1 149,23 € 149,23 € 149,23 €
+2 0 910663 / PRO010 Désodorisant aérosol Eolia Davania 250ml/1 6,76 € 6,76 € 13,52 €
+1 0 1037 / 803104813 Savon mousse cartouche 1L Ecolabel AKO/6 37,82 € 37,82 € 37,82 €
+5 0 914321 / 742151 Serviette R'Soft lunch calendrier blanc 40x40/500 49,88 € 49,88 € 249,40 €
+TOTAL 854,50 €
+TGAP 0,54 €
+Frais de facturation 3,10 €
+Total HT 858,14 €
+TVA 20 % 171,63 €
+Total TVA 171,63 €
+Total TTC 1 029,77 €
+MODALITES DE REGLEMENT: Prélèvement 30 jours nets
+TLD PRO
+Ecoparc du Val de Sée, Le Chêne au Loup
+50870 TIREPIED
+Tel: 02 33 70 91 80
+E-Mail: tldpro@hyg-up.com

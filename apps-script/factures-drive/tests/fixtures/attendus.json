@@ -493,5 +493,50 @@
         "2026"
       ]
     }
+  },
+  "cozigou_facture_6080101689_bello": {
+    "_cas_piege": "TTC 729,25, consigne +30, déconsigne -64,20 : Pennylane retient le TOTAL NET A PAYER 695,05 (répété), pas 759,25 (TTC + consigne) ni 729,25",
+    "mail": {
+      "from": "compta.dinan@cozigou.bzh",
+      "subject": "Votre facture SAS COZIGOU COTE D'EMERAUDE No 6080101689",
+      "nomPiece": "facture_F6080101689.pdf",
+      "dateMail": "2026-09-03"
+    },
+    "attendu": {
+      "type": "facture",
+      "etablissement": "Bello Mio",
+      "fournisseur": "Cozigou",
+      "numero": "6080101689",
+      "date": "2026-08-17",
+      "montant": "695.05",
+      "nom": "2026-08-17 — Cozigou — Facture n° 6080101689 — 695.05 EUR.pdf",
+      "destination": "envoi",
+      "chemin": [
+        "Envoi Pennylane",
+        "Bello Mio"
+      ],
+      "archive": [
+        "Bello Mio",
+        "Cozigou",
+        "2026"
+      ]
+    }
+  },
+  "hygup_bon_de_commande_bello": {
+    "_cas_piege": "« Bon de commande n°99000908 » avec un total TTC : bon de commande, journal seul, pas une facture",
+    "mail": {
+      "from": "tldpro@hyg-up.com",
+      "subject": "Votre bon de commande 99000908",
+      "nomPiece": "99000908.pdf",
+      "dateMail": "2026-09-25"
+    },
+    "attendu": {
+      "type": "bon_commande",
+      "etablissement": "Bello Mio",
+      "fournisseur": "Hyg'Up",
+      "destination": "journal",
+      "chemin": [],
+      "archive": []
+    }
   }
 }

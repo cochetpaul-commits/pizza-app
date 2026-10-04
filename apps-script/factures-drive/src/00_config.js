@@ -122,7 +122,7 @@ var CONFIG = {
     { nom: "Cheville 35", variantes: ["Maison Hardy", "Maisonhardy", "Hardy", "Cheville"], domaines: ["vif.fr", "maison-hardy.fr"], identifiants: ["FR38829192319", "82919231900020"], etab: "Bello" },
     { nom: "TerreAzur", variantes: ["Terre Azur", "Pomona", "TA Bretagne"], domaines: ["groupe-pomona.fr", "terreazur.fr"], identifiants: ["FR56552044992", "55204499202861"], etab: "Les deux" },
     { nom: "Elis", variantes: ["Esker", "Elis Bretagne", "Les Lavandières"], domaines: ["elis.com", "elis.fr", "esker.com"], identifiants: ["FR65062201009", "06220100900388"], etab: "Les deux" },
-    { nom: "Hyg'Up", variantes: ["Hyg-up", "Hyg Up", "Hygup", "TLD PRO"], domaines: ["hygup.fr", "hyg-up.fr"], identifiants: ["FR16911617124", "91161712400019"], etab: "Les deux" },
+    { nom: "Hyg'Up", variantes: ["Hyg-up", "Hyg Up", "Hygup", "TLD PRO"], domaines: ["hygup.fr", "hyg-up.fr", "hyg-up.com"], identifiants: ["FR16911617124", "91161712400019"], etab: "Les deux" },
     { nom: "Leroy Merlin", variantes: ["Leroymerlin"], domaines: ["leroymerlin.fr"], identifiants: [], etab: "Les deux" },
     { nom: "Prophyl", variantes: [], domaines: ["prophyl.fr"], identifiants: ["FR48451251128"], etab: "Bello" },
     { nom: "Lequertier", variantes: ["Lequertiersa", "ELJ", "Lequertier SA"], domaines: ["lequertiersa.fr", "lequertier.fr"], identifiants: [], etab: "Bello" },

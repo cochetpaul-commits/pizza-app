@@ -105,6 +105,13 @@ Règles ajoutées en v4.3 :
 - messageries de particuliers (gmail, hotmail, icloud, wanadoo, live…) : sans SIRET, ni TVA, ni montant, la pièce est un
   « courrier » (devis client, CV, réservation) au journal seul ; avec un montant ou un identifiant, traitement normal.
 
+Règles ajoutées en v4.4 :
+- montant : le « net à payer » prime sur le TTC, c'est ce que Pennylane retient quand consignes et déconsignes s'en mêlent
+  (Cozigou 6080101689 : TTC 729,25, consigne +30, déconsigne -64,20, net à payer 695,05) ; dans sa fenêtre, d'abord un montant
+  cohérent HT + TVA, sinon un montant répété ailleurs sur le document ; « 0,00 » n'est jamais un total ;
+- « Bon de commande n° » en tête de document (Hyg'Up) : bon de commande, journal seul, même avec un total TTC ; une facture
+  qui cite un numéro de commande reste une facture.
+
 Le nom des fichiers garde le format historique : `AAAA-MM-JJ — Fournisseur — Facture n° XXX — 123.45 EUR.pdf`
 (avoirs en négatif, tickets sans numéro, relevés `Relevé n° XXX`).
 

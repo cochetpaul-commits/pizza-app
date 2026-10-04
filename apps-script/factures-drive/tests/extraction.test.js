@@ -200,3 +200,17 @@ describe("v4.3 : consigne, variantes d'établissement, expéditeurs journal seul
     assert.equal(ctx.decider(devis).destination, "journal");
   });
 });
+
+describe("v4.4 : net à payer et bon de commande", () => {
+  test("le net à payer répété l'emporte sur le TTC cohérent quand consignes et déconsignes s'en mêlent", () => {
+    const t = "615.76 113.49 729.25 CONSIGNE 30.00 A payer: -64.20 TOTAL NET A PAYER 17/08/2026 695.05 BELLO MIO 2.46 759.25 695.05";
+    assert.equal(ctx.trouverMontantTTC(t), "695.05");
+  });
+  test("sans consigne, le net à payer cohérent reste le TTC", () => {
+    assert.equal(ctx.trouverMontantTTC("Total HT 131,99 TVA 7,26 Net à payer : 139,25 EUR 131,99 7,26 131,99"), "139.25");
+  });
+  test("« Bon de commande n° » avec total TTC : bon de commande", () => {
+    assert.equal(ctx.detecterTypeDocument("Bon de commande n°99000908 du 25/09/2026 Total HT 858,14 € TVA 171,63 € Total TTC 1 029,77 €", "1029.77"), "bon_commande");
+    assert.equal(ctx.detecterTypeDocument("Facture N° 127999 Cde N°99000908 du 25/09/2026 Total TTC 1 155,24 €", "1155.24"), "facture", "une facture qui cite une commande reste une facture");
+  });
+});
