@@ -24,17 +24,24 @@ function reindexerArchive() { return avecVerrou("reindexerArchive", function() {
 function indexerDossiers(reconstruire) {
   var debut = Date.now(), racine = obtenirOuCreerDossier(null, CONFIG.dossierRacine), idxF = fournisseursIndex();
   var props = PropertiesService.getScriptProperties(), cleEnCours = "reindex.encours";
-  if (reconstruire && !props.getProperty(cleEnCours)) { indexVider(); props.setProperty(cleEnCours, "1"); Logger.log("Index vidé : reconstruction depuis le Drive"); }
-  indexCharger();
   var st = { vus: 0, ajoutes: 0, arret: false };
-  // Envoi Pennylane et transit d'abord (archive prévue), puis l'archive, _Hors Pennylane et À vérifier
-  CONFIG.etablissements.forEach(function(etab) { if (!st.arret) parcourirDossier(dossierEnvoi(etab), CONFIG.dossiers.envoi + "/" + etab, visiter); });
+  // 1) lecture du Drive d'abord (liste des fichiers et de leurs chemins) : l'Index n'est vidé que si elle a réussi
+  var fichiers = [];
+  var lister = function(f, chemin) { fichiers.push({ f: f, chemin: chemin }); return true; };
+  CONFIG.etablissements.forEach(function(etab) { parcourirDossier(dossierEnvoi(etab), CONFIG.dossiers.envoi + "/" + etab, lister); });
   var tetes = [CONFIG.dossiers.transit].concat(CONFIG.etablissements, [CONFIG.dossiers.horsPennylane, CONFIG.dossiers.aVerifier, CONFIG.dossiers.ancienAVerifier]);
-  for (var i = 0; i < tetes.length && !st.arret; i++) {
-    var it = racine.getFoldersByName(tetes[i]);
-    if (it.hasNext()) parcourirDossier(it.next(), tetes[i], visiter);
+  tetes.forEach(function(tete) { var it = racine.getFoldersByName(tete); if (it.hasNext()) parcourirDossier(it.next(), tete, lister); });
+  try {
+    if (reconstruire && !props.getProperty(cleEnCours)) { indexVider(); props.setProperty(cleEnCours, "1"); Logger.log("Index vidé : reconstruction depuis le Drive (" + fichiers.length + " fichiers)"); }
+    indexCharger();
+    // 2) indexation (MD5 lu dans Drive), jusqu'à la limite de temps ; les fichiers déjà indexés ne sont pas relus
+    for (var i = 0; i < fichiers.length; i++) { if (visiter(fichiers[i].f, fichiers[i].chemin) === false) break; }
+    journalVider();
+  } catch (e) {
+    // échec en cours de reconstruction : la propriété est levée, le prochain lancement repart de zéro (vide puis reconstruit)
+    if (reconstruire) props.deleteProperty(cleEnCours);
+    throw e;
   }
-  journalVider();
   if (!st.arret && reconstruire) props.deleteProperty(cleEnCours);
   Logger.log("Fichiers vus : " + st.vus + ", ajoutés à l'index : " + st.ajoutes);
   Logger.log(st.arret ? "PAS FINI — relancer la fonction" : "TERMINÉ");

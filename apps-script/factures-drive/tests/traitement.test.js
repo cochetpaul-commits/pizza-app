@@ -711,3 +711,56 @@ describe("v4.6 : sûreté (verrou, curseur, écriture après chaque message), pi
     assert.ok(env.ctx.trouverDoublon(env.ctx.indexCharger(), { fournisseur: "Self Stockage", etablissement: "Bello Mio", type: "facture", numero: "2026-091", montant: "1.00" }, "zzz"), "les clés anti-doublon suivent le nouveau nom");
   });
 });
+
+describe("v4.6.1 : vidage d'un onglet à en-tête figé, reconstruction de l'Index protégée", () => {
+  test("vider un onglet de 557 lignes avec 1 ligne figée : Sheets refuse deleteRows sur toutes les lignes, viderOnglet passe", () => {
+    const env = creerEnvironnement();
+    const f = env.ctx.journalOnglet(env.ctx.journalClasseur(), "Index", env.ctx.COLONNES_INDEX);
+    for (let i = 0; i < 556; i++) f.appendRow(["f_" + i, "md5", "Bello Mio", "X", "00" + i, "2026-01-01", "1.00", "n.pdf", "c", new Date(), "", ""]);
+    assert.equal(f.getLastRow(), 557);
+    assert.throws(() => f.deleteRows(2, f.getLastRow() - 1), /impossible de supprimer toutes les lignes non figées/, "le bouchon reproduit l'erreur de Sheets");
+    assert.equal(f.getLastRow(), 557, "rien n'a été supprimé par l'appel refusé");
+    env.ctx.viderOnglet(f, env.ctx.COLONNES_INDEX);
+    assert.equal(f.getLastRow(), 1, "seul l'en-tête reste");
+    assert.deepEqual(plain(f.getRange(1, 1, 1, 3).getValues()[0]), ["Fichier id", "MD5", "Établissement"]);
+    // un onglet de 2 lignes (en-tête + 1) se vide aussi
+    f.appendRow(["f_x", "md5", "", "", "", "", "", "", "", "", "", ""]);
+    env.ctx.viderOnglet(f, env.ctx.COLONNES_INDEX);
+    assert.equal(f.getLastRow(), 1);
+    // indexVider remet le format texte et vide la mémoire
+    f.appendRow(["f_y", "md5", "", "", "", "", "", "", "", "", "", ""]);
+    env.ctx.indexVider();
+    assert.equal(f.getLastRow(), 1);
+    assert.equal(env.onglet("Index")._format, "@");
+    assert.equal(env.ctx.indexParId("f_y"), null);
+    // la simulation et la liste des fournisseurs passent par le même chemin
+    const sim = env.ctx.journalOnglet(env.ctx.journalClasseur(), "Simulation", env.ctx.COLONNES_JOURNAL);
+    for (let i = 0; i < 300; i++) sim.appendRow(["x"]);
+    env.ctx.journalViderSimulation();
+    assert.equal(sim.getLastRow(), 1);
+  });
+  test("reindexerArchive : l'Index n'est vidé qu'après la lecture du Drive ; un échec lève la propriété « reindex.encours »", () => {
+    const env = creerEnvironnement();
+    env.ctx.dossierDuChemin(["Bello Mio", "Metro", "2026"]).createFile("2026-09-12 — Metro — Facture n° 123 — 50.00 EUR.pdf", "a", "application/pdf");
+    env.ctx.indexAjouter({ fichierId: "ancien", md5: "x", etablissement: "Bello Mio", fournisseur: "Metro", numero: "1", date: "2026-09-01", montant: "1.00", nom: "ancien.pdf", chemin: "Bello Mio/Metro/2026", archive: "" });
+    env.ctx.journalVider();
+    // la lecture du Drive échoue : rien n'est vidé, pas de propriété
+    const racine = env.racine.getFoldersByName("Factures iFratelli").next();
+    const getFoldersByName = racine.getFoldersByName;
+    racine.getFoldersByName = () => { throw new Error("Drive indisponible"); };
+    assert.throws(() => env.ctx.reindexerArchive(), /Drive indisponible/);
+    assert.equal(env.feuille("Index").length, 1, "l'ancien Index est intact");
+    assert.equal(env.props["reindex.encours"], undefined);
+    racine.getFoldersByName = getFoldersByName;
+    // une erreur pendant l'indexation : la propriété est levée, l'exception remonte, la relance repart de zéro
+    const md5De = env.ctx.md5De; let appels = 0;
+    env.ctx.md5De = (f) => { if (++appels === 1) throw new Error("API Drive en panne"); return md5De(f); };
+    assert.throws(() => env.ctx.reindexerArchive(), /API Drive en panne/);
+    assert.equal(env.props["reindex.encours"], undefined, "pas de reconstruction « en cours » fantôme");
+    const st = env.ctx.reindexerArchive();
+    assert.equal(st.ajoutes, 1);
+    assert.equal(env.feuille("Index").length, 1);
+    assert.equal(env.feuille("Index")[0][3], "Metro");
+    assert.ok(env.journalLog.some((l) => /TERMINÉ/.test(l)));
+  });
+});

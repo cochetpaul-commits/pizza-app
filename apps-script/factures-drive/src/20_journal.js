@@ -155,10 +155,24 @@ function indexMarquerEnvoi(fichierId, chemin, archive, date) {
   f.getRange(ligne, 12).setValue(iso);
 }
 
-/** Vide l'onglet « Index » (reindexerArchive) : mémoire et Sheet */
+/**
+ * Vide un onglet sous son en-tête figé. Sheets interdit de supprimer toutes les lignes non figées (« il est impossible de
+ * supprimer toutes les lignes non figées ») : le contenu est effacé, puis les lignes au delà de la 2e sont supprimées.
+ */
+function viderOnglet(f, colonnes) {
+  var n = f.getLastRow();
+  if (n < 2) return;
+  var largeur = Math.max(colonnes.length, f.getLastColumn ? f.getLastColumn() : 0);
+  f.getRange(2, 1, n - 1, largeur).clearContent();
+  if (n > 2) { try { f.deleteRows(3, n - 2); } catch (e) { Logger.log("Lignes vides non supprimées (" + e + ") : sans conséquence"); } }
+}
+
+/** Vide l'onglet « Index » (reindexerArchive) : mémoire et Sheet, format texte remis */
 function indexVider() {
   var f = journalOnglet(journalClasseur(), "Index", COLONNES_INDEX);
-  if (f.getLastRow() > 1) f.deleteRows(2, f.getLastRow() - 1);
+  viderOnglet(f, COLONNES_INDEX);
+  _journal.indexPrepare = false;
+  journalOnglet(journalClasseur(), "Index", COLONNES_INDEX);   // remet le format texte @ sur les colonnes
   _journal.index = {}; _journal.parId = {}; _journal.lignesIndex = {}; _journal.tampon.Index = [];
 }
 
@@ -254,8 +268,7 @@ function journalVider() {
 }
 
 function journalViderSimulation() {
-  var f = journalOnglet(journalClasseur(), "Simulation", COLONNES_JOURNAL);
-  if (f.getLastRow() > 1) f.deleteRows(2, f.getLastRow() - 1);
+  viderOnglet(journalOnglet(journalClasseur(), "Simulation", COLONNES_JOURNAL), COLONNES_JOURNAL);
 }
 
 /** AAAA-MM-JJ d'une Date (ou d'une chaîne qui commence par une date ISO) */

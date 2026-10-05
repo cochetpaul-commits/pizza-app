@@ -104,7 +104,7 @@ function genererListeFournisseurs() {
     ajoutees++;
   }
   liste.sort(function(a, b) { return cleFournisseur(a.nom).localeCompare(cleFournisseur(b.nom)); });
-  if (f.getLastRow() > 1) f.deleteRows(2, f.getLastRow() - 1);
+  viderOnglet(f, COLONNES_FOURNISSEURS);
   f.getRange(2, 1, liste.length, COLONNES_FOURNISSEURS.length).setValues(liste.map(ligneDepuisEntree));
   _fournisseurs.idx = null;
   Logger.log("Liste « " + CONFIG.fournisseursNom + " » : " + liste.length + " fournisseurs (" + ajoutees + " dossiers ajoutés à relire, " + variantesAjoutees + " variantes ajoutées) — " + classeur.getUrl());

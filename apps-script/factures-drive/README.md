@@ -168,6 +168,9 @@ Règles ajoutées en v4.6 (audit du 06/10 : archive comparée à Pennylane, Jour
   `deplacerJournauxDeCloture` met l'Index à jour, `reindexerArchive` reconstruit l'Index depuis le Drive ;
 - **OCR** : une erreur passagère (hors quota) donne un nouvel essai après 2 s, puis « texte illisible (OCR : <erreur>) » ;
 - **contrôle quotidien** `controlerPasses` (7 h) : mail à Paul si la dernière passe terminée date de plus de 24 h.
+- **v4.6.1** : les onglets ne sont plus vidés par `deleteRows` sur toutes les lignes (Sheets le refuse sous un en-tête figé) mais
+  par `viderOnglet` (contenu effacé, lignes au delà de la 2e supprimées, format texte de l'Index remis) ; `reindexerArchive` lit
+  d'abord le Drive, ne vide l'Index qu'ensuite, et lève la propriété « reindex.encours » si l'indexation échoue.
 
 Le nom des fichiers garde le format historique : `AAAA-MM-JJ — Fournisseur — Facture n° XXX — 123.45 EUR.pdf`
 (avoirs en négatif, tickets sans numéro, relevés `Relevé n° XXX`).

@@ -82,13 +82,17 @@ function creerEnvironnement() {
   function feuille(nom) {
     const f = { _nom: nom, _lignes: [] };
     Object.assign(f, {
-      getName: () => f._nom, setName: (n) => { f._nom = n; return f; }, appendRow: (r) => { f._lignes.push(r); return f; }, setFrozenRows: () => f, getLastRow: () => f._lignes.length,
+      getName: () => f._nom, setName: (n) => { f._nom = n; return f; }, appendRow: (r) => { f._lignes.push(r); return f; }, setFrozenRows: (n) => { f._figees = n; return f; },
+      getFrozenRows: () => f._figees || 0,
+      /** comme Sheets : dernière ligne qui contient quelque chose */
+      getLastRow: () => { for (let k = f._lignes.length - 1; k >= 0; k--) if ((f._lignes[k] || []).some((v) => v !== "" && v !== null && v !== undefined)) return k + 1; return 0; },
       getLastColumn: () => Math.max(...f._lignes.map((l) => l.length), 0), getMaxRows: () => 1000,
       getRange: (r, c, n, m) => ({
         getValues: () => f._lignes.slice(r - 1, r - 1 + n).map((l) => { const out = []; for (let k = 0; k < m; k++) out.push(l[c - 1 + k] === undefined ? "" : l[c - 1 + k]); return out; }),
         setValues: (v) => { for (let k = 0; k < v.length; k++) { if (!f._lignes[r - 1 + k]) f._lignes[r - 1 + k] = []; for (let j = 0; j < v[k].length; j++) f._lignes[r - 1 + k][c - 1 + j] = v[k][j]; } },
         setValue: (v) => { if (!f._lignes[r - 1]) f._lignes[r - 1] = []; f._lignes[r - 1][c - 1] = v; },
         setNumberFormat: () => { f._format = "@"; },
+        clearContent: () => { for (let k = r - 1; k < r - 1 + n; k++) if (f._lignes[k]) for (let j = c - 1; j < c - 1 + m; j++) if (j < f._lignes[k].length) f._lignes[k][j] = ""; },
         // TextFinder sur une colonne : recherche par identifiant de fichier dans l'Index (après un tri éventuel)
         createTextFinder: (texte) => ({ matchEntireCell: function() { return this; }, findNext: () => {
           for (let k = r - 1; k < Math.min(f._lignes.length, r - 1 + n); k++) if (String((f._lignes[k] || [])[c - 1]) === String(texte)) return { getRow: () => k + 1 };
@@ -97,7 +101,12 @@ function creerEnvironnement() {
       }),
       /** tri de l'onglet (test : indexDeplacer ne doit pas écrire au mauvais endroit) */
       sort: (col) => { const tete = f._lignes[0]; const corps = f._lignes.slice(1).sort((a, b) => String(a[col - 1]).localeCompare(String(b[col - 1]))); f._lignes = [tete].concat(corps); },
-      deleteRows: (r, n) => { f._lignes.splice(r - 1, n); }
+      /** comme Sheets : refuse de supprimer toutes les lignes non figées */
+      deleteRows: (r, n) => {
+        const figees = f._figees || 0, total = Math.max(f._lignes.length, 2);
+        if (r <= figees + 1 && r - 1 + n >= total) throw new Error("Exception: Désolé, il est impossible de supprimer toutes les lignes non figées.");
+        f._lignes.splice(r - 1, n);
+      }
     });
     return f;
   }
