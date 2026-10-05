@@ -1,0 +1,47 @@
+FACTURE n° 21741SARL BELLO MIO
+
+3 PLACE DU PONCEL
+
+Code Client 7598 Nom Client SARL BELLO MIO
+
+35400 ST MALO FRANCE
+
+Origine Client SARL BELLO MIO Référence DV10267 / GM10232 Type Prestation de services
+
+DATE NUMERO ECHEANCE
+
+11/09/2026 FC21741 11/09/2026
+
+DESIGNATION QTE P.U. HT MONTANT HT TVA
+
+DESCRIPTIF DU SELF STOCKAGE
+
+PERIODE DU 01/09/2026 au 30/09/2026 DATE D'ENTREE : 15/06/2022
+
+VOLUME OU SURFACE : 16 LOCATION ESPACE
+
+BOX DE 16 M3 1,00 75,00 € 75,00 € 2
+
+MONTANT HT
+
+75,00 € 2
+
+TVA20,0%
+
+MONTANT TVA
+
+15,00 €
+
+NET HT TOTAL TVA TOTAL TTC
+
+REGLEMENTS
+
+75,00 € 15,00 € A PAYER 90,00 €
+
+Pas d'escompte à l'échéance En cas de retard de paiement, une pénalité égale à 3 fois le taux d'intérêt légal ainsi qu'une indemnité forfaitaire pour frais de recouvrement de 40 euros seront facturées.
+
+90,00 €
+
+Solde Antérieur 90,00 € Nouveau Solde 180,00 €
+
+SELF STOCKAGE SAS N° TVA FR53922735535

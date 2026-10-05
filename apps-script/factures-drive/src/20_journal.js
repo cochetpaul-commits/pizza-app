@@ -9,10 +9,11 @@
 // ============================================================================
 
 var COLONNES_JOURNAL = ["Horodatage", "Date mail", "Expéditeur", "Reçu sur", "Objet", "Pièce", "Type", "Établissement", "Fournisseur", "Numéro", "Date facture", "Montant", "Destination", "Chemin", "Raison", "Lien fichier", "Lien mail", "Message id", "Mode"];
-var COLONNES_INDEX = ["Fichier id", "MD5", "Établissement", "Fournisseur", "Numéro", "Date", "Montant", "Nom", "Chemin", "Ajouté le", "Archive prévue"];
+var COLONNES_INDEX = ["Fichier id", "MD5", "Établissement", "Fournisseur", "Numéro", "Date", "Montant", "Nom", "Chemin", "Ajouté le", "Archive prévue", "Dans Envoi depuis"];
 var COLONNES_REORG = ["Fichier id", "Ancien chemin", "Nouveau chemin", "Nom", "Méthode", "Statut", "Horodatage", "Nouveau nom"];
+var COLONNES_TYPES = ["Fichier id", "Chemin", "Nom", "Type actuel", "Type attendu", "Statut", "Horodatage"];
 
-var _journal = { classeur: null, tampon: { Journal: [], "Messages traités": [], Index: [], Simulation: [], "Réorganisation": [] }, traites: null, index: null, parId: null, lignesIndex: {} };
+var _journal = { classeur: null, tampon: { Journal: [], "Messages traités": [], Index: [], Simulation: [], "Réorganisation": [], Types: [] }, traites: null, index: null, parId: null, lignesIndex: {} };
 
 function journalClasseur() {
   if (_journal.classeur) return _journal.classeur;
@@ -28,6 +29,7 @@ function journalClasseur() {
   journalOnglet(classeur, "Index", COLONNES_INDEX);
   journalOnglet(classeur, "Simulation", COLONNES_JOURNAL);
   journalOnglet(classeur, "Réorganisation", COLONNES_REORG);
+  journalOnglet(classeur, "Types", COLONNES_TYPES);
   var defaut = classeur.getSheetByName("Feuille 1") || classeur.getSheetByName("Sheet1");
   if (defaut && classeur.getSheets().length > 1) classeur.deleteSheet(defaut);
   _journal.classeur = classeur;
@@ -37,6 +39,12 @@ function journalClasseur() {
 function journalOnglet(classeur, nom, colonnes) {
   var f = classeur.getSheetByName(nom);
   if (!f) { f = classeur.insertSheet(nom); f.appendRow(colonnes); f.setFrozenRows(1); }
+  if (nom === "Index" && !_journal.indexPrepare) {
+    _journal.indexPrepare = true;
+    // colonnes ajoutées après coup (« Dans Envoi depuis », v4.6) et format texte : « 00113789 » ne devient pas 113789
+    if (f.getLastColumn && f.getLastColumn() < colonnes.length) for (var c = f.getLastColumn() + 1; c <= colonnes.length; c++) f.getRange(1, c).setValue(colonnes[c - 1]);
+    try { f.getRange(1, 1, Math.max(f.getMaxRows ? f.getMaxRows() : 5000, 2), colonnes.length).setNumberFormat("@"); } catch (e) { Logger.log("Format texte de l'Index non posé : " + e); }
+  }
   return f;
 }
 
@@ -62,7 +70,7 @@ function indexCharger() {
   var n = f.getLastRow(), index = {}, parId = {};
   if (n > 1) f.getRange(2, 1, n - 1, COLONNES_INDEX.length).getValues().forEach(function(r, i) {
     var e = { fichierId: r[0], md5: r[1], etablissement: r[2], fournisseur: r[3], numero: r[4] ? String(r[4]) : null, date: r[5] ? dateIso(r[5]) : null,
-              montant: r[6] !== "" && r[6] !== null ? montantTexte(r[6]) : null, nom: r[7], chemin: r[8], archive: r[10] || "" };
+              montant: r[6] !== "" && r[6] !== null ? montantTexte(r[6]) : null, nom: r[7], chemin: r[8], archive: r[10] || "", arriveEnvoi: r[11] ? dateIso(r[11]) : null };
     indexInserer(index, e);
     parId[e.fichierId] = e;
     _journal.lignesIndex[e.fichierId] = i + 2;
@@ -76,7 +84,8 @@ function indexCharger() {
 function indexParId(fichierId) { indexCharger(); return _journal.parId[fichierId] || null; }
 
 function indexInserer(index, e) {
-  var a = { fournisseur: e.fournisseur, numero: e.numero, date: e.date, dateSecours: e.date, montant: e.montant };
+  var n = e.nom ? analyserNomFichier(e.nom) : null;
+  var a = { fournisseur: e.fournisseur, etablissement: e.etablissement, numero: e.numero, date: e.date, dateSecours: e.date, montant: e.montant, type: e.type || (n ? n.type : null) };
   clesDoublon(a, e.md5).forEach(function(k) { if (!index[k]) index[k] = e; });
 }
 
@@ -84,23 +93,73 @@ function indexInserer(index, e) {
 function indexAjouter(e) {
   indexInserer(indexCharger(), e);
   if (e.fichierId) _journal.parId[e.fichierId] = e;
-  _journal.tampon.Index.push([e.fichierId, e.md5 || "", e.etablissement || "", e.fournisseur || "", e.numero || "", e.date || "", e.montant || "", e.nom || "", e.chemin || "", new Date(), e.archive || ""]);
+  _journal.tampon.Index.push([e.fichierId, e.md5 || "", e.etablissement || "", e.fournisseur || "", e.numero || "", e.date || "", e.montant || "", e.nom || "", e.chemin || "", new Date(), e.archive || "", e.arriveEnvoi || ""]);
 }
 
-/** Met à jour le chemin d'un fichier déplacé (mémoire, et Sheet si la ligne est connue) */
+/**
+ * Ligne du Sheet « Index » d'un fichier, cherchée par identifiant (un tri de l'onglet ne trompe pas l'écriture), ou 0.
+ * Les lignes écrites pendant l'exécution sont dans le tampon tant que journalVider n'a pas été appelé : on le vide d'abord.
+ */
+function indexLigneDe(fichierId) {
+  if (_journal.tampon.Index.length) journalVider();
+  var f = journalOnglet(journalClasseur(), "Index", COLONNES_INDEX);
+  var plage = f.getRange(1, 1, Math.max(f.getLastRow(), 1), 1);
+  if (plage.createTextFinder) {
+    try {
+      var cellule = plage.createTextFinder(String(fichierId)).matchEntireCell(true).findNext();
+      if (cellule) return cellule.getRow();
+    } catch (e) { Logger.log("Recherche dans l'Index impossible (" + e + ") : position mémorisée"); }
+  }
+  return _journal.lignesIndex[fichierId] || 0;
+}
+
+function indexEcrire(fichierId, colonne, valeur) {
+  var ligne = indexLigneDe(fichierId);
+  if (ligne) journalOnglet(journalClasseur(), "Index", COLONNES_INDEX).getRange(ligne, colonne).setValue(valeur);
+  return ligne;
+}
+
+/** Met à jour le chemin d'un fichier déplacé (mémoire et Sheet) */
 function indexDeplacer(fichierId, chemin) {
   var e = indexParId(fichierId);
   if (e) e.chemin = chemin;
-  var ligne = _journal.lignesIndex[fichierId];
-  if (ligne) journalOnglet(journalClasseur(), "Index", COLONNES_INDEX).getRange(ligne, 9).setValue(chemin);
+  indexEcrire(fichierId, 9, chemin);
 }
 
-/** Met à jour le nom d'un fichier renommé (mémoire, et Sheet si la ligne est connue) */
+/**
+ * Met à jour un fichier renommé (mémoire et Sheet) : nom, et fournisseur, numéro, date, montant relus dans le nouveau nom
+ * (« Wanadoo » -> « Self Stockage »), avec de nouvelles clés anti-doublon.
+ */
 function indexRenommer(fichierId, nom) {
-  var e = indexParId(fichierId);
-  if (e) e.nom = nom;
-  var ligne = _journal.lignesIndex[fichierId];
-  if (ligne) journalOnglet(journalClasseur(), "Index", COLONNES_INDEX).getRange(ligne, 8).setValue(nom);
+  var e = indexParId(fichierId), n = analyserNomFichier(nom), idx = indexCharger();
+  if (e) {
+    e.nom = nom;
+    if (n) { e.fournisseur = n.fournisseur; e.numero = n.numero; e.date = n.date; e.montant = n.montant; indexInserer(idx, e); }
+  }
+  var ligne = indexLigneDe(fichierId);
+  if (!ligne) return;
+  var f = journalOnglet(journalClasseur(), "Index", COLONNES_INDEX);
+  f.getRange(ligne, 8).setValue(nom);
+  if (n) f.getRange(ligne, 4, 1, 4).setValues([[n.fournisseur, n.numero || "", n.date, n.montant || ""]]);
+}
+
+/** Un fichier arrivé dans « Envoi Pennylane » (déposé par le script, ou déplacé à la main) : chemin, archive prévue et date d'arrivée */
+function indexMarquerEnvoi(fichierId, chemin, archive, date) {
+  var e = indexParId(fichierId), iso = dateIso(date || new Date());
+  if (e) { e.chemin = chemin; if (archive) e.archive = archive; e.arriveEnvoi = iso; }
+  var ligne = indexLigneDe(fichierId);
+  if (!ligne) return;
+  var f = journalOnglet(journalClasseur(), "Index", COLONNES_INDEX);
+  f.getRange(ligne, 9).setValue(chemin);
+  if (archive) f.getRange(ligne, 11).setValue(archive);
+  f.getRange(ligne, 12).setValue(iso);
+}
+
+/** Vide l'onglet « Index » (reindexerArchive) : mémoire et Sheet */
+function indexVider() {
+  var f = journalOnglet(journalClasseur(), "Index", COLONNES_INDEX);
+  if (f.getLastRow() > 1) f.deleteRows(2, f.getLastRow() - 1);
+  _journal.index = {}; _journal.parId = {}; _journal.lignesIndex = {}; _journal.tampon.Index = [];
 }
 
 /** Une ligne de journal (objet avec les clés de COLONNES_JOURNAL, en minuscules sans accents) */
@@ -149,6 +208,35 @@ function reorgStatut(ligne, statut) {
   var f = journalOnglet(journalClasseur(), "Réorganisation", COLONNES_REORG);
   f.getRange(ligne, 6).setValue(statut);
   f.getRange(ligne, 7).setValue(new Date());
+}
+
+/** Ligne du plan de réparation des types MIME : { fichierId, chemin, nom, actuel, attendu, statut } */
+function typesAjouter(r) {
+  _journal.tampon.Types.push([r.fichierId, r.chemin, r.nom, r.actuel, r.attendu, r.statut, new Date()]);
+}
+
+function typesLire() {
+  var f = journalOnglet(journalClasseur(), "Types", COLONNES_TYPES), n = f.getLastRow();
+  if (n < 2) return [];
+  return f.getRange(2, 1, n - 1, COLONNES_TYPES.length).getValues().map(function(r, i) {
+    return { ligne: i + 2, fichierId: r[0], chemin: r[1], nom: r[2], actuel: r[3], attendu: r[4], statut: r[5] };
+  });
+}
+
+function typesStatut(ligne, statut) {
+  var f = journalOnglet(journalClasseur(), "Types", COLONNES_TYPES);
+  f.getRange(ligne, 6).setValue(statut);
+  f.getRange(ligne, 7).setValue(new Date());
+}
+
+/** Dernière passe horaire terminée (curseur) : Date ou null */
+function curseurPasseLire() {
+  var v = PropertiesService.getScriptProperties().getProperty("curseur.passe");
+  return v ? new Date(v) : null;
+}
+
+function curseurPasseEcrire(date) {
+  PropertiesService.getScriptProperties().setProperty("curseur.passe", date.toISOString());
 }
 
 /** Écrit tout ce qui est en attente (à appeler en fin de passe et avant la limite de temps) */

@@ -1,0 +1,47 @@
+2018 Facture HT avec En Tête & Pied de page
+
+Date : 31/07/2026
+
+TVA Montant HT P.U. HT Qté Description
+
+0,00 0,00 0,00 0,00 Transformé de : Commande N° CC6923 du 01/ 07/2026.
+
+0,00 0,00 0,00 0,00 BON N°178085 DU 02.07
+
+5,50 163,38 23,34 7,00 4.5 L VANILLE (gousse naturelle infusée)
+
+5,50 48,75 16,25 3,00 * BIO - 2.5 L CITRON
+
+5,50 236,00 23,60 10,00 4.5 L VANILLE GOUSSE
+
+5,50 29,00 14,50 2,00 2.5 L CITRON
+
+Facture N° D63834
+
+BELLO MIO - SASHA 3 PLACE DU PONCEL 35400 ST MALO facture@bellomio.fr
+
+Récapitulatif des échéances :
+
+Date d'échéance Solde dû Montant de
+
+l'échéance Mode de paiement 30/08/2026 0,00 € 1 072,56 € LCR
+
+Coordonnées bancaires société : Banque : CCM LANGUEUX - TREGUEUX IBAN : FR76 1558 9228 7701 5009 3734 440 BIC : CMBRFR2BARK
+
+Facture N° D63834
+
+Total HT
+
+Total TVA
+
+Total TTC
+
+Net à payer
+
+1 016,64
+
+55,92
+
+1 O72,56
+
+1 072,56 €

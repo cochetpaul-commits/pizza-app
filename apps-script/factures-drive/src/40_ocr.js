@@ -7,13 +7,19 @@
 function ErreurOcrQuota(message) { this.name = "ErreurOcrQuota"; this.message = message; }
 ErreurOcrQuota.prototype = Object.create(Error.prototype);
 
+var _ocr = { derniereErreur: null };
+
+/** Dernière erreur OCR (hors quota) de la pièce en cours, ou null : traiterMessage la met dans la raison « texte illisible » */
+function derniereErreurOcr() { return _ocr.derniereErreur; }
+
 function estErreurDeQuota(e) {
   return /rate\s*limit|quota|too\s*many\s*requests|backend\s*error|limit\s*exceeded/i.test(String(e && e.message || e));
 }
 
 /** Texte d'un blob PDF / image via l'OCR de Google Drive (document temporaire mis à la corbeille) ; null si le document est illisible */
 function lireTexteOcr(blob) {
-  var attentes = CONFIG.ocrAttentesMs, essai = 0, derniere = null;
+  var attentes = CONFIG.ocrAttentesMs, essai = 0, derniere = null, essaiErreur = 0;
+  _ocr.derniereErreur = null;
   while (true) {
     var tmpId = null;
     try {
@@ -26,7 +32,13 @@ function lireTexteOcr(blob) {
       return DocumentApp.openById(tmpId).getBody().getText();
     } catch (e) {
       derniere = e;
-      if (!estErreurDeQuota(e)) { Logger.log("Lecture OCR impossible : " + e); return null; }
+      if (!estErreurDeQuota(e)) {
+        // erreur passagère (hors quota) : un nouvel essai, puis la pièce est illisible et l'erreur va dans le journal
+        if (essaiErreur < 1) { essaiErreur++; Logger.log("Erreur OCR, nouvel essai dans " + CONFIG.ocrAttenteErreurMs / 1000 + " s : " + e); Utilities.sleep(CONFIG.ocrAttenteErreurMs); continue; }
+        _ocr.derniereErreur = String(e && e.message || e);
+        Logger.log("Lecture OCR impossible : " + e);
+        return null;
+      }
       if (essai >= attentes.length) break;
       Logger.log("Quota OCR atteint, nouvel essai dans " + attentes[essai] / 1000 + " s (" + e + ")");
       Utilities.sleep(attentes[essai]);

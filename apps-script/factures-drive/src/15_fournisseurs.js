@@ -17,7 +17,7 @@ function cleIdentifiant(s) { return String(s || "").toUpperCase().replace(/[^A-Z
 function listeFournisseursParDefaut() {
   return CONFIG.fournisseursReference.map(function(f) {
     return { nom: f.nom, variantes: f.variantes.slice(), domaines: f.domaines.slice(), identifiants: f.identifiants.slice(), etab: f.etab,
-             pennylaneBello: "", pennylanePiccola: "", actif: "oui" };
+             pennylaneBello: "", pennylanePiccola: "", actif: f.actif || "oui", remarque: f.remarque || "" };
   });
 }
 
@@ -38,11 +38,21 @@ function interpreterEtablissement(valeur) {
   return r;
 }
 
-/** Vrai si la ligne est active (colonne Actif, et colonne Établissement « perso » / « pas besoin ») */
+/**
+ * Vrai si la ligne est active : colonne Actif ni « non » ni « à compléter » (une ligne proposée par le script n'est active
+ * qu'une fois relue par Paul : c'est ainsi que « Cmb », « Indy » et « Esker » étaient devenus des fournisseurs), et colonne
+ * Établissement ni « perso » ni « pas besoin ».
+ */
 function ligneActive(f) {
   if (!f) return false;
-  if (String(f.actif || "oui").toLowerCase().trim() === "non") return false;
+  var a = normaliser(f.actif || "oui").trim();
+  if (a === "non" || a === "0" || a === "false" || /^a\s*completer/.test(a)) return false;
   return !interpreterEtablissement(f.etab).inactif;
+}
+
+/** Vrai pour une plateforme de facturation (Crédit Mutuel, Esker, Indy, Mon Expert en Gestion…) : le domaine n'est pas le fournisseur */
+function estDomainePlateforme(domaine) {
+  return domainesCandidats(domaine).some(function(d) { return CONFIG.domainesPlateformes.indexOf(d) !== -1; });
 }
 
 /** Vrai pour une messagerie grand public (gmail, hotmail, wanadoo…) : seule une adresse complète identifie un fournisseur */
@@ -130,7 +140,9 @@ function nomProposeDepuisDomaine(from) {
 function listerIdentifiants(texte) {
   var t = String(texte || "").replace(/ /g, " "), out = [], notres = [];
   CONFIG.etablissements.forEach(function(e) { notres.push(cleIdentifiant(CONFIG.marqueurs[e].tva)); notres.push(CONFIG.marqueurs[e].siren); });
-  var ajouter = function(k) { if (k && notres.indexOf(k) === -1 && out.indexOf(k) === -1) out.push(k); };
+  // les nôtres : TVA, SIREN, et tout SIRET qui commence par notre SIREN (« 91321738600014 » s'était retrouvé sur la ligne Cmb)
+  var sirenDe = function(k) { return /^FR\d{11}$/.test(k) ? k.slice(4) : k.slice(0, 9); };
+  var ajouter = function(k) { if (k && notres.indexOf(k) === -1 && notres.indexOf(sirenDe(k)) === -1 && out.indexOf(k) === -1) out.push(k); };
   var m, reTva = /\bFR\s?\d{2}(?:\s?\d{3}){3}\b/gi;
   while ((m = reTva.exec(t)) !== null) ajouter(cleIdentifiant(m[0]));
   var reSiret = /(?:siret|siren|rcs)\s*:?\s*[A-Za-z\s]{0,12}?((?:\d\s?){9}(?:(?:\d\s?){5})?)\b/gi;
@@ -139,12 +151,39 @@ function listerIdentifiants(texte) {
 }
 
 /**
- * Résolution d'un fournisseur : { entree, source } ou null.
+ * Nom ou variante de la liste présent, en entier et en mots entiers, dans un texte : { entree, cle } (le plus long) ou null.
+ *   - `minimum` : longueur minimale de la clé (sans espaces) ; par défaut 6 (« Apple » dans « Apple Pay », « masse » : jamais sur 5 lettres)
+ *   - seules les entrées actives comptent.
+ */
+function chercherNomDans(idx, texte, minimum) {
+  var min = minimum || 6;
+  var texteNorm = " " + normaliser(texte || "").replace(/[^a-z0-9]+/g, " ") + " ";
+  var compact = texteNorm.replace(/ /g, "");
+  var meilleur = null, longueur = 0;
+  for (var k in idx.parCle) {
+    if (k.length < min) continue;
+    var f = idx.parCle[k];
+    if (!ligneActive(f)) continue;
+    // nom complet : « mael distribution » ou « maeldistribution », jamais une partie
+    var phrases = [];
+    [f.nom].concat(f.variantes || []).forEach(function(v) { if (cleFournisseur(v) === k) phrases.push(" " + normaliser(v).replace(/[^a-z0-9]+/g, " ").trim() + " "); });
+    var trouve = phrases.some(function(p) { return texteNorm.indexOf(p) !== -1; })
+      || (k.length >= 8 && compact.indexOf(k) !== -1 && texteNorm.indexOf(" " + k + " ") !== -1);
+    if (!trouve && texteNorm.indexOf(" " + k + " ") !== -1) trouve = true;
+    if (trouve && k.length > longueur) { meilleur = f; longueur = k.length; }
+  }
+  return meilleur ? { entree: meilleur, cle: longueur } : null;
+}
+
+/**
+ * Résolution d'un fournisseur : { entree, source } ou null ({ source: "plateforme" } si l'expéditeur est une plateforme sans fournisseur lisible).
  *  1) identifiant (TVA, SIRET, SIREN) lu sur le document ;
- *  2) domaine de l'expéditeur (sous-domaine puis domaine) ;
- *  3) nom ou variante présent dans l'objet ou l'expéditeur (mots entiers, 4 caractères au moins) ;
- *  4) pour un transfert interne (Pierre, Paul) : nom ou variante présent dans l'objet.
- * Les entrées « non » (inactives) ne sont jamais retenues.
+ *  2) adresse complète, puis domaine de l'expéditeur (sous-domaine puis domaine) — jamais pour une messagerie grand public
+ *     (adresse complète seulement) ni pour une plateforme de facturation (CONFIG.domainesPlateformes) ;
+ *  3) nom complet ou variante dans l'objet ou dans le nom affiché de l'expéditeur (6 caractères au moins ; 4 dans le nom affiché) ;
+ *  4) plateforme : nom complet lu dans le document lui-même (3 000 premiers caractères, 5 caractères au moins : « Sysco ») ;
+ *  5) pour un transfert interne (Pierre, Paul) : nom ou variante présent dans l'objet.
+ * Les entrées inactives ou « à compléter » ne sont jamais retenues.
  */
 function resoudreFournisseur(idx, e) {
   var actif = function(f) { return ligneActive(f); };
@@ -152,35 +191,69 @@ function resoudreFournisseur(idx, e) {
   for (var i = 0; i < ids.length; i++) { var fi = idx.parIdentifiant[ids[i]]; if (actif(fi)) return { entree: fi, source: "identifiant" }; }
   var from = String(e.from || "").toLowerCase();
   var adresse = (from.match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+/) || [""])[0];
+  var domaine = domaineDe(from);
   var interne = CONFIG.transfertsAutorises.some(function(x) { return from.indexOf(x) !== -1; }) || CONFIG.adressesInternes.some(function(x) { return from.indexOf(x) !== -1; });
-  if (!interne) {
+  var plateforme = !interne && estDomainePlateforme(domaine);
+  if (!interne && !plateforme) {
     // adresse complète (obligatoire pour gmail, hotmail, wanadoo… : SDPF écrit depuis sdpfcompta@hotmail.com)
     var fa = adresse && (idx.parAdresse[adresse] || idx.parDomaine[adresse]);
     if (actif(fa)) return { entree: fa, source: "adresse" };
-    var domaine = domaineDe(from);
     if (!estDomaineGrandPublic(domaine)) {
       var cands = domainesCandidats(domaine);
       for (var j = 0; j < cands.length; j++) { var fd = idx.parDomaine[cands[j]]; if (actif(fd) && !estDomaineGrandPublic(cands[j])) return { entree: fd, source: "domaine" }; }
     }
   }
-  // expéditeur pris en compte pour la recherche par nom, sans le domaine grand public (« Wanadoo » est une variante de Self Stockage,
-  // mais quelqun@wanadoo.fr n'est pas Self Stockage)
-  var fromNom = interne ? "" : String(e.from || "");
-  if (!interne && estDomaineGrandPublic(domaineDe(from))) fromNom = fromNom.replace(/@[a-z0-9.\-]+/gi, " ");
-  var champ = cleFournisseur(" " + (e.subject || "") + " " + fromNom + " ");
-  var texteNorm = " " + normaliser((e.subject || "") + " " + fromNom).replace(/[^a-z0-9]+/g, " ") + " ";
-  var meilleur = null, longueur = 0;
-  for (var k in idx.parCle) {
-    if (k.length < 4) continue;
-    var f = idx.parCle[k];
-    if (!actif(f)) continue;
-    var mot = " " + k.replace(/([a-z])(\d)/g, "$1 $2") + " ";
-    var trouve = texteNorm.indexOf(" " + k + " ") !== -1 || texteNorm.replace(/ /g, "").indexOf(k) !== -1 && champ.indexOf(k) !== -1 && k.length >= 6;
-    if (!trouve && texteNorm.indexOf(mot) !== -1) trouve = true;
-    if (trouve && k.length > longueur) { meilleur = f; longueur = k.length; }
+  // nom complet dans l'objet (6 caractères au moins) ; dans le nom affiché de l'expéditeur (« Metro <noreply@…> ») dès 4 caractères,
+  // sans la partie adresse (« Wanadoo » est une variante de Self Stockage, quelqun@wanadoo.fr n'est pas Self Stockage)
+  var dansObjet = chercherNomDans(idx, e.subject || "", 6);
+  if (dansObjet) return { entree: dansObjet.entree, source: "nom" };
+  if (!interne && !plateforme) {
+    var affiche = String(e.from || "").replace(/<[^>]*>/, " ").replace(/[a-z0-9._%+\-]+@[a-z0-9.\-]+/gi, " ");
+    var dansFrom = chercherNomDans(idx, affiche, 4);
+    if (dansFrom) return { entree: dansFrom.entree, source: "nom" };
   }
-  if (meilleur) return { entree: meilleur, source: "nom" };
+  if (plateforme) {
+    var dansDoc = chercherNomDans(idx, String(e.texte || "").slice(0, 3000), 5);
+    if (dansDoc) return { entree: dansDoc.entree, source: "nom (document)" };
+    return { entree: null, source: "plateforme" };
+  }
   return null;
+}
+
+/**
+ * Identifiants du bloc émetteur d'une facture, pour compléter la liste : jamais les nôtres (listerIdentifiants les écarte),
+ * jamais ceux déjà portés par une autre ligne (`dejaPris` : { identifiant: nom de ligne }), et un seul groupe (SIREN, SIRET, TVA
+ * d'une même société) : celui écrit le plus près du nom du fournisseur (`noms`), sinon le premier du document.
+ * Renvoie { identifiants: [...], ecartes: [{ id, ligne }] }.
+ */
+function identifiantsEmetteur(texte, noms, dejaPris) {
+  var t = String(texte || "").replace(/\u00a0/g, " "), out = { identifiants: [], ecartes: [] };
+  var ids = listerIdentifiants(t);
+  if (!ids.length) return out;
+  var siren = function(id) { return /^FR\d{11}$/.test(id) ? id.slice(4) : id.slice(0, 9); };
+  var position = function(id) {
+    var motif = /^FR/.test(id) ? "FR\\s?" + id.slice(2, 4) + "\\s?" + id.slice(4).replace(/(\d{3})(?=\d)/g, "$1\\s?") : id.replace(/(\d{3})(?=\d)/g, "$1\\s?");
+    var m = t.match(new RegExp(motif, "i"));
+    return m ? m.index : t.length;
+  };
+  var groupes = {};
+  ids.forEach(function(id) {
+    if (dejaPris && dejaPris[id]) { out.ecartes.push({ id: id, ligne: dejaPris[id] }); return; }
+    var g = siren(id);
+    if (!groupes[g]) groupes[g] = { ids: [], pos: t.length };
+    groupes[g].ids.push(id);
+    groupes[g].pos = Math.min(groupes[g].pos, position(id));
+  });
+  var cles = Object.keys(groupes);
+  if (!cles.length) return out;
+  var posNom = -1, tn = normaliser(t);
+  (noms || []).forEach(function(n) { var k = normaliser(n).trim(); if (k.length >= 4) { var p = tn.indexOf(k); if (p !== -1 && (posNom === -1 || p < posNom)) posNom = p; } });
+  cles.sort(function(a, b) {
+    var da = posNom === -1 ? groupes[a].pos : Math.abs(groupes[a].pos - posNom), db = posNom === -1 ? groupes[b].pos : Math.abs(groupes[b].pos - posNom);
+    return da - db;
+  });
+  out.identifiants = groupes[cles[0]].ids;
+  return out;
 }
 
 /** Ligne « à compléter » pour un fournisseur inconnu (proposition de nom, domaine, identifiants lus) */

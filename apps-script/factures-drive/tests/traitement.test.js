@@ -112,17 +112,19 @@ describe("passe réelle sur une boîte mêlant les cas du brief", () => {
     assert.ok(index.every((l) => /^[0-9a-f]{32}$/.test(l[1])), "MD5 hexadécimal");
     assert.ok(index.some((l) => l[3] === "Cheville 35" && String(l[4]) === "00113789" && l[6] === "375.64" && l[10] === "Bello Mio/Cheville 35/2026"));
   });
-  test("après 3 jours, archiverEnvoisPennylane déplace vers <Etab>/<Fournisseur>/<Année> en gardant l'identifiant", () => {
+  test("après 3 jours DANS ENVOI, archiverEnvoisPennylane déplace vers <Etab>/<Fournisseur>/<Année> en gardant l'identifiant", () => {
     const envoi = env.ctx.dossierEnvoi("Bello Mio");
     const avant = {};
+    const vieillir = (id, jours) => { env.ctx.indexParId(id).arriveEnvoi = new Date(Date.now() - jours * 86400000).toISOString().slice(0, 10); };
     const fs = envoi.getFiles();
-    while (fs.hasNext()) { const f = fs.next(); avant[f.getName()] = f.getId(); if (/Cheville 35|Leroy Merlin/.test(f.getName())) f._cree = new Date(Date.now() - 4 * 86400000); }
-    // un fichier déposé à la main par Paul, au nom libre, trop vieux pour l'archive automatique
+    while (fs.hasNext()) { const f = fs.next(); avant[f.getName()] = f.getId(); if (/Cheville 35|Leroy Merlin/.test(f.getName())) vieillir(f.getId(), 4); }
+    // un fichier déposé à la main par Paul, au nom libre, CRÉÉ il y a 9 jours : inconnu de l'Index, il est indexé aujourd'hui et attend 3 jours
     const manuel = envoi.createFile("facture-sans-nom-normalise.pdf", "contenu", "application/pdf");
     manuel._cree = new Date(Date.now() - 9 * 86400000);
     const st = env.ctx.archiverEnvoisPennylane();
     assert.equal(st.archives, 2);
-    assert.equal(st.bloques, 1);
+    assert.equal(st.bloques, 0, "le fichier déposé à la main n'est pas archivé le jour où il est vu");
+    assert.equal(env.ctx.indexParId(manuel.getId()).arriveEnvoi, new Date().toISOString().slice(0, 10), "indexé avec sa date d'arrivée");
     const apres = env.arbre();
     assert.ok(apres.includes("/Bello Mio/Cheville 35/2026/2026-08-31 — Cheville 35 — Facture n° 00113789 — 375.64 EUR.pdf"), apres.join("\n"));
     assert.ok(apres.includes("/Bello Mio/Leroy Merlin/2026/2026-10-02 — Leroy Merlin — Facture — 38.79 EUR.pdf"));
@@ -131,11 +133,29 @@ describe("passe réelle sur une boîte mêlant les cas du brief", () => {
     const archive = racine.getFoldersByName("Bello Mio").next().getFoldersByName("Cheville 35").next().getFoldersByName("2026").next().getFiles().next();
     assert.equal(archive.getId(), avant[archive.getName()], "même identifiant Drive après déplacement");
     assert.ok(env.feuille("Journal").some((l) => l[12] === "archive" && /Bello Mio\/Cheville 35\/2026/.test(l[13])));
+    assert.ok(env.feuille("Index").some((l) => l[0] === archive.getId() && l[8] === "Bello Mio/Cheville 35/2026"), "chemin de l'Index mis à jour");
+    // 9 jours plus tard, le fichier au nom libre est toujours là : bloqué (nom non reconnu) et signalé par l'alerte hebdomadaire
+    vieillir(manuel.getId(), 9);
+    const st2 = env.ctx.archiverEnvoisPennylane();
+    assert.equal(st2.bloques, 1);
     assert.ok(env.feuille("Journal").some((l) => l[12] === "envoi_bloque" && /nom de fichier non reconnu/.test(l[14])));
-    // l'alerte hebdomadaire signale le fichier bloqué depuis plus de 7 jours
     env.ctx.alerteHebdo();
     assert.equal(env.mails.length, 1);
     assert.match(env.mails[0].body, /facture-sans-nom-normalise\.pdf/);
+  });
+  test("un fichier déplacé à la main depuis À vérifier vers Envoi Pennylane attend 3 jours à compter de son arrivée", () => {
+    const racine = env.racine.getFoldersByName("Factures iFratelli").next();
+    const av = racine.getFoldersByName("À vérifier").next();
+    const f = av.getFiles().next();
+    f._cree = new Date(Date.now() - 30 * 86400000);
+    f.moveTo(env.ctx.dossierEnvoi("Bello Mio"));
+    const st = env.ctx.archiverEnvoisPennylane();
+    assert.ok(env.arbre().includes("/Envoi Pennylane/Bello Mio/" + f.getName()), "toujours dans Envoi : vu aujourd'hui pour la première fois");
+    const e = env.ctx.indexParId(f.getId());
+    assert.equal(e.chemin, "Envoi Pennylane/Bello Mio");
+    assert.equal(e.arriveEnvoi, new Date().toISOString().slice(0, 10));
+    assert.ok(env.feuille("Index").some((l) => l[0] === f.getId() && l[8] === "Envoi Pennylane/Bello Mio" && l[11] === e.arriveEnvoi), "Sheet à jour");
+    assert.equal(st.erreurs, 0);
   });
 });
 
@@ -282,35 +302,6 @@ describe("réorganisation de l'archive : simulation puis réel", () => {
     assert.ok(!env.arbre().some((x) => /Journaux de clôture/.test(x)));
     const dest = env.racine.getFoldersByName("Journaux de caisse iFratelli").next().getFoldersByName("Piccola Mia").next();
     assert.equal(dest.getFiles().next().getName(), "journal-caisse-2026-09.pdf");
-  });
-});
-
-describe("rattrapage de la bascule Pennylane", () => {
-  const env = creerEnvironnement();
-  const apres = new Date("2026-10-04T10:00:00+02:00"), avant = new Date("2026-10-02T10:00:00+02:00");
-  const a = env.ctx.dossierDuChemin(["Piccola Mia", "Maeldistribution", "10 - Octobre 2026"]).createFile("2026-10-01 — Maeldistribution — Facture n° FC0103 — 2054.81 EUR.pdf", "x", "application/pdf"); a._cree = apres;
-  const b = env.ctx.dossierDuChemin(["Piccola Mia", "Maeldistribution", "10 - Octobre 2026"]).createFile("2026-10-04 — Maeldistribution — Facture n° FC0160 — 300.00 EUR.pdf", "y", "application/pdf"); b._cree = apres;
-  const c = env.ctx.dossierDuChemin(["Bello Mio", "Carniato", "10 - Octobre 2026"]).createFile("2026-09-30 — Carniato — Facture n° 201018858 — 347.59 EUR.pdf", "z", "application/pdf"); c._cree = avant;
-  const d = env.ctx.dossierDuChemin(["Bello Mio", "TerreAzur", "10 - Octobre 2026"]).createFile("2026-10-05 — TerreAzur — Facture n° 8801810000 — 99.00 EUR.pdf", "w", "application/pdf"); d._cree = apres;
-  env.ctx.dossierEnvoi("Piccola Mia").createFile("2026-10-01 — Maël Distribution — Facture n° FC0103 — 2054.81 EUR.pdf", "copie manuelle de Paul", "application/pdf");
-
-  test("simulation : liste ce qui serait copié, sans copier", () => {
-    const st = env.ctx.rattrapageBasculeSimulation();
-    assert.equal(st.vus, 3, "créés après le 03/10 au soir");
-    assert.equal(st.deja, 1, "FC0103 déjà copiée à la main (même numéro et montant, autre graphie du nom)");
-    assert.equal(st.copies, 2);
-    assert.equal(env.ctx.dossierEnvoi("Piccola Mia").getFiles().next().getName(), "2026-10-01 — Maël Distribution — Facture n° FC0103 — 2054.81 EUR.pdf");
-    assert.equal(env.feuille("Simulation").length, 2);
-  });
-  test("réel : copie dans Envoi Pennylane, l'archive garde l'original", () => {
-    const st = env.ctx.rattrapageBasculeReel();
-    assert.equal(st.copies, 2);
-    const arbre = env.arbre();
-    assert.ok(arbre.includes("/Envoi Pennylane/Piccola Mia/2026-10-04 — Maeldistribution — Facture n° FC0160 — 300.00 EUR.pdf"), arbre.join("\n"));
-    assert.ok(arbre.includes("/Envoi Pennylane/Bello Mio/2026-10-05 — TerreAzur — Facture n° 8801810000 — 99.00 EUR.pdf"));
-    assert.ok(arbre.includes("/Piccola Mia/Maeldistribution/10 - Octobre 2026/2026-10-04 — Maeldistribution — Facture n° FC0160 — 300.00 EUR.pdf"), "original conservé");
-    assert.ok(!arbre.includes("/Envoi Pennylane/Bello Mio/2026-09-30 — Carniato — Facture n° 201018858 — 347.59 EUR.pdf"), "créé avant la bascule : Pennylane l'a déjà");
-    assert.equal(env.ctx.rattrapageBasculeReel().copies, 0, "une seconde passe ne recopie rien");
   });
 });
 
@@ -532,5 +523,191 @@ describe("v4.5 : liste de fournisseurs nettoyée, renommage de l'archive, averti
     assert.equal(s.envoi, 0);
     assert.deepEqual(env.arbre(), []);
     assert.ok(env.feuille("Journal").some((l) => l[6] === "bon_commande" && l[12] === "journal"));
+  });
+});
+
+describe("v4.6 : sûreté (verrou, curseur, écriture après chaque message), pièces, plateformes, OCR, types MIME, Index", () => {
+  const mael = (env, date, to) => env.fil([{ date: date || "2026-10-02T09:00:00", from: "comptabilite@maeldistribution.fr", to: to || "facture@piccolamia.fr", subject: "Facture FC0140", pieces: [{ nom: "FC0140.pdf", contenu: env.fixture("mael_facture_piccola") }] }]);
+
+  test("verrou : une exécution en cours fait abandonner la suivante ; curseur de date après une passe terminée ; contrôle quotidien", () => {
+    const env = creerEnvironnement();
+    mael(env, new Date(Date.now() - 3600000).toISOString());
+    env.verrou.pris = true;
+    assert.equal(env.ctx.extraireFactures(), null);
+    assert.ok(env.journalLog.some((l) => /ABANDON extraireFactures/.test(l)));
+    assert.deepEqual(env.arbre(), []);
+    env.verrou.pris = false;
+    const st = env.ctx.extraireFactures();
+    assert.equal(st.envoi, 1);
+    assert.ok(st.termine);
+    assert.ok(env.props["curseur.passe"], "curseur écrit après une passe terminée");
+    assert.equal(env.verrou.pris, false, "verrou relâché");
+    assert.equal(env.ctx.controlerPasses() <= 1, true);
+    assert.equal(env.mails.length, 0, "passe récente : pas de mail");
+    env.props["curseur.passe"] = new Date(Date.now() - 30 * 3600000).toISOString();
+    env.ctx.controlerPasses();
+    assert.equal(env.mails.length, 1);
+    assert.match(env.mails[0].subject, /ne tourne plus/);
+  });
+
+  test("curseur : après plusieurs jours d'arrêt, la passe horaire remonte jusqu'à la dernière passe terminée", () => {
+    const env = creerEnvironnement();
+    const il_y_a = (h) => new Date(Date.now() - h * 3600000).toISOString();
+    env.fil([{ date: il_y_a(9 * 24), from: "comptabilite@maeldistribution.fr", to: "facture@piccolamia.fr", subject: "Facture FC0140", pieces: [{ nom: "FC0140.pdf", contenu: env.fixture("mael_facture_piccola") }] }]);
+    assert.equal(env.ctx.extraireFactures().envoi, 0, "sans curseur : fenêtre de 72 h, le mail de 9 jours n'est pas vu");
+    env.props["curseur.passe"] = il_y_a(9 * 24 - 2);   // dernière passe terminée il y a presque 9 jours
+    assert.equal(env.ctx.extraireFactures().envoi, 1, "avec le curseur (moins 24 h de marge) : repêché");
+  });
+
+  test("limite de temps au milieu d'un message : la pièce déjà rangée est dans l'Index, le message n'est pas marqué traité, la reprise ne double rien", () => {
+    const env = creerEnvironnement();
+    env.fil([{ date: "2026-10-02T09:00:00", from: "comptabilite@maeldistribution.fr", to: "facture@bellomio.fr", subject: "Factures", pieces: [
+      { nom: "FC0140.pdf", contenu: env.fixture("mael_facture_piccola") }, { nom: "FC0126.pdf", contenu: env.fixture("mael_avoir_bello") }] }]);
+    const vraiNow = env.DateVm.now; let decalage = 0; env.DateVm.now = () => vraiNow() + decalage;
+    const lireTexteOrig = env.ctx.lireTexte; let appels = 0;
+    env.ctx.lireTexte = function(b, e) { const r = lireTexteOrig(b, e); if (++appels === 1) decalage = 10 * 60 * 1000; return r; };   // l'horloge saute après la première pièce
+    const s1 = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "t" });
+    assert.ok(env.journalLog.some((l) => /PAS FINI/.test(l)));
+    assert.equal(env.feuille("Messages traités").length, 0, "message interrompu : pas marqué traité");
+    assert.equal(env.feuille("Index").length, 1, "la première pièce est déjà écrite dans l'Index");
+    assert.equal(env.feuille("Journal").length, 1);
+    assert.ok(env.arbre().includes("/Envoi Pennylane/Piccola Mia/2026-10-02 — Maël Distribution — Facture n° FC0140 — 906.39 EUR.pdf"));
+    assert.equal(s1.envoi, 1);
+    decalage = 0; env.ctx.lireTexte = lireTexteOrig;
+    const s2 = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "t" });
+    assert.equal(s2.doublons, 1, "FC0140 reconnue par son empreinte");
+    assert.equal(s2.envoi, 1, "FC0126 rangée");
+    assert.equal(env.feuille("Messages traités").length, 1);
+    assert.equal(env.arbre().filter((x) => x.includes("FC0140")).length, 1);
+    assert.ok(env.journalLog.some((l) => /TERMINÉ/.test(l)));
+  });
+
+  test("pièces écartées journalisées, PDF sans extension reconnu par son type, type MIME posé d'après l'extension, Factur-X", () => {
+    const env = creerEnvironnement();
+    env.fil([{ date: "2026-10-02T09:00:00", from: "noreply@carniato.com", to: "facture@bellomio.fr", subject: "Facture", pieces: [
+      { nom: "archive.zip", contenu: "PK...", type: "application/zip" },
+      { nom: "facture", contenu: env.fixture("carniato_facture_bello"), type: "application/pdf" },
+      { nom: "signature.p7m", contenu: "x", type: "application/pkcs7-mime" }] }]);
+    env.fil([{ date: "2026-10-02T10:00:00", from: "comptabilite@maeldistribution.fr", to: "facture@piccolamia.fr", subject: "Facture FC0140", pieces: [
+      { nom: "FC0140.pdf", contenu: env.fixture("mael_facture_piccola"), type: "application/octet-stream" },
+      { nom: "FC0140.xml", contenu: "<rsm:CrossIndustryInvoice>FC0140</rsm:CrossIndustryInvoice>", type: "application/xml" }] }]);
+    const st = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "p" });
+    assert.equal(st.ecartees, 2);
+    const j = env.feuille("Journal");
+    assert.ok(j.some((l) => l[5] === "archive.zip" && l[12] === "ignoree" && /zip/.test(l[14])), JSON.stringify(j.map((l) => [l[5], l[12], l[14]])));
+    assert.ok(j.some((l) => l[5] === "signature.p7m" && l[12] === "ignoree"));
+    assert.ok(env.arbre().includes("/Envoi Pennylane/Bello Mio/2026-09-29 — Carniato — Facture n° 201018858 — 347.59 EUR.pdf"), "PDF sans extension lu grâce à son type MIME");
+    assert.ok(j.some((l) => l[5] === "FC0140.xml" && l[6] === "facturx" && l[12] === "journal"), "XML Factur-X journalisé seulement");
+    assert.equal(env.arbre().filter((x) => /FC0140/.test(x)).length, 1, "seul le PDF est rangé");
+    const envoi = env.ctx.dossierEnvoi("Piccola Mia").getFiles();
+    while (envoi.hasNext()) { const f = envoi.next(); assert.equal(f.getMimeType(), "application/pdf", "type MIME d'après l'extension, pas celui du mail : " + f.getName()); }
+  });
+
+  test("plateforme de facturation dans la passe : fournisseur lu dans le document, jamais de ligne « à compléter »", () => {
+    const env = creerEnvironnement();
+    env.fil([{ date: "2026-08-26T12:00:00", from: "ne-pas-repondre@facture.cmb.fr", to: "facture@bellomio.fr", subject: "BR NUISIBLES BOURCE RICHARD : facture FAC00054", pieces: [{ nom: "FAC00054.pdf", contenu: env.fixture("brnuisibles_facture_FAC00054_bello") }] }]);
+    env.fil([{ date: "2026-08-27T12:00:00", from: "ne-pas-repondre@facture.cmb.fr", to: "facture@bellomio.fr", subject: "Votre facture", pieces: [{ nom: "f.pdf", contenu: "Facture n° 12 Total HT 10,00 TVA 2,00 Total TTC 12,00 SARL SASHA Date : 27/08/2026" }] }]);
+    const st = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "pf" });
+    assert.equal(st.envoi, 1);
+    assert.ok(env.arbre().includes("/Envoi Pennylane/Bello Mio/2026-08-26 — BR Nuisibles — Facture n° FAC00054 — 294.80 EUR.pdf"), env.arbre().join("\n"));
+    assert.equal(st.a_verifier, 1);
+    assert.ok(env.feuille("Journal").some((l) => l[12] === "a_verifier" && /plateforme, fournisseur non lu/.test(l[14])));
+    assert.equal(env.fournisseurs().length, 0, "aucune ligne « Cmb » proposée");
+  });
+
+  test("OCR muet : un nouvel essai, puis « texte illisible » avec l'erreur dans le journal, message traité", () => {
+    const env = creerEnvironnement();
+    mael(env);
+    env.pannes.ocrErreurs = 1;
+    const s1 = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "o1" });
+    assert.equal(s1.envoi, 1, "repris au second essai");
+    assert.ok(env.pannes.pauses.includes(2000));
+    const env2 = creerEnvironnement();
+    mael(env2);
+    env2.pannes.ocrErreurs = 2;
+    const s2 = env2.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "o2" });
+    assert.equal(s2.a_verifier, 1);
+    assert.ok(env2.feuille("Journal").some((l) => /texte illisible \(OCR : .*conversion failed/.test(l[14])), JSON.stringify(env2.feuille("Journal").map((l) => l[14])));
+    assert.equal(env2.feuille("Messages traités").length, 1);
+  });
+
+  test("reparerTypesFichiers : simulation dans l'onglet « Types », puis réel (même identifiant, type corrigé)", () => {
+    const env = creerEnvironnement();
+    const mauvais = env.ctx.dossierDuChemin(["Bello Mio", "Masse", "2026"]).createFile("2026-09-23 — Masse — Facture n° FACN012603733 — 56.76 EUR.pdf", "%PDF", "application/others");
+    env.ctx.dossierDuChemin(["Bello Mio", "Masse", "2026"]).createFile("2026-09-09 — Masse — Facture n° 127 — 137.52 EUR.pdf", "%PDF", "application/pdf");
+    env.ctx.dossierEnvoi("Piccola Mia").createFile("2026-10-02 — Maël Distribution — Facture n° FC0140 — 906.39 EUR.pdf", "%PDF", "application/octet-stream");
+    const st = env.ctx.reparerTypesFichiers();
+    assert.equal(st.aReparer, 2);
+    assert.equal(mauvais.getMimeType(), "application/others", "simulation : rien ne change");
+    const plan = env.feuille("Types");
+    assert.equal(plan.length, 2);
+    assert.ok(plan.every((l) => l[4] === "application/pdf" && l[5] === "simulation"));
+    env.ctx.reparerTypesFichiers();
+    assert.equal(env.feuille("Types").length, 2, "relancer ne redouble pas");
+    const reel = env.ctx.reparerTypesFichiersReel();
+    assert.equal(reel.faits, 2);
+    assert.equal(reel.erreurs, 0);
+    assert.equal(env.fichierParId(mauvais.getId()).getMimeType(), "application/pdf");
+    assert.equal(env.fichierParId(mauvais.getId()).getName(), "2026-09-23 — Masse — Facture n° FACN012603733 — 56.76 EUR.pdf");
+    assert.ok(env.feuille("Types").every((l) => l[5] === "fait"));
+  });
+
+  test("reindexerArchive : Index reconstruit depuis le Drive (chemins, fournisseurs canoniques, numéros en texte), reprise après la limite", () => {
+    const env = creerEnvironnement();
+    const f1 = env.ctx.dossierDuChemin(["Bello Mio", "Self Stockage", "2026"]).createFile("2026-09-01 — Self Stockage — Facture n° 2026-091 — 120.00 EUR.pdf", "a", "application/pdf");
+    const f2 = env.ctx.dossierEnvoi("Bello Mio").createFile("2026-08-31 — Cheville 35 — Facture n° 00113789 — 375.64 EUR.pdf", "b", "application/pdf");
+    const f3 = env.ctx.dossierDuChemin(["Rattrapage à valider", "Piccola Mia"]).createFile("2026-10-02 — Maeldistribution — Facture n° FC0140 — 906.39 EUR.pdf", "c", "application/pdf");
+    // un ancien Index périmé : chemin faux, fournisseur à l'ancien nom, numéro converti en nombre par le Sheet
+    env.ctx.indexAjouter({ fichierId: f1.getId(), md5: "x", etablissement: "Bello Mio", fournisseur: "Wanadoo", numero: null, date: "2026-09-01", montant: "120.00", nom: "ancien.pdf", chemin: "Bello Mio/Wanadoo/09 - Septembre 2026", archive: "" });
+    env.ctx.indexAjouter({ fichierId: f2.getId(), md5: "y", etablissement: "Bello Mio", fournisseur: "Cheville 35", numero: 113789, date: "2026-08-31", montant: "375.64", nom: f2.getName(), chemin: "Envoi Pennylane/Bello Mio", archive: "" });
+    env.ctx.journalVider();
+    assert.equal(env.onglet("Index")._format, "@", "colonnes de l'Index au format texte");
+    env.ctx.CONFIG.limiteMs = -1;
+    env.ctx.reindexerArchive();
+    assert.ok(env.journalLog.some((l) => /Index vidé/.test(l)));
+    assert.ok(env.journalLog.some((l) => /PAS FINI/.test(l)));
+    assert.equal(env.props["reindex.encours"], "1");
+    env.ctx.CONFIG.limiteMs = 5 * 60 * 1000;
+    const st = env.ctx.reindexerArchive();
+    assert.equal(st.ajoutes, 3);
+    assert.ok(!env.props["reindex.encours"]);
+    const index = env.feuille("Index");
+    assert.equal(index.length, 3);
+    const l1 = index.find((l) => l[0] === f1.getId()), l2 = index.find((l) => l[0] === f2.getId()), l3 = index.find((l) => l[0] === f3.getId());
+    assert.equal(l1[8], "Bello Mio/Self Stockage/2026");
+    assert.equal(l1[3], "Self Stockage");
+    assert.equal(l1[7], f1.getName());
+    assert.equal(l2[4], "00113789", "numéro gardé en texte");
+    assert.equal(l2[10], "Bello Mio/Cheville 35/2026", "archive prévue pour un fichier de Envoi");
+    assert.ok(l2[11], "date d'arrivée dans Envoi");
+    assert.equal(l3[3], "Maël Distribution", "fournisseur canonique d'après le nom");
+    assert.equal(l3[10], "Piccola Mia/Maël Distribution/2026", "archive prévue pour le transit");
+    assert.ok(index.every((l) => /^[0-9a-f]{32}$/.test(l[1])), "MD5 relus dans Drive");
+    assert.ok(env.journalLog.some((l) => /TERMINÉ/.test(l)));
+  });
+
+  test("Index : écriture par identifiant de fichier même après un tri de l'onglet ; journaux de clôture suivis ; renommage mis à jour", () => {
+    const env = creerEnvironnement();
+    const a = env.ctx.dossierDuChemin(["Bello Mio", "Metro", "2026"]).createFile("2026-09-12 — Metro — Facture n° 123 — 50.00 EUR.pdf", "a", "application/pdf");
+    const b = env.ctx.dossierDuChemin(["Bello Mio", "Self Stockage", "2026"]).createFile("2026-09-01 — Wanadoo — Facture n° 2026-091 — 120.00 EUR.pdf", "b", "application/pdf");
+    const j = env.ctx.dossierDuChemin(["Piccola Mia", "Journaux de clôture"]).createFile("journal-caisse-2026-09.pdf", "caisse", "application/pdf");
+    env.ctx.indexerExistant();
+    env.onglet("Index").sort(8);   // tri par nom : les numéros de ligne mémorisés sont faux
+    env.ctx.deplacerFichier(a, ["Piccola Mia", "Metro", "2026"]);
+    const index = env.feuille("Index");
+    assert.equal(index.find((l) => l[0] === a.getId())[8], "Piccola Mia/Metro/2026");
+    assert.equal(index.find((l) => l[0] === b.getId())[8], "Bello Mio/Self Stockage/2026", "l'autre ligne n'a pas été touchée");
+    env.ctx.deplacerJournauxDeCloture();
+    assert.equal(env.feuille("Index").find((l) => l[0] === j.getId())[8], "Journaux de caisse iFratelli/Piccola Mia");
+    // renommage : fournisseur, numéro, date, montant relus dans le nouveau nom
+    const c = env.ctx.fournisseursClasseur(true); const fs = c.getSheetByName("Fournisseurs");
+    fs.appendRow(["Self Stockage", "Wanadoo", "", "FR53922735535", "Bello", "", "", "oui", ""]);
+    fs.appendRow(["Metro", "", "metro.fr", "", "Les deux", "", "", "oui", ""]);
+    env.ctx.renommerArchive();
+    env.ctx.renommerArchiveReel();
+    const lb = env.feuille("Index").find((l) => l[0] === b.getId());
+    assert.equal(lb[7], "2026-09-01 — Self Stockage — Facture n° 2026-091 — 120.00 EUR.pdf");
+    assert.equal(lb[3], "Self Stockage", "colonne Fournisseur mise à jour");
+    assert.ok(env.ctx.trouverDoublon(env.ctx.indexCharger(), { fournisseur: "Self Stockage", etablissement: "Bello Mio", type: "facture", numero: "2026-091", montant: "1.00" }, "zzz"), "les clés anti-doublon suivent le nouveau nom");
   });
 });

@@ -175,8 +175,8 @@ describe("v4.3 : consigne, variantes d'établissement, expéditeurs journal seul
     assert.equal(b.sourceEtablissement, "liste");
     assert.deepEqual(plain(b.raisons), []);
   });
-  test("DocuSign, notifications Pennylane, Vinted, La Poste, JDC, Up Coop : journal seul", () => {
-    const cas = [["dse@eumail.docusign.net", "contrat"], ["no-reply-support@notifications.pennylane.com", "notification"], ["noreply@vinted.fr", "notification"],
+  test("DocuSign, Vinted, La Poste, JDC, Up Coop : journal seul ; notifications Pennylane : plateforme (v4.6)", () => {
+    const cas = [["dse@eumail.docusign.net", "contrat"], ["noreply@vinted.fr", "notification"],
                  ["system@jdc.fr", "notification"], ["emilie.tremblais@up.coop", "bon_commande"], ["lettre@laposte.net", "notification"]];
     for (const [from, type] of cas) {
       const a = ctx.analyserDocument({ idx, texte: "Toutes les parties ont complété « JDC SA - CONTRAT Q-485528 SASHA » Total TTC 2 400,00 € HT 2 000,00 TVA 400,00 Facture n° 12345", from, subject: "Complétée", nomPiece: "doc.pdf", dateMail: "2026-09-30", extension: ".pdf" });
@@ -294,5 +294,144 @@ describe("v4.5 : index des fournisseurs, valeurs libres, domaines grand public, 
     assert.equal(ctx.nomAvecFournisseur("2026-10-01 — Carniato — Relevé LCR 14054661 — 138.80 EUR.pdf", "Carniato SA"), "2026-10-01 — Carniato SA — Relevé LCR 14054661 — 138.80 EUR.pdf");
     assert.equal(ctx.nomAvecFournisseur("facture_scan.pdf", "Metro"), "facture_scan.pdf", "format inconnu : inchangé");
     assert.equal(ctx.nomAvecFournisseur("2026-09-15 — Transfert Pierre — Facture.pdf", "Metro"), "2026-09-15 — Metro — Facture.pdf");
+  });
+});
+
+describe("v4.6 A : montants collés, séparateurs fins, O pour 0, tiret parasite, avoir positif, soldes", () => {
+  test("une colonne isolée collée à la base HT par l'OCR ne fait pas un montant : la lecture non collée forme le triplet", () => {
+    assert.equal(ctx.trouverMontantTTC("NET Code Base Taux Montant Total HT Total TTC A PAYER\nV0 5 121,58 5,5% 6,69\n121,58 0,00 128,27 0,00 128,27"), "128.27", "SDPF FA071465");
+    assert.equal(ctx.trouverMontantTTC("Total TTC Acompte Net à payer 2\n2 105,40 Tx:2,00 5,80\n5,50 H.T. :\n105,40 2,15\nT.V.A. :\n5,80\n111,20\n111,20"), "111.20", "Maël FB9280");
+  });
+  test("la lecture collée reste acceptée quand aucun triplet n'existe sans elle", () => {
+    assert.equal(ctx.trouverMontantTTC("Total HT 4 160,10 €\nTVA 228,81 €\nRéduite 4 160,10 € 5,50% 228,81 €\nTotal TTC 4 388,91 €"), "4388.91", "Le Père Billard");
+    assert.equal(ctx.trouverMontantTTC("Montant total à payer 1 234,56 €"), "1234.56", "sans HT ni TVA : le plus grand après le mot clé");
+  });
+  test("espace fine U+202F / U+2009 et O lu pour un zéro", () => {
+    assert.equal(ctx.trouverMontantTTC("Total HT 1 016,64 Total TVA 55,92 Total TTC 1 O72,56 Net à payer 1 072,56 €"), "1072.56", "Elien D63834");
+    assert.equal(ctx.normaliserMontants("1 O72,56 et 2O,00"), "1 072,56 et 20,00");
+  });
+  test("un tiret de mise en page après le montant n'est pas un signe moins ; un signe collé ou suivi de € / fin de ligne l'est", () => {
+    assert.equal(ctx.trouverMontantTTC("Net à payer : 128,27 - Echéance 14/08/2026 HT 121,58 TVA 6,69"), "128.27");
+    assert.equal(ctx.detecterTypeDocument("Facture n° 1 Net à payer : 128,27 - Echéance", "128.27"), "facture");
+    assert.equal(ctx.trouverMontantTTC("Net à payer 148,12- HT 140,40- TVA 7,72-"), "-148.12", "signe collé après");
+    assert.equal(ctx.trouverMontantTTC("Total HT -4,66 TVA -0,26 Total TTC -4,92"), "-4.92", "signe collé avant");
+    assert.equal(ctx.trouverMontantTTC("Total HT 140,40 - €\nTVA 7,72 - €\nNet à payer 148,12 -\n"), "-148.12", "signe suivi de € ou d'une fin de ligne");
+  });
+  test("un avoir imprimé en positif prend un montant négatif, et ne se confond pas avec la facture de même montant", () => {
+    const a = ctx.analyserDocument({ idx, texte: "AVOIR N° AV2026-12\nMaël Distribution N.I.I. : FR36828779454\nBELLO MIO SASHA 3 place du Poncel\nTotal HT 100,00 TVA 5,50 Total TTC 105,50\nDate : 02/10/2026", from: "comptabilite@maeldistribution.fr", subject: "Avoir", nomPiece: "av.pdf", dateMail: "2026-10-02", extension: ".pdf" });
+    assert.equal(a.type, "avoir");
+    assert.equal(a.montant, "-105.50");
+    assert.equal(a.nom, "2026-10-02 — Maël Distribution — Facture n° AV2026-12 — -105.50 EUR.pdf");
+    const facture = { fournisseur: "Maël Distribution", etablissement: "Bello Mio", type: "facture", numero: null, date: "2026-10-02", montant: "105.50" };
+    const index = {}; for (const k of ctx.clesDoublon(facture, "m1")) index[k] = { nom: "facture" };
+    assert.equal(ctx.trouverDoublon(index, Object.assign({}, a, { numero: null }), "m2"), null, "facture et avoir de même montant : pas un doublon");
+  });
+  test("solde antérieur et nouveau solde ne sont jamais le montant de la facture", () => {
+    assert.equal(ctx.trouverMontantTTC("NET HT TOTAL TVA TOTAL TTC\n75,00 € 15,00 € A PAYER 90,00 €\n90,00 €\nSolde Antérieur 90,00 € Nouveau Solde 180,00 €"), "90.00", "Self Stockage 21741");
+    assert.equal(ctx.nettoyerNumero("21741SARL"), "21741");
+    assert.equal(ctx.nettoyerNumero("FC0140"), "FC0140");
+  });
+});
+
+describe("v4.6 B : anti-doublon par établissement et par type, noms avec « (2) »", () => {
+  const cle = (a) => Object.assign({ fournisseur: "Pennylane", type: "facture", numero: null, date: "2026-10-01", montant: "49.00" }, a);
+  test("deux abonnements Pennylane (Bello et Piccola) du même jour au même prix ne sont pas des doublons", () => {
+    const index = {}; for (const k of ctx.clesDoublon(cle({ etablissement: "Bello Mio" }), "p1")) index[k] = { nom: "bello" };
+    assert.equal(ctx.trouverDoublon(index, cle({ etablissement: "Piccola Mia" }), "p2"), null);
+    assert.ok(ctx.trouverDoublon(index, cle({ etablissement: "Bello Mio" }), "p3"), "même établissement, même jour, même montant : doublon");
+  });
+  test("deux pièces qui ont chacune un numéro ne sont des doublons que si c'est le même numéro", () => {
+    const index = {}; for (const k of ctx.clesDoublon(cle({ etablissement: "Bello Mio", numero: "INV-1" }), "p1")) index[k] = { nom: "inv1", numero: "INV-1" };
+    assert.equal(ctx.trouverDoublon(index, cle({ etablissement: "Bello Mio", numero: "INV-2" }), "p2"), null, "autre numéro, même date et montant");
+    assert.ok(ctx.trouverDoublon(index, cle({ etablissement: "Bello Mio", numero: null }), "p3"), "sans numéro : la date et le montant suffisent");
+    assert.ok(ctx.trouverDoublon(index, cle({ etablissement: "Piccola Mia", numero: "INV-1", montant: "1.00" }), "p4"), "même numéro chez le même fournisseur : doublon, quel que soit l'établissement lu");
+  });
+  test("un nom de fichier suffixé « (2) » reste lisible", () => {
+    const n = ctx.analyserNomFichier("2026-10-03 — Elis — Facture n° 2610301-865398 — 352.01 EUR (2).pdf");
+    assert.equal(n.numero, "2610301-865398");
+    assert.equal(n.montant, "352.01");
+    assert.equal(ctx.nomAvecFournisseur("2026-10-03 — Esker — Facture n° 1 — 1.00 EUR (2).pdf", "Elis"), "2026-10-03 — Elis — Facture n° 1 — 1.00 EUR (2).pdf");
+  });
+});
+
+describe("v4.6 C : lignes « à compléter », plateformes, identifiants de l'émetteur, établissement, bons de livraison, noms complets", () => {
+  const brn = cas.find((c) => c.nom === "brnuisibles_facture_FAC00054_bello").texte;
+  test("une ligne « à compléter » est inactive tant que Paul ne l'a pas relue", () => {
+    assert.equal(ctx.ligneActive({ nom: "Cmb", actif: "à compléter", etab: "" }), false);
+    assert.equal(ctx.ligneActive({ nom: "Cmb", actif: "A compléter", etab: "" }), false);
+    assert.equal(ctx.ligneActive({ nom: "Cmb", actif: "oui", etab: "" }), true);
+    assert.equal(ctx.ligneActive({ nom: "Cmb", actif: "", etab: "" }), true);
+    const i = ctx.indexerFournisseurs([{ nom: "Cmb", variantes: [], domaines: ["facture-x.fr"], identifiants: [], etab: "", actif: "à compléter" }]);
+    assert.equal(ctx.extraireFournisseur(i, "noreply@facture-x.fr", "", "").nom, null);
+  });
+  test("plateforme de facturation : jamais le domaine, le fournisseur vient de l'identifiant ou du nom lu dans le document", () => {
+    const r = ctx.extraireFournisseur(idx, "ne-pas-repondre@facture.cmb.fr", "Facture FAC00054", brn);
+    assert.equal(r.nom, "BR Nuisibles");
+    assert.equal(r.source, "identifiant");
+    const inconnu = ctx.extraireFournisseur(idx, "ne-pas-repondre@facture.cmb.fr", "Votre facture", "Facture n° 12 Total HT 10,00 TVA 2,00 Total TTC 12,00");
+    assert.equal(inconnu.nom, null);
+    assert.equal(inconnu.source, "plateforme");
+    assert.equal(inconnu.propose, null, "pas de ligne « à compléter » pour une plateforme");
+    const a = ctx.analyserDocument({ idx, texte: "Facture n° 12 Total HT 10,00 TVA 2,00 Total TTC 12,00 SARL SASHA Date : 01/10/2026", from: "ne-pas-repondre@facture.cmb.fr", subject: "Votre facture", nomPiece: "f.pdf", dateMail: "2026-10-02", extension: ".pdf" });
+    assert.match(a.raisons.join(","), /plateforme, fournisseur non lu/);
+    assert.equal(ctx.decider(a).destination, "a_verifier");
+    const sysco = ctx.extraireFournisseur(idx, "salesadminsgroup.elis@esker.com", "Nouvelles factures", "SYSCO FRANCE SAS Facture n° 77 Total TTC 12,00 € HT 10,00 TVA 2,00");
+    assert.equal(sysco.nom, "Sysco", "une facture Sysco envoyée par Esker n'est pas Elis");
+    assert.equal(sysco.source, "nom (document)");
+    const elis = ctx.extraireFournisseur(idx, "salesadminsgroup.elis@esker.com", "Nouvelles factures", "ELIS BRETAGNE RENNES ID TVA FR65062201009");
+    assert.equal(elis.nom, "Elis");
+    const indy = ctx.extraireFournisseur(idx, "no-reply@via.indy.fr", "Facture", "Alain Pedron Nettoyage Facture n° 3 Total TTC 50,00");
+    assert.equal(indy.nom, "Alain Pedron Nettoyage");
+  });
+  test("identifiants du bloc émetteur : ni les nôtres, ni ceux d'une autre ligne", () => {
+    const r = ctx.identifiantsEmetteur(brn, ["BR Nuisibles", "Bource Richard"], {});
+    assert.deepEqual(plain(r.identifiants).sort(), ["94776172200018", "947761722", "FR32947761722"].sort());
+    assert.ok(!r.identifiants.some((x) => /913217386|91321738600014|FR78913217386/.test(x)), "jamais le SIRET de SARL SASHA");
+    const r2 = ctx.identifiantsEmetteur(brn, ["BR Nuisibles"], { FR32947761722: "Cmb" });
+    assert.equal(r2.ecartes.length, 1);
+    assert.equal(r2.ecartes[0].ligne, "Cmb");
+    const billard = cas.find((c) => c.nom === "perebillard_facture_FAC00000703_bello").texte;
+    const r3 = ctx.identifiantsEmetteur(billard, ["Le Père Billard", "Corsaire Marée"], {});
+    assert.ok(r3.identifiants.indexOf("87790529900013") !== -1, JSON.stringify(r3));
+    assert.ok(!r3.identifiants.some((x) => /913217386/.test(x)));
+  });
+  test("établissement : bloc d'adresse d'abord, contradiction sans défaut, majorité, adresse de réception, « SASHA I FRATELLI AND CO »", () => {
+    assert.deepEqual(plain(ctx.analyserEtablissement("Siège : SARL SASHA Saint-Malo. Facturé à : SARL I FRATELLI 12 rue Ville Pépin 35400 Saint-Malo")), { etab: "Piccola Mia", contradictoire: false, source: "adresse" });
+    assert.deepEqual(plain(ctx.analyserEtablissement("SARL SASHA et SARL FRATELLI")), { etab: null, contradictoire: true, source: null });
+    assert.equal(ctx.analyserEtablissement("BELLO MIO SASHA 3 place du Poncel 35400 Saint-Malo. Référence : I FRATELLI").etab, "Bello Mio", "trois marqueurs contre un");
+    assert.equal(ctx.analyserEtablissement("SARL SASHA I FRATELLI AND CO BELLO MIO 3 PLACE DU PONCEL").etab, "Bello Mio", "nom complet de la SARL SASHA");
+    assert.equal(ctx.analyserEtablissement("SARL SASHA I FRATELLI AND CO BELLO MIO 3 PLACE DU PONCEL").contradictoire, false);
+    const texte = "Facture n° 44 Masse SARL SASHA / SARL I FRATELLI Total HT 100,00 TVA 5,50 Total TTC 105,50 Date : 01/06/2026";
+    const liste = ctx.listeFournisseursParDefaut(); liste.find((f) => f.nom === "Masse").etab = "Bello";
+    const i = ctx.indexerFournisseurs(liste);
+    const sans = ctx.analyserDocument({ idx: i, texte, from: "compta@masse.fr", subject: "Facture", nomPiece: "f.pdf", dateMail: "2026-06-02", extension: ".pdf", recuSur: "contact@bellomio.fr" });
+    assert.equal(sans.etablissement, null, "contradictoire : l'établissement par défaut de la liste ne s'applique pas");
+    assert.match(sans.raisons.join(","), /établissement contradictoire/);
+    assert.equal(ctx.decider(sans).destination, "a_verifier");
+    const avec = ctx.analyserDocument({ idx: i, texte, from: "compta@masse.fr", subject: "Facture", nomPiece: "f.pdf", dateMail: "2026-06-02", extension: ".pdf", recuSur: "facture@piccolamia.fr" });
+    assert.equal(avec.etablissement, "Piccola Mia", "reçu sur facture@piccolamia.fr : départagé");
+    assert.equal(avec.sourceEtablissement, "réception");
+    assert.equal(ctx.decider(avec).destination, "envoi");
+    assert.equal(ctx.etablissementParReception("contact@bellomio.fr"), null, "contact@ reçoit de tout : jamais une preuve");
+  });
+  test("bon de livraison : journal seul, même avec un total et le mot « facturée » ; une facture qui cite un BL reste une facture", () => {
+    assert.equal(ctx.detecterTypeDocument("BON DE LIVRAISON N° : BDL00000439 Date : 04/08/2026 Total TTC 581,10 € Marchandise livrée, facturée en fin de mois.", "581.10"), "bon_livraison");
+    assert.equal(ctx.detecterTypeDocument("Facture n° 127999 BL N°145049 du 02/09/2026 Total TTC 1 155,24 €", "1155.24"), "facture");
+    const a = ctx.analyserDocument({ idx, texte: "BON DE LIVRAISON N° : BDL00000439 SARL LE PERE BILLARD Siret : 87790529900013 SASHA BELLO MIO Total TTC 581,10 €", from: "notification@mon-expert-en-gestion.fr", subject: "BDL", nomPiece: "b.pdf", dateMail: "2026-08-04", extension: ".pdf" });
+    assert.equal(ctx.decider(a).destination, "journal");
+  });
+  test("noms complets seulement : « Apple Pay » n'est pas Apple, « masse » n'est pas Masse, un nom affiché court reste reconnu", () => {
+    assert.equal(ctx.extraireFournisseur(idx, "noreply@boutique-inconnue.fr", "Reçu Apple Pay", "").nom, null);
+    assert.equal(ctx.extraireFournisseur(idx, "rh@cabinet-inconnu.fr", "Facture masse salariale", "").nom, null);
+    assert.equal(ctx.extraireFournisseur(idx, "Metro <noreply@mailing-inconnu.fr>", "", "").nom, "Metro", "nom affiché de l'expéditeur");
+    assert.equal(ctx.extraireFournisseur(idx, "noreply@inconnu.fr", "Facture Maël Distribution", "").nom, "Maël Distribution");
+    assert.equal(ctx.extraireFournisseur(idx, "noreply@inconnu.fr", "Votre facture Leroy Merlin", "").nom, "Leroy Merlin");
+  });
+  test("type MIME et extension", () => {
+    assert.equal(ctx.typeMimePour("x.pdf"), "application/pdf");
+    assert.equal(ctx.typeMimePour("x.JPG"), "image/jpeg");
+    assert.equal(ctx.typeMimePour("x.zip"), null);
+    assert.equal(ctx.extensionParMime("application/pdf; name=x"), "pdf");
+    assert.equal(ctx.extensionParMime("application/zip"), "");
   });
 });

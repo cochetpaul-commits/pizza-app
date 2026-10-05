@@ -538,5 +538,219 @@
       "chemin": [],
       "archive": []
     }
+  },
+  "brnuisibles_facture_FAC00054_bello": {
+    "_cas_piege": "v4.6 C2 : facture BR Nuisibles émise par la plateforme Crédit Mutuel (facture.cmb.fr) : le domaine n'est pas le fournisseur, l'identifiant FR32947761722 du bloc émetteur l'est ; notre SIRET 91321738600014 figure aussi sur le document ; texte Drive (OCR à confirmer)",
+    "mail": {
+      "from": "ne-pas-repondre@facture.cmb.fr",
+      "subject": "BR NUISIBLES BOURCE RICHARD : facture FAC00054",
+      "nomPiece": "FAC00054.pdf",
+      "dateMail": "2026-08-26"
+    },
+    "attendu": {
+      "type": "facture",
+      "etablissement": "Bello Mio",
+      "fournisseur": "BR Nuisibles",
+      "numero": "FAC00054",
+      "date": "2026-08-26",
+      "montant": "294.80",
+      "nom": "2026-08-26 — BR Nuisibles — Facture n° FAC00054 — 294.80 EUR.pdf",
+      "destination": "envoi",
+      "chemin": [
+        "Envoi Pennylane",
+        "Bello Mio"
+      ],
+      "archive": [
+        "Bello Mio",
+        "BR Nuisibles",
+        "2026"
+      ]
+    }
+  },
+  "perebillard_facture_FAC00000703_bello": {
+    "_cas_piege": "v4.6 C2 : facture Le Père Billard (Corsaire Marée) envoyée par Mon Expert en Gestion (plateforme) : reconnu par son SIRET 87790529900013 ; montant « 4 388,91 » (lecture collée acceptée : sans elle, pas de triplet) ; Pennylane le connaît sous « Corsaire Marée » (variante) ; texte Drive",
+    "mail": {
+      "from": "notification@mon-expert-en-gestion.fr",
+      "subject": "Votre facture FAC00000703",
+      "nomPiece": "FAC00000703.pdf",
+      "dateMail": "2026-09-17"
+    },
+    "attendu": {
+      "type": "facture",
+      "etablissement": "Bello Mio",
+      "fournisseur": "Le Père Billard",
+      "numero": "FAC00000703",
+      "date": "2026-09-17",
+      "montant": "4388.91",
+      "nom": "2026-09-17 — Le Père Billard — Facture n° FAC00000703 — 4388.91 EUR.pdf",
+      "destination": "envoi",
+      "chemin": [
+        "Envoi Pennylane",
+        "Bello Mio"
+      ],
+      "archive": [
+        "Bello Mio",
+        "Le Père Billard",
+        "2026"
+      ]
+    }
+  },
+  "perebillard_bon_de_livraison_bello": {
+    "_cas_piege": "v4.6 C5 : « BON DE LIVRAISON N° BDL00000439 » du Père Billard, avec un total TTC et le mot « facturée » : bon de livraison, journal seul (texte synthétique d'après la facture mensuelle)",
+    "mail": {
+      "from": "notification@mon-expert-en-gestion.fr",
+      "subject": "Votre bon de livraison BDL00000439",
+      "nomPiece": "BDL00000439.pdf",
+      "dateMail": "2026-08-04"
+    },
+    "attendu": {
+      "type": "bon_livraison",
+      "etablissement": "Bello Mio",
+      "fournisseur": "Le Père Billard",
+      "destination": "journal",
+      "chemin": [],
+      "archive": []
+    },
+    "synthetique": true
+  },
+  "sdpf_facture_FA071465_bello": {
+    "_cas_piege": "v4.6 A1/A3 : SDPF lue 5 121,58 par la v4 (colonne « 5 » collée à la base HT 121,58 par l'OCR) : vrai montant 128,27 (121,58 + 6,69) ; « 128,27 - LCR » n'est pas un montant négatif ; texte Drive, collage OCR reproduit d'après l'audit ; expéditeur hotmail : adresse complète dans la liste",
+    "mail": {
+      "from": "sdpfcompta@hotmail.com",
+      "subject": "Facture FA071465",
+      "nomPiece": "FA071465.pdf",
+      "dateMail": "2026-08-02"
+    },
+    "attendu": {
+      "type": "facture",
+      "etablissement": "Bello Mio",
+      "fournisseur": "SDPF",
+      "numero": "FA071465",
+      "date": "2026-07-31",
+      "montant": "128.27",
+      "nom": "2026-07-31 — SDPF — Facture n° FA071465 — 128.27 EUR.pdf",
+      "destination": "envoi",
+      "chemin": [
+        "Envoi Pennylane",
+        "Bello Mio"
+      ],
+      "archive": [
+        "Bello Mio",
+        "SDPF",
+        "2026"
+      ]
+    }
+  },
+  "mael_facture_FB9280_bello": {
+    "_cas_piege": "v4.6 A1 : Maël FB9280 lue 2 105,40 par la v4 (code TVA « 2 » collé à la base 105,40) : vrai montant 111,20 (105,40 + 5,80) ; texte Drive, collage reproduit d'après l'audit",
+    "mail": {
+      "from": "comptabilite@maeldistribution.fr",
+      "subject": "Facture FB9280",
+      "nomPiece": "FB9280.pdf",
+      "dateMail": "2026-07-30"
+    },
+    "attendu": {
+      "type": "facture",
+      "etablissement": "Bello Mio",
+      "fournisseur": "Maël Distribution",
+      "numero": "FB9280",
+      "date": "2026-07-30",
+      "montant": "111.20",
+      "nom": "2026-07-30 — Maël Distribution — Facture n° FB9280 — 111.20 EUR.pdf",
+      "destination": "envoi",
+      "chemin": [
+        "Envoi Pennylane",
+        "Bello Mio"
+      ],
+      "archive": [
+        "Bello Mio",
+        "Maël Distribution",
+        "2026"
+      ]
+    }
+  },
+  "elien_facture_D63834_bello": {
+    "_cas_piege": "v4.6 A2 : Elien D63834 lue 72,56 par la v4 : espace fine U+202F dans « 1 072,56 » et O lu pour un zéro (« 1 O72,56 ») ; vrai montant 1 072,56 ; texte Drive, séparateurs reproduits d'après l'audit",
+    "mail": {
+      "from": "compta@elien.fr",
+      "subject": "Facture D63834",
+      "nomPiece": "D63834.pdf",
+      "dateMail": "2026-07-31"
+    },
+    "attendu": {
+      "type": "facture",
+      "etablissement": "Bello Mio",
+      "fournisseur": "Elien",
+      "numero": "D63834",
+      "date": "2026-07-31",
+      "montant": "1072.56",
+      "nom": "2026-07-31 — Elien — Facture n° D63834 — 1072.56 EUR.pdf",
+      "destination": "envoi",
+      "chemin": [
+        "Envoi Pennylane",
+        "Bello Mio"
+      ],
+      "archive": [
+        "Bello Mio",
+        "Elien",
+        "2026"
+      ]
+    }
+  },
+  "selfstockage_facture_21741_bello": {
+    "_cas_piege": "v4.6 A5 : Self Stockage 21741 lue 180,00 par la v4 (« Nouveau Solde 180,00 ») : vrai montant 90,00 (« A PAYER 90,00 », 75 + 15) ; numéro 21741 et non « 21741SARL » ; expéditeur wanadoo : nom complet dans l'objet ; texte Drive (OCR à confirmer)",
+    "mail": {
+      "from": "selfstockage.stmalo@wanadoo.fr",
+      "subject": "Self Stockage : facture 21741",
+      "nomPiece": "21741.pdf",
+      "dateMail": "2026-09-11"
+    },
+    "attendu": {
+      "type": "facture",
+      "etablissement": "Bello Mio",
+      "fournisseur": "Self Stockage",
+      "numero": "21741",
+      "date": "2026-09-11",
+      "montant": "90.00",
+      "nom": "2026-09-11 — Self Stockage — Facture n° 21741 — 90.00 EUR.pdf",
+      "destination": "envoi",
+      "chemin": [
+        "Envoi Pennylane",
+        "Bello Mio"
+      ],
+      "archive": [
+        "Bello Mio",
+        "Self Stockage",
+        "2026"
+      ]
+    }
+  },
+  "elis_facture_982324_bello": {
+    "_cas_piege": "v4.6 A5 : Elis 2610301-982324 lue 238,50 par la v4 (sous-total HT) : vrai montant 291,23 (242,69 + 48,54, NET A PAYER) ; via Esker (plateforme) : reconnu par ID TVA FR65062201009 ; texte Drive (OCR à confirmer)",
+    "mail": {
+      "from": "salesadminsgroup.elis@esker.com",
+      "subject": "ELIS BRETAGNE RENNES - Nouvelles factures",
+      "nomPiece": "2610301-982324.pdf",
+      "dateMail": "2026-10-03"
+    },
+    "attendu": {
+      "type": "facture",
+      "etablissement": "Bello Mio",
+      "fournisseur": "Elis",
+      "numero": "2610301-982324",
+      "date": "2026-09-30",
+      "montant": "291.23",
+      "nom": "2026-09-30 — Elis — Facture n° 2610301-982324 — 291.23 EUR.pdf",
+      "destination": "envoi",
+      "chemin": [
+        "Envoi Pennylane",
+        "Bello Mio"
+      ],
+      "archive": [
+        "Bello Mio",
+        "Elis",
+        "2026"
+      ]
+    }
   }
 }

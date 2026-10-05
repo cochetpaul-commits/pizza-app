@@ -47,12 +47,20 @@ function nomLibre(dossier, nom) {
  */
 function rangerPiece(blob, nom, chemin, description, infosIndex) {
   var dossier = dossierDuChemin(chemin);
-  var fichier = dossier.createFile(blob.copyBlob().setName(nomLibre(dossier, nom)));
+  // Type MIME d'après l'extension, jamais celui du mail (« application/others », « application/octet-stream » : Drive n'affiche pas le PDF)
+  var copie = blob.copyBlob().setName(nomLibre(dossier, nom)), type = typeMimePour(nom);
+  if (type) copie.setContentType(type);
+  var fichier = dossier.createFile(copie);
   if (description) fichier.setDescription(description);
+  var dansEnvoi = chemin[0] === CONFIG.dossiers.envoi;
   indexAjouter({ fichierId: fichier.getId(), md5: infosIndex.md5, etablissement: infosIndex.etablissement, fournisseur: infosIndex.fournisseur,
-                 numero: infosIndex.numero, date: infosIndex.date, montant: infosIndex.montant, nom: fichier.getName(), chemin: chemin.join("/"), archive: infosIndex.archive || "" });
+                 numero: infosIndex.numero, date: infosIndex.date, montant: infosIndex.montant, nom: fichier.getName(), chemin: chemin.join("/"), archive: infosIndex.archive || "",
+                 arriveEnvoi: dansEnvoi ? dateIso(new Date()) : "" });
   return fichier;
 }
+
+/** Type MIME attendu d'après l'extension du nom (CONFIG.mimeParExtension), ou null */
+function typeMimePour(nom) { return CONFIG.mimeParExtension[extensionDe(nom)] || null; }
 
 /** Déplace un fichier vers un chemin (le fichier garde son identifiant Drive) et met l'index à jour */
 function deplacerFichier(fichier, chemin) {
@@ -70,13 +78,41 @@ function fichiersAnciens(dossier, chemin, jours) {
   return out;
 }
 
-/** Fichiers de « Envoi Pennylane/<Établissement> » plus vieux que `jours` : [{ fichier, chemin, etablissement }] */
+/**
+ * Fichiers de « Envoi Pennylane/<Établissement> » présents depuis plus de `jours` : [{ fichier, chemin, etablissement, depuis }].
+ * L'âge se compte depuis l'ARRIVÉE dans Envoi (colonne « Dans Envoi depuis » de l'Index), pas depuis la création du fichier :
+ * un fichier déplacé à la main depuis « À vérifier » ou le transit est daté du jour où il est vu ici pour la première fois
+ * (et son chemin dans l'Index est mis à jour) ; un fichier inconnu de l'Index y est ajouté d'après son nom. Ils ne sont
+ * donc jamais archivés avant que Pennylane ait eu le temps de les importer.
+ */
 function fichiersEnvoiAnciens(jours) {
-  var out = [];
+  var out = [], limite = Date.now() - jours * 86400000, aujourdHui = dateIso(new Date()), idxF = null;
+  indexCharger();
   CONFIG.etablissements.forEach(function(etab) {
-    fichiersAnciens(dossierEnvoi(etab), CONFIG.dossiers.envoi + "/" + etab, jours).forEach(function(x) { x.etablissement = etab; out.push(x); });
+    var chemin = CONFIG.dossiers.envoi + "/" + etab, fs = dossierEnvoi(etab).getFiles();
+    while (fs.hasNext()) {
+      var f = fs.next(), e = indexParId(f.getId()), depuis = null;
+      if (!e) {
+        // déposé à la main, inconnu de l'Index : on l'indexe aujourd'hui
+        idxF = idxF || fournisseursIndex();
+        var n = analyserNomFichier(f.getName()) || {}, fournisseur = n.fournisseur ? (nomCanonique(idxF, n.fournisseur) || n.fournisseur) : null;
+        var archive = n.fournisseur && n.date ? [etab, fournisseur, n.date.slice(0, 4)].join("/") : "";
+        indexAjouter({ fichierId: f.getId(), md5: md5De(f), etablissement: etab, fournisseur: fournisseur, numero: n.numero || null, date: n.date || dateIso(f.getDateCreated()),
+                       montant: n.montant || null, nom: f.getName(), chemin: chemin, archive: archive, arriveEnvoi: aujourdHui });
+        continue;
+      }
+      if (e.chemin !== chemin) { indexMarquerEnvoi(f.getId(), chemin, e.archive, new Date()); continue; }   // déplacé à la main : arrivé aujourd'hui
+      if (e.arriveEnvoi) depuis = new Date(e.arriveEnvoi + "T12:00:00").getTime();
+      else depuis = f.getDateCreated().getTime();   // déposé par le script avant la v4.6 : créé directement dans Envoi
+      if (depuis < limite) out.push({ fichier: f, chemin: chemin, etablissement: etab, depuis: depuis });
+    }
   });
   return out;
+}
+
+/** Empreinte MD5 d'un fichier Drive (lue par l'API), ou null */
+function md5De(f) {
+  try { return Drive.Files.get(f.getId(), { fields: "md5Checksum" }).md5Checksum || null; } catch (e) { Logger.log("MD5 illisible " + f.getName() + " : " + e); return null; }
 }
 
 /** Fichiers de « À vérifier » (et de l'ancien « _À vérifier ») plus vieux que `jours`, sous-dossiers compris */

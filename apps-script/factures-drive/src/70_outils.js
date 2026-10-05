@@ -1,43 +1,60 @@
 // ============================================================================
 // Outils à lancer à la main depuis l'éditeur Apps Script :
-//   indexerExistant, ocrDump, analyserMessage,
-//   reorganiserArchive (simulation) / reorganiserArchiveReel, deplacerJournauxDeCloture,
-//   rattrapageBasculeSimulation / rattrapageBasculeReel.
+//   indexerExistant, reindexerArchive, ocrDump, analyserMessage,
+//   reorganiserArchive (simulation) / reorganiserArchiveReel, renommerArchive / renommerArchiveReel,
+//   reparerTypesFichiers (simulation) / reparerTypesFichiersReel, deplacerJournauxDeCloture.
+// (rattrapageBascule, dont les copies n'étaient pas indexées, a été retiré en v4.6 : la bascule est faite.)
 // ============================================================================
 
 /**
- * Indexe les fichiers déjà rangés (Envoi Pennylane, Bello Mio, Piccola Mia, _Hors Pennylane, À vérifier) dans l'onglet
- * « Index » du journal : empreinte MD5 (lue dans Drive), établissement, fournisseur (nom de la liste de référence),
- * numéro, date, montant tirés du nom normalisé. À lancer AVANT le premier rattrapage. Relancer jusqu'à « TERMINÉ ».
+ * Indexe les fichiers déjà rangés (Envoi Pennylane, Rattrapage à valider, Bello Mio, Piccola Mia, _Hors Pennylane, À vérifier) dans
+ * l'onglet « Index » du journal : empreinte MD5 (lue dans Drive), établissement, fournisseur (nom de la liste de référence),
+ * numéro, date, montant tirés du nom normalisé, archive prévue (Envoi et transit), date d'arrivée dans Envoi (création du fichier).
+ * Les fichiers déjà dans l'Index ne sont pas relus. À lancer AVANT le premier rattrapage. Relancer jusqu'à « TERMINÉ ».
  */
-function indexerExistant() {
+function indexerExistant() { return avecVerrou("indexerExistant", function() { return indexerDossiers(false); }); }
+
+/**
+ * Reconstruit l'Index à partir du Drive réel : l'onglet est vidé au premier appel, puis rempli ; relancer jusqu'à « TERMINÉ »
+ * (les fichiers déjà réindexés ne sont pas relus). Répare les chemins périmés (journaux de clôture, fichiers déplacés à la main),
+ * les fournisseurs restés à l'ancien nom (« Wanadoo », « Esker »), les numéros convertis en nombres par le Sheet.
+ */
+function reindexerArchive() { return avecVerrou("reindexerArchive", function() { return indexerDossiers(true); }); }
+
+function indexerDossiers(reconstruire) {
   var debut = Date.now(), racine = obtenirOuCreerDossier(null, CONFIG.dossierRacine), idxF = fournisseursIndex();
+  var props = PropertiesService.getScriptProperties(), cleEnCours = "reindex.encours";
+  if (reconstruire && !props.getProperty(cleEnCours)) { indexVider(); props.setProperty(cleEnCours, "1"); Logger.log("Index vidé : reconstruction depuis le Drive"); }
   indexCharger();
   var st = { vus: 0, ajoutes: 0, arret: false };
-  var tetes = [CONFIG.dossiers.envoi].concat(CONFIG.etablissements, [CONFIG.dossiers.horsPennylane, CONFIG.dossiers.aVerifier, CONFIG.dossiers.ancienAVerifier]);
+  // Envoi Pennylane et transit d'abord (archive prévue), puis l'archive, _Hors Pennylane et À vérifier
+  CONFIG.etablissements.forEach(function(etab) { if (!st.arret) parcourirDossier(dossierEnvoi(etab), CONFIG.dossiers.envoi + "/" + etab, visiter); });
+  var tetes = [CONFIG.dossiers.transit].concat(CONFIG.etablissements, [CONFIG.dossiers.horsPennylane, CONFIG.dossiers.aVerifier, CONFIG.dossiers.ancienAVerifier]);
   for (var i = 0; i < tetes.length && !st.arret; i++) {
-    var dossier = tetes[i] === CONFIG.dossiers.envoi ? null : (racine.getFoldersByName(tetes[i]).hasNext() ? racine.getFoldersByName(tetes[i]).next() : null);
-    if (tetes[i] === CONFIG.dossiers.envoi) {
-      CONFIG.etablissements.forEach(function(etab) { if (!st.arret) parcourirDossier(dossierEnvoi(etab), CONFIG.dossiers.envoi + "/" + etab, visiter); });
-    } else if (dossier) parcourirDossier(dossier, tetes[i], visiter);
+    var it = racine.getFoldersByName(tetes[i]);
+    if (it.hasNext()) parcourirDossier(it.next(), tetes[i], visiter);
   }
   journalVider();
+  if (!st.arret && reconstruire) props.deleteProperty(cleEnCours);
   Logger.log("Fichiers vus : " + st.vus + ", ajoutés à l'index : " + st.ajoutes);
   Logger.log(st.arret ? "PAS FINI — relancer la fonction" : "TERMINÉ");
+  return st;
 
   function visiter(f, chemin) {
     if (Date.now() - debut > CONFIG.limiteMs) { st.arret = true; return false; }
     st.vus++;
     if (indexParId(f.getId())) return true;
     if (/^(application\/vnd\.google-apps)/.test(f.getMimeType ? f.getMimeType() : "")) return true;
-    var md5 = null;
-    try { md5 = Drive.Files.get(f.getId(), { fields: "md5Checksum" }).md5Checksum || null; } catch (e) { Logger.log("MD5 illisible " + f.getName() + " : " + e); }
+    var md5 = md5De(f);
     var n = analyserNomFichier(f.getName()) || {};
     var morceaux = chemin.split("/"), etab = null, fournisseur = n.fournisseur || null;
     for (var k = 0; k < morceaux.length; k++) if (CONFIG.etablissements.indexOf(morceaux[k]) !== -1) { etab = morceaux[k]; if (!fournisseur && morceaux[k + 1] && !/^\d{2} - |^\d{4}$/.test(morceaux[k + 1])) fournisseur = morceaux[k + 1]; break; }
     if (fournisseur) fournisseur = nomCanonique(idxF, fournisseur) || fournisseur;
+    var enAttente = morceaux[0] === CONFIG.dossiers.envoi || morceaux[0] === CONFIG.dossiers.transit;
+    var annee = (n.date || dateIso(f.getDateCreated())).slice(0, 4);
+    var archive = enAttente && etab && fournisseur ? [etab, fournisseur, annee].join("/") : "";
     indexAjouter({ fichierId: f.getId(), md5: md5, etablissement: etab, fournisseur: fournisseur, numero: n.numero || null, date: n.date || dateIso(f.getDateCreated()),
-                   montant: n.montant || null, nom: f.getName(), chemin: chemin, archive: "" });
+                   montant: n.montant || null, nom: f.getName(), chemin: chemin, archive: archive, arriveEnvoi: morceaux[0] === CONFIG.dossiers.envoi ? dateIso(f.getDateCreated()) : "" });
     st.ajoutes++;
     if (st.ajoutes % 100 === 0) journalVider();
     return true;
@@ -262,42 +279,71 @@ function deplacerJournauxDeCloture() {
   var sd = source.getFolders();
   while (sd.hasNext()) { sd.next().moveTo(cible); n++; }
   source.setTrashed(true);
-  Logger.log(n + " élément(s) déplacés vers « " + CONFIG.dossiers.journauxCaisse + "/Piccola Mia » ; ancien dossier mis à la corbeille");
+  // l'Index suit : les journaux indexés sous « Piccola Mia/Journaux de clôture » pointent vers leur nouveau chemin
+  var corriges = 0;
+  indexCharger();
+  parcourirDossier(cible, CONFIG.dossiers.journauxCaisse + "/Piccola Mia", function(f, chemin) {
+    var e = indexParId(f.getId());
+    if (e && e.chemin !== chemin) { indexDeplacer(f.getId(), chemin); corriges++; }
+    return true;
+  });
+  Logger.log(n + " élément(s) déplacés vers « " + CONFIG.dossiers.journauxCaisse + "/Piccola Mia » ; ancien dossier mis à la corbeille ; " + corriges + " ligne(s) d'Index corrigée(s)");
 }
 
-// ---------------------------------------------------------------- Rattrapage de la bascule
+// ---------------------------------------------------------------- Types MIME
 
 /**
- * Pennylane ne lit plus l'ancien rangement depuis le 03/10/2026 au soir. Tout fichier créé dans Bello Mio/ ou Piccola Mia/
- * après cette date (par le script v3) est copié dans « Envoi Pennylane/<Établissement> », sauf s'il y est déjà
- * (même nom, ou même numéro + montant lus dans le nom). Simulation d'abord : rattrapageBasculeSimulation(), puis rattrapageBasculeReel().
+ * reparerTypesFichiers() = SIMULATION : liste dans l'onglet « Types » du journal les fichiers de « Factures iFratelli » dont le type
+ * MIME ne correspond pas à l'extension (« application/others », « application/octet-stream » pour un .pdf : Drive ne les affiche pas,
+ * Pennylane ne les importe pas). Rien n'est modifié. Puis reparerTypesFichiersReel().
  */
-function rattrapageBasculeSimulation() { return rattrapageBascule(true); }
-function rattrapageBasculeReel() { return rattrapageBascule(false); }
-
-function rattrapageBascule(simulation) {
-  var racine = obtenirOuCreerDossier(null, CONFIG.dossierRacine), bascule = new Date(CONFIG.dateBascule).getTime();
-  var st = { vus: 0, copies: 0, deja: 0 };
-  CONFIG.etablissements.forEach(function(etab) {
-    var it = racine.getFoldersByName(etab);
-    if (!it.hasNext()) return;
-    var envoi = dossierEnvoi(etab), presents = {};
-    var fs = envoi.getFiles();
-    while (fs.hasNext()) { var p = fs.next(); presents[p.getName()] = true; var np = analyserNomFichier(p.getName()); if (np && np.numero && np.montant) presents[np.numero + "|" + np.montant] = true; }
-    parcourirDossier(it.next(), etab, function(f, chemin) {
-      if (f.getDateCreated().getTime() <= bascule) return true;
+function reparerTypesFichiers() {
+  return avecVerrou("reparerTypesFichiers", function() {
+    var debut = Date.now(), racine = obtenirOuCreerDossier(null, CONFIG.dossierRacine), st = { vus: 0, aReparer: 0, arret: false };
+    var deja = {};
+    typesLire().forEach(function(r) { deja[r.fichierId] = true; });
+    var visiter = function(f, chemin) {
+      if (Date.now() - debut > CONFIG.limiteMs) { st.arret = true; return false; }
       st.vus++;
-      var n = analyserNomFichier(f.getName());
-      var deja = presents[f.getName()] || (n && n.numero && n.montant && presents[n.numero + "|" + n.montant]);
-      if (deja) { st.deja++; return true; }
-      if (!simulation) { f.makeCopy(f.getName(), envoi); presents[f.getName()] = true; }
-      st.copies++;
-      journalAjouter({ piece: f.getName(), etablissement: etab, fournisseur: n ? n.fournisseur : "", numero: n ? n.numero : "", montant: n ? n.montant : "",
-                       destination: simulation ? "bascule (simulation)" : "bascule", chemin: CONFIG.dossiers.envoi + "/" + etab + "/" + f.getName(), raison: "créé le " + dateIso(f.getDateCreated()) + " dans " + chemin, lienFichier: f.getUrl() }, simulation);
+      if (deja[f.getId()]) return true;
+      var attendu = typeMimePour(f.getName()), actuel = String(f.getMimeType ? f.getMimeType() : "");
+      if (!attendu || actuel === attendu) return true;
+      if (/^application\/vnd\.google-apps/.test(actuel)) return true;
+      typesAjouter({ fichierId: f.getId(), chemin: chemin, nom: f.getName(), actuel: actuel, attendu: attendu, statut: "simulation" });
+      st.aReparer++;
+      if (st.aReparer % 50 === 0) journalVider();
       return true;
-    });
+    };
+    CONFIG.etablissements.forEach(function(etab) { if (!st.arret) parcourirDossier(dossierEnvoi(etab), CONFIG.dossiers.envoi + "/" + etab, visiter); });
+    var tetes = [CONFIG.dossiers.transit].concat(CONFIG.etablissements, [CONFIG.dossiers.horsPennylane, CONFIG.dossiers.aVerifier, CONFIG.dossiers.ancienAVerifier]);
+    for (var i = 0; i < tetes.length && !st.arret; i++) { var it = racine.getFoldersByName(tetes[i]); if (it.hasNext()) parcourirDossier(it.next(), tetes[i], visiter); }
+    journalVider();
+    Logger.log("[SIMULATION] fichiers vus : " + st.vus + ", types à réparer : " + st.aReparer);
+    Logger.log(st.arret ? "PAS FINI — relancer la fonction" : "TERMINÉ");
+    return st;
   });
-  journalVider();
-  Logger.log((simulation ? "[SIMULATION] " : "") + "fichiers créés après la bascule : " + st.vus + ", à copier dans Envoi Pennylane : " + st.copies + ", déjà présents : " + st.deja);
-  return st;
+}
+
+/**
+ * Exécute le plan de l'onglet « Types » : nouvelle révision du fichier avec le bon type MIME (Drive.Files.update avec le contenu),
+ * même identifiant Drive, même nom, même dossier. Relancer jusqu'à « TERMINÉ ».
+ */
+function reparerTypesFichiersReel() {
+  return avecVerrou("reparerTypesFichiersReel", function() {
+    var debut = Date.now(), st = { faits: 0, erreurs: 0, arret: false };
+    typesLire().forEach(function(r) {
+      if (st.arret || r.statut !== "simulation") return;
+      if (Date.now() - debut > CONFIG.limiteMs) { st.arret = true; return; }
+      try {
+        var f = DriveApp.getFileById(r.fichierId);
+        var blob = f.getBlob().copyBlob().setContentType(r.attendu).setName(f.getName());
+        Drive.Files.update({ mimeType: r.attendu }, r.fichierId, blob);
+        typesStatut(r.ligne, "fait");
+        st.faits++;
+      } catch (e) { typesStatut(r.ligne, "erreur : " + e); st.erreurs++; }
+    });
+    Logger.log("Types réparés : " + st.faits + ", erreurs : " + st.erreurs);
+    Logger.log(st.arret ? "PAS FINI — relancer la fonction" : "TERMINÉ");
+    return st;
+  });
 }

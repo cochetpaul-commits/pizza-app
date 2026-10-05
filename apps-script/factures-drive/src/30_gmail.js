@@ -36,21 +36,44 @@ function extensionDe(nom) {
   return m ? m[1] : "";
 }
 
-/** Pièces jointes utiles (PDF, XML, images), sans les images inline des signatures */
-function piecesDuMessage(message) {
+/** Extension déduite du type MIME d'une pièce sans extension connue (PDF envoyé sans « .pdf »), ou "" */
+function extensionParMime(type) {
+  var t = String(type || "").toLowerCase().split(";")[0].trim();
+  for (var ext in CONFIG.mimeParExtension) if (CONFIG.mimeParExtension[ext] === t) return ext;
+  if (t === "image/jpg" || t === "image/pjpeg") return "jpg";
+  return "";
+}
+
+/**
+ * Pièces jointes d'un message, triées : { gardees: [blob], ecartees: [{ nom, raison }] }.
+ *   - PDF, XML et images (par extension, ou par type MIME pour un PDF sans extension : le blob est alors renommé « .pdf ») ;
+ *   - images de signature écartées sans trace (moins de 20 Ko, ou nom générique image001.png, logo.jpg, Outlook-xxx.png) ;
+ *   - tout le reste (zip, p7m, docx, sans extension ni type connu…) est écarté ET journalisé par traiterMessage.
+ */
+function trierPieces(message) {
   var pieces = message.getAttachments({ includeInlineImages: false, includeAttachments: true });
-  return pieces.filter(function(p) {
-    var ext = extensionDe(p.getName());
-    if (CONFIG.extensionsPieces.indexOf(ext) === -1) return false;
+  var out = { gardees: [], ecartees: [] };
+  pieces.forEach(function(p) {
+    var nom = String(p.getName() || ""), ext = extensionDe(nom);
+    if (CONFIG.extensionsPieces.indexOf(ext) === -1) {
+      var parMime = extensionParMime(p.getContentType && p.getContentType());
+      if (!parMime) { out.ecartees.push({ nom: nom || "(sans nom)", raison: "pièce écartée : type « " + (ext || (p.getContentType && p.getContentType()) || "inconnu") + " » non traité" }); return; }
+      ext = parMime;
+      try { p.setName(nom + "." + ext); } catch (e) { Logger.log("Renommage de la pièce impossible : " + e); }
+    }
     if (ext !== "pdf" && ext !== "xml") {
       // une image de moins de 20 Ko est un logo, pas une facture photographiée
-      if (p.getSize() < 20 * 1024) return false;
+      if (p.getSize() < 20 * 1024) return;
       // image au nom générique (image001.png, logo.jpg, Outlook-xxx.png…) : signature de mail, quelle que soit la taille
-      if (CONFIG.imagesGeneriques.test(String(p.getName()).replace(/\.[a-z0-9]+$/i, "")) || /^outlook/i.test(String(p.getName()))) return false;
+      if (CONFIG.imagesGeneriques.test(nom.replace(/\.[a-z0-9]+$/i, "")) || /^outlook/i.test(nom)) return;
     }
-    return true;
+    out.gardees.push(p);
   });
+  return out;
 }
+
+/** Pièces jointes utiles (compatibilité) */
+function piecesDuMessage(message) { return trierPieces(message).gardees; }
 
 /** Mail sans pièce jointe qui ressemble à une facture (Zenchef, Alan, Mailjet…) : montant + mot clé */
 function corpsRessembleAUneFacture(message) {

@@ -14,13 +14,35 @@ function normaliser(texte) { return sansAccents(String(texte || "").replace(/ /
 
 // ---------------------------------------------------------------- Montant
 
-/** Tous les montants « 1 234,56 » / « 12.30 » / « -4,92 » / « 148,12- » d'un texte : [{ c: centimes signés, pos }] */
+/**
+ * Texte prêt pour la lecture des montants : espaces insécables et fines (U+00A0, U+202F, U+2009, U+2007) ramenées à
+ * l'espace, et un O lu par l'OCR à la place d'un zéro entre deux chiffres (« 1 O72,56 » -> « 1 072,56 »).
+ */
+function normaliserMontants(s) {
+  return String(s || "").replace(/[    ]/g, " ").replace(/(?<=\d ?)[oO](?=\d)/g, "0").replace(/(?<=\d)[oO](?=[,.]\d{2}\b)/g, "0");
+}
+
+/**
+ * Tous les montants « 1 234,56 » / « 12.30 » / « -4,92 » / « 148,12- » d'un texte : [{ c: centimes signés, pos, colle, decolle }].
+ * Un signe moins n'est retenu que collé au nombre (« -4,92 », « 148,12- ») ou, après le nombre, suivi d'un « € » ou d'une fin de ligne :
+ * « 128,27 - Echéance » est un tiret de mise en page.
+ * Lecture collée : « 2 105,40 » peut être le montant 2 105,40 ou une colonne isolée (« 2 ») suivie de 105,40 (OCR). Les deux lectures
+ * sont produites : la collée porte `colle`, la non collée `decolle` ; trouverMontantTTC garde celle qui forme un triplet cohérent.
+ */
 function listerMontants(s) {
-  var re = /(- ?)?(?<![\d.,])(?!0\d)(\d{1,3}(?:[ .]\d{3})+|\d+)[,.](\d{2})(?![\d%])( ?-(?! ?\d))?/g, a, out = [];
+  var re = /(-)?(?<![\d.,])(?!0\d)(\d{1,3}(?:[ .]\d{3})+|\d+)[,.](\d{2})(?![\d%])(-(?! ?\d)| ?-(?=\s*(?:€|eur\b|\n|$)))?/gim, a, out = [];
   while ((a = re.exec(s)) !== null) {
     var c = parseInt(a[2].replace(/[ .]/g, ""), 10) * 100 + parseInt(a[3], 10);
     if (a[1] || a[4]) c = -c;
-    if (c !== 0 && Math.abs(c) < CONFIG.montantMax) out.push({ c: c, pos: a.index });   // « 0,00 » n'est jamais un total
+    if (c === 0 || Math.abs(c) >= CONFIG.montantMax) continue;   // « 0,00 » n'est jamais un total ; au delà : capital, SIREN
+    var parEspace = a[2].indexOf(" ") !== -1;
+    out.push({ c: c, pos: a.index, colle: parEspace });
+    if (parEspace) {
+      // lecture non collée : le dernier groupe de trois chiffres (« 5 121,58 » -> 121,58)
+      var dernier = a[2].slice(a[2].lastIndexOf(" ") + 1), c2 = parseInt(dernier, 10) * 100 + parseInt(a[3], 10);
+      if (a[1] || a[4]) c2 = -c2;
+      if (c2 !== 0) out.push({ c: c2, pos: a.index + a[0].length - a[3].length - 1 - dernier.length, decolle: true });
+    }
   }
   return out;
 }
@@ -45,19 +67,29 @@ var PROXIMITE_TOTAUX = 400;   // HT, TVA et TTC sont écrits dans le même bloc 
  */
 function trouverMontantTTC(texte) {
   if (!texte) return null;
-  var t = texte.replace(/ /g, " ");
+  var t = normaliserMontants(texte);
   var pasUnTaux = function(m) { return CONFIG.tauxTva.indexOf(Math.abs(m.c)) === -1; };
-  var tous = listerMontants(t).filter(pasUnTaux);
-  var estSomme = function(m) {
-    for (var x = 0; x < tous.length; x++) {
-      if (Math.abs(tous[x].pos - m.pos) > PROXIMITE_TOTAUX) continue;
-      for (var y = 0; y < tous.length; y++) {
-        if (x === y || Math.abs(tous[y].pos - m.pos) > PROXIMITE_TOTAUX) continue;
-        if (tripletCoherent(tous[x].c, tous[y].c, m.c)) return true;
+  var estSommeDans = function(liste, m) {
+    for (var x = 0; x < liste.length; x++) {
+      if (Math.abs(liste[x].pos - m.pos) > PROXIMITE_TOTAUX) continue;
+      for (var y = 0; y < liste.length; y++) {
+        if (x === y || Math.abs(liste[y].pos - m.pos) > PROXIMITE_TOTAUX) continue;
+        if (tripletCoherent(liste[x].c, liste[y].c, m.c)) return true;
       }
     }
     return false;
   };
+  // Lectures collées (« 2 105,40 ») : acceptées seulement si aucun triplet HT + TVA = TTC n'existe sans elles
+  var brut = listerMontants(t).filter(pasUnTaux);
+  var sansCollees = brut.filter(function(m) { return !m.colle; });
+  var tripletSansCollees = sansCollees.some(function(m) { return estSommeDans(sansCollees, m); });
+  var tous = tripletSansCollees ? sansCollees : brut.filter(function(m) { return !m.decolle; });
+  // Soldes de compte (« Solde antérieur 90,00 Nouveau solde 180,00 ») : jamais un total de facture
+  var reS = new RegExp(CONFIG.motifsSolde.source, "gi"), ms, soldes = [];
+  while ((ms = reS.exec(t)) !== null) soldes.push([ms.index, ms.index + ms[0].length + 40]);
+  tous = tous.filter(function(m) { return !soldes.some(function(f) { return m.pos >= f[0] && m.pos <= f[1]; }); });
+  var estSomme = function(m) { return estSommeDans(tous, m); };
+  var dansFenetre = function(debut, longueur) { return tous.filter(function(m) { return m.pos >= debut && m.pos < debut + longueur; }); };
   // Fréquence de chaque montant dans le texte : le vrai total est répété (total TTC, net à payer, échéancier),
   // une consigne ajoutée (TTC + 30 €) ne l'est pas
   var freq = {};
@@ -88,10 +120,7 @@ function trouverMontantTTC(texte) {
   for (var i = 0; i < cles.length; i++) {
     var re = cles[i], m;
     re.lastIndex = 0;
-    while ((m = re.exec(t)) !== null) {
-      var debutFen = m.index + m[0].length;
-      listerMontants(t.substr(debutFen, 150)).filter(pasUnTaux).forEach(function(x) { cand.push({ c: x.c, pos: debutFen + x.pos }); });
-    }
+    while ((m = re.exec(t)) !== null) cand = cand.concat(dansFenetre(m.index + m[0].length, 150));
   }
   // 0) « net à payer » : c'est le montant que Pennylane retient. Il peut différer du TTC quand des consignes et des
   //    déconsignes s'ajoutent (Cozigou : TTC 729,25, consigne +30, déconsigne -64,20, net à payer 695,05).
@@ -101,10 +130,7 @@ function trouverMontantTTC(texte) {
   for (var n0 = 0; n0 < clesNet.length; n0++) {
     var reN = clesNet[n0], mN;
     reN.lastIndex = 0;
-    while ((mN = reN.exec(t)) !== null) {
-      var debutN = mN.index + mN[0].length;
-      listerMontants(t.substr(debutN, 150)).filter(pasUnTaux).forEach(function(x) { candNet.push({ c: x.c, pos: debutN + x.pos }); });
-    }
+    while ((mN = reN.exec(t)) !== null) candNet = candNet.concat(dansFenetre(mN.index + mN[0].length, 150));
   }
   candNet = sansConsigne(candNet.filter(function(m) { return Math.abs(m.c) <= CONFIG.montantMaxSansTriplet; }));
   var netCoherents = candNet.filter(estSomme);
@@ -127,7 +153,8 @@ function trouverMontantTTC(texte) {
 
 var MOTIF_NUM = "(?=[A-Z0-9\\-\\/_.]*\\d)([A-Z0-9][A-Z0-9\\-\\/_.]{2,})";
 
-function nettoyerNumero(n) { return n.replace(/[\/\\]/g, "-").replace(/[.\-_]+$/, ""); }
+/** Numéro nettoyé : séparateurs unifiés, et un mot collé par l'OCR à la fin d'un numéro chiffré retiré (« 21741SARL » -> « 21741 ») */
+function nettoyerNumero(n) { return n.replace(/[\/\\]/g, "-").replace(/[.\-_]+$/, "").replace(/^(\d{4,})[A-Z]{3,}$/, "$1"); }
 
 /** Vrai si le numéro trouvé à la position `pos` est un numéro de client (« client », « code client », « destinataire code »…) */
 function numeroDeClient(t, pos) {
@@ -233,10 +260,10 @@ function trouverDateFacture(texte, dateMail) {
   var limite = dateMail ? ajouterJours(dateMail, CONFIG.dateFutureJours) : null;
   var niveaux = [
     /facture\s*n?\s*[°o]?\.?\s*[A-Z0-9\-\/]*\s+du\b|relev[ée]\s*(?:mensuel|client|de\s*compte)?\s*(?:n\s*[°o]\.?\s*\S+)?\s*du\b|date\s*(?:de\s*(?:la\s*)?)?(?:facture|facturation|d['’]?\s*emission|emission)|invoice\s*date|issue\s*date|[ée]mise?\s+le\b|[ée]tablie?\s+le\b|[ée]dit[ée]e?\s+le\b/gi,
-    /en\s*date\s*du|date\s*:|date\s+ech[ée]ance|date\s+client\s+page|date\s+contrem|,\s*le\s+(?=\d)|\bfait\s+a\s+[a-z\- ]{2,30}\s+le\b/gi,
+    /en\s*date\s*du|date\s*:|date\s+ech[ée]ance|date\s+client\s+page|date\s+contrem|,\s*le\s+(?=\d)|\bfait\s+a\s+[a-z\- ]{2,30}\s+le\b|(?:^|\n)[a-z][a-z\- ]{1,30}\s+le,?\s+(?=\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})|\b[a-z]{2,}\s+le,\s+(?=\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/gi,
     /\bdate\b/gi
   ];
-  var exclu = /ech[ée]ance|pr[ée]l[èe]vement|pr[ée]lev[ée]|payer\s+avant|limite|due\s*date|validit[ée]|livraison|expedition\s*prevue/i;
+  var exclu = /ech[ée]ance|pr[ée]l[èe]vement|pr[ée]lev[ée]|payer\s+avant|limite|due\s*date|validit[ée]|livraison|expedition\s*prevue|transporteur|exp[ée]di[ée]|remis\s+le|envoy[ée]/i;
   for (var n = 0; n < niveaux.length; n++) {
     var re = niveaux[n], m;
     while ((m = re.exec(t)) !== null) {
@@ -283,20 +310,60 @@ function joursEntre(a, b) {
 // ---------------------------------------------------------------- Établissement
 
 /**
- * Établissement destinataire lu sur le document : "Bello Mio", "Piccola Mia" ou null (inconnu / contradictoire).
- * Un numéro de TVA ou un SIREN est une preuve forte ; les mots (SASHA, place du Poncel, FRATELLI, rue Ville Pépin) ensuite.
+ * Établissement destinataire lu sur le document : { etab: "Bello Mio" | "Piccola Mia" | null, contradictoire, source }.
+ *   1) bloc d'adresse de facturation (« Facturé à », « Client : », « Destinataire »…, 300 caractères) : un seul établissement cité -> retenu ;
+ *   2) numéro de TVA ou SIREN (preuve forte) ;
+ *   3) mots (SASHA, place du Poncel / FRATELLI, rue Ville Pépin…) ; les deux établissements cités -> majorité nette (au moins deux
+ *      marqueurs contre un), sinon `contradictoire` : la pièce va dans À vérifier, sans appliquer l'établissement par défaut de la liste.
+ * Les phrases de CONFIG.marqueurs.ignorer (« SASHA I FRATELLI AND CO », nom complet de la SARL SASHA) sont retirées avant la recherche.
  */
-function detecterEtablissement(texte) {
-  if (!texte) return null;
-  var t = normaliser(texte), compact = t.replace(/[\s.]/g, "");
-  var fort = [], faible = [];
-  CONFIG.etablissements.forEach(function(etab) {
-    var mq = CONFIG.marqueurs[etab];
-    if (compact.indexOf(mq.tva.toLowerCase()) !== -1 || compact.indexOf(mq.siren) !== -1) fort.push(etab);
-    for (var i = 0; i < mq.mots.length; i++) if (t.indexOf(mq.mots[i]) !== -1) { faible.push(etab); break; }
-  });
-  if (fort.length === 1) return fort[0];
-  if (fort.length === 0 && faible.length === 1) return faible[0];
+function analyserEtablissement(texte) {
+  var r = { etab: null, contradictoire: false, source: null };
+  if (!texte) return r;
+  var t = normaliser(texte);
+  (CONFIG.marqueurs.ignorer || []).forEach(function(p) { t = t.split(p).join(" "); });
+  var compact = t.replace(/[\s.]/g, "");
+  var marqueursDans = function(s) {
+    var out = {};
+    CONFIG.etablissements.forEach(function(etab) {
+      var mq = CONFIG.marqueurs[etab], n = 0;
+      for (var i = 0; i < mq.mots.length; i++) if (s.indexOf(mq.mots[i]) !== -1) n++;
+      if (n) out[etab] = n;
+    });
+    return out;
+  };
+  // 1) bloc d'adresse de facturation
+  var reA = new RegExp(CONFIG.motifsAdresseFacturation.source, "gi"), ma, dansAdresse = {};
+  while ((ma = reA.exec(t)) !== null) {
+    var bloc = marqueursDans(t.substr(ma.index + ma[0].length, 300));
+    for (var k in bloc) dansAdresse[k] = (dansAdresse[k] || 0) + bloc[k];
+  }
+  var etabsAdresse = Object.keys(dansAdresse);
+  if (etabsAdresse.length === 1) { r.etab = etabsAdresse[0]; r.source = "adresse"; return r; }
+  // 2) identifiants
+  var fort = CONFIG.etablissements.filter(function(etab) { var mq = CONFIG.marqueurs[etab]; return compact.indexOf(mq.tva.toLowerCase()) !== -1 || compact.indexOf(mq.siren) !== -1; });
+  if (fort.length === 1) { r.etab = fort[0]; r.source = "identifiant"; return r; }
+  if (fort.length > 1) { r.contradictoire = true; return r; }
+  // 3) mots
+  var faible = marqueursDans(t), etabs = Object.keys(faible);
+  if (etabs.length === 1) { r.etab = etabs[0]; r.source = "mots"; return r; }
+  if (etabs.length > 1) {
+    var tri = etabs.slice().sort(function(a, b) { return faible[b] - faible[a]; });
+    if (faible[tri[0]] >= 2 && faible[tri[1]] === 1) { r.etab = tri[0]; r.source = "mots (majorité)"; return r; }
+    r.contradictoire = true;
+  }
+  return r;
+}
+
+/** Établissement seul (compatibilité) : "Bello Mio", "Piccola Mia" ou null (inconnu ou contradictoire) */
+function detecterEtablissement(texte) { return analyserEtablissement(texte).etab; }
+
+/** Établissement désigné par l'adresse de réception du mail (facture@piccolamia.fr -> Piccola Mia), ou null */
+function etablissementParReception(recuSur) {
+  var a = String(recuSur || "").toLowerCase();
+  if (!a || CONFIG.adressesFacture.indexOf(a) === -1) return null;
+  if (/bellomio/.test(a)) return "Bello Mio";
+  if (/piccolamia/.test(a)) return "Piccola Mia";
   return null;
 }
 
@@ -327,7 +394,11 @@ function detecterTypeDocument(texte, montant) {
   // Un devis ou un bon de commande affiche un total TTC : seul un vrai numéro de facture l'emporte
   if (/\bdevis\s*(?:n\s*[°o]|num|:)|ce\s*devis|validite\s*(?:du\s*)?devis|bon\s*pour\s*accord|pro\s*-?\s*forma/.test(t) && !numeroFacture) return "devis";
   // « Bon de commande », « BC n° », « purchase order » dans le titre : bon de commande, même si « facture » apparaît plus loin
-  if (/bon\s*de\s*commande|\bbc\s*n\s*[°o]|purchase\s*order/.test(t.slice(0, 800)) && !/facture\s*n\s*[°o]|n\s*[°o]\.?\s*(?:de\s*)?facture/.test(t.slice(0, 800))) return "bon_commande";
+  var titreNumero = /facture\s*n\s*[°o]|n\s*[°o]\.?\s*(?:de\s*)?facture/.test(t.slice(0, 800));
+  if (/bon\s*de\s*commande|\bbc\s*n\s*[°o]|purchase\s*order/.test(t.slice(0, 800)) && !titreNumero) return "bon_commande";
+  // Bon de livraison (« Bon de livraison », « BL n° », « BDL00000439 ») : la facture mensuelle le reprend, journal seul.
+  // (« facturé » perd son accent dans `normaliser` : cette règle passe AVANT celle des factures)
+  if (/bon\s*de\s*livraison|\bbl\s*n\s*[°o]|\bbdl\s*\d|bon\s*de\s*r[ée]ception|delivery\s*note/.test(t.slice(0, 800)) && !titreNumero) return "bon_livraison";
   if (/\bdevis\b/.test(t) && !signauxFacture) return "devis";
   if (/bon\s*de\s*commande|confirmation\s*de\s*commande|purchase\s*order|accuse\s*de\s*reception\s*de\s*commande/.test(t) && !signauxFacture) return "bon_commande";
   // Épreuves d'imprimeur (Diazo : PDF de contrôle, bon à tirer) et contrats signés électroniquement
@@ -373,7 +444,9 @@ function estCatalogueParObjet(subject, nomPiece) {
  */
 function extraireFournisseur(idx, from, subject, texte) {
   var r = resoudreFournisseur(idx, { from: from, subject: subject, texte: texte });
-  if (r) return { nom: r.entree.nom, source: r.source, entree: r.entree };
+  if (r && r.entree) return { nom: r.entree.nom, source: r.source, entree: r.entree };
+  // plateforme de facturation sans fournisseur lisible : pas de nom proposé (le domaine n'est pas le fournisseur)
+  if (r && r.source === "plateforme") return { nom: null, source: "plateforme", propose: null };
   return { nom: null, source: "inconnu", propose: nomProposeDepuisDomaine(from) };
 }
 
@@ -396,7 +469,7 @@ function construireNom(a, extension) {
 
 /**
  * Analyse pure d'une pièce. Entrée :
- *   { idx (index des fournisseurs), texte, from, subject, nomPiece, dateMail (AAAA-MM-JJ), extension }
+ *   { idx (index des fournisseurs), texte, from, subject, nomPiece, dateMail (AAAA-MM-JJ), extension, recuSur (adresse de réception) }
  * Sortie :
  *   { type, etablissement, fournisseur, sourceFournisseur, fournisseurPropose, numero, date, dateSecours, montant, nom, texteLu, raisons[] }
  * `raisons` liste ce qui empêche un classement sûr (vide = pièce sûre).
@@ -407,6 +480,8 @@ function analyserDocument(e) {
   var f = extraireFournisseur(e.idx || indexerFournisseurs(listeFournisseursParDefaut()), e.from, e.subject, texte);
   var montant = texteLu ? trouverMontantTTC(texte) : null;
   var type = texteLu ? detecterTypeDocument(texte, montant) : "autre";
+  // Un avoir imprimé avec des montants positifs reste un avoir : montant négatif (Pennylane et l'anti-doublon s'y fient)
+  if (type === "avoir" && montant && parseFloat(montant) > 0) montant = "-" + montant;
   // Expéditeurs qui n'envoient jamais de factures (DocuSign, notifications Pennylane, Vinted, La Poste, JDC, Up Coop),
   // et fournisseurs dont la colonne « Établissement par défaut » dit « bon de commande »
   var typeForce = typeParExpediteur(e.from) || (f.entree && f.entree.typeForce) || null;
@@ -417,11 +492,15 @@ function analyserDocument(e) {
   // Tarifs, promotions, catalogues annoncés par l'objet du mail ou le nom de la pièce : journal seul
   if (type !== "facture" && type !== "avoir" && type !== "releve" && type !== "mandat" && estCatalogueParObjet(e.subject, e.nomPiece)) type = "catalogue";
   if (type === "autre" && texteLu && estCatalogueParObjet(e.subject, e.nomPiece)) type = "catalogue";
-  var etabLu = texteLu ? detecterEtablissement(texte) : null;
+  var etabA = texteLu ? analyserEtablissement(texte) : { etab: null, contradictoire: false };
+  var etabLu = etabA.etab, sourceEtab = etabLu ? "document" : null;
+  // Document contradictoire (les deux sociétés citées) : l'adresse de réception (facture@bellomio.fr / facture@piccolamia.fr) départage
+  if (!etabLu && etabA.contradictoire) { var parReception = etablissementParReception(e.recuSur); if (parReception) { etabLu = parReception; sourceEtab = "réception"; } }
   var a = {
     type: type,
     etablissement: etabLu,
-    sourceEtablissement: etabLu ? "document" : null,
+    sourceEtablissement: sourceEtab,
+    etablissementContradictoire: !!etabA.contradictoire && !etabLu,
     fournisseur: f.nom,
     sourceFournisseur: f.source,
     fournisseurPropose: f.propose || null,
@@ -432,8 +511,8 @@ function analyserDocument(e) {
     texteLu: texteLu,
     raisons: []
   };
-  // Établissement par défaut de la liste de référence (colonne remplie par Paul), si « Bello » ou « Piccola »
-  if (!a.etablissement && texteLu && f.entree && f.entree.etab) {
+  // Établissement par défaut de la liste de référence (colonne remplie par Paul), si « Bello » ou « Piccola » ; jamais sur un document contradictoire
+  if (!a.etablissement && !a.etablissementContradictoire && texteLu && f.entree && f.entree.etab) {
     var defaut = etablissementParDefaut(f.entree.etab);
     if (defaut) { a.etablissement = defaut; a.sourceEtablissement = "liste"; }
   }
@@ -441,10 +520,12 @@ function analyserDocument(e) {
   // Numéro de secours : dans le nom de la pièce jointe ("CHEVI35 Chev35 00113789.pdf")
   if (!a.numero && e.nomPiece) { var m = String(e.nomPiece).match(/\d{6,}/); if (m) a.numero = m[0]; }
   if (!texteLu) a.raisons.push("texte illisible (OCR)");
-  if (texteLu && !a.etablissement) a.raisons.push("établissement inconnu" + (f.entree ? " (liste : « " + (a.etabParDefaut || "vide") + " »)" : ""));
+  if (texteLu && !a.etablissement) a.raisons.push(a.etablissementContradictoire ? "établissement contradictoire (les deux sociétés citées)" : "établissement inconnu" + (f.entree ? " (liste : « " + (a.etabParDefaut || "vide") + " »)" : ""));
   if ((type === "facture" || type === "avoir" || type === "ticket") && !a.montant) a.raisons.push("montant introuvable");
   if (type === "autre" && texteLu) a.raisons.push("type de document incertain");
-  if (!f.nom && ["catalogue", "contrat", "notification", "courrier", "epreuve"].indexOf(type) === -1) a.raisons.push("fournisseur inconnu" + (f.propose ? " (" + f.propose + " ?)" : ""));
+  if (!f.nom && ["catalogue", "contrat", "notification", "courrier", "epreuve", "bon_livraison"].indexOf(type) === -1) {
+    a.raisons.push(f.source === "plateforme" ? "plateforme, fournisseur non lu" : "fournisseur inconnu" + (f.propose ? " (" + f.propose + " ?)" : ""));
+  }
   // Une facture de plus de 90 jours reçue aujourd'hui est suspecte (facture de 2025 dans un mail de 2026)
   if (a.date && e.dateMail && (type === "facture" || type === "avoir" || type === "ticket") && joursEntre(a.date, e.dateMail) > CONFIG.ancienneFactureJours) {
     a.raisons.push("ancienne facture (" + a.date + ")");
@@ -477,7 +558,7 @@ function anneeDe(a) { return String(a.date || a.dateSecours || "").slice(0, 4) |
  */
 function decider(a) {
   var annee = anneeDe(a);
-  if (["devis", "bon_commande", "attestation", "catalogue", "contrat", "notification", "courrier", "epreuve"].indexOf(a.type) !== -1) {
+  if (["devis", "bon_commande", "bon_livraison", "attestation", "catalogue", "contrat", "notification", "courrier", "epreuve"].indexOf(a.type) !== -1) {
     return { destination: "journal", chemin: [], archive: [], raison: a.type + " : rien à ranger" };
   }
   if ((a.type === "releve" || a.type === "mandat") && a.texteLu && a.fournisseur) {
@@ -495,25 +576,45 @@ function decider(a) {
 
 // ---------------------------------------------------------------- Anti-doublon (pure)
 
-/** Clés de rapprochement d'une pièce : empreinte, fournisseur+numéro, fournisseur+date+montant */
+/** Famille d'une pièce pour l'anti-doublon : avoir (montant négatif), relevé, mandat, sinon facture (tickets compris) */
+function typeDoublon(a) {
+  if (a.type === "releve" || a.type === "mandat") return a.type;
+  if (a.type === "avoir" || (a.montant && parseFloat(a.montant) < 0)) return "avoir";
+  return "facture";
+}
+
+/**
+ * Clés de rapprochement d'une pièce : empreinte ; fournisseur + numéro (un numéro de facture est unique chez un fournisseur, quel que
+ * soit l'établissement lu) ; fournisseur + établissement + type + date + montant. L'établissement et le type font partie de cette
+ * dernière clé : les abonnements Pennylane de Bello et de Piccola du même jour au même prix, ou une facture et son avoir de même
+ * montant, ne sont pas des doublons.
+ */
 function clesDoublon(a, md5) {
-  var cles = [], f = cleFournisseur(a.fournisseur || "");
+  var cles = [], f = cleFournisseur(a.fournisseur || ""), etab = cleFournisseur(a.etablissement || ""), type = typeDoublon(a);
   if (md5) cles.push("md5:" + md5);
   if (a.numero && f) cles.push("num:" + f + "|" + String(a.numero).toUpperCase());
-  if (a.montant && f && (a.date || a.dateSecours)) cles.push("dm:" + f + "|" + (a.date || a.dateSecours) + "|" + a.montant);
+  if (a.montant && f && (a.date || a.dateSecours)) cles.push("dm:" + f + "|" + etab + "|" + type + "|" + (a.date || a.dateSecours) + "|" + a.montant);
   return cles;
 }
 
-/** Entrée de l'index qui correspond à la pièce, ou null. `index` = { "md5:…": entrée, "num:…": entrée, "dm:…": entrée } */
+/**
+ * Entrée de l'index qui correspond à la pièce, ou null. `index` = { "md5:…": entrée, "num:…": entrée, "dm:…": entrée }.
+ * Deux pièces qui ont chacune un numéro ne sont des doublons que si c'est le même numéro.
+ */
 function trouverDoublon(index, a, md5) {
   var cles = clesDoublon(a, md5);
-  for (var i = 0; i < cles.length; i++) if (index[cles[i]]) return index[cles[i]];
+  for (var i = 0; i < cles.length; i++) {
+    var e = index[cles[i]];
+    if (!e) continue;
+    if (cles[i].indexOf("dm:") === 0 && a.numero && e.numero && String(a.numero).toUpperCase() !== String(e.numero).toUpperCase()) continue;
+    return e;
+  }
   return null;
 }
 
-/** Reconstruit les clés d'un fichier déjà rangé à partir de son nom normalisé (pour l'indexation de l'existant) */
+/** Reconstruit les clés d'un fichier déjà rangé à partir de son nom normalisé (pour l'indexation de l'existant) ; « (2) » toléré avant l'extension */
 function analyserNomFichier(nom) {
-  var m = String(nom).match(/^(\d{4}-\d{2}-\d{2}) — (.+?) — (Relevé LCR|Relevé|Facture|Mandat|Devis|Attestation)(?: n°)? ?([^—]*?)?(?: — (-?[\d.]+) EUR)?\.(pdf|xml|jpg|jpeg|png)$/i);
+  var m = String(nom).match(/^(\d{4}-\d{2}-\d{2}) — (.+?) — (Relevé LCR|Relevé|Facture|Mandat|Devis|Attestation)(?: n°)? ?([^—]*?)?(?: — (-?[\d.]+) EUR)?(?: \(\d+\))?\.(pdf|xml|jpg|jpeg|png)$/i);
   if (!m) return null;
   var numero = (m[4] || "").trim() || null;
   return { date: m[1], fournisseur: m[2], type: /relev/i.test(m[3]) ? "releve" : m[3].toLowerCase(), numero: numero, montant: m[5] || null };

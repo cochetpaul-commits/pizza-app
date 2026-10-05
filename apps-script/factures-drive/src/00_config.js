@@ -52,20 +52,29 @@ var CONFIG = {
   alerteDestinataire: "cochetpaul@bellomio.fr",
   alerteAgeJours: 3,
 
-  // Passe horaire : on relit les messages des 3 derniers jours, le journal des identifiants évite tout retraitement
+  // Passe horaire : curseur par date (dernière passe TERMINÉE, moins une marge), sinon les 3 derniers jours ;
+  // le journal des identifiants évite tout retraitement. Alerte si la dernière passe réussie date de plus de 24 h.
   fenetreHeures: 72,
+  curseurMargeHeures: 24,
+  passeAlerteHeures: 24,
   // Limite Apps Script : 6 min. On s'arrête à 5 et on reprend à la passe suivante.
   limiteMs: 5 * 60 * 1000,
   tailleLot: 50,
 
-  // Pièces jointes prises en compte (PDF, XML Factur-X, photos)
+  // Pièces jointes prises en compte (PDF, XML Factur-X, photos) ; le type MIME complète l'extension (PDF sans extension)
   extensionsPieces: ["pdf", "xml", "jpg", "jpeg", "png", "heic", "heif", "gif", "tif", "tiff", "webp"],
+  mimeParExtension: { pdf: "application/pdf", xml: "application/xml", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", heic: "image/heic", heif: "image/heif",
+    gif: "image/gif", tif: "image/tiff", tiff: "image/tiff", webp: "image/webp" },
 
-  // Marqueurs d'établissement lus sur le document (adresse de facturation, raison sociale, TVA, SIREN)
+  // Marqueurs d'établissement lus sur le document (adresse de facturation, raison sociale, TVA, SIREN).
+  // `ignorer` : phrases retirées avant la recherche (la SARL SASHA s'appelle aussi « SASHA I FRATELLI AND CO » : « fratelli » n'y désigne pas Piccola)
   marqueurs: {
     "Bello Mio":   { mots: ["sasha", "poncel", "bello mio", "bellomio"], tva: "FR78913217386", siren: "913217386" },
-    "Piccola Mia": { mots: ["fratelli", "ville pepin", "piccola", "piccolamia"], tva: "FR40909382640", siren: "909382640" }
+    "Piccola Mia": { mots: ["fratelli", "ville pepin", "piccola", "piccolamia"], tva: "FR40909382640", siren: "909382640" },
+    ignorer: ["sasha i fratelli and co", "sasha i fratelli"]
   },
+  // Bloc d'adresse de facturation : les marqueurs y sont cherchés d'abord (300 caractères après ces mots)
+  motifsAdresseFacturation: /factur[ée]e?\s*[àa]\b|adresse\s*de\s*facturation|destinataire\s*:|client\s*:|livr[ée]e?\s*[àa]\b|bill\s*to|invoice\s*to/gi,
 
   // Montants : un taux de TVA n'est jamais un total ; au delà de 100 000 € c'est un capital ou un SIREN ;
   // entre 10 000 et 100 000 € un montant n'est retenu que s'il forme un triplet HT + TVA = TTC
@@ -88,7 +97,7 @@ var CONFIG = {
   expediteursJournalSeul: {
     "docusign.net": "contrat",                 // contrats et avenants signés (Elis, JDC…)
     "docusign.com": "contrat",
-    "notifications.pennylane.com": "notification",   // notifications de Pennylane lui-même (les factures d'abonnement viennent d'une autre adresse)
+    // notifications.pennylane.com : plateforme (v4.6), des factures de fournisseurs émises avec le module Pennylane y transitent
     "vinted.fr": "notification",
     "laposte.fr": "notification",
     "laposte.net": "notification",
@@ -100,10 +109,19 @@ var CONFIG = {
     "icloud.com", "me.com", "mac.com", "yahoo.com", "yahoo.fr", "wanadoo.fr", "orange.fr", "free.fr", "sfr.fr", "laposte.net", "bbox.fr", "neuf.fr", "aol.com", "protonmail.com", "proton.me"],
   // Consigne, emballages, caution : un total qui vaut TTC + consigne n'est pas le montant de la facture
   motifsConsigne: /consign\w*|emballages?\s*(?:consign|factur)|caution|d[ée]p[ôo]t\s*de\s*garantie/i,
+  // Soldes de compte (Self Stockage : « Solde antérieur 90,00 Nouveau solde 180,00 ») : jamais le montant de la facture
+  motifsSolde: /nouveau\s*solde|solde\s*ant[ée]rieur|solde\s*pr[ée]c[ée]dent|ancien\s*solde|report\s*(?:de\s*|du\s*)?solde|solde\s*(?:de\s*)?compte|cumul/gi,
 
-  // OCR Drive : nouvel essai après 2 s, 5 s, 15 s sur « User rate limit exceeded » ; pause entre deux OCR en rattrapage
+  // Plateformes de facturation : le domaine de l'expéditeur n'est PAS le fournisseur (Crédit Mutuel facture.cmb.fr : BR Nuisibles,
+  // Lucangeli ; Esker : Elis, Sysco ; Indy : Alain Pedron ; Mon Expert en Gestion : Le Père Billard ; module de facturation Pennylane).
+  // Pour ces expéditeurs : jamais de ligne « à compléter », le fournisseur doit être lu dans le document (identifiant ou nom), sinon À vérifier.
+  domainesPlateformes: ["facture.cmb.fr", "cmb.fr", "esker.com", "indy.fr", "via.indy.fr", "mon-expert-en-gestion.fr", "monexpertengestion.fr", "notifications.pennylane.com"],
+
+  // OCR Drive : nouvel essai après 2 s, 5 s, 15 s sur « User rate limit exceeded » ; pause entre deux OCR en rattrapage ;
+  // autre erreur passagère : un nouvel essai après 2 s, puis la pièce est « texte illisible » avec l'erreur dans le journal
   ocrAttentesMs: [2000, 5000, 15000],
   ocrPauseRattrapageMs: 1000,
+  ocrAttenteErreurMs: 2000,
 
   // Anciens dossiers « fourre-tout » de l'archive : leur contenu est reclassé d'après le PDF (reorganiserArchive)
   dossiersFourreTout: ["Facture", "Factures", "Invoicing", "Invoice", "Transfert Pierre", "Yahoo", "Wanadoo", "Gmail", "Mail", "Indy", "Bellomio", "Bello Mio",
@@ -121,7 +139,7 @@ var CONFIG = {
     { nom: "Carniato", variantes: ["Carniato Europe"], domaines: ["carniato.com"], identifiants: ["FR14340783828", "34078382800015"], etab: "Les deux" },
     { nom: "Cheville 35", variantes: ["Maison Hardy", "Maisonhardy", "Hardy", "Cheville"], domaines: ["vif.fr", "maison-hardy.fr"], identifiants: ["FR38829192319", "82919231900020"], etab: "Bello" },
     { nom: "TerreAzur", variantes: ["Terre Azur", "Pomona", "TA Bretagne"], domaines: ["groupe-pomona.fr", "terreazur.fr"], identifiants: ["FR56552044992", "55204499202861"], etab: "Les deux" },
-    { nom: "Elis", variantes: ["Esker", "Elis Bretagne", "Les Lavandières"], domaines: ["elis.com", "elis.fr", "esker.com"], identifiants: ["FR65062201009", "06220100900388"], etab: "Les deux" },
+    { nom: "Elis", variantes: ["Esker", "Elis Bretagne", "Les Lavandières"], domaines: ["elis.com", "elis.fr"], identifiants: ["FR65062201009", "06220100900388"], etab: "Les deux" },   // via Esker (plateforme) : reconnu par son identifiant
     { nom: "Hyg'Up", variantes: ["Hyg-up", "Hyg Up", "Hygup", "TLD PRO"], domaines: ["hygup.fr", "hyg-up.fr", "hyg-up.com"], identifiants: ["FR16911617124", "91161712400019"], etab: "Les deux" },
     { nom: "Leroy Merlin", variantes: ["Leroymerlin"], domaines: ["leroymerlin.fr"], identifiants: [], etab: "Les deux" },
     { nom: "Prophyl", variantes: [], domaines: ["prophyl.fr"], identifiants: ["FR48451251128"], etab: "Bello" },
@@ -134,7 +152,7 @@ var CONFIG = {
     { nom: "Bar Spirits", variantes: ["Barspirits"], domaines: ["barspirits.fr"], identifiants: [], etab: "Les deux" },
     { nom: "Vinoflo", variantes: [], domaines: ["vinoflo.fr", "vinoflo.com"], identifiants: [], etab: "Les deux" },
     { nom: "Cozigou", variantes: ["SAS COZIGOU COTE D'EMERAUDE"], domaines: ["cozigou.fr", "cozigou.bzh"], identifiants: ["FR81950026212", "950026212"], etab: "Les deux" },
-    { nom: "SDPF", variantes: [], domaines: ["sdpf.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "SDPF", variantes: ["Progourmands", "S.D.P.F."], domaines: ["sdpf.fr", "progourmands.fr", "sdpfcompta@hotmail.com"], identifiants: ["FR08433943305", "43394330500022"], etab: "Les deux" },   // écrit depuis hotmail : adresse complète
     { nom: "Elien", variantes: [], domaines: ["elien.fr"], identifiants: [], etab: "Bello" },
     { nom: "LMDW", variantes: ["La Maison du Whisky"], domaines: ["lmdw.fr", "lmdw.com"], identifiants: [], etab: "Les deux" },
     { nom: "Pennylane", variantes: [], domaines: ["headsup.pennylane.com", "pennylane.com"], identifiants: [], etab: "Les deux" },
@@ -169,7 +187,10 @@ var CONFIG = {
     { nom: "Verisure", variantes: [], domaines: ["verisure.fr", "verisure.com"], identifiants: [], etab: "Les deux" },
     { nom: "Bimpli", variantes: [], domaines: ["bimpli.com", "bimpli.fr"], identifiants: [], etab: "Les deux" },
     { nom: "SC M2", variantes: ["SC-M2", "Sc-m2", "SCM2"], domaines: ["sc-m2.fr"], identifiants: [], etab: "Les deux" },
-    { nom: "Mon Expert en Gestion", variantes: ["Mon-expert-en-gestion", "MEG"], domaines: ["mon-expert-en-gestion.fr", "monexpertengestion.fr"], identifiants: [], etab: "Les deux" },
+    { nom: "Mon Expert en Gestion", variantes: ["Mon-expert-en-gestion", "MEG"], domaines: [], identifiants: [], etab: "Les deux", actif: "non", remarque: "plateforme de facturation (Le Père Billard…)" },
+    { nom: "Le Père Billard", variantes: ["Corsaire Marée", "Pere Billard", "SARL LE PERE BILLARD"], domaines: ["leperebillard.com"], identifiants: ["87790529900013", "FR39877905299"], etab: "Bello" },
+    { nom: "BR Nuisibles", variantes: ["Bource Richard", "BR Nuisibles Bource Richard"], domaines: [], identifiants: ["94776172200018", "FR32947761722"], etab: "Bello" },
+    { nom: "Self Stockage", variantes: ["Selfstockage", "Self Stockage SAS"], domaines: [], identifiants: ["FR53922735535", "922735535"], etab: "Bello" },   // écrit depuis une adresse wanadoo.fr : mettre l'adresse complète dans le Sheet
     { nom: "Distrimalo", variantes: [], domaines: ["distrimalo.fr"], identifiants: [], etab: "Piccola" },
     { nom: "Buffet Plus", variantes: ["Buffetplus"], domaines: ["buffetplus.fr"], identifiants: [], etab: "Piccola" },
     { nom: "Flamigni", variantes: [], domaines: ["flamigni.it", "flamigni.com"], identifiants: [], etab: "Piccola" },

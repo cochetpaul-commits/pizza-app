@@ -1,0 +1,31 @@
+SARL LE PERE BILLARD
+
+Poissonnerie, Conserverie, Plateaux de fruits de mer 4 Rue de la Gardelle 35400 - ST MALO FRANCE
+
+Siret : 87790529900013
+
+BON DE LIVRAISON
+
+N° : BDL00000439 Date : 04/08/2026 N° client : CLT00000180
+
+SASHA BELLO MIO
+
+3 PLACE DU PONCEL 35400 SAINT-MALO FRANCE
+
+Libellé Qté Unité PU HT Montant HT TVA
+
+ENCORNET LE 04/08 7,00 kg 18,00 € 126,00 € 5,50%
+
+THON ROUGE LE 04/08 10,00 kg 28,90 € 289,00 € 5,50%
+
+HOMARD LE 04/08 3,95 kg 29,90 € 118,11 € 5,50%
+
+Total HT 550,81 €
+
+TVA 30,29 €
+
+Total TTC 581,10 €
+
+Marchandise livrée, facturée en fin de mois.
+
+CORSAIRE MAREE - 4 Rue de la Gardelle 35400 ST MALO FRANCE - Siret : 87790529900013 - N° TVA FR39877905299

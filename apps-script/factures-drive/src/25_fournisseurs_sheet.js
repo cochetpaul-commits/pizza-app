@@ -112,7 +112,8 @@ function genererListeFournisseurs() {
 
 /**
  * Complète la colonne SIRET / TVA en lisant (OCR) une facture archivée par fournisseur sans identifiant.
- * Relancer jusqu'à « TERMINÉ ».
+ * Seul le bloc émetteur est retenu (identifiantsEmetteur) : jamais les nôtres, jamais ceux de la plateforme de facturation ou de
+ * l'affactureur, jamais un identifiant déjà porté par une autre ligne (signalé en remarque et dans le journal). Relancer jusqu'à « TERMINÉ ».
  */
 function completerIdentifiantsFournisseurs() {
   var debut = Date.now();
@@ -121,6 +122,8 @@ function completerIdentifiantsFournisseurs() {
   var n = f.getLastRow();
   if (n < 2) { Logger.log("Liste vide : lancer genererListeFournisseurs"); return; }
   var lignes = f.getRange(2, 1, n - 1, COLONNES_FOURNISSEURS.length).getValues();
+  var dejaPris = {};
+  lignes.forEach(function(l) { var e = entreeDepuisLigne(l); e.identifiants.forEach(function(id) { var k = cleIdentifiant(id); if (k) dejaPris[k] = e.nom; }); });
   var racine = obtenirOuCreerDossier(null, CONFIG.dossierRacine), st = { lus: 0, trouves: 0, arret: false };
   for (var i = 0; i < lignes.length; i++) {
     if (Date.now() - debut > CONFIG.limiteMs) { st.arret = true; break; }
@@ -129,9 +132,12 @@ function completerIdentifiantsFournisseurs() {
     var fichier = premierFichierDuFournisseur(racine, [e.nom].concat(e.variantes));
     if (!fichier) { lignes[i][8] = e.remarque || "aucun fichier archivé"; continue; }
     st.lus++;
-    var ids = listerIdentifiants(lireTexte(fichier.getBlob(), extensionDe(fichier.getName())));
-    if (ids.length) { lignes[i][3] = ids.join("; "); st.trouves++; } else lignes[i][8] = (e.remarque ? e.remarque + " ; " : "") + "aucun identifiant lu";
+    var r = identifiantsEmetteur(lireTexte(fichier.getBlob(), extensionDe(fichier.getName())), [e.nom].concat(e.variantes), dejaPris);
+    r.ecartes.forEach(function(x) { journalAvertir("Fournisseurs : identifiant " + x.id + " lu sur une facture de « " + e.nom + " » mais déjà porté par « " + x.ligne + "» : non copié"); });
+    if (r.identifiants.length) { lignes[i][3] = r.identifiants.join("; "); r.identifiants.forEach(function(id) { dejaPris[cleIdentifiant(id)] = e.nom; }); st.trouves++; }
+    else lignes[i][8] = (e.remarque ? e.remarque + " ; " : "") + (r.ecartes.length ? "identifiant(s) déjà pris par " + r.ecartes.map(function(x) { return x.ligne; }).join(", ") : "aucun identifiant lu");
   }
+  journalVider();
   f.getRange(2, 1, lignes.length, COLONNES_FOURNISSEURS.length).setValues(lignes);
   _fournisseurs.idx = null;
   Logger.log("Factures lues : " + st.lus + ", identifiants trouvés : " + st.trouves);
