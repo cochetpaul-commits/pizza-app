@@ -150,10 +150,20 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
      `destroyChart()` qui ne servaient plus qu'à ce graphique — plus aucune
      trace de chart.js dans le bundle initial de la page. Les 3 graphiques de
      `ventes/marges` suivent maintenant exactement le même patron.
-     Page `ventes` (~2700 lignes) toujours pas commencée : mêmes 2 patterns
-     (`catTrendChartRef` en haut de page + un composant `MiniChart` interne
-     réutilisé plusieurs fois en bas, lignes ~2576-2702) — prévoir une
-     exécution dédiée pour cette page vu sa taille.
+   - [x] *(05/10/2026)* `ventes/page.tsx` (2684 l.) : le composant
+     `ChartCanvas` (4 usages : top10, mix, serveurs, paiements, lignes
+     ~2556-2688) extrait dans `src/app/ventes/ChartCanvas.tsx`, chargé via
+     `next/dynamic({ ssr: false })` — même patron que les composants
+     ci-dessus (`import Chart from "chart.js/auto"` statique dans le fichier
+     dédié au lieu du `loadChart()` par dynamic `import()` utilisé jusque-là
+     dans `page.tsx`). Le type `WeekData` est exporté de `page.tsx` et
+     réimporté en `import type` (pas de dépendance runtime). Page passée de
+     2688 à 2554 lignes.
+     Reste à faire sur cette page (pas traité cette fois, trop risqué à
+     extraire sans pouvoir tester dans le navigateur) : le graphique
+     `catTrendChartRef` en haut de page (~150 lignes) est très imbriqué avec
+     l'état de la page (filtres, données de tendance) — son extraction
+     mérite une exécution dédiée avec plus de budget.
 2. **`v_latest_offers` téléchargée en entier** (toutes les offres de tous les
    fournisseurs) à chaque ouverture d'un formulaire de recette — 6 composants
    concernés. Filtrer par les ingrédients affichés, comme le fait déjà
@@ -191,9 +201,14 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
   `add_ingredient_status` (0204) et `etablissements` (0312/0313).
 
 ### Divers
-- 40 warnings ESLint restants (variables inutilisées mineures).
-- `babel-plugin-react-compiler` en devDeps sans config visible — à confirmer
-  puis retirer.
+- [x] *(05/10/2026)* 40 warnings ESLint restants : déjà à 0 (vérifié,
+  `eslint src --max-warnings 0` passe sans rien à corriger — probablement
+  réglé au fil des exécutions précédentes sans être recoché ici).
+- `babel-plugin-react-compiler` en devDeps sans config visible — confirmé le
+  05/10/2026 : aucun `babel.config.*`/`.babelrc`, aucune mention dans
+  `next.config.ts`, aucun usage dans `src/` → dépendance morte, à retirer
+  (`npm uninstall babel-plugin-react-compiler`) lors d'une prochaine
+  exécution.
 - Vignettes `<img>` brutes dans CatalogueSalleTab et StepsList → `next/image`.
 
 ## Règles pour la suite (leçons de cette nuit)
