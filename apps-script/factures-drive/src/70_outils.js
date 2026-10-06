@@ -9,7 +9,8 @@
 /**
  * Indexe les fichiers déjà rangés (Envoi Pennylane, Rattrapage à valider, Bello Mio, Piccola Mia, _Hors Pennylane, À vérifier) dans
  * l'onglet « Index » du journal : empreinte MD5 (lue dans Drive), établissement, fournisseur (nom de la liste de référence),
- * numéro, date, montant tirés du nom normalisé, archive prévue (Envoi et transit), date d'arrivée dans Envoi (création du fichier).
+ * numéro, date, montant tirés du nom normalisé, archive prévue (Envoi et transit), date d'arrivée dans Envoi (celle de l'ancien
+ * Index, sinon le jour de l'indexation : jamais la date de création du fichier).
  * Les fichiers déjà dans l'Index ne sont pas relus. À lancer AVANT le premier rattrapage. Relancer jusqu'à « TERMINÉ ».
  */
 function indexerExistant() { return avecVerrou("indexerExistant", function() { return indexerDossiers(false); }); }
@@ -31,18 +32,28 @@ function indexerDossiers(reconstruire) {
   CONFIG.etablissements.forEach(function(etab) { parcourirDossier(dossierEnvoi(etab), CONFIG.dossiers.envoi + "/" + etab, lister); });
   var tetes = [CONFIG.dossiers.transit].concat(CONFIG.etablissements, [CONFIG.dossiers.horsPennylane, CONFIG.dossiers.aVerifier, CONFIG.dossiers.ancienAVerifier]);
   tetes.forEach(function(tete) { var it = racine.getFoldersByName(tete); if (it.hasNext()) parcourirDossier(it.next(), tete, lister); });
+  // Dates d'arrivée dans Envoi de l'ancien Index : reprises à l'identique (jamais la date de création du fichier) ; gardées dans
+  // une propriété le temps de la reconstruction (plusieurs lancements) ; un fichier d'Envoi sans date connue est daté d'aujourd'hui
+  var cleArrivees = "reindex.arrivees", arrivees = {}, aujourdHui = dateIso(new Date());
   try {
-    if (reconstruire && !props.getProperty(cleEnCours)) { indexVider(); props.setProperty(cleEnCours, "1"); Logger.log("Index vidé : reconstruction depuis le Drive (" + fichiers.length + " fichiers)"); }
+    if (reconstruire && !props.getProperty(cleEnCours)) {
+      var ancien = indexCharger();
+      for (var id in _journal.parId) if (_journal.parId[id].arriveEnvoi) arrivees[id] = _journal.parId[id].arriveEnvoi;
+      try { props.setProperty(cleArrivees, JSON.stringify(arrivees)); } catch (eProp) { Logger.log("Dates d'arrivée non mémorisées (" + eProp + ") : les fichiers d'Envoi seront datés d'aujourd'hui"); }
+      indexVider(); props.setProperty(cleEnCours, "1"); Logger.log("Index vidé : reconstruction depuis le Drive (" + fichiers.length + " fichiers, " + Object.keys(arrivees).length + " dates d'arrivée gardées)");
+    } else if (reconstruire) {
+      try { arrivees = JSON.parse(props.getProperty(cleArrivees) || "{}"); } catch (eJson) { arrivees = {}; }
+    }
     indexCharger();
     // 2) indexation (MD5 lu dans Drive), jusqu'à la limite de temps ; les fichiers déjà indexés ne sont pas relus
     for (var i = 0; i < fichiers.length; i++) { if (visiter(fichiers[i].f, fichiers[i].chemin) === false) break; }
     journalVider();
   } catch (e) {
     // échec en cours de reconstruction : la propriété est levée, le prochain lancement repart de zéro (vide puis reconstruit)
-    if (reconstruire) props.deleteProperty(cleEnCours);
+    if (reconstruire) { props.deleteProperty(cleEnCours); props.deleteProperty(cleArrivees); }
     throw e;
   }
-  if (!st.arret && reconstruire) props.deleteProperty(cleEnCours);
+  if (!st.arret && reconstruire) { props.deleteProperty(cleEnCours); props.deleteProperty(cleArrivees); }
   Logger.log("Fichiers vus : " + st.vus + ", ajoutés à l'index : " + st.ajoutes);
   Logger.log(st.arret ? "PAS FINI — relancer la fonction" : "TERMINÉ");
   return st;
@@ -60,8 +71,9 @@ function indexerDossiers(reconstruire) {
     var enAttente = morceaux[0] === CONFIG.dossiers.envoi || morceaux[0] === CONFIG.dossiers.transit;
     var annee = (n.date || dateIso(f.getDateCreated())).slice(0, 4);
     var archive = enAttente && etab && fournisseur ? [etab, fournisseur, annee].join("/") : "";
+    var dansEnvoi = morceaux[0] === CONFIG.dossiers.envoi;
     indexAjouter({ fichierId: f.getId(), md5: md5, etablissement: etab, fournisseur: fournisseur, numero: n.numero || null, date: n.date || dateIso(f.getDateCreated()),
-                   montant: n.montant || null, nom: f.getName(), chemin: chemin, archive: archive, arriveEnvoi: morceaux[0] === CONFIG.dossiers.envoi ? dateIso(f.getDateCreated()) : "" });
+                   montant: n.montant || null, nom: f.getName(), chemin: chemin, archive: archive, arriveEnvoi: dansEnvoi ? (arrivees[f.getId()] || aujourdHui) : "" });
     st.ajoutes++;
     if (st.ajoutes % 100 === 0) journalVider();
     return true;

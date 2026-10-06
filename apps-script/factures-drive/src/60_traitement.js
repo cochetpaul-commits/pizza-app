@@ -210,23 +210,39 @@ function traiterMessage(message, fil, opts, index, idxFournisseurs, stats, debut
 
 /**
  * Déplace vers l'archive <Établissement>/<Fournisseur>/<Année> les fichiers présents depuis plus de 3 jours dans « Envoi Pennylane »
- * (Pennylane les a importés ; le fichier garde son identifiant Drive). L'âge se compte depuis l'arrivée dans Envoi (Index), un fichier
- * déplacé à la main y reste donc 3 jours pleins. Le dossier d'archive vient de l'index, sinon du nom du fichier. Un fichier qui ne
- * peut pas être archivé est laissé en place et signalé (journal, mail hebdomadaire) ; une erreur sur un fichier n'arrête pas les autres.
+ * (le fichier garde son identifiant Drive). L'âge se compte depuis l'arrivée dans Envoi (Index), un fichier déplacé à la main y
+ * reste donc 3 jours pleins. Avant de déplacer, l'API Pennylane confirme que la facture est importée (45_pennylane.js) : sinon
+ * le fichier reste dans Envoi (journal « envoi_attente », description du fichier), et le mail du lundi le signale après 7 jours.
+ * Le dossier d'archive vient de l'index, sinon du nom du fichier. Un fichier qui ne peut pas être archivé est laissé en place
+ * et signalé (journal, mail hebdomadaire) ; une erreur sur un fichier n'arrête pas les autres.
  */
 function archiverEnvoisPennylane() {
   return avecVerrou("archiverEnvoisPennylane", function() {
-    var idxF = fournisseursIndex(), st = { archives: 0, bloques: 0, erreurs: 0 };
+    var idxF = fournisseursIndex(), st = { archives: 0, bloques: 0, nonImportes: 0, erreurs: 0 }, sansJeton = {};
     fichiersEnvoiAnciens(CONFIG.archiveApresJours).forEach(function(x) {
       var f = x.fichier;
       try {
-        var e = indexParId(f.getId()), chemin = null, raison = "";
+        var e = indexParId(f.getId()), chemin = null, raison = "", n = analyserNomFichier(f.getName());
         if (e && e.archive) chemin = e.archive.split("/");
         else {
-          var n = analyserNomFichier(f.getName());
           var fournisseur = n && n.fournisseur ? nomCanonique(idxF, n.fournisseur) : null;
           if (n && fournisseur) chemin = [x.etablissement, fournisseur, n.date.slice(0, 4)];
           else raison = n ? "fournisseur « " + n.fournisseur + " » absent de la liste de référence" : "nom de fichier non reconnu";
+        }
+        // Pennylane a-t-il importé la facture ? (même numéro, ou même fournisseur, date et montant) Sinon elle reste dans Envoi.
+        if (chemin) {
+          var infos = { numero: e && e.numero || (n && n.numero) || null, date: e && e.date || (n && n.date) || null, montant: e && e.montant || (n && n.montant) || null, nom: f.getName(),
+                        fournisseurId: pennylaneIdFournisseur(idxF, e && e.fournisseur || chemin[1], x.etablissement) };
+          var importe = pennylaneFactureExiste(x.etablissement, infos);
+          if (importe === null && !pennylaneJeton(x.etablissement)) {
+            if (!sansJeton[x.etablissement]) { sansJeton[x.etablissement] = true; journalAvertir("Pas de jeton Pennylane pour " + x.etablissement + " (propriété du script « pennylane.token." + x.etablissement + " ») : archivage sans vérification"); }
+          } else if (importe !== true) {
+            st.nonImportes++;
+            var motif = importe === false ? "pas encore importé par Pennylane" : "vérification Pennylane impossible";
+            f.setDescription(motif + " (vérifié le " + Utilities.formatDate(new Date(), "Europe/Paris", "dd/MM/yyyy") + ")");
+            journalAjouter({ piece: f.getName(), destination: "envoi_attente", chemin: x.chemin + "/" + f.getName(), lienFichier: f.getUrl(), raison: motif + " : laissé dans Envoi Pennylane" }, false);
+            chemin = null; raison = "";
+          }
         }
         if (chemin) {
           deplacerFichier(f, chemin);
@@ -243,7 +259,7 @@ function archiverEnvoisPennylane() {
       }
     });
     journalVider();
-    Logger.log("Archivés : " + st.archives + ", restés dans Envoi Pennylane faute de dossier d'archive : " + st.bloques + ", erreurs : " + st.erreurs);
+    Logger.log("Archivés : " + st.archives + ", restés dans Envoi Pennylane faute de dossier d'archive : " + st.bloques + ", pas encore importés par Pennylane : " + st.nonImportes + ", erreurs : " + st.erreurs);
     return st;
   });
 }

@@ -64,6 +64,7 @@ function creerEnvironnement() {
   };
   const pannes = { ocr: 0, ocrErreurs: 0, appelsOcr: 0, pauses: [] };
   const verrou = { pris: false, demandes: 0 };
+  const pennylane = { factures: [], panne: false, appels: [] };
   const Drive = { Files: {
     create: (meta, b) => {
       pannes.appelsOcr++;
@@ -166,6 +167,17 @@ function creerEnvironnement() {
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (k in props ? props[k] : null), setProperty: (k, v) => { props[k] = v; }, deleteProperty: (k) => { delete props[k]; }, getKeys: () => Object.keys(props) }) },
     MailApp: { sendEmail: (o) => mails.push(o) },
     LockService: { getScriptLock: () => ({ tryLock: () => { verrou.demandes++; if (verrou.pris) return false; verrou.pris = true; return true; }, releaseLock: () => { verrou.pris = false; } }) },
+    /** API Pennylane : env.pennylane.factures = [{ invoice_number, date, amount, filename, supplier: { id } }], env.pennylane.panne = true pour une erreur HTTP */
+    UrlFetchApp: { fetch: (url, options) => {
+      const u = new URL(url); const filtre = JSON.parse(u.searchParams.get("filter") || "[]");
+      pennylane.appels.push({ url, filtre, auth: options && options.headers && options.headers.Authorization });
+      if (pennylane.panne) return { getResponseCode: () => 500, getContentText: () => "{\"error\":\"panne\"}" };
+      const items = pennylane.factures.filter((f) => filtre.every((c) => {
+        const v = c.field === "supplier_id" ? String((f.supplier || {}).id) : String(f[c.field]);
+        return c.operator === "eq" ? v === String(c.value) : true;
+      }));
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ items, has_more: false }) };
+    } },
     ScriptApp: { getProjectTriggers: () => [], newTrigger: () => ({ timeBased: () => ({ everyHours: () => ({ create: () => {} }), everyDays: () => ({ atHour: () => ({ create: () => {} }) }), onWeekDay: () => ({ atHour: () => ({ create: () => {} }) }) }) }), WeekDay: { MONDAY: 1 } }
   };
   vm.createContext(ctx);
@@ -174,7 +186,7 @@ function creerEnvironnement() {
 
   // Aides pour les tests
   const aides = {
-    ctx, racine, fils, fil, mails, journalLog, props, pannes, verrou,
+    ctx, racine, fils, fil, mails, journalLog, props, pannes, verrou, pennylane,
     /** Date du contexte VM (pour simuler l'horloge : DateVm.now = ...) */
     DateVm: vm.runInContext("Date", ctx),
     fixture: (nom) => fs.readFileSync(path.join(__dirname, "fixtures", nom + ".txt"), "utf8"),

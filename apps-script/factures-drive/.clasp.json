@@ -9,6 +9,7 @@
     "src/25_fournisseurs_sheet.js",
     "src/30_gmail.js",
     "src/40_ocr.js",
+    "src/45_pennylane.js",
     "src/50_rangement.js",
     "src/60_traitement.js",
     "src/70_outils.js",

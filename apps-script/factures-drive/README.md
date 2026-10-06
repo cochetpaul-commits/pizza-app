@@ -44,6 +44,7 @@ src/
   25_fournisseurs_sheet.js  Google Sheet « Fournisseurs iFratelli » : lecture, lignes « à compléter », génération
   30_gmail.js             lecture Gmail par message, filtres d'expéditeur, pièces jointes
   40_ocr.js               OCR Google Drive (PDF, photos), XML, empreinte MD5
+  45_pennylane.js         API Pennylane v2 : la facture est-elle importée ? (avant archivage)
   50_rangement.js         dossiers Drive, écriture et déplacement des fichiers
   60_traitement.js        extraireFactures, rattrapage, archiverEnvoisPennylane, alerteHebdo, controlerPasses, installerDeclencheurs
   70_outils.js            indexerExistant, reindexerArchive, ocrDump, reorganiserArchive, renommerArchive, reparerTypesFichiers, deplacerJournauxDeCloture
@@ -171,6 +172,13 @@ Règles ajoutées en v4.6 (audit du 06/10 : archive comparée à Pennylane, Jour
 - **v4.6.1** : les onglets ne sont plus vidés par `deleteRows` sur toutes les lignes (Sheets le refuse sous un en-tête figé) mais
   par `viderOnglet` (contenu effacé, lignes au delà de la 2e supprimées, format texte de l'Index remis) ; `reindexerArchive` lit
   d'abord le Drive, ne vide l'Index qu'ensuite, et lève la propriété « reindex.encours » si l'indexation échoue.
+- **v4.6.2** : la date d'arrivée dans Envoi n'est JAMAIS la date de création du fichier (Masse FACN012603733, déposée à la main le
+  05/10, créée le 23/09, archivée le 06/10 avant import) : à la réindexation, la date de l'ancien Index est reprise, sinon le jour
+  de l'indexation ; une ligne sans date est datée du jour où elle est vue. Avant d'archiver, l'API Pennylane (45_pennylane.js,
+  jeton par société dans les propriétés du script `pennylane.token.Bello Mio` / `pennylane.token.Piccola Mia`) confirme que la
+  facture est importée (même numéro, ou même fournisseur, date et montant) ; sinon le fichier reste dans Envoi (journal
+  `envoi_attente`, description du fichier) et le mail du lundi le signale après 7 jours. Sans jeton : archivage comme avant,
+  avec un avertissement dans le journal.
 
 Le nom des fichiers garde le format historique : `AAAA-MM-JJ — Fournisseur — Facture n° XXX — 123.45 EUR.pdf`
 (avoirs en négatif, tickets sans numéro, relevés `Relevé n° XXX`).
@@ -195,6 +203,8 @@ Puis, dans l'éditeur Apps Script (`npm run open`), dans cet ordre :
 3. `indexerExistant` : indexe les fichiers déjà rangés (Envoi Pennylane, archives, _Hors Pennylane, À vérifier).
    Relancer jusqu'à « TERMINÉ ». **Obligatoire avant tout rattrapage.**
 4. Paul bascule la source Google Drive de chaque société Pennylane sur `Envoi Pennylane/<Établissement>`.
+5. Propriétés du script (Paramètres du projet > Propriétés du script) : `pennylane.token.Bello Mio` et `pennylane.token.Piccola Mia`
+   (jetons API Pennylane de chaque société), pour que l'archivage vérifie l'import.
 
 ## Rattrapages, dans l'ordre
 

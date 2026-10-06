@@ -13,7 +13,7 @@ function chargerContexte() {
     console,
     Logger: { log: (m) => journal.push(String(m)) },
     Utilities: bouchon, DriveApp: bouchon, GmailApp: bouchon, SpreadsheetApp: bouchon, DocumentApp: bouchon,
-    Drive: bouchon, MailApp: bouchon, PropertiesService: bouchon, ScriptApp: bouchon, Session: bouchon, LockService: bouchon,
+    Drive: bouchon, MailApp: bouchon, PropertiesService: bouchon, ScriptApp: bouchon, Session: bouchon, LockService: bouchon, UrlFetchApp: bouchon,
     _journalTest: journal
   };
   vm.createContext(ctx);

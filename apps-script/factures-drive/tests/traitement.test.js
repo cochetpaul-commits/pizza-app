@@ -764,3 +764,92 @@ describe("v4.6.1 : vidage d'un onglet à en-tête figé, reconstruction de l'Ind
     assert.ok(env.journalLog.some((l) => /TERMINÉ/.test(l)));
   });
 });
+
+describe("v4.6.2 : date d'arrivée dans Envoi jamais celle de la création, vérification Pennylane avant archivage", () => {
+  const ilYA = (jours) => new Date(Date.now() - jours * 86400000);
+  const iso = (d) => d.toISOString().slice(0, 10);
+
+  test("un fichier créé il y a 13 jours, trouvé dans Envoi par reindexerArchive, n'est pas archivé au passage suivant", () => {
+    const env = creerEnvironnement();
+    const masse = env.ctx.dossierEnvoi("Bello Mio").createFile("2026-09-23 — Masse — Facture n° FACN012603733 — 56.76 EUR.pdf", "%PDF", "application/pdf");
+    masse._cree = ilYA(13);
+    // un autre fichier d'Envoi, connu de l'ancien Index comme arrivé il y a 5 jours : sa date est reprise
+    const ancien = env.ctx.dossierEnvoi("Bello Mio").createFile("2026-08-31 — Cheville 35 — Facture n° 00113789 — 375.64 EUR.pdf", "x", "application/pdf");
+    ancien._cree = ilYA(40);
+    env.ctx.indexAjouter({ fichierId: ancien.getId(), md5: "y", etablissement: "Bello Mio", fournisseur: "Cheville 35", numero: "00113789", date: "2026-08-31", montant: "375.64", nom: ancien.getName(), chemin: "Envoi Pennylane/Bello Mio", archive: "Bello Mio/Cheville 35/2026", arriveEnvoi: iso(ilYA(5)) });
+    env.ctx.journalVider();
+    env.ctx.reindexerArchive();
+    const index = env.feuille("Index");
+    assert.equal(index.find((l) => l[0] === masse.getId())[11], iso(new Date()), "arrivée = jour de la réindexation, pas la création");
+    assert.equal(index.find((l) => l[0] === ancien.getId())[11], iso(ilYA(5)), "date d'arrivée de l'ancien Index reprise");
+    assert.ok(!env.props["reindex.arrivees"], "propriété de travail effacée");
+    const st = env.ctx.archiverEnvoisPennylane();
+    assert.equal(st.archives, 1, "seul le fichier arrivé il y a 5 jours part");
+    const arbre = env.arbre();
+    assert.ok(arbre.includes("/Envoi Pennylane/Bello Mio/" + masse.getName()), "Masse reste dans Envoi");
+    assert.ok(arbre.includes("/Bello Mio/Cheville 35/2026/" + ancien.getName()));
+    // une ligne d'Index sans date d'arrivée (avant v4.6) : datée d'aujourd'hui, pas de la création
+    const env2 = creerEnvironnement();
+    const f = env2.ctx.dossierEnvoi("Bello Mio").createFile("2026-08-31 — Cheville 35 — Facture n° 00113789 — 375.64 EUR.pdf", "x", "application/pdf");
+    f._cree = ilYA(20);
+    env2.ctx.indexAjouter({ fichierId: f.getId(), md5: "y", etablissement: "Bello Mio", fournisseur: "Cheville 35", numero: "00113789", date: "2026-08-31", montant: "375.64", nom: f.getName(), chemin: "Envoi Pennylane/Bello Mio", archive: "Bello Mio/Cheville 35/2026" });
+    env2.ctx.journalVider();
+    assert.equal(env2.ctx.archiverEnvoisPennylane().archives, 0);
+    assert.equal(env2.ctx.indexParId(f.getId()).arriveEnvoi, iso(new Date()));
+  });
+
+  test("avec un jeton Pennylane : archivé seulement si la facture est importée ; sinon laissé dans Envoi, journalisé, signalé après 7 jours", () => {
+    const env = creerEnvironnement();
+    env.props["pennylane.token.Bello Mio"] = "jeton-test";
+    const depose = (nom, jours) => { const f = env.ctx.dossierEnvoi("Bello Mio").createFile(nom, nom, "application/pdf"); const n = env.ctx.analyserNomFichier(nom);
+      env.ctx.indexAjouter({ fichierId: f.getId(), md5: nom, etablissement: "Bello Mio", fournisseur: n.fournisseur, numero: n.numero, date: n.date, montant: n.montant, nom, chemin: "Envoi Pennylane/Bello Mio", archive: "Bello Mio/" + n.fournisseur + "/2026", arriveEnvoi: iso(ilYA(jours)) }); return f; };
+    const parNumero = depose("2026-08-26 — BR Nuisibles — Facture n° FAC00054 — 294.80 EUR.pdf", 4);
+    const parMontant = depose("2026-10-02 — Leroy Merlin — Facture — 38.79 EUR.pdf", 4);
+    const absente = depose("2026-09-23 — Masse — Facture n° FACN012603733 — 56.76 EUR.pdf", 4);
+    const recente = depose("2026-10-02 — Maël Distribution — Facture n° FC0126 — -4.92 EUR.pdf", 1);
+    env.ctx.journalVider();
+    env.pennylane.factures = [
+      { invoice_number: "FAC00054", date: "2026-08-26", amount: "294.8", filename: "autre nom.pdf", supplier: { id: 154108174 } },
+      { invoice_number: null, date: "2026-10-02", amount: "38.79", filename: "ticket.pdf", supplier: { id: 1 } }
+    ];
+    const st = env.ctx.archiverEnvoisPennylane();
+    assert.equal(st.archives, 2);
+    assert.equal(st.nonImportes, 1);
+    const arbre = env.arbre();
+    assert.ok(arbre.includes("/Bello Mio/BR Nuisibles/2026/" + parNumero.getName()), "trouvée par son numéro");
+    assert.ok(arbre.includes("/Bello Mio/Leroy Merlin/2026/" + parMontant.getName()), "trouvée par date et montant");
+    assert.ok(arbre.includes("/Envoi Pennylane/Bello Mio/" + absente.getName()), "pas encore importée : reste");
+    assert.ok(arbre.includes("/Envoi Pennylane/Bello Mio/" + recente.getName()), "trop récente : pas même vérifiée");
+    assert.match(absente.getDescription(), /pas encore importé par Pennylane/);
+    assert.ok(env.feuille("Journal").some((l) => l[12] === "envoi_attente" && /pas encore importé/.test(l[14]) && /FACN012603733/.test(l[5])));
+    assert.ok(env.pennylane.appels.every((a) => a.auth === "Bearer jeton-test"));
+    assert.ok(env.pennylane.appels.some((a) => a.filtre.some((c) => c.field === "invoice_number" && c.value === "FAC00054")));
+    // API en panne : rien n'est archivé, la raison le dit
+    env.ctx.indexParId(absente.getId()).arriveEnvoi = iso(ilYA(8));
+    env.pennylane.panne = true;
+    const st2 = env.ctx.archiverEnvoisPennylane();
+    assert.equal(st2.archives, 0);
+    assert.equal(st2.nonImportes, 1);
+    assert.match(absente.getDescription(), /vérification Pennylane impossible/);
+    env.pennylane.panne = false;
+    // après 7 jours dans Envoi, le mail du lundi la signale avec sa description
+    env.ctx.alerteHebdo();
+    assert.equal(env.mails.length, 1);
+    assert.match(env.mails[0].body, /FACN012603733/);
+    assert.match(env.mails[0].body, /vérification Pennylane impossible|pas encore importé/);
+    // puis Pennylane l'importe : archivée au passage suivant
+    env.pennylane.factures.push({ invoice_number: "FACN012603733", date: "2026-09-23", amount: "56.76", filename: absente.getName(), supplier: { id: 2 } });
+    assert.equal(env.ctx.archiverEnvoisPennylane().archives, 1);
+    assert.ok(env.arbre().includes("/Bello Mio/Masse/2026/" + absente.getName()));
+  });
+
+  test("sans jeton Pennylane : archivage comme avant, avec un avertissement dans le journal", () => {
+    const env = creerEnvironnement();
+    const f = env.ctx.dossierEnvoi("Piccola Mia").createFile("2026-10-02 — Maël Distribution — Facture n° FC0140 — 906.39 EUR.pdf", "x", "application/pdf");
+    env.ctx.indexAjouter({ fichierId: f.getId(), md5: "m", etablissement: "Piccola Mia", fournisseur: "Maël Distribution", numero: "FC0140", date: "2026-10-02", montant: "906.39", nom: f.getName(), chemin: "Envoi Pennylane/Piccola Mia", archive: "Piccola Mia/Maël Distribution/2026", arriveEnvoi: iso(ilYA(4)) });
+    env.ctx.journalVider();
+    assert.equal(env.ctx.archiverEnvoisPennylane().archives, 1);
+    assert.equal(env.pennylane.appels.length, 0);
+    assert.ok(env.feuille("Journal").some((l) => l[12] === "avertissement" && /pennylane\.token\.Piccola Mia/.test(l[14])));
+  });
+});

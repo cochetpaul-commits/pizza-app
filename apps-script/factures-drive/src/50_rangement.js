@@ -80,10 +80,10 @@ function fichiersAnciens(dossier, chemin, jours) {
 
 /**
  * Fichiers de « Envoi Pennylane/<Établissement> » présents depuis plus de `jours` : [{ fichier, chemin, etablissement, depuis }].
- * L'âge se compte depuis l'ARRIVÉE dans Envoi (colonne « Dans Envoi depuis » de l'Index), pas depuis la création du fichier :
- * un fichier déplacé à la main depuis « À vérifier » ou le transit est daté du jour où il est vu ici pour la première fois
- * (et son chemin dans l'Index est mis à jour) ; un fichier inconnu de l'Index y est ajouté d'après son nom. Ils ne sont
- * donc jamais archivés avant que Pennylane ait eu le temps de les importer.
+ * L'âge se compte depuis l'ARRIVÉE dans Envoi (colonne « Dans Envoi depuis » de l'Index), jamais depuis la création du fichier :
+ * un fichier déplacé à la main depuis « À vérifier » ou le transit, ou sans date d'arrivée dans l'Index, est daté du jour où il
+ * est vu ici pour la première fois (et son chemin dans l'Index est mis à jour) ; un fichier inconnu de l'Index y est ajouté
+ * d'après son nom. Ils ne sont donc jamais archivés avant que Pennylane ait eu le temps de les importer.
  */
 function fichiersEnvoiAnciens(jours) {
   var out = [], limite = Date.now() - jours * 86400000, aujourdHui = dateIso(new Date()), idxF = null;
@@ -102,9 +102,11 @@ function fichiersEnvoiAnciens(jours) {
         continue;
       }
       if (e.chemin !== chemin) { indexMarquerEnvoi(f.getId(), chemin, e.archive, new Date()); continue; }   // déplacé à la main : arrivé aujourd'hui
-      if (e.arriveEnvoi) depuis = new Date(e.arriveEnvoi + "T12:00:00").getTime();
-      else depuis = f.getDateCreated().getTime();   // déposé par le script avant la v4.6 : créé directement dans Envoi
-      if (depuis < limite) out.push({ fichier: f, chemin: chemin, etablissement: etab, depuis: depuis });
+      // sans date d'arrivée connue (ligne d'avant la v4.6) : daté d'aujourd'hui, JAMAIS de la date de création du fichier
+      // (un PDF créé le 23/09 et déposé à la main le 05/10 passait pour « dans Envoi depuis 13 jours » : Masse FACN012603733)
+      if (!e.arriveEnvoi) { indexMarquerEnvoi(f.getId(), chemin, e.archive, new Date()); continue; }
+      depuis = new Date(e.arriveEnvoi + "T12:00:00").getTime();
+      if (depuis < limite) out.push({ fichier: f, chemin: chemin, etablissement: etab, depuis: depuis, entree: e });
     }
   });
   return out;
