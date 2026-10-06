@@ -444,7 +444,7 @@ function estCatalogueParObjet(subject, nomPiece) {
  */
 function extraireFournisseur(idx, from, subject, texte) {
   var r = resoudreFournisseur(idx, { from: from, subject: subject, texte: texte });
-  if (r && r.entree) return { nom: r.entree.nom, source: r.source, entree: r.entree };
+  if (r && r.entree) return { nom: r.entree.nom, source: r.source, entree: r.entree, perso: !!r.perso, ignorer: !!r.ignorer };
   // plateforme de facturation sans fournisseur lisible : pas de nom proposé (le domaine n'est pas le fournisseur)
   if (r && r.source === "plateforme") return { nom: null, source: "plateforme", propose: null };
   return { nom: null, source: "inconnu", propose: nomProposeDepuisDomaine(from) };
@@ -504,6 +504,8 @@ function analyserDocument(e) {
     fournisseur: f.nom,
     sourceFournisseur: f.source,
     fournisseurPropose: f.propose || null,
+    perso: !!f.perso,          // fournisseur « perso » de la liste : _Hors Pennylane/Perso, jamais Pennylane
+    ignorer: !!f.ignorer,      // fournisseur « pas besoin » de la liste : journal seul
     numero: texteLu ? (type === "releve" ? trouverNumeroReleve(texte) || trouverNumeroFacture(texte) : trouverNumeroFacture(texte)) : null,
     date: texteLu ? trouverDateFacture(texte, e.dateMail) : null,
     dateSecours: e.dateMail,
@@ -552,6 +554,7 @@ function anneeDe(a) { return String(a.date || a.dateSecours || "").slice(0, 4) |
  *     <Établissement>/<Fournisseur>/<Année> où le fichier sera déplacé après 3 jours ;
  *   - hors_pennylane : relevés et mandats, « _Hors Pennylane/<Établissement>/<Fournisseur>/<Année> » ;
  *   - journal : devis, bon de commande, attestation, rien n'est rangé ;
+ *   - perso : fournisseur « perso » de la liste, « _Hors Pennylane/Perso/<Fournisseur>/<Année> » ;
  *   - a_verifier : « À vérifier », à plat, la raison dans la description du fichier.
  * Règle d'or : seules les vraies factures, avoirs et tickets, avec établissement sûr, montant lu et fournisseur
  * de la liste de référence, partent vers Pennylane.
@@ -561,6 +564,13 @@ function decider(a) {
   if (["devis", "bon_commande", "bon_livraison", "attestation", "catalogue", "contrat", "notification", "courrier", "epreuve"].indexOf(a.type) !== -1) {
     return { destination: "journal", chemin: [], archive: [], raison: a.type + " : rien à ranger" };
   }
+  // Fournisseur « perso » de la liste (Alma, Birkenstock, Boulanger, Bhrbeton…) : rangé dans _Hors Pennylane/Perso/<Fournisseur>/<Année>,
+  // jamais dans Envoi Pennylane ni dans À vérifier ; « pas besoin » : journal seul
+  if (a.perso && a.fournisseur) {
+    var cheminPerso = [CONFIG.dossiers.horsPennylane, CONFIG.dossiers.perso, a.fournisseur, annee];
+    return { destination: "perso", chemin: cheminPerso, archive: cheminPerso, raison: "fournisseur perso (liste)" };
+  }
+  if (a.ignorer && a.fournisseur) return { destination: "journal", chemin: [], archive: [], raison: "fournisseur « pas besoin » (liste) : rien à ranger" };
   if ((a.type === "releve" || a.type === "mandat") && a.texteLu && a.fournisseur) {
     var etabHp = a.etablissement || "Etablissement inconnu";
     var cheminHp = [CONFIG.dossiers.horsPennylane, etabHp, a.fournisseur, annee];

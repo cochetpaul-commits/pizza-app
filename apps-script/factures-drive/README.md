@@ -17,6 +17,7 @@ Factures iFratelli/
   Bello Mio/<Fournisseur>/<Année>/      archive, plus lue par Pennylane
   Piccola Mia/<Fournisseur>/<Année>/    archive
   _Hors Pennylane/<Établissement>/<Fournisseur>/<Année>/   relevés et mandats (dossier existant, gardé tel quel)
+  _Hors Pennylane/Perso/<Fournisseur>/<Année>/   pièces des fournisseurs « perso » de la liste (jamais Pennylane)
   À vérifier/                 douteux, raison dans la description du fichier
   Rattrapage à valider/<Établissement>/   transit du rattrapage, non surveillé par Pennylane
   Journal factures            Google Sheet (journal, messages traités, index anti-doublon, simulation, réorganisation, types)
@@ -179,6 +180,11 @@ Règles ajoutées en v4.6 (audit du 06/10 : archive comparée à Pennylane, Jour
   facture est importée (même numéro, ou même fournisseur, date et montant) ; sinon le fichier reste dans Envoi (journal
   `envoi_attente`, description du fichier) et le mail du lundi le signale après 7 jours. Sans jeton : archivage comme avant,
   avec un avertissement dans le journal.
+- **v4.6.3** : fournisseurs « perso » de la liste (colonne Établissement = `perso`, Actif = non : Alma, Birkenstock, Boulanger,
+  Bhrbeton…) : leurs pièces sont rangées dans `_Hors Pennylane/Perso/<Fournisseur>/<Année>` avec une ligne de journal `perso`,
+  jamais dans Envoi Pennylane ni dans À vérifier (même illisibles), sans ligne « à compléter » ; `reorganiserArchive` y envoie
+  aussi leurs anciens dossiers d'archive. Colonne Établissement = `pas besoin` (3bsc) : journal seul. Les devis, catalogues et
+  autres pièces « journal seul » restent au journal quel que soit le fournisseur.
 
 Le nom des fichiers garde le format historique : `AAAA-MM-JJ — Fournisseur — Facture n° XXX — 123.45 EUR.pdf`
 (avoirs en négatif, tickets sans numéro, relevés `Relevé n° XXX`).

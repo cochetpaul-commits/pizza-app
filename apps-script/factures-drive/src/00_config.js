@@ -19,6 +19,7 @@ var CONFIG = {
     aVerifier: "À vérifier",
     ancienAVerifier: "_À vérifier",           // ancien nom (v4.0), lu par l'alerte et l'indexation s'il existe
     transit: "Rattrapage à valider",          // rattrapageReel n'écrit JAMAIS dans Envoi Pennylane : Claude (Cowork) compare à Pennylane puis déplace
+    perso: "Perso",                           // sous _Hors Pennylane : pièces des fournisseurs « perso » de la liste (Alma, Birkenstock, Boulanger…), jamais Pennylane
     fixtures: "_Fixtures OCR",                // PDF déposés à la main pour produire les textes de test (ocrDump)
     journauxCloture: "Journaux de clôture",   // sous Piccola Mia : journaux de caisse, pas des factures
     journauxCaisse: "Journaux de caisse iFratelli"   // dossier à part, hors « Factures iFratelli »
@@ -166,7 +167,7 @@ var CONFIG = {
     { nom: "Combo", variantes: ["Combohr", "Combo HR"], domaines: ["combohr.com", "combo.fr"], identifiants: [], etab: "Les deux" },
     { nom: "Anthropic", variantes: [], domaines: ["anthropic.com", "mail.anthropic.com"], identifiants: [], etab: "Bello" },
     { nom: "Zenchef", variantes: [], domaines: ["zenchef.com"], identifiants: [], etab: "Les deux" },
-    { nom: "Alma", variantes: ["Getalma"], domaines: ["getalma.eu"], identifiants: [], etab: "Les deux" },
+    { nom: "Alma", variantes: ["Getalma"], domaines: ["getalma.eu"], identifiants: [], etab: "perso", actif: "non", remarque: "tout Alma est perso (Paul, 06/10/2026)" },
     { nom: "Alan", variantes: ["Alan Insurance"], domaines: ["alan.eu", "alan.com"], identifiants: [], etab: "Les deux" },
     { nom: "Daniel Marquet", variantes: ["EFC Marquet", "EFCMarquet", "Efc-marquet", "Danielmarquet"], domaines: ["efc-marquet.fr", "efcmarquet.fr"], identifiants: [], etab: "Bello" },
     { nom: "Beezign", variantes: [], domaines: ["beezign.com", "beezign.fr"], identifiants: [], etab: "Piccola" },

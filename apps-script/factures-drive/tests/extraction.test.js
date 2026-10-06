@@ -435,3 +435,28 @@ describe("v4.6 C : lignes « à compléter », plateformes, identifiants de l'é
     assert.equal(ctx.extensionParMime("application/zip"), "");
   });
 });
+
+describe("v4.6.3 : fournisseur « perso » et « pas besoin » de la liste", () => {
+  test("Alma (perso dans la liste par défaut) : reconnu, destination perso, jamais Pennylane", () => {
+    const r = ctx.extraireFournisseur(idx, "no-reply@getalma.eu", "Votre facture", "");
+    assert.equal(r.nom, "Alma");
+    assert.equal(r.perso, true);
+    const a = ctx.analyserDocument({ idx, texte: "Alma Facture n° FR-1 Total HT 100,00 € TVA 20,00 € Total TTC 120,00 € Date : 02/10/2026", from: "no-reply@getalma.eu", subject: "Facture", nomPiece: "a.pdf", dateMail: "2026-10-02", extension: ".pdf" });
+    assert.equal(a.perso, true);
+    const d = ctx.decider(a);
+    assert.equal(d.destination, "perso");
+    assert.deepEqual(plain(d.chemin), ["_Hors Pennylane", "Perso", "Alma", "2026"]);
+    const illisible = ctx.analyserDocument({ idx, texte: "", from: "no-reply@getalma.eu", subject: "Facture", nomPiece: "a.pdf", dateMail: "2026-10-02", extension: ".pdf" });
+    assert.equal(ctx.decider(illisible).destination, "perso", "même illisible : Perso plutôt que À vérifier");
+    assert.deepEqual(plain(ctx.interpreterEtablissement("perso")), { etab: null, lesDeux: false, inactif: true, perso: true, ignorer: false, typeForce: null, inconnu: false, brut: "perso" });
+    assert.equal(ctx.interpreterEtablissement("pas besoin").ignorer, true);
+    assert.equal(ctx.ligneActive({ nom: "Alma", actif: "non", etab: "perso" }), false, "toujours inactif pour le reste (nom canonique, propositions)");
+  });
+  test("« pas besoin » : journal seul ; une ligne inactive sans étiquette reste inconnue", () => {
+    const i = ctx.indexerFournisseurs([{ nom: "3bsc", variantes: [], domaines: ["3bsc.fr"], identifiants: [], etab: "pas besoin", actif: "non" }, { nom: "Vieux", variantes: [], domaines: ["vieux.fr"], identifiants: [], etab: "", actif: "non" }]);
+    const a = ctx.analyserDocument({ idx: i, texte: "3BSC Facture n° 77 Total HT 50,00 TVA 10,00 Total TTC 60,00 SARL SASHA Date : 01/10/2026", from: "cave@3bsc.fr", subject: "Facture", nomPiece: "f.pdf", dateMail: "2026-10-02", extension: ".pdf" });
+    assert.equal(a.fournisseur, "3bsc");
+    assert.equal(ctx.decider(a).destination, "journal");
+    assert.equal(ctx.extraireFournisseur(i, "x@vieux.fr", "", "").nom, null);
+  });
+});

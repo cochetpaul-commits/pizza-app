@@ -408,7 +408,8 @@ describe("v4.5 : liste de fournisseurs nettoyée, renommage de l'archive, averti
     ["Self Stockage", "Wanadoo", "wanadoo.fr; selfstockage@wanadoo.fr", "FR53922735535", "Bello", "", "", "oui", ""],
     ["Hyg'Up", "", "hygup.fr", "FR16911617124", "Bello", "", "", "oui", ""],
     ["Hyg-up", "", "", "", "", "", "", "non", "fusionné avec Hyg'Up"],
-    ["Cmb", "", "cmb.fr", "", "perso", "", "", "oui", "banque perso de Pierre"],
+    ["Cmb", "", "cmb.fr", "", "", "", "", "non", "plateforme de facturation (ancienne ligne)"],
+    ["Alma", "Getalma", "getalma.eu", "", "perso", "", "", "non", "tout Alma est perso"],
     ["SDPF", "Progourmands", "sdpfcompta@hotmail.com", "", "Bello", "", "", "oui", ""],
     ["Up Coop", "", "up.coop", "", "bon de commande", "", "", "oui", ""],
     ["Metro", "Metro-gsc", "metro.fr", "", "je sais pas", "", "", "oui", ""],
@@ -440,7 +441,7 @@ describe("v4.5 : liste de fournisseurs nettoyée, renommage de l'archive, averti
     assert.equal(w.ancien, w.nouveau, "même dossier");
     assert.equal(plan.find((p) => p.nom.startsWith("2026-09-10 — Hyg-up")).nouveauNom, "2026-09-10 — Hyg'Up — Facture n° 127999 — 1155.24 EUR.pdf");
     const cmb = plan.find((p) => p.nom.startsWith("2026-09-05 — Cmb"));
-    assert.match(cmb.statut, /^ignoré \(fournisseur inactif\)/);
+    assert.match(cmb.statut, /^ignoré \(fournisseur inactif\)/, "ligne inactive sans « perso » : laissée en place");
     assert.ok(!plan.some((p) => p.nom.startsWith("2026-08-01 — Self Stockage")), "déjà au bon nom : pas de ligne");
     assert.ok(!plan.some((p) => p.nom.startsWith("2026-09-05 — Dossier mystère")), "dossier hors liste : laissé tel quel sans OCR");
     assert.ok(!plan.some((p) => /Relevé LCR/.test(p.nom)), "relevé déjà bien nommé et bien rangé");
@@ -851,5 +852,70 @@ describe("v4.6.2 : date d'arrivée dans Envoi jamais celle de la création, vér
     assert.equal(env.ctx.archiverEnvoisPennylane().archives, 1);
     assert.equal(env.pennylane.appels.length, 0);
     assert.ok(env.feuille("Journal").some((l) => l[12] === "avertissement" && /pennylane\.token\.Piccola Mia/.test(l[14])));
+  });
+});
+
+describe("v4.6.3 : fournisseurs « perso » rangés dans _Hors Pennylane/Perso, jamais dans Envoi ni À vérifier", () => {
+  const alma = "Alma\nFacture n° FR-2026-0912\nPaul Cochet\nTotal HT 100,00 €\nTVA 20,00 €\nTotal TTC 120,00 €\nDate : 02/10/2026";
+  test("passe réelle : pièce d'Alma rangée dans Perso, ligne de journal « perso », aucune proposition de fournisseur", () => {
+    const env = creerEnvironnement();
+    env.fil([{ date: "2026-10-02T09:00:00", from: "no-reply@getalma.eu", to: "contact@bellomio.fr", subject: "Votre facture Alma", pieces: [{ nom: "alma.pdf", contenu: alma }] }]);
+    env.fil([{ date: "2026-10-02T10:00:00", from: "no-reply@getalma.eu", to: "contact@bellomio.fr", subject: "Votre échéancier", pieces: [{ nom: "echeancier.pdf", contenu: "Alma Échéancier de paiement en 3 fois : 40,00 € le 02/10, 40,00 € le 02/11, 40,00 € le 02/12" }] }]);
+    const st = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "perso" });
+    assert.equal(st.perso, 2, "même l'illisible ou l'incertain d'un fournisseur perso va dans Perso, pas dans À vérifier");
+    assert.equal(st.envoi, 0);
+    assert.equal(st.a_verifier, 0);
+    const arbre = env.arbre();
+    assert.ok(arbre.includes("/_Hors Pennylane/Perso/Alma/2026/2026-10-02 — Alma — Facture n° FR-2026-0912 — 120.00 EUR.pdf"), arbre.join("\n"));
+    assert.ok(arbre.every((x) => x.startsWith("/_Hors Pennylane/Perso/Alma/2026/")));
+    const j = env.feuille("Journal");
+    assert.equal(j.filter((l) => l[12] === "perso").length, 2);
+    assert.ok(j.some((l) => l[12] === "perso" && l[8] === "Alma" && /fournisseur perso/.test(l[14])));
+    assert.equal(env.fournisseurs().length, 0, "pas de ligne « à compléter »");
+    assert.ok(env.feuille("Index").some((l) => l[3] === "Alma" && l[8] === "_Hors Pennylane/Perso/Alma/2026"));
+    // en rattrapage aussi (pas de transit : le transit ne concerne que Envoi Pennylane)
+    const env2 = creerEnvironnement();
+    env2.fil([{ date: "2026-10-02T09:00:00", from: "no-reply@getalma.eu", to: "contact@bellomio.fr", subject: "Votre facture Alma", pieces: [{ nom: "alma.pdf", contenu: alma }] }]);
+    const sim = env2.ctx.rattrapage("2026-07-01");
+    assert.equal(sim.perso, 1);
+    assert.ok(env2.feuille("Simulation").some((l) => l[12] === "perso" && /^_Hors Pennylane\/Perso\/Alma\/2026\//.test(l[13])));
+    env2.ctx.rattrapageReel("2026-07-01");
+    assert.ok(env2.arbre().includes("/_Hors Pennylane/Perso/Alma/2026/2026-10-02 — Alma — Facture n° FR-2026-0912 — 120.00 EUR.pdf"));
+    assert.ok(!env2.arbre().some((x) => /Rattrapage à valider|Envoi Pennylane/.test(x)));
+  });
+  test("« pas besoin » (3bsc) : journal seul ; un devis d'un fournisseur perso reste au journal", () => {
+    const env = creerEnvironnement();
+    const c = env.ctx.fournisseursClasseur(true); const fs = c.getSheetByName("Fournisseurs");
+    fs.appendRow(["3bsc", "", "3bsc.fr", "", "pas besoin", "", "", "non", "catalogues"]);
+    fs.appendRow(["Alma", "Getalma", "getalma.eu", "", "perso", "", "", "non", ""]);
+    env.fil([{ date: "2026-10-02T09:00:00", from: "cave@3bsc.fr", to: "contact@bellomio.fr", subject: "Facture", pieces: [{ nom: "f.pdf", contenu: "3BSC Facture n° 77 Total HT 50,00 TVA 10,00 Total TTC 60,00 SARL SASHA Date : 01/10/2026" }] }]);
+    env.fil([{ date: "2026-10-02T10:00:00", from: "no-reply@getalma.eu", to: "contact@bellomio.fr", subject: "Devis", pieces: [{ nom: "d.pdf", contenu: "Alma Devis n° 12 du 02/10/2026 Prestation de financement Total TTC 60,00 € Bon pour accord, validité du devis 30 jours" }] }]);
+    const st = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "pb" });
+    assert.equal(st.journal, 2);
+    assert.deepEqual(env.arbre(), []);
+    assert.ok(env.feuille("Journal").some((l) => l[8] === "3bsc" && l[12] === "journal" && /pas besoin/.test(l[14])));
+    assert.ok(env.feuille("Journal").some((l) => l[8] === "Alma" && l[6] === "devis" && l[12] === "journal"));
+  });
+  test("réorganisation : le dossier d'archive d'un fournisseur perso part dans _Hors Pennylane/Perso", () => {
+    const env = creerEnvironnement();
+    const c = env.ctx.fournisseursClasseur(true); const fs = c.getSheetByName("Fournisseurs");
+    fs.appendRow(["Alma", "Getalma", "getalma.eu", "", "perso", "", "", "non", ""]);
+    fs.appendRow(["Boulanger", "", "services.boulanger.com", "", "perso", "", "", "non", ""]);
+    const f = env.ctx.dossierDuChemin(["Bello Mio", "Getalma", "2026"]).createFile("2026-09-01 — Getalma — Facture n° 1 — 30.00 EUR.pdf", "x", "application/pdf");
+    env.ctx.dossierDuChemin(["Piccola Mia", "Boulanger", "2026"]).createFile("2026-08-30 — Boulanger — Facture n° 2 — 499.00 EUR.pdf", "y", "application/pdf");
+    const st = env.ctx.reorganiserArchive();
+    assert.equal(st.planifies, 2);
+    assert.equal(st.ignores, 0);
+    const plan = env.feuille("Réorganisation");
+    const a = plan.find((l) => l[3].startsWith("2026-09-01 — Getalma"));
+    assert.equal(a[2], "_Hors Pennylane/Perso/Alma/2026");
+    assert.match(a[4], /perso/);
+    assert.equal(a[7], "2026-09-01 — Alma — Facture n° 1 — 30.00 EUR.pdf");
+    assert.equal(plan.find((l) => l[3].startsWith("2026-08-30 — Boulanger"))[2], "_Hors Pennylane/Perso/Boulanger/2026");
+    env.ctx.reorganiserArchiveReel();
+    const arbre = env.arbre();
+    assert.ok(arbre.includes("/_Hors Pennylane/Perso/Alma/2026/2026-09-01 — Alma — Facture n° 1 — 30.00 EUR.pdf"), arbre.join("\n"));
+    assert.ok(arbre.includes("/_Hors Pennylane/Perso/Boulanger/2026/2026-08-30 — Boulanger — Facture n° 2 — 499.00 EUR.pdf"));
+    assert.equal(env.fichierParId(f.getId()).getName(), "2026-09-01 — Alma — Facture n° 1 — 30.00 EUR.pdf");
   });
 });

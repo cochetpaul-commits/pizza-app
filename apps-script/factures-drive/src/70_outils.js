@@ -244,7 +244,13 @@ function cibleReorganisation(f, morceaux, idxF, opts) {
   }
   if (!fourreTout) {
     var entree = entreeParNom(idxF, dossierFournisseur);
-    if (entree && !ligneActive(entree)) return { ignore: "fournisseur inactif", methode: "dossier " + dossierFournisseur + " (ligne « " + entree.nom + " » inactive)" };
+    if (entree && !ligneActive(entree)) {
+      // fournisseur « perso » de la liste : ses pièces partent dans _Hors Pennylane/Perso/<Fournisseur>/<Année> (jamais Pennylane)
+      if (interpreterEtablissement(entree.etab).perso) {
+        return { chemin: [CONFIG.dossiers.horsPennylane, CONFIG.dossiers.perso, entree.nom, annee], methode: "dossier " + dossierFournisseur + " (perso)", nouveauNom: nomAvecFournisseur(nom, entree.nom) };
+      }
+      return { ignore: "fournisseur inactif", methode: "dossier " + dossierFournisseur + " (ligne « " + entree.nom + " » inactive)" };
+    }
   }
   if (opts.renommageSeul) {
     // sans lecture du document, on ne sait pas mieux nommer : on laisse tel quel

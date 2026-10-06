@@ -27,12 +27,14 @@ function listeFournisseursParDefaut() {
  */
 function interpreterEtablissement(valeur) {
   var v = normaliser(valeur).replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
-  var r = { etab: null, lesDeux: false, inactif: false, typeForce: null, inconnu: false, brut: String(valeur || "") };
+  var r = { etab: null, lesDeux: false, inactif: false, perso: false, ignorer: false, typeForce: null, inconnu: false, brut: String(valeur || "") };
   if (!v) return r;
   if (/^(les deux|les 2|both|tous|tous les deux|deux)$/.test(v)) { r.lesDeux = true; return r; }
   if (/^(bello( mio)?|sasha|bm)$/.test(v) || /^bello mio\b/.test(v)) { r.etab = "Bello Mio"; return r; }
   if (/^(piccola( mia)?|fratelli|i fratelli|pm)$/.test(v) || /^piccola mia\b/.test(v)) { r.etab = "Piccola Mia"; return r; }
-  if (/^(perso|personnel|pas besoin|inutile|ignorer|non)$/.test(v)) { r.inactif = true; return r; }
+  // « perso » : les pièces vont dans _Hors Pennylane/Perso ; « pas besoin » : journal seul
+  if (/^(perso|personnel|personnelle|prive|privee)$/.test(v)) { r.inactif = true; r.perso = true; return r; }
+  if (/^(pas besoin|inutile|ignorer|non)$/.test(v)) { r.inactif = true; r.ignorer = true; return r; }
   if (/^(bon de commande|bons de commande|bdc|commande|commandes)$/.test(v)) { r.typeForce = "bon_commande"; return r; }
   r.inconnu = true;
   return r;
@@ -183,12 +185,22 @@ function chercherNomDans(idx, texte, minimum) {
  *  3) nom complet ou variante dans l'objet ou dans le nom affiché de l'expéditeur (6 caractères au moins ; 4 dans le nom affiché) ;
  *  4) plateforme : nom complet lu dans le document lui-même (3 000 premiers caractères, 5 caractères au moins : « Sysco ») ;
  *  5) pour un transfert interne (Pierre, Paul) : nom ou variante présent dans l'objet.
- * Les entrées inactives ou « à compléter » ne sont jamais retenues.
+ * Les entrées inactives ou « à compléter » ne sont jamais retenues, sauf les lignes « perso » et « pas besoin » (renvoyées avec
+ * perso: true / ignorer: true : _Hors Pennylane/Perso, ou journal seul).
  */
 function resoudreFournisseur(idx, e) {
   var actif = function(f) { return ligneActive(f); };
+  // ligne inactive « perso » (Alma, Birkenstock, Boulanger…) ou « pas besoin » : retenue avec son étiquette, la pièce ne va jamais vers Pennylane
+  var retenir = function(f, source) {
+    if (!f) return null;
+    if (actif(f)) return { entree: f, source: source };
+    var inter = interpreterEtablissement(f.etab);
+    if (inter.perso) return { entree: f, source: source, perso: true };
+    if (inter.ignorer) return { entree: f, source: source, ignorer: true };
+    return null;
+  };
   var ids = listerIdentifiants(e.texte);
-  for (var i = 0; i < ids.length; i++) { var fi = idx.parIdentifiant[ids[i]]; if (actif(fi)) return { entree: fi, source: "identifiant" }; }
+  for (var i = 0; i < ids.length; i++) { var ri = retenir(idx.parIdentifiant[ids[i]], "identifiant"); if (ri) return ri; }
   var from = String(e.from || "").toLowerCase();
   var adresse = (from.match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+/) || [""])[0];
   var domaine = domaineDe(from);
@@ -197,10 +209,11 @@ function resoudreFournisseur(idx, e) {
   if (!interne && !plateforme) {
     // adresse complète (obligatoire pour gmail, hotmail, wanadoo… : SDPF écrit depuis sdpfcompta@hotmail.com)
     var fa = adresse && (idx.parAdresse[adresse] || idx.parDomaine[adresse]);
-    if (actif(fa)) return { entree: fa, source: "adresse" };
+    var ra = retenir(fa, "adresse");
+    if (ra) return ra;
     if (!estDomaineGrandPublic(domaine)) {
       var cands = domainesCandidats(domaine);
-      for (var j = 0; j < cands.length; j++) { var fd = idx.parDomaine[cands[j]]; if (actif(fd) && !estDomaineGrandPublic(cands[j])) return { entree: fd, source: "domaine" }; }
+      for (var j = 0; j < cands.length; j++) { if (estDomaineGrandPublic(cands[j])) continue; var rd = retenir(idx.parDomaine[cands[j]], "domaine"); if (rd) return rd; }
     }
   }
   // nom complet dans l'objet (6 caractères au moins) ; dans le nom affiché de l'expéditeur (« Metro <noreply@…> ») dès 4 caractères,
