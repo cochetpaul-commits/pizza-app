@@ -616,21 +616,19 @@ function IngredientsPageInner() {
     await mutate();
   }
 
+  /**
+   * Unité de commande devinée depuis l'offre quand la fiche n'en a pas : toujours une unité de la liste
+   * (`UNITES_COMMANDE`), jamais un libellé libre. Avant : « colis 8 × 50L », que le libellé de colisage ne
+   * connaît pas → l'ouverture de la fiche plantait toute l'application (KIT CAPS Hyg'Up, 07/10/2026).
+   */
   const guessOrderUnit = useCallback((off: LatestOffer | undefined): string => {
     if (!off) return "";
     const kind = off.price_kind;
-    if (kind === "pack_composed" && off.pack_count && off.pack_each_qty && off.pack_each_unit) {
-      const u = off.pack_each_unit === "kg" ? "kg" : off.pack_each_unit === "l" ? "L" : "pcs";
-      return `colis ${off.pack_count} × ${off.pack_each_qty}${u}`;
-    }
-    if (kind === "pack_simple" && off.pack_total_qty && off.pack_unit) {
-      const u = off.pack_unit === "kg" ? "kg" : "L";
-      return `${off.pack_total_qty}${u}`;
-    }
+    if (kind === "pack_composed" || kind === "pack_simple") return "colis";
     if (kind === "unit") {
       if (off.unit === "kg") return "kg";
-      if (off.unit === "l") return "L";
-      if (off.unit === "pc") return "pièce";
+      if (off.unit === "l") return "litre";
+      if (off.unit === "pc") return "piece";
     }
     return "";
   }, []);

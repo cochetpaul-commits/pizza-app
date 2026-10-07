@@ -71,9 +71,16 @@ const LIBELLE: Record<UniteCommande, { un: string; plusieurs: string }> = {
   litre: { un: "litre", plusieurs: "litres" },
 };
 
-/** Nom d'une unité, au singulier ou au pluriel selon n */
+/** Vrai si la valeur est une unité de commande connue */
+export function estUniteCommande(u: unknown): u is UniteCommande {
+  return typeof u === "string" && Object.prototype.hasOwnProperty.call(LIBELLE, u);
+}
+
+/** Nom d'une unité, au singulier ou au pluriel selon n ; une unité inconnue (ancienne saisie libre) est rendue telle quelle */
 export function nomUnite(u: UniteCommande, n = 1): string {
-  return n > 1 ? LIBELLE[u].plusieurs : LIBELLE[u].un;
+  const l = LIBELLE[u];
+  if (!l) return String(u ?? "");
+  return n > 1 ? l.plusieurs : l.un;
 }
 
 const nombre = (n: number) => String(Math.round(n * 1000) / 1000).replace(".", ",");

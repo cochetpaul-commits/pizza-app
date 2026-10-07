@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { libelleColisage, libelleElement, prixUniteCommande, quantiteAffichee, type CommandeArticle } from "@/lib/commandeArticles";
+import { libelleColisage, libelleElement, prixUniteCommande, quantiteAffichee, type CommandeArticle, type UniteCommande, nomUnite, estUniteCommande } from "@/lib/commandeArticles";
 
 const art = (p: Partial<CommandeArticle>): CommandeArticle => ({
   unite_commande: "piece", contenu_nb: 1, element: null, element_qte: null, element_unite: null,
@@ -115,3 +115,14 @@ describe("libelleZone et validerConditionnement", () => {
     expect(r).toEqual({ ok: true, valeur: { unite_commande: "kg", contenu_nb: 1, element: null, element_qte: null, element_unite: null, commande_element_permise: false } });
   });
 });
+
+describe("unité inconnue (ancienne saisie libre) : jamais de plantage", () => {
+  it("nomUnite et libelleColisage rendent la valeur telle quelle", () => {
+    expect(nomUnite("colis 8 × 50L" as UniteCommande)).toBe("colis 8 × 50L");
+    expect(libelleColisage({ unite_commande: "colis 8 × 50L" as UniteCommande, contenu_nb: 1, element: null, element_qte: null, element_unite: null, commande_element_permise: false, precommande: false })).toBe("colis 8 × 50L");
+    expect(estUniteCommande("colis")).toBe(true);
+    expect(estUniteCommande("colis 8 × 50L")).toBe(false);
+    expect(estUniteCommande(null)).toBe(false);
+  });
+});
+

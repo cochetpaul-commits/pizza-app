@@ -18,7 +18,7 @@ import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { inChunks } from "@/lib/supabaseChunks";
 import { ZONES_EMBED, appliquerZonesEtab, type ZoneEtabRow } from "@/lib/zonesEtablissement";
 import { CommandeSimplifiee } from "@/components/commandes/CommandeSimplifiee";
-import { couleurTexte } from "@/lib/styleCategories";
+import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie } from "@/lib/styleCategories";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1924,27 +1924,13 @@ function CommandesPage() {
           <>
             {sortedCats.map((cat) => {
               const items = byCat[cat].sort((a, b) => a.name.localeCompare(b.name, "fr"));
-              const color = couleurTexte(CAT_COLORS[cat] ?? "#6B7280");
+              const couleurCat = CAT_COLORS[cat] ?? "#6B7280";
               return (
                 <div key={cat} style={{ marginBottom: 8 }}>
-                  <div
-                    onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = color; }}
-                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; e.currentTarget.style.borderLeftColor = color; }}
-                    style={{
-                      width: "100%", display: "flex", alignItems: "center", gap: 10,
-                      padding: "12px 16px", background: "#fff",
-                      border: "1.5px solid #ddd6c8", borderLeft: `3px solid ${color}`,
-                      borderRadius: 12, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                      marginTop: 16, marginBottom: 6,
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                      transition: "box-shadow 0.2s, border-color 0.2s",
-                    }}>
-                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
-                    <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color }}>
-                      {catLabel(cat)}
-                    </span>
-                    <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${color}18`, color }}>
-                      {items.length}
+                  {/* Barre de catégorie du récapitulatif : même trame que partout ailleurs */}
+                  <div style={{ ...styleBarreCategorie(couleurCat), cursor: "default", marginTop: 12, marginBottom: 6 }}>
+                    <span style={styleTitreCategorie(couleurCat)}>
+                      {catLabel(cat)} <span style={{ opacity: 0.75, fontWeight: 400 }}>({items.length})</span>
                     </span>
                   </div>
                   {items.map((item, i) => {
@@ -2036,37 +2022,17 @@ function CommandesPage() {
           const allItems = [...favoris, ...others];
           const selectedCount = allItems.filter((i) => Number(quantities[i.id] ?? 0) > 0).length;
           const isOpen = openCats[cat] ?? false;
-          const color = couleurTexte(CAT_COLORS[cat] ?? "#6B7280");
+          const couleur = CAT_COLORS[cat] ?? "#6B7280";
 
           return (
-            <div key={cat} style={{ marginTop: 16, marginBottom: 6 }}>
-              <button type="button"
-                onClick={() => setOpenCats((prev) => ({ ...prev, [cat]: !isOpen }))}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = color; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; e.currentTarget.style.borderLeftColor = color; }}
-                style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: 10,
-                  padding: "12px 16px", background: "#fff",
-                  border: "1.5px solid #ddd6c8", borderLeft: `3px solid ${color}`,
-                  borderRadius: isOpen ? "12px 12px 0 0" : 12,
-                  cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                  marginBottom: 0,
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                  transition: "box-shadow 0.2s, border-color 0.2s",
-                }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
-                <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color }}>
-                  {catLabel(cat)}
+            <div key={cat} style={{ marginTop: 10, marginBottom: 6 }}>
+              {/* Barre de catégorie : même trame que le menu produits, l'inventaire et la commande simplifiée (src/lib/styleCategories.ts) */}
+              <button type="button" onClick={() => setOpenCats((prev) => ({ ...prev, [cat]: !isOpen }))} aria-expanded={isOpen} style={styleBarreCategorie(couleur)}>
+                <span style={styleTitreCategorie(couleur)}>
+                  {catLabel(cat)} <span style={{ opacity: 0.75, fontWeight: 400 }}>({allItems.length})</span>
                 </span>
-                <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${color}18`, color }}>
-                  {allItems.length}
-                </span>
-                {selectedCount > 0 && (
-                  <span style={{ background: color, color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, minWidth: 20, textAlign: "center" }}>
-                    {selectedCount}
-                  </span>
-                )}
-                <span style={{ fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}>{"▼"}</span>
+                {selectedCount > 0 && <span style={stylePastilleBarre(couleur)}>{selectedCount}</span>}
+                <span style={styleChevronBarre(couleur, isOpen)}>▼</span>
               </button>
 
               <div style={{
@@ -2074,13 +2040,6 @@ function CommandesPage() {
                 // les grosses catégories (cave à vin Vinoflo) étaient coupées.
                 maxHeight: isOpen ? Math.max(5000, allItems.length * 900 + 600) : 0, overflow: "hidden",
                 transition: "max-height 0.3s ease",
-                ...(isOpen ? {
-                  borderLeft: `3px solid ${color}`,
-                  borderRight: "1.5px solid #ddd6c8",
-                  borderBottom: "1.5px solid #ddd6c8",
-                  borderRadius: "0 0 12px 12px",
-                } : {}),
-                background: "#fff",
               }}>
                 {favoris.length > 0 && (
                   <>
@@ -2114,8 +2073,8 @@ function CommandesPage() {
                     <div style={{ padding: "6px 10px 10px" }}>
                       {subGroups.map((sg, gi) => (
                         <div key={sg.sub}>
-                          <div style={{ padding: gi > 0 ? "10px 4px 4px" : "2px 4px 4px", fontSize: 10, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.06em", borderTop: gi > 0 ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
-                            {sg.sub}
+                          <div style={{ ...styleSousCategorie(couleur, true), cursor: "default", marginTop: gi > 0 ? 10 : 2 }}>
+                            <span>{sg.sub} <span style={{ fontWeight: 500, opacity: 0.8 }}>({sg.items.length})</span></span>
                           </div>
                           <div className="commandes-grid" style={{ display: "grid", gap: 10 }}>
                             {sg.items.map((item) => renderProductCard(item, false))}

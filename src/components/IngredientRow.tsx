@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { TYPES_COLISAGE, libelleType, libelleColisage, libelleElement, type UniteCommande, type ElementCommande } from "@/lib/commandeArticles";
+import { TYPES_COLISAGE, libelleType, libelleColisage, libelleElement, type UniteCommande, type ElementCommande, estUniteCommande } from "@/lib/commandeArticles";
 
 import type { CSSProperties } from "react";
 import {
@@ -702,7 +702,8 @@ export const IngredientRow = React.memo(function IngredientRow({
             const elementEffectif = plusieurs ? (edit.orderElement || (typePiece && typePiece !== "piece" ? typePiece : "piece")) : null;
             const tailleQ = edit.baseUnit === "piece" ? parseFloat(edit.pieceContentQty.replace(",", ".")) : NaN;
             const tailleU = edit.pieceContentUnit;
-            const apercu = uc ? libelleColisage({
+            // Unité libre (ancienne saisie « colis 8 × 50L ») : affichée telle quelle, le libellé calculé exige une unité de la liste
+            const apercu = uc && !estUniteCommande(uc === "pièce" ? "piece" : uc) ? uc : uc ? libelleColisage({
               unite_commande: (uc === "pièce" ? "piece" : uc) as UniteCommande,
               contenu_nb: plusieurs ? contenu : 1,
               element: elementEffectif as ElementCommande | null,
