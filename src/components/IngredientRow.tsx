@@ -933,5 +933,14 @@ export const IngredientRow = React.memo(function IngredientRow({
 
   if (prev.supplierName !== next.supplierName) return false;
   if (prev.onCreateDerived !== next.onCreateDerived) return false;
+  // Sélection (case à cocher) : sans cette ligne, la case restait décochée à l'écran alors que la barre
+  // du bas comptait « 2 sélectionnés » (vécu 07/10/2026)
+  if ((prev.selected ?? false) !== (next.selected ?? false)) return false;
+  if (!!prev.onToggleSelect !== !!next.onToggleSelect) return false;
+  // Établissements (BM / PM), sous-catégorie, zone, doublon : mis à jour sans quitter la liste
+  if (prev.item.establishments !== next.item.establishments) return false;
+  if (prev.item.sub_category !== next.item.sub_category) return false;
+  if (prev.item.storage_zone !== next.item.storage_zone) return false;
+  if (prev.duplicateMatch !== next.duplicateMatch) return false;
   return true;
 });
