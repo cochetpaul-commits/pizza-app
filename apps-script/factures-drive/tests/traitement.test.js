@@ -919,3 +919,22 @@ describe("v4.6.3 : fournisseurs « perso » rangés dans _Hors Pennylane/Perso, 
     assert.equal(env.fichierParId(f.getId()).getName(), "2026-09-01 — Alma — Facture n° 1 — 30.00 EUR.pdf");
   });
 });
+
+describe("v4.6.4 : une facture interne SASHA <-> FRATELLI va dans _Hors Pennylane/Factures internes, jamais dans Envoi", () => {
+  const texte = "FRATELLI : Invoice\nÉmetteur ou Émettrice\nSARL I FRATELLI 12 rue Ville Pépin 35400 Saint-Malo SIREN 909382640\nClient ou Cliente\nSARL SASHA 3 place du Poncel 35400 Saint-Malo SIREN 913217386\nFacture n° F-2026-0107 Date d'émission : 30/09/2026\nTotal HT 500,00 € TVA 100,00 € Total TTC 600,00 €";
+  test("passe réelle, puis réorganisation qui la laisse en place", () => {
+    const env = creerEnvironnement();
+    env.fil([{ date: "2026-09-30T09:00:00", from: "no-reply@notifications.pennylane.com", to: "facture@bellomio.fr", subject: "FRATELLI : Invoice F-2026-0107", pieces: [{ nom: "F-2026-0107.pdf", contenu: texte }] }]);
+    const st = env.ctx.traiterMessages({ depuis: DEPUIS, simulation: false, cleReprise: "int" });
+    assert.equal(st.interne, 1);
+    assert.equal(st.envoi, 0);
+    assert.equal(st.a_verifier, 0);
+    const arbre = env.arbre();
+    assert.ok(arbre.includes("/_Hors Pennylane/Factures internes/2026-09-30 — Interne Piccola vers Bello — Facture n° F-2026-0107 — 600.00 EUR.pdf"), arbre.join("\n"));
+    assert.ok(env.feuille("Journal").some((l) => l[12] === "interne" && l[8] === "Interne Piccola vers Bello" && l[7] === "Bello Mio"));
+    assert.equal(env.fournisseurs().length, 0, "pas de ligne « à compléter »");
+    const plan = env.ctx.reorganiserArchive();
+    assert.equal(plan.planifies, 0, "le dossier Factures internes n'est pas touché");
+    assert.deepEqual(env.arbre(), arbre);
+  });
+});

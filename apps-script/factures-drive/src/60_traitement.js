@@ -84,7 +84,7 @@ function traiterMessages(opts) {
   // En simulation on travaille sur une copie de l'index : les pièces « rangées » virtuellement ne doivent pas rester en mémoire
   var index = opts.simulation ? Object.assign({}, indexCharger()) : indexCharger();
   var idxFournisseurs = fournisseursIndex();
-  var stats = { messages: 0, deja: 0, ignores: 0, pieces: 0, ecartees: 0, envoi: 0, transit: 0, hors_pennylane: 0, perso: 0, a_verifier: 0, journal: 0, doublons: 0, corps: 0, inconnus: 0, quota: 0, termine: false };
+  var stats = { messages: 0, deja: 0, ignores: 0, pieces: 0, ecartees: 0, envoi: 0, transit: 0, hors_pennylane: 0, perso: 0, interne: 0, a_verifier: 0, journal: 0, doublons: 0, corps: 0, inconnus: 0, quota: 0, termine: false };
 
   var st = parcourirMessages(requeteGmail(opts.depuis), function(message, fil) {
     if (Date.now() - debut > CONFIG.limiteMs) return false;
@@ -122,7 +122,7 @@ function traiterMessages(opts) {
   journalVider();
   fournisseursVider();
   var resume = (opts.simulation ? "[SIMULATION] " : "") + "messages examinés : " + stats.messages + " (déjà traités : " + stats.deja + ", ignorés : " + stats.ignores + ") — pièces : " + stats.pieces
-    + " (écartées : " + stats.ecartees + ") — vers Pennylane : " + stats.envoi + (opts.transit ? ", en transit (Rattrapage à valider) : " + stats.transit : "") + ", hors Pennylane : " + stats.hors_pennylane + ", perso : " + stats.perso + ", à vérifier : " + stats.a_verifier + " (dont fournisseurs inconnus : " + stats.inconnus + "), journal seul : " + stats.journal
+    + " (écartées : " + stats.ecartees + ") — vers Pennylane : " + stats.envoi + (opts.transit ? ", en transit (Rattrapage à valider) : " + stats.transit : "") + ", hors Pennylane : " + stats.hors_pennylane + ", perso : " + stats.perso + ", factures internes : " + stats.interne + ", à vérifier : " + stats.a_verifier + " (dont fournisseurs inconnus : " + stats.inconnus + "), journal seul : " + stats.journal
     + ", doublons : " + stats.doublons + ", factures dans le corps du mail : " + stats.corps;
   if (st.arret) { props.setProperty(cle, String(st.position)); Logger.log(resume); Logger.log((stats.quota ? "ARRÊT SUR QUOTA OCR — " : "PAS FINI — ") + "relancer la même fonction (reprise au fil n° " + st.position + ")"); }
   else { props.deleteProperty(cle); stats.termine = true; Logger.log(resume); Logger.log("TERMINÉ"); }
@@ -194,7 +194,7 @@ function traiterMessage(message, fil, opts, index, idxFournisseurs, stats, debut
                     archive: d.archive.join("/"), type: a.type };
       if (opts.simulation) {
         indexInserer(index, infos);   // pour repérer les doublons à l'intérieur même de la simulation
-        ligne.chemin = d.chemin.join("/") + "/" + a.nom + (d.archive.length && d.destination !== "hors_pennylane" && d.destination !== "perso" ? "  -> archive " + d.archive.join("/") : "");
+        ligne.chemin = d.chemin.join("/") + "/" + a.nom + (d.archive.length && d.destination !== "hors_pennylane" && d.destination !== "perso" && d.destination !== "interne" ? "  -> archive " + d.archive.join("/") : "");
       } else {
         var description = d.destination === "a_verifier" ? "À vérifier : " + d.raison + " — mail : " + base.lienMail : "";
         var fichier = rangerPiece(p, a.nom, d.chemin, description, infos);

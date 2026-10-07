@@ -18,6 +18,7 @@ Factures iFratelli/
   Piccola Mia/<Fournisseur>/<Année>/    archive
   _Hors Pennylane/<Établissement>/<Fournisseur>/<Année>/   relevés et mandats (dossier existant, gardé tel quel)
   _Hors Pennylane/Perso/<Fournisseur>/<Année>/   pièces des fournisseurs « perso » de la liste (jamais Pennylane)
+  _Hors Pennylane/Factures internes/        factures SASHA <-> FRATELLI du module Pennylane (déjà dans Pennylane des deux côtés)
   À vérifier/                 douteux, raison dans la description du fichier
   Rattrapage à valider/<Établissement>/   transit du rattrapage, non surveillé par Pennylane
   Journal factures            Google Sheet (journal, messages traités, index anti-doublon, simulation, réorganisation, types)
@@ -185,6 +186,11 @@ Règles ajoutées en v4.6 (audit du 06/10 : archive comparée à Pennylane, Jour
   jamais dans Envoi Pennylane ni dans À vérifier (même illisibles), sans ligne « à compléter » ; `reorganiserArchive` y envoie
   aussi leurs anciens dossiers d'archive. Colonne Établissement = `pas besoin` (3bsc) : journal seul. Les devis, catalogues et
   autres pièces « journal seul » restent au journal quel que soit le fournisseur.
+- **v4.6.4** (Cowork, 07/10) : factures internes entre SASHA et FRATELLI (émises avec le module de facturation Pennylane,
+  « Émetteur ou Émettrice » / « Client ou Cliente », les deux SIREN sur le document) : fournisseur « Interne Bello vers
+  Piccola » (ou l'inverse), établissement = la société facturée, rangées dans `_Hors Pennylane/Factures internes` (journal
+  `interne`), jamais dans Envoi Pennylane (Pennylane les a déjà des deux côtés) ; montant lu en lecture collée (le plus
+  grand triplet HT + TVA = TTC) ; `reorganiserArchive` laisse ce dossier en place. Sens illisible : circuit normal.
 
 Le nom des fichiers garde le format historique : `AAAA-MM-JJ — Fournisseur — Facture n° XXX — 123.45 EUR.pdf`
 (avoirs en négatif, tickets sans numéro, relevés `Relevé n° XXX`).

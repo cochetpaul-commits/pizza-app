@@ -460,3 +460,28 @@ describe("v4.6.3 : fournisseur « perso » et « pas besoin » de la liste", () 
     assert.equal(ctx.extraireFournisseur(i, "x@vieux.fr", "", "").nom, null);
   });
 });
+
+describe("v4.6.4 : factures internes SASHA <-> FRATELLI (module de facturation Pennylane)", () => {
+  const texte = "SASHA : Invoice\nÉmetteur ou Émettrice\nSARL SASHA 3 place du Poncel 35400 Saint-Malo SIREN 913217386 TVA FR78913217386\nClient ou Cliente\nSARL I FRATELLI 12 rue Ville Pépin 35400 Saint-Malo SIREN 909382640\nFacture n° F-2026-0042 Date d'émission : 30/09/2026\nPrestations traiteur septembre\nTotal HT 1 329,04 € TVA 78,36 € Total TTC 1 407,40 €";
+  test("sens de la facture, fournisseur « Interne X vers Y », établissement = société facturée, montant en lecture collée", () => {
+    assert.deepEqual(plain(ctx.detecterFactureInterne(texte)), { emetteur: "Bello Mio", client: "Piccola Mia" });
+    const a = ctx.analyserDocument({ idx, texte, from: "no-reply@notifications.pennylane.com", subject: "SASHA : Invoice F-2026-0042", nomPiece: "F-2026-0042.pdf", dateMail: "2026-09-30", extension: ".pdf" });
+    assert.equal(a.fournisseur, "Interne Bello vers Piccola");
+    assert.equal(a.sourceFournisseur, "interne");
+    assert.equal(a.etablissement, "Piccola Mia");
+    assert.equal(a.montant, "1407.40", "1 329,04 + 78,36 = 1 407,40 (et non 329,04 + 78,36 = 407,40)");
+    assert.deepEqual(plain(a.raisons), []);
+    const d = ctx.decider(a);
+    assert.equal(d.destination, "interne");
+    assert.deepEqual(plain(d.chemin), ["_Hors Pennylane", "Factures internes"]);
+    assert.equal(a.nom, "2026-09-30 — Interne Bello vers Piccola — Facture n° F-2026-0042 — 1407.40 EUR.pdf");
+  });
+  test("sens inversé, et doute : circuit normal", () => {
+    const inverse = texte.replace("SASHA : Invoice", "FRATELLI : Invoice").replace(/Émetteur ou Émettrice\n(.*)\nClient ou Cliente\n(.*)\n/, "Émetteur ou Émettrice\n$2\nClient ou Cliente\n$1\n");
+    assert.deepEqual(plain(ctx.detecterFactureInterne(inverse)), { emetteur: "Piccola Mia", client: "Bello Mio" });
+    assert.equal(ctx.detecterFactureInterne("SARL SASHA SIREN 913217386 Facture n° 1 Total TTC 10,00"), null, "un seul SIREN : pas une facture interne");
+    assert.equal(ctx.detecterFactureInterne("SIREN 913217386 et SIREN 909382640 cités sans émetteur ni client"), null, "sens illisible : null");
+    const normale = ctx.analyserDocument({ idx, texte: "SARL SASHA SIREN 913217386 Facture n° 1 Total HT 10,00 TVA 2,00 Total TTC 12,00", from: "x@carniato.com", subject: "F", nomPiece: "f.pdf", dateMail: "2026-09-30", extension: ".pdf" });
+    assert.equal(normale.interne, undefined);
+  });
+});

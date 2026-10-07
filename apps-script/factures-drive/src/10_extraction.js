@@ -465,6 +465,47 @@ function construireNom(a, extension) {
   return morceaux.join(" — ") + extension;
 }
 
+// ---------------------------------------------------------------- Factures internes (v4.6.4)
+
+/**
+ * Facture interne entre les deux sociétés (émise avec le module de facturation Pennylane, titre « Invoicing ») :
+ * les SIREN de SASHA et de FRATELLI sont tous deux sur le document, et les blocs « Émetteur ou Émettrice » / « Client ou Cliente »
+ * disent qui facture qui. Pennylane les enregistre déjà des deux côtés : jamais dans Envoi Pennylane (doublon assuré).
+ * Retourne { emetteur, client } (noms d'établissement) ou null. Au moindre doute (sens illisible) : null, la pièce suit le
+ * circuit normal (À vérifier).
+ */
+function detecterFactureInterne(texte) {
+  if (!texte) return null;
+  var t = normaliser(texte);
+  var compact = t.replace(/[^0-9a-z]/g, "");
+  var presents = CONFIG.etablissements.filter(function(etab) { return compact.indexOf(CONFIG.marqueurs[etab].siren) !== -1; });
+  if (presents.length !== CONFIG.etablissements.length) return null;
+  var premierCite = function(fen) {
+    CONFIG.marqueurs.ignorer.forEach(function(x) { fen = fen.split(x).join(" "); });
+    var meilleur = null, pos = Infinity;
+    CONFIG.etablissements.forEach(function(etab) {
+      var m = CONFIG.marqueurs[etab];
+      m.mots.concat([m.siren]).forEach(function(mot) { var i = fen.indexOf(mot); if (i !== -1 && i < pos) { pos = i; meilleur = etab; } });
+    });
+    return meilleur;
+  };
+  var bloc = function(re) { var m = re.exec(t); return m ? premierCite(t.slice(m.index + m[0].length, m.index + m[0].length + 250)) : null; };
+  var emetteur = bloc(/\bem\w{0,7}\s+ou\s+em\w{0,9}/);       // « Émetteur ou Émettrice » (l'OCR perd parfois les « tt »)
+  var client = bloc(/\bclient\s+ou\s+cliente\b/);
+  if (!emetteur) { var h = /^\s*(sasha|bello mio|fratelli|piccola mia)\s*:\s*invoice\b/.exec(t); if (h) emetteur = premierCite(h[1]); }
+  var autre = function(etab) { return CONFIG.etablissements.filter(function(x) { return x !== etab; })[0]; };
+  if (emetteur && !client) client = autre(emetteur);
+  if (client && !emetteur) emetteur = autre(client);
+  if (!emetteur || !client || emetteur === client) return null;
+  return { emetteur: emetteur, client: client };
+}
+
+/** « Interne Piccola vers Bello » : nom de fournisseur des factures internes (fichier, journal, index) */
+function libelleInterne(i) {
+  var court = function(etab) { return String(etab).split(" ")[0]; };
+  return "Interne " + court(i.emetteur) + " vers " + court(i.client);
+}
+
 // ---------------------------------------------------------------- Analyse complète
 
 /**
@@ -532,6 +573,25 @@ function analyserDocument(e) {
   if (a.date && e.dateMail && (type === "facture" || type === "avoir" || type === "ticket") && joursEntre(a.date, e.dateMail) > CONFIG.ancienneFactureJours) {
     a.raisons.push("ancienne facture (" + a.date + ")");
   }
+  // Facture interne SASHA <-> FRATELLI (v4.6.4) : fournisseur « Interne X vers Y », établissement = la société facturée ;
+  // les raisons « établissement contradictoire » et « plateforme, fournisseur non lu » ne s'appliquent pas
+  var interne = texteLu && (type === "facture" || type === "avoir") ? detecterFactureInterne(texte) : null;
+  if (interne) {
+    a.interne = interne;
+    a.fournisseur = libelleInterne(interne);
+    a.sourceFournisseur = "interne";
+    a.fournisseurPropose = null;
+    a.etablissement = interne.client;
+    a.sourceEtablissement = "document";
+    a.etablissementContradictoire = false;
+    a.raisons = a.raisons.filter(function(r) { return !/^(établissement|plateforme|fournisseur inconnu)/.test(r); });
+    // Montant : sur ces factures Pennylane, « 1 329,04 € 78,36 € 1 407,40 € » se lit aussi 329,04 + 78,36 = 407,40 (lecture décollée).
+    // Le plus grand triplet HT + TVA = TTC en lecture collée l'emporte.
+    var collees = listerMontants(normaliserMontants(texte)).filter(function(m) { return !m.decolle && m.c > 0; }), totalInterne = 0;
+    collees.forEach(function(z) { collees.forEach(function(x) { collees.forEach(function(y) { if (x !== y && tripletCoherent(x.c, y.c, z.c) && z.c > totalInterne) totalInterne = z.c; }); }); });
+    if (totalInterne) a.montant = (a.montant && parseFloat(a.montant) < 0 ? "-" : "") + (totalInterne / 100).toFixed(2);
+    else if (!a.montant) a.raisons.push("montant introuvable");
+  }
   a.nom = construireNom(a, e.extension || ".pdf");
   return a;
 }
@@ -555,6 +615,7 @@ function anneeDe(a) { return String(a.date || a.dateSecours || "").slice(0, 4) |
  *   - hors_pennylane : relevés et mandats, « _Hors Pennylane/<Établissement>/<Fournisseur>/<Année> » ;
  *   - journal : devis, bon de commande, attestation, rien n'est rangé ;
  *   - perso : fournisseur « perso » de la liste, « _Hors Pennylane/Perso/<Fournisseur>/<Année> » ;
+ *   - interne : facture entre SASHA et FRATELLI (v4.6.4), « _Hors Pennylane/Factures internes », jamais Pennylane ;
  *   - a_verifier : « À vérifier », à plat, la raison dans la description du fichier.
  * Règle d'or : seules les vraies factures, avoirs et tickets, avec établissement sûr, montant lu et fournisseur
  * de la liste de référence, partent vers Pennylane.
@@ -563,6 +624,11 @@ function decider(a) {
   var annee = anneeDe(a);
   if (["devis", "bon_commande", "bon_livraison", "attestation", "catalogue", "contrat", "notification", "courrier", "epreuve"].indexOf(a.type) !== -1) {
     return { destination: "journal", chemin: [], archive: [], raison: a.type + " : rien à ranger" };
+  }
+  // Facture interne SASHA <-> FRATELLI (v4.6.4) : déjà dans Pennylane des deux côtés, rangée dans _Hors Pennylane/Factures internes
+  if (a.interne) {
+    var cheminInterne = [CONFIG.dossiers.horsPennylane, CONFIG.dossiers.facturesInternes];
+    return { destination: "interne", chemin: cheminInterne, archive: cheminInterne, raison: a.raisons.join(", ") };
   }
   // Fournisseur « perso » de la liste (Alma, Birkenstock, Boulanger, Bhrbeton…) : rangé dans _Hors Pennylane/Perso/<Fournisseur>/<Année>,
   // jamais dans Envoi Pennylane ni dans À vérifier ; « pas besoin » : journal seul

@@ -229,6 +229,7 @@ function planifierReorganisation(opts) {
 function cibleReorganisation(f, morceaux, idxF, opts) {
   opts = opts || {};
   var hors = morceaux[0] === CONFIG.dossiers.horsPennylane;
+  if (hors && morceaux[1] === CONFIG.dossiers.facturesInternes) return null;   // factures internes (v4.6.4) : laissées en place
   var etab = hors ? morceaux[1] : morceaux[0];
   var dossierFournisseur = hors ? morceaux[2] : morceaux[1];
   var nom = f.getName(), n = analyserNomFichier(nom) || {};
@@ -260,6 +261,7 @@ function cibleReorganisation(f, morceaux, idxF, opts) {
   var ext = extensionDe(nom);
   var texte = lireTexte(f.getBlob(), ext);
   var a = analyserDocument({ idx: idxF, texte: texte, from: "", subject: nom, nomPiece: nom, dateMail: n.date || dateIso(f.getDateCreated()), extension: "." + ext });
+  if (a.interne) return { chemin: [CONFIG.dossiers.horsPennylane, CONFIG.dossiers.facturesInternes], methode: "contenu (facture interne)", nouveauNom: a.nom };
   var etabLu = a.etablissement || (CONFIG.etablissements.indexOf(etab) !== -1 ? etab : null);
   if (a.fournisseur && etabLu && (a.type === "facture" || a.type === "avoir" || a.type === "ticket")) {
     return { chemin: [etabLu, a.fournisseur, anneeDe({ date: a.date, dateSecours: n.date || dateIso(f.getDateCreated()) })], methode: "contenu (" + a.sourceFournisseur + ")",

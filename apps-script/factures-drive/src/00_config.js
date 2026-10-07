@@ -22,7 +22,8 @@ var CONFIG = {
     perso: "Perso",                           // sous _Hors Pennylane : pièces des fournisseurs « perso » de la liste (Alma, Birkenstock, Boulanger…), jamais Pennylane
     fixtures: "_Fixtures OCR",                // PDF déposés à la main pour produire les textes de test (ocrDump)
     journauxCloture: "Journaux de clôture",   // sous Piccola Mia : journaux de caisse, pas des factures
-    journauxCaisse: "Journaux de caisse iFratelli"   // dossier à part, hors « Factures iFratelli »
+    journauxCaisse: "Journaux de caisse iFratelli",  // dossier à part, hors « Factures iFratelli »
+    facturesInternes: "Factures internes"     // sous _Hors Pennylane (v4.6.4) : factures entre SASHA et FRATELLI, déjà dans Pennylane des deux côtés
   },
   // Dossiers « Envoi Pennylane » déjà créés par Paul (identifiants Drive) ; repli par nom si l'identifiant ne répond plus
   envoiIds: { "Bello Mio": "180pZHqP2rRX1x281S7QXBREpc4VPROzS", "Piccola Mia": "1JCPrEpMPlVeWm9gjLZDR1bU-l38cYEH8" },
