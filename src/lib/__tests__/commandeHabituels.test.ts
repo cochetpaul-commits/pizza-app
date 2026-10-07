@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculerHabituels, quantiteCommande, type RegleArticle } from "@/lib/commandeHabituels";
+import { calculerHabituels, lignesCommandesNonFacturees, quantiteCommande, type RegleArticle } from "@/lib/commandeHabituels";
 
 const colis = (prix: number, nb: number, element = false): RegleArticle => ({ prix_uc: prix, contenu_nb: nb, element_permis: element, au_poids: false });
 
@@ -61,3 +61,37 @@ describe("calculerHabituels (médiane par livraison)", () => {
     expect(calculerHabituels([{ ingredient_id: "z", date: "2026-09-01", montant: 5 }], regles).size).toBe(0);
   });
 });
+
+describe("lignesCommandesNonFacturees (Vinoflo, 06/10/2026 : une facture importée effaçait trois mois de commandes)", () => {
+  const dates = new Map([["s1", "2026-07-24"], ["s2", "2026-08-10"], ["s3", "2026-09-03"], ["s4", "2026-09-16"], ["s5", "2026-09-24"]]);
+  const lignes = ["s1", "s2", "s3", "s4", "s5"].flatMap((s) => [{ session_id: s, ingredient_id: "chianti" }, { session_id: s, ingredient_id: "prosecco" }]);
+  it("sans facture, toutes les commandes comptent", () => {
+    expect(lignesCommandesNonFacturees(lignes, dates, [])).toHaveLength(10);
+  });
+  it("une facture du 29/09 couvre les commandes des 14 jours précédents (16/09, 24/09) pour les produits qu'elle contient, et rien d'autre", () => {
+    const factures = [{ date: "2026-09-29", ingredientIds: new Set(["chianti"]) }];
+    const restantes = lignesCommandesNonFacturees(lignes, dates, factures);
+    expect(restantes).toHaveLength(8);
+    expect(restantes.find((l) => l.session_id === "s5" && l.ingredient_id === "chianti")).toBeUndefined();
+    expect(restantes.find((l) => l.session_id === "s4" && l.ingredient_id === "chianti")).toBeUndefined();
+    expect(restantes.find((l) => l.session_id === "s5" && l.ingredient_id === "prosecco")).toBeDefined();
+    expect(restantes.filter((l) => l.session_id === "s1")).toHaveLength(2);
+    expect(restantes[0].date).toBe("2026-07-24");
+  });
+  it("au delà de 14 jours ou avant la commande, une facture ne couvre pas", () => {
+    expect(lignesCommandesNonFacturees(lignes, dates, [{ date: "2026-10-01", ingredientIds: new Set(["chianti"]) }]).filter((l) => l.session_id === "s4")).toHaveLength(2);
+    expect(lignesCommandesNonFacturees(lignes, dates, [{ date: "2026-09-23", ingredientIds: new Set(["chianti"]) }]).filter((l) => l.session_id === "s5")).toHaveLength(2);
+  });
+  it("une ligne d'une session inconnue est ignorée", () => {
+    expect(lignesCommandesNonFacturees([{ session_id: "zz", ingredient_id: "x" }], dates, [])).toHaveLength(0);
+  });
+  it("les habituels reviennent : 5 commandes sur 90 jours font un habituel même après l'import d'une facture", () => {
+    const factures = [{ date: "2026-09-29", ingredientIds: new Set(["chianti"]) }];
+    const achats = lignesCommandesNonFacturees(lignes, dates, factures).map((l) => ({ ingredient_id: l.ingredient_id, date: l.date, quantite: 2, mode: "uc" as const }));
+    achats.push({ ingredient_id: "chianti", date: "2026-09-29", quantite: 2, mode: "uc" });
+    const h = calculerHabituels(achats, new Map([["chianti", colis(80, 6)], ["prosecco", colis(60, 6)]]));
+    expect(h.get("chianti")?.nb_achats).toBe(4);   // 3 commandes non couvertes + la facture
+    expect(h.get("prosecco")?.nb_achats).toBe(5);
+  });
+});
+

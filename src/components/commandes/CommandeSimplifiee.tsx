@@ -162,8 +162,10 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
 
   const sections = useMemo(() => {
     if (!data) return [];
-    // Précommande : les produits cochés, tous affichés (à 0 au départ) ; jour : habituels + déjà commandés
-    const visibles = onglet === "precommande" ? duJour : duJour.filter((a) => estHabituel(a) || enCommande(a));
+    // Précommande : les produits cochés, tous affichés (à 0 au départ) ; jour : habituels + déjà commandés.
+    // Aucun habituel (fournisseur rare, historique court) : tous les articles, l'écran n'est jamais vide.
+    const habituelsOuCommandes = duJour.filter((a) => estHabituel(a) || enCommande(a));
+    const visibles = onglet === "precommande" || habituelsOuCommandes.length === 0 ? duJour : habituelsOuCommandes;
     return data.rayons
       .map((r) => ({
         ...r,

@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { zonesPour, type ZoneEtabRow } from "@/lib/zonesEtablissement";
 import { libelleColisage, libelleElement, nomUnite, prixUniteCommande, type CommandeArticle, type OffrePrix, type UniteCommande } from "@/lib/commandeArticles";
-import { calculerHabituels, type AchatBrut, type RegleArticle } from "@/lib/commandeHabituels";
+import { calculerHabituels, lignesCommandesNonFacturees, type AchatBrut, type FactureCouvrante, type RegleArticle } from "@/lib/commandeHabituels";
 
 /**
  * Commande simplifiée (fournisseurs avec suppliers.commande_simplifiee, Maël d'abord).
@@ -167,10 +167,11 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
     };
   });
 
-  // Achats des 90 derniers jours : factures (converties par le montant) + commandes pas encore facturées
+  // Achats des 90 derniers jours : factures (converties par le montant) + commandes envoyées dont la livraison
+  // n'est pas couverte par une facture (même produit facturé dans les 14 jours qui suivent la commande).
   const achats: AchatBrut[] = [];
   const dateFacture = new Map((factures ?? []).map((x) => [x.id as string, String(x.invoice_date)]));
-  let derniereFacture = "";
+  const couvrantes = new Map<string, FactureCouvrante>();
   if (dateFacture.size) {
     const { data: lignesFact } = await supabaseAdmin.from("supplier_invoice_lines")
       .select("invoice_id, sku, total_price").in("invoice_id", [...dateFacture.keys()]);
@@ -179,25 +180,24 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
       const date = dateFacture.get(l.invoice_id as string);
       if (!ing || !date) continue;
       achats.push({ ingredient_id: ing, date, montant: Number(l.total_price) });
-      if (date > derniereFacture) derniereFacture = date;
+      const c = couvrantes.get(l.invoice_id as string) ?? { date, ingredientIds: new Set<string>() };
+      (c.ingredientIds as Set<string>).add(ing);
+      couvrantes.set(l.invoice_id as string, c);
     }
   }
   const { data: envoyees } = await supabaseAdmin.from("commande_sessions").select("id, created_at")
     .eq("supplier_id", f.ficheId).eq("etablissement_id", etabId)
     .in("status", ["validee", "envoyee", "recue"]).gte("created_at", depuis);
-  const dateCommande = new Map((envoyees ?? [])
-    .map((s) => [s.id as string, String(s.created_at).slice(0, 10)] as const)
-    .filter(([, d]) => d > derniereFacture));
+  const dateCommande = new Map((envoyees ?? []).map((s) => [s.id as string, String(s.created_at).slice(0, 10)] as const));
   if (dateCommande.size) {
     const libellesParProduit = new Map(sortie.map((s) => [s.ingredient_id, s]));
     const { data: lignesCmd } = await supabaseAdmin.from("commande_lignes")
       .select("session_id, ingredient_id, quantite, unite").in("session_id", [...dateCommande.keys()]);
-    for (const l of lignesCmd ?? []) {
-      const date = dateCommande.get(l.session_id as string);
-      if (!date) continue;
-      const lib = libellesParProduit.get(l.ingredient_id as string);
-      const mode = lib ? modeDeLigne(l.unite as string | null, lib) : "uc";
-      achats.push({ ingredient_id: l.ingredient_id as string, date, quantite: Number(l.quantite), mode });
+    const lignesTypees = (lignesCmd ?? []).map((l) => ({ session_id: String(l.session_id), ingredient_id: String(l.ingredient_id), quantite: Number(l.quantite), unite: (l.unite as string | null) ?? null }));
+    for (const l of lignesCommandesNonFacturees(lignesTypees, dateCommande, [...couvrantes.values()])) {
+      const lib = libellesParProduit.get(l.ingredient_id);
+      const mode = lib ? modeDeLigne(l.unite, lib) : "uc";
+      achats.push({ ingredient_id: l.ingredient_id, date: l.date, quantite: l.quantite, mode });
     }
   }
   const habituels = calculerHabituels(achats, regles);

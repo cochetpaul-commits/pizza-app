@@ -103,3 +103,35 @@ export function calculerHabituels(achats: AchatBrut[], regles: Map<string, Regle
   }
   return res;
 }
+
+/**
+ * Lignes de commandes envoyées qui ne sont PAS déjà comptées par une facture : une facture datée dans les
+ * `fenetreJours` qui suivent la commande, et qui contient le produit, couvre la livraison (le produit compte
+ * alors par la facture) ; sinon la ligne de commande compte.
+ *
+ * Avant (vécu Vinoflo, 06/10/2026) : toute commande antérieure à la dernière facture était écartée. Une seule
+ * facture importée (5 lignes, dont 2 sans correspondance de référence) effaçait trois mois de commandes :
+ * plus aucun habituel, écran de commande vide.
+ */
+export type LigneCommandeDatee = { session_id: string; ingredient_id: string };
+export type FactureCouvrante = { date: string; ingredientIds: ReadonlySet<string> };
+
+export function lignesCommandesNonFacturees<T extends LigneCommandeDatee>(
+  lignes: readonly T[],
+  dateCommande: ReadonlyMap<string, string>,
+  factures: readonly FactureCouvrante[],
+  fenetreJours = 14,
+): Array<T & { date: string }> {
+  const out: Array<T & { date: string }> = [];
+  for (const l of lignes) {
+    const date = dateCommande.get(l.session_id);
+    if (!date) continue;
+    const fin = new Date(date + "T12:00:00Z");
+    fin.setUTCDate(fin.getUTCDate() + fenetreJours);
+    const limite = fin.toISOString().slice(0, 10);
+    const couverte = factures.some((f) => f.date >= date && f.date <= limite && f.ingredientIds.has(l.ingredient_id));
+    if (!couverte) out.push({ ...l, date });
+  }
+  return out;
+}
+
