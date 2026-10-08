@@ -10,6 +10,8 @@
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 60px;
   --topbar-desktop-height: 56px;
+  /* Largeur utile des pages sur bureau (refonte 08/10 : on utilise la largeur de l'écran, comme ComandR) */
+  --page-max-width: 1400px;
   --etab-color: #b45f57;
   --sauge: #4a6741;
   --sauge-light: #e8ede6;
@@ -215,6 +217,20 @@ html, body{
   background: var(--creme);
   /* Place pour la barre du haut fixe (bureau) */
   padding-top: var(--topbar-desktop-height);
+}
+
+/* Pages sur bureau : les racines de page plafonnées à 900–1100 px en style inline s'élargissent
+   jusqu'à --page-max-width. Les grilles en auto-fit et les tableaux occupent la place ; sur mobile
+   et tablette, rien ne change. */
+@media (min-width: 1100px) {
+  .app-main main > div[style*="max-width: 900px"],
+  .app-main main > div[style*="max-width: 980px"],
+  .app-main main > div[style*="max-width: 1000px"],
+  .app-main main > div[style*="max-width: 1100px"] {
+    max-width: var(--page-max-width) !important;
+    padding-left: 32px !important;
+    padding-right: 32px !important;
+  }
 }
 
 /* Barre du haut bureau : fixe, alignée sur la zone de contenu, suit le repli de la barre latérale */

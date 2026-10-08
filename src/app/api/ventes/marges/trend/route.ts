@@ -6,15 +6,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /* ── Types ── */
-type VenteLigne = {
-  date_service: string;
-  quantite: number;
-  ttc: number;
-  ht: number;
-  categorie?: string;
-  description?: string;
-};
-
 type DailyRow = {
   date: string;
   qty: number;
@@ -22,11 +13,18 @@ type DailyRow = {
   ca_ht: number;
 };
 
+type LigneJour = { categorie: string | null; date_service: string; qty: number | string; ca_ttc: number | string; ca_ht: number | string };
+type LigneProduit = { name: string; qty: number | string; ca_ttc: number | string; ca_ht: number | string };
+
 /* ── GET /api/ventes/marges/trend?etablissement_id=X&product=Y&category=Z&from=YYYY-MM-DD&to=YYYY-MM-DD ── */
 /* product — filter by exact product name (description)                                                     */
 /* category — filter by categorie column (aggregated)                                                        */
 /* group_by=category — return data grouped by category instead of flat daily array                           */
 /* neither — aggregate ALL products                                                                          */
+/*                                                                                                          */
+/* Vécu 08/10 : la route rapatriait toutes les lignes de vente de la période (124 000 lignes sur un an,     */
+/* 124 pages) et saturait le pool de connexions ; les agrégats sont désormais calculés en base par les       */
+/* fonctions ventes_tendance_jour et ventes_tendance_produits (mêmes filtres : Produit, non annulé, TTC>0). */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const etabId = searchParams.get("etablissement_id");
@@ -46,122 +44,33 @@ export async function GET(req: NextRequest) {
   const denied = await etabAccessDenied(req, etabId, ["group_admin", "manager"]);
   if (denied) return denied;
 
-
-  /* ── 1. Fetch ventes_lignes (paginated) ── */
-  const PAGE = 1000;
-  const needCategorie = groupBy === "category";
-  const allRows: VenteLigne[] = [];
-  let offset = 0;
-  let hasMore = true;
-  while (hasMore) {
-    let query = supabaseAdmin
-      .from("ventes_lignes")
-      .select("date_service,quantite,ttc,ht,categorie,description")
-      .eq("etablissement_id", etabId)
-      .eq("type_ligne", "Produit")
-      .eq("annule", false)
-      .gt("ttc", 0)
-      .gte("date_service", from)
-      .lte("date_service", to);
-
-    if (product) {
-      query = query.eq("description", product);
-    } else if (category) {
-      query = query.eq("categorie", category);
-    }
-    if (service) {
-      query = query.eq("service", service);
-    }
-
-    const { data, error } = await query
-      .order("date_service", { ascending: true })
-      .range(offset, offset + PAGE - 1);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-    allRows.push(...((data ?? []) as unknown as VenteLigne[]));
-    hasMore = (data?.length ?? 0) === PAGE;
-    offset += PAGE;
-  }
+  const params = { p_etab: etabId, p_from: from, p_to: to, p_product: product, p_category: category, p_service: service };
+  const num = (x: number | string) => Number(x) || 0;
 
   /* ── group_by=category mode ── */
-  if (needCategorie) {
-    const catDayMap = new Map<string, Map<string, { qty: number; ca_ttc: number; ca_ht: number }>>();
-    for (const r of allRows) {
-      const cat = r.categorie || "Autre";
-      let dayMap = catDayMap.get(cat);
-      if (!dayMap) { dayMap = new Map(); catDayMap.set(cat, dayMap); }
-      const key = r.date_service;
-      const prev = dayMap.get(key);
-      if (prev) {
-        prev.qty += Number(r.quantite) || 1;
-        prev.ca_ttc += Number(r.ttc);
-        prev.ca_ht += Number(r.ht);
-      } else {
-        dayMap.set(key, { qty: Number(r.quantite) || 1, ca_ttc: Number(r.ttc), ca_ht: Number(r.ht) });
-      }
-    }
-
+  if (groupBy === "category") {
+    const { data, error } = await supabaseAdmin.rpc("ventes_tendance_jour", { ...params, p_par_categorie: true });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     const categories: Record<string, DailyRow[]> = {};
-    for (const [cat, dayMap] of catDayMap) {
-      categories[cat] = Array.from(dayMap.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, v]) => ({
-          date,
-          qty: Math.round(v.qty * 100) / 100,
-          ca_ttc: Math.round(v.ca_ttc * 100) / 100,
-          ca_ht: Math.round(v.ca_ht * 100) / 100,
-        }));
+    for (const r of (data ?? []) as LigneJour[]) {
+      const cat = r.categorie || "Autre";
+      (categories[cat] ??= []).push({ date: r.date_service, qty: num(r.qty), ca_ttc: num(r.ca_ttc), ca_ht: num(r.ca_ht) });
     }
-
     return NextResponse.json({ categories });
   }
 
-  /* ── 2. Aggregate by date_service ── */
-  const dayMap = new Map<string, { qty: number; ca_ttc: number; ca_ht: number }>();
-  for (const r of allRows) {
-    const key = r.date_service;
-    const prev = dayMap.get(key);
-    if (prev) {
-      prev.qty += Number(r.quantite) || 1;
-      prev.ca_ttc += Number(r.ttc);
-      prev.ca_ht += Number(r.ht);
-    } else {
-      dayMap.set(key, {
-        qty: Number(r.quantite) || 1,
-        ca_ttc: Number(r.ttc),
-        ca_ht: Number(r.ht),
-      });
-    }
-  }
+  /* ── Par jour + par produit, en deux agrégats légers ── */
+  const [jours, produits] = await Promise.all([
+    supabaseAdmin.rpc("ventes_tendance_jour", { ...params, p_par_categorie: false }),
+    supabaseAdmin.rpc("ventes_tendance_produits", params),
+  ]);
+  if (jours.error) return NextResponse.json({ error: jours.error.message }, { status: 500 });
+  if (produits.error) return NextResponse.json({ error: produits.error.message }, { status: 500 });
 
-  /* ── 3. Sort by date ascending ── */
-  const daily: DailyRow[] = Array.from(dayMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, v]) => ({
-      date,
-      qty: Math.round(v.qty * 100) / 100,
-      ca_ttc: Math.round(v.ca_ttc * 100) / 100,
-      ca_ht: Math.round(v.ca_ht * 100) / 100,
-    }));
-
-  /* ── 4. Aggregate by product (description) ── */
-  const prodMap = new Map<string, { qty: number; ca_ttc: number; ca_ht: number }>();
-  for (const r of allRows) {
-    const name = r.description || "Autre";
-    const prev = prodMap.get(name);
-    if (prev) {
-      prev.qty += Number(r.quantite) || 1;
-      prev.ca_ttc += Number(r.ttc);
-      prev.ca_ht += Number(r.ht);
-    } else {
-      prodMap.set(name, { qty: Number(r.quantite) || 1, ca_ttc: Number(r.ttc), ca_ht: Number(r.ht) });
-    }
-  }
-  const products = Array.from(prodMap.entries())
-    .map(([name, v]) => ({ name, qty: Math.round(v.qty), ca_ttc: Math.round(v.ca_ttc * 100) / 100, ca_ht: Math.round(v.ca_ht * 100) / 100 }))
-    .sort((a, b) => b.ca_ht - a.ca_ht);
+  const daily: DailyRow[] = ((jours.data ?? []) as LigneJour[])
+    .map((r) => ({ date: r.date_service, qty: num(r.qty), ca_ttc: num(r.ca_ttc), ca_ht: num(r.ca_ht) }));
+  const products = ((produits.data ?? []) as LigneProduit[])
+    .map((r) => ({ name: r.name, qty: Math.round(num(r.qty)), ca_ttc: num(r.ca_ttc), ca_ht: num(r.ca_ht) }));
 
   const label = product ?? category ?? "all";
   return NextResponse.json({ product: label, daily, products });

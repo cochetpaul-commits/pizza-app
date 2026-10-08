@@ -347,13 +347,13 @@ function PerformancesPage() {
   useEffect(() => {
     if (!etab || !catTrendFilterCat) { setTrendCatProducts([]); return; }
     let cancelled = false;
-    fetchApi(`/api/ventes/stats?etablissement_id=${etab.id}&from=${catTrendFrom}&to=${catTrendTo}`)
+    // Agrégat en base (vécu 08/10 : /api/ventes/stats sur un an rapatriait trois fois 124 000 lignes)
+    fetchApi(`/api/ventes/marges/trend?etablissement_id=${etab.id}&from=${catTrendFrom}&to=${catTrendTo}&category=${encodeURIComponent(catTrendFilterCat)}`)
       .then(r => r.json())
       .then(json => {
-        if (cancelled || !json.stats?.cat_products) return;
-        const cp = json.stats.cat_products as Record<string, { n: string; ca_ttc: number }[]>;
-        const cpKey = Object.keys(cp).find(k => k.toLowerCase() === catTrendFilterCat.toLowerCase());
-        setTrendCatProducts(cpKey ? cp[cpKey].sort((a, b) => b.ca_ttc - a.ca_ttc) : []);
+        if (cancelled || !Array.isArray(json.products)) return;
+        const produits = (json.products as { name: string; ca_ttc: number }[]).map(p => ({ n: p.name, ca_ttc: p.ca_ttc }));
+        setTrendCatProducts(produits.sort((a, b) => b.ca_ttc - a.ca_ttc));
       })
       .catch(() => { if (!cancelled) setTrendCatProducts([]); });
     return () => { cancelled = true; };

@@ -139,7 +139,7 @@ const inner: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: 8,
-  maxWidth: 980,
+  maxWidth: "var(--page-max-width, 980px)",
   margin: "0 auto",
   padding: "0 12px",
   height: 44,
