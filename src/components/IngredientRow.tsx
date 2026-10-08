@@ -288,14 +288,17 @@ export type IngredientRowProps = {
   onMergeDuplicate?: (keepId: string, deleteId: string) => void;
   onIgnoreDuplicate?: (id1: string, id2: string) => void;
   subCategorySuggestions?: string[];
+  /** « volet » : formulaire seul, sections empilées, sans tuile ni cadre (volet droit de la Base produits sur bureau) */
+  presentation?: "liste" | "volet";
 };
 
 export const IngredientRow = React.memo(function IngredientRow({
   item: x, offer, altOffers, suppliersMap, supplierName, supplierIdForDisplay, alert, isEditing, compactMode, edit,
   suppliers, storageZones,
   onStartEdit, onSaveEdit, onDelete, onSetStatus, onEditChange, onEditImportName, onCreateDerived, onOpenSupplier, onToggleEstablishment,
-  selected, onToggleSelect, duplicateMatch, onMergeDuplicate, onIgnoreDuplicate, subCategorySuggestions,
+  selected, onToggleSelect, duplicateMatch, onMergeDuplicate, onIgnoreDuplicate, subCategorySuggestions, presentation = "liste",
 }: IngredientRowProps) {
+  const volet = presentation === "volet";
   const [mobileSection, setMobileSection] = React.useState<string>("prix"); // mobile accordion: only one open at a time
   const toggleMobileSection = React.useCallback((key: string) => {
     setMobileSection(prev => prev === key ? "" : key);
@@ -349,9 +352,9 @@ export const IngredientRow = React.memo(function IngredientRow({
   const petit: CSSProperties = { fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, border: "none", cursor: "pointer", flexShrink: 0, fontFamily: "inherit" };
 
   return (
-    <div style={{ ...cadreTuile(catAccent, false, selected ?? false), padding: 0 }}>
+    <div style={volet ? undefined : { ...cadreTuile(catAccent, false, selected ?? false), padding: 0 }}>
       {/* ── Tuile commune : nom, infos, ligne du bas (même tuile sur ordinateur et téléphone) ── */}
-      <TuileProduit cadre={false} couleur={catAccent} inactive={inactive} nom={x.name} onClick={ouvrir}
+      {!volet && <TuileProduit cadre={false} couleur={catAccent} inactive={inactive} nom={x.name} onClick={ouvrir}
         avant={onToggleSelect && (
           <input type="checkbox" checked={selected ?? false} title="Sélectionner (actions groupées : catégorie, suppression)"
             onChange={(e) => { e.stopPropagation(); onToggleSelect(x.id); }} onClick={(e) => e.stopPropagation()}
@@ -403,7 +406,7 @@ export const IngredientRow = React.memo(function IngredientRow({
           {hasPrice && <span className="pastille-ronde">{price}</span>}
           {isEditing && <button type="button" onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ ...BTN_ACTION, width: "auto", padding: "0 10px", background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700 }}>OK</button>}
         </>}
-      />
+      />}
 
       {/* ── DUPLICATE ALERT ── */}
       {isEditing && duplicateMatch && (
@@ -790,94 +793,96 @@ export const IngredientRow = React.memo(function IngredientRow({
           {edit.allergens.length > 0 && <div style={{ fontSize: 9, color: "#999", marginTop: 3 }}>{edit.allergens.join(" · ")}</div>}
         </>);
 
+        // Champs d'identité, communs aux trois mises en page (bureau, téléphone, volet)
+        const champNom = (<div>
+          <div style={fieldLabel}>Nom</div>
+          <input style={inputStyle} value={edit.name} onChange={(e) => onEditChange({ ...edit, name: e.target.value })} />
+        </div>);
+        const champCategorie = (<div>
+          <div style={fieldLabel}>Catégorie</div>
+          <StyledSelect value={edit.category}
+            onChange={(v) => onEditChange({ ...edit, category: v as Category })}
+            options={CATEGORIES.map(c => ({ value: c, label: CAT_LABELS[c] }))}
+            accentColor={CAT_COLORS[edit.category]}
+          />
+        </div>);
+        const champSousCategorie = (<div>
+          <div style={fieldLabel}>Sous-catégorie</div>
+          <SousCategorieChoix valeur={edit.subCategory} existantes={subCategorySuggestions ?? []} onChange={(v) => onEditChange({ ...edit, subCategory: v })} />
+        </div>);
+        const champFournisseur = (<div>
+          <div style={fieldLabel}>Fournisseur</div>
+          <StyledSelect value={edit.supplierId}
+            onChange={(v) => onEditChange({ ...edit, supplierId: v })}
+            placeholder="—"
+            options={[{ value: "", label: "—" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
+          />
+        </div>);
+        const selectStatut = (
+          <StyledSelect value={edit.is_active ? "1" : "0"} onChange={(v) => onEditChange({ ...edit, is_active: v === "1" })}
+            options={[{ value: "1", label: "Actif" }, { value: "0", label: "Inactif" }]}
+          />
+        );
+        const ligneImport = (hauteur: number, taille: number) => (
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, background: "#f5f0e8", border: "1.5px solid #e5ddd0", borderRadius: 8, padding: "6px 10px", fontSize: taille, color: "#999", height: hauteur }}>
+              <span style={{ fontSize: 10, color: "#aaa", fontWeight: 600 }}>Import:</span>
+              <span style={{ fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{edit.importName || "—"}</span>
+            </div>
+            <button type="button" onClick={() => onEditImportName(x.id, edit.importName)} title="Changer le nom d'import (clé de rapprochement des factures)"
+              style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, border: "1.5px solid #e5ddd0", background: "white", color: "#888", cursor: "pointer", height: hauteur }}>✎</button>
+          </div>
+        );
+
+        if (volet) {
+          // Volet droit (bureau) : une colonne, sections empilées, pas de cartes ni de bouton OK (le pied du volet enregistre)
+          const titreSection: CSSProperties = { fontSize: 10.5, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "#6f6a61", margin: "20px 0 10px", paddingTop: 16, borderTop: "1px solid #ece6db" };
+          return (
+            <div>
+              <div style={{ ...titreSection, margin: "0 0 10px", paddingTop: 0, borderTop: "none" }}>Identité</div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {champNom}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {champCategorie}{champSousCategorie}{champFournisseur}
+                  <div><div style={fieldLabel}>Statut</div>{selectStatut}</div>
+                </div>
+                {ligneImport(36, 11)}
+              </div>
+              <div style={titreSection}>Prix d&apos;achat</div>
+              {renderPrixContent()}
+              <div style={titreSection}>Commande &amp; stock</div>
+              {renderCommandeContent()}
+              <div style={titreSection}>Établissements &amp; allergènes</div>
+              {renderEtabAllergenesContent()}
+            </div>
+          );
+        }
+
         return (
         <div style={{ padding: "12px 16px", borderTop: "1.5px solid #e5ddd0", background: "#faf7f2" }}>
 
           {/* ═══ DESKTOP TOP BAR: 4 columns ═══ */}
           <div className="hidden md:block" style={{ marginBottom: 10 }}>
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 8, marginBottom: 6 }}>
-              <div>
-                <div style={fieldLabel}>Nom</div>
-                <input style={inputStyle} value={edit.name} onChange={(e) => onEditChange({ ...edit, name: e.target.value })} />
-              </div>
-              <div>
-                <div style={fieldLabel}>Catégorie</div>
-                <StyledSelect value={edit.category}
-                  onChange={(v) => onEditChange({ ...edit, category: v as Category })}
-                  options={CATEGORIES.map(c => ({ value: c, label: CAT_LABELS[c] }))}
-                  accentColor={CAT_COLORS[edit.category]}
-                />
-              </div>
-              <div>
-                <div style={fieldLabel}>Sous-catégorie</div>
-                <SousCategorieChoix valeur={edit.subCategory} existantes={subCategorySuggestions ?? []} onChange={(v) => onEditChange({ ...edit, subCategory: v })} />
-              </div>
-              <div>
-                <div style={fieldLabel}>Fournisseur</div>
-                <StyledSelect value={edit.supplierId}
-                  onChange={(v) => onEditChange({ ...edit, supplierId: v })}
-                  placeholder="—"
-                  options={[{ value: "", label: "—" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
-                />
-              </div>
-              <div>
-                <div style={fieldLabel}>Statut</div>
-                <StyledSelect value={edit.is_active ? "1" : "0"} onChange={(v) => onEditChange({ ...edit, is_active: v === "1" })}
-                  options={[{ value: "1", label: "Actif" }, { value: "0", label: "Inactif" }]}
-                />
-              </div>
+              {champNom}
+              {champCategorie}
+              {champSousCategorie}
+              {champFournisseur}
+              <div><div style={fieldLabel}>Statut</div>{selectStatut}</div>
             </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, background: "#f5f0e8", border: "1.5px solid #e5ddd0", borderRadius: 8, padding: "6px 10px", fontSize: 11, color: "#999", height: 32 }}>
-                <span style={{ fontSize: 10, color: "#aaa", fontWeight: 600 }}>Import:</span>
-                <span style={{ fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{edit.importName || "—"}</span>
-              </div>
-              <button type="button" onClick={() => onEditImportName(x.id, edit.importName)}
-                style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, border: "1.5px solid #e5ddd0", background: "white", color: "#888", cursor: "pointer", height: 32 }}>✎</button>
-            </div>
+            {ligneImport(32, 11)}
           </div>
 
           {/* ═══ MOBILE TOP BAR: stacked rows ═══ */}
           <div className="md:hidden" style={{ marginBottom: 10 }}>
-            <div style={{ marginBottom: 6 }}>
-              <div style={fieldLabel}>Nom</div>
-              <input style={inputStyle} value={edit.name} onChange={(e) => onEditChange({ ...edit, name: e.target.value })} />
-            </div>
+            <div style={{ marginBottom: 6 }}>{champNom}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
-              <div>
-                <div style={fieldLabel}>Catégorie</div>
-                <StyledSelect value={edit.category}
-                  onChange={(v) => onEditChange({ ...edit, category: v as Category })}
-                  options={CATEGORIES.map(c => ({ value: c, label: CAT_LABELS[c] }))}
-                  accentColor={CAT_COLORS[edit.category]}
-                />
-              </div>
-              <div>
-                <div style={fieldLabel}>Sous-catégorie</div>
-                <SousCategorieChoix valeur={edit.subCategory} existantes={subCategorySuggestions ?? []} onChange={(v) => onEditChange({ ...edit, subCategory: v })} />
-              </div>
-              <div>
-                <div style={fieldLabel}>Fournisseur</div>
-                <StyledSelect value={edit.supplierId}
-                  onChange={(v) => onEditChange({ ...edit, supplierId: v })}
-                  placeholder="—"
-                  options={[{ value: "", label: "—" }, ...suppliers.filter(s => s.is_active).map(s => ({ value: s.id, label: s.name }))]}
-                />
-              </div>
+              {champCategorie}
+              {champSousCategorie}
+              {champFournisseur}
+              <div><div style={fieldLabel}>Statut</div>{selectStatut}</div>
             </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <div style={{ width: 80 }}>
-                <StyledSelect value={edit.is_active ? "1" : "0"} onChange={(v) => onEditChange({ ...edit, is_active: v === "1" })}
-                  options={[{ value: "1", label: "Actif" }, { value: "0", label: "Inactif" }]}
-                />
-              </div>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 4, background: "#f5f0e8", border: "1.5px solid #e5ddd0", borderRadius: 8, padding: "6px 8px", fontSize: 10, color: "#999", height: 36 }}>
-                <span style={{ color: "#aaa", fontWeight: 600 }}>Import:</span>
-                <span style={{ fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{edit.importName || "—"}</span>
-              </div>
-              <button type="button" onClick={() => onEditImportName(x.id, edit.importName)}
-                style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, border: "1.5px solid #e5ddd0", background: "white", color: "#888", cursor: "pointer", height: 36 }}>✎</button>
-            </div>
+            {ligneImport(36, 10)}
           </div>
 
           {/* ═══ DESKTOP: 2 columns, no accordions ═══ */}
@@ -943,5 +948,6 @@ export const IngredientRow = React.memo(function IngredientRow({
   if (prev.item.sub_category !== next.item.sub_category) return false;
   if (prev.item.storage_zone !== next.item.storage_zone) return false;
   if (prev.duplicateMatch !== next.duplicateMatch) return false;
+  if (prev.presentation !== next.presentation) return false;
   return true;
 });

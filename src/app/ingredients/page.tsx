@@ -1653,7 +1653,7 @@ function IngredientsPageInner() {
                   </button>
                 </>}
               >
-                <IngredientRow {...propsLigne(ficheEnCours)} compactMode={false} />
+                <IngredientRow {...propsLigne(ficheEnCours)} compactMode={false} presentation="volet" />
               </VoletDroit>
             )}
 

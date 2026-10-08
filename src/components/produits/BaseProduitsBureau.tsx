@@ -342,7 +342,7 @@ export function BaseProduitsBureau(p: BaseProduitsBureauProps) {
  * Volet de droite (comme ComandR) : par-dessus la liste, sous la barre du haut, à droite de la barre latérale.
  * Échap ou clic à côté : `onFermer`. Le pied reçoit les boutons d'action de l'écran appelant.
  */
-export function VoletDroit({ titre, sousTitre, onFermer, pied, largeur = 880, children }: {
+export function VoletDroit({ titre, sousTitre, onFermer, pied, largeur = 640, children }: {
   titre: ReactNode;
   sousTitre?: ReactNode;
   onFermer: () => void;
@@ -362,19 +362,19 @@ export function VoletDroit({ titre, sousTitre, onFermer, pied, largeur = 880, ch
       <aside role="dialog" aria-modal="true" style={{
         position: "fixed", top: "calc(var(--topbar-desktop-height, 0px) + 12px)", right: 12, bottom: 12,
         width: `min(${largeur}px, calc(100vw - var(--sidebar-width, 240px) - 48px))`,
-        background: "#f9f5ef", border: `1px solid ${BORD}`, borderRadius: 16, boxShadow: "-12px 0 40px rgba(0,0,0,0.16)",
+        background: "#fff", border: `1px solid ${BORD}`, borderRadius: 16, boxShadow: "-12px 0 40px rgba(0,0,0,0.16)",
         display: "flex", flexDirection: "column", zIndex: 61, overflow: "hidden",
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, padding: "16px 18px 12px", borderBottom: `1px solid ${BORD}`, background: "#fff" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, padding: "16px 20px 12px", borderBottom: `1px solid ${BORD}` }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 18, textTransform: "uppercase", letterSpacing: ".02em", color: "#1a1a1a", lineHeight: 1.15 }}>{titre}</div>
             {sousTitre && <div style={{ color: MUTED, fontSize: 12.5, marginTop: 2 }}>{sousTitre}</div>}
           </div>
           <button type="button" onClick={onFermer} aria-label="Fermer" style={{ border: "none", background: "transparent", fontSize: 22, lineHeight: 1, color: MUTED, cursor: "pointer", padding: "0 4px", fontFamily: "inherit" }}>×</button>
         </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px" }}>{children}</div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 24px" }}>{children}</div>
         {pied && (
-          <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "12px 18px", borderTop: `1px solid ${BORD}`, background: "#fff" }}>{pied}</div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "12px 20px", borderTop: `1px solid ${BORD}` }}>{pied}</div>
         )}
       </aside>
     </>
