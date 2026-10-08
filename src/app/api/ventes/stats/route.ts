@@ -101,27 +101,28 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
 
 
-  // Sous-catégories Popina + les TROIS périodes (courante, A-1, S-1) en parallèle
+  // Sous-catégories Popina (lues par aggregate via subCatByName), puis les TROIS périodes
+  // (courante, A-1, S-1) en parallèle, chacune servie par le cache quand ses lignes n'ont pas bougé
   const fromA1 = (parseInt(from.slice(0, 4)) - 1) + from.slice(4);
   const toA1 = (parseInt(to.slice(0, 4)) - 1) + to.slice(4);
   const fromS1 = shiftDays(from, -7);
   const toS1 = shiftDays(to, -7);
-  const [{ data: popinaProds }, rows, prevData, prevWeekData] = await Promise.all([
-    supabase
-      .from("popina_products")
-      .select("name, sub_category")
-      .eq("active", true)
-      .not("sub_category", "is", null),
-    fetchRange(etabId, from, to),
-    fetchRange(etabId, fromA1, toA1),
-    fetchRange(etabId, fromS1, toS1),
-  ]);
+  const { data: popinaProds } = await supabase
+    .from("popina_products")
+    .select("name, sub_category")
+    .eq("active", true)
+    .not("sub_category", "is", null);
   subCatByName = new Map();
   for (const p of popinaProds ?? []) {
     if (p.name && p.sub_category) subCatByName.set(p.name.trim().toLowerCase(), p.sub_category);
   }
+  const [stats, prev, prevWeek] = await Promise.all([
+    statsPeriode(etabId, from, to),
+    statsPeriode(etabId, fromA1, toA1),
+    statsPeriode(etabId, fromS1, toS1),
+  ]);
 
-  if (rows.length === 0) {
+  if (!stats) {
     // Fallback: try daily_sales (Kezia / aggregated data)
     const dailyResult = await buildFromDailySales(etabId, from, to);
     if (dailyResult) {
@@ -134,10 +135,37 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ empty: true, stats: null, prev: null, prevWeek: null });
   }
 
-  const stats = aggregate(rows);
-  const prev = prevData.length > 0 ? aggregate(prevData) : null;
-  const prevWeek = prevWeekData.length > 0 ? aggregate(prevWeekData) : null;
   return NextResponse.json({ empty: false, stats, prev, prevWeek });
+}
+
+type Stats = ReturnType<typeof aggregate>;
+
+/**
+ * Indicateurs d'une période. Une empreinte des lignes de vente (nombre, dernier import, produits
+ * Popina actifs) est comparée au cache ventes_stats_cache : si rien n'a bougé, le résultat est
+ * relu tel quel ; sinon les lignes sont chargées, agrégées, et le résultat remplace le cache.
+ * Vécu 08/10 : chaque ouverture de la page rechargeait trois périodes complètes de lignes.
+ */
+async function statsPeriode(etabId: string, from: string, to: string): Promise<Stats | null> {
+  const { data: version } = await supabase.rpc("ventes_version", { p_etab: etabId, p_from: from, p_to: to });
+  const v = typeof version === "string" ? version : null;
+  if (v) {
+    const { data: cache } = await supabase
+      .from("ventes_stats_cache")
+      .select("version, stats")
+      .eq("etablissement_id", etabId).eq("du", from).eq("au", to)
+      .maybeSingle();
+    if (cache && cache.version === v && cache.stats) return cache.stats as Stats;
+  }
+  const rows = await fetchRange(etabId, from, to);
+  if (rows.length === 0) return null;
+  const stats = aggregate(rows);
+  if (v) {
+    await supabase.from("ventes_stats_cache").upsert({
+      etablissement_id: etabId, du: from, au: to, version: v, stats, calcule_le: new Date().toISOString(),
+    });
+  }
+  return stats;
 }
 
 /** Get couverts for a unique order (dedup by num_fiscal+date).
