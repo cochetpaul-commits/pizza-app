@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import React, { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { CAT_COLORS, CAT_LABELS, type Category, type Ingredient, type IngredientStatus, type LatestOffer, type Supplier, type Tab } from "@/types/ingredients";
-import type { StorageZoneOption } from "@/components/IngredientRow";
+import { CategoryHeader, type StorageZoneOption } from "@/components/IngredientRow";
 import type { PriceAlert } from "@/lib/priceAlerts";
 import { formatIngredientPrice } from "@/lib/formatPrice";
 import { legacyHasPrice, offerHasPrice } from "@/lib/offers";
 import { cachedSupplierColor } from "@/lib/supplierColors";
-import { couleurTexte } from "@/lib/styleCategories";
+import { couleurTexte, styleSousCategorie } from "@/lib/styleCategories";
 import { OSWALD } from "@/components/TuileProduit";
 import { articleDeFiche, type FicheConditionnement } from "@/lib/inventaire";
 import { libelleColisage } from "@/lib/commandeArticles";
@@ -16,7 +16,8 @@ import { libelleColisage } from "@/lib/commandeArticles";
  * Base produits (étape 3 de la refonte inspirée de ComandR, 08/10/2026), bureau et téléphone.
  * Liste plate de A à Z colorée par catégorie, tuiles qui changent de vue, filtres en menus déroulants,
  * et volet (à droite sur bureau, plein écran sur téléphone) pour paramétrer la fiche avec le
- * formulaire de l'application. Sur téléphone (comme ComandR mobile) : tuiles sur deux colonnes,
+ * formulaire de l'application. Deux affichages : A → Z (liste plate) ou par catégorie (volets de
+ * catégorie et de sous-catégorie, repliés sauf pendant une recherche). Sur téléphone (comme ComandR mobile) : tuiles sur deux colonnes,
  * filtres en petits menus alignés, cartes « nom / état + prix / fournisseur » avec chevron, fiche
  * en feuille qui monte du bas.
  */
@@ -60,6 +61,14 @@ const SELECT: CSSProperties = { border: "none", background: "transparent", fontW
 
 const nombre = (n: number) => n.toLocaleString("fr-FR");
 
+// Affichage A → Z ou par catégorie, mémorisé sur l'appareil (store externe : pas de décalage à l'hydratation)
+const CLE_AFFICHAGE = "produits:affichage";
+const abonnesAffichage = new Set<() => void>();
+// Par défaut : par catégorie (volets de catégories et de sous-catégories, comme avant la refonte) ; A → Z sur demande
+const lireAffichage = (): "az" | "cat" => { try { return localStorage.getItem(CLE_AFFICHAGE) === "az" ? "az" : "cat"; } catch { return "cat"; } };
+const ecrireAffichage = (v: "az" | "cat") => { try { localStorage.setItem(CLE_AFFICHAGE, v); } catch { /* navigation privée */ } abonnesAffichage.forEach((f) => f()); };
+const abonnerAffichage = (f: () => void) => { abonnesAffichage.add(f); return () => { abonnesAffichage.delete(f); }; };
+
 function dateCourte(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -86,6 +95,8 @@ type LigneProps = {
   onOuvrir: (x: Ingredient) => void;
   onToggleSelect: (id: string) => void;
   onOpenSupplier: (id: string) => void;
+  /** Vue par catégorie : la colonne Catégorie est portée par la barre au-dessus */
+  sansCategorie?: boolean;
 };
 
 /** Ce qu'une ligne (tableau bureau) ou une carte (téléphone) affiche d'un produit */
@@ -106,7 +117,7 @@ function affichageProduit(x: Ingredient, offer: LatestOffer | undefined) {
 }
 
 /** Carte produit sur téléphone : liseré de la catégorie, nom, sous-catégorie · fournisseur · zone, prix et état */
-const CarteProduit = React.memo(function CarteProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect }: LigneProps) {
+const CarteProduit = React.memo(function CarteProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, sansCategorie }: LigneProps) {
   const a = affichageProduit(x, offer);
   const sous = [x.sub_category, fournisseur?.name, x.storage_zone].filter(Boolean).join(" · ");
   return (
@@ -130,7 +141,7 @@ const CarteProduit = React.memo(function CarteProduit({ x, offer, fournisseur, a
           {alerte && <span style={{ fontSize: 10.5, fontWeight: 700, color: alerte.direction === "up" ? "#DC2626" : "#16A34A" }}>{alerte.direction === "up" ? "+" : "-"}{(Math.abs(alerte.change_pct) * 100).toFixed(0)} %</span>}
         </div>
         <div style={{ fontSize: 11.5, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          <span style={{ color: a.texteCat, fontWeight: 700 }}>{CAT_LABELS[x.category] ?? x.category}</span>{sous ? ` · ${sous}` : ""}
+          {!sansCategorie && <span style={{ color: a.texteCat, fontWeight: 700 }}>{CAT_LABELS[x.category] ?? x.category}</span>}{sous ? (sansCategorie ? sous : ` · ${sous}`) : ""}
         </div>
       </div>
       <span aria-hidden style={{ color: FAIBLE, fontSize: 18, flexShrink: 0 }}>›</span>
@@ -138,7 +149,7 @@ const CarteProduit = React.memo(function CarteProduit({ x, offer, fournisseur, a
   );
 });
 
-const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, onOpenSupplier }: LigneProps) {
+const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, onOpenSupplier, sansCategorie }: LigneProps) {
   const { couleurCat, texteCat, inactive, aUnPrix, prix, colisage, maj, etat } = affichageProduit(x, offer);
   const sousProduit = [x.sub_category, maj ? `mis à jour le ${maj}` : null].filter(Boolean).join(" · ");
 
@@ -158,9 +169,11 @@ const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, a
         </div>
         {sousProduit && <div style={{ fontSize: 11.5, color: MUTED }}>{sousProduit}</div>}
       </td>
-      <td style={TD}>
-        <Chip fond={`${couleurCat}24`} couleur={texteCat}>{CAT_LABELS[x.category] ?? x.category}</Chip>
-      </td>
+      {!sansCategorie && (
+        <td style={TD}>
+          <Chip fond={`${couleurCat}24`} couleur={texteCat}>{CAT_LABELS[x.category] ?? x.category}</Chip>
+        </td>
+      )}
       <td style={TD}>
         {fournisseur ? (
           <button type="button" onClick={(e) => { e.stopPropagation(); onOpenSupplier(fournisseur.id); }} title="Fiche fournisseur"
@@ -242,6 +255,15 @@ export type BaseProduitsProps = {
 
 export function BaseProduits(p: BaseProduitsProps) {
   const [menuOuvert, setMenuOuvert] = useState(false);
+  // A → Z ou par catégorie (mémorisé sur l'appareil) ; volets repliés par défaut, tous ouverts pendant une recherche
+  const affichage = useSyncExternalStore(abonnerAffichage, lireAffichage, () => "cat" as const);
+  const changerAffichage = ecrireAffichage;
+  const [ouvertes, setOuvertes] = useState<Set<string>>(new Set());
+  const [sousFermees, setSousFermees] = useState<Set<string>>(new Set());
+  const recherche = p.q.trim() !== "";
+  const estOuverte = (cat: string) => recherche || ouvertes.has(cat);
+  const basculerCat = (cat: Category) => setOuvertes((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; });
+  const basculerSous = (cle: string) => setSousFermees((prev) => { const n = new Set(prev); if (n.has(cle)) n.delete(cle); else n.add(cle); return n; });
   const tries = useMemo(
     () => [...p.produits].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "fr", { sensitivity: "base" })),
     [p.produits],
@@ -291,11 +313,77 @@ export function BaseProduits(p: BaseProduitsProps) {
         style={{ width: "100%", height: p.bureau ? 36 : 40, borderRadius: 10, border: `1px solid ${BORD}`, padding: "0 12px 0 32px", fontSize: p.bureau ? 13 : 16, background: "#fff", outline: "none", color: "#1a1a1a", boxSizing: "border-box", fontFamily: "inherit" }} />
     </div>
   );
-  const lignes = tries.map((x) => {
+  const lignes = useMemo(() => tries.map((x) => {
     const offer = p.offersByIngredientId.get(x.id);
     const idFournisseur = offer?.supplier_id ?? x.supplier_id ?? null;
     return { x, offer, fournisseur: idFournisseur ? p.suppliersMap.get(idFournisseur) ?? null : null };
-  });
+  }), [tries, p.offersByIngredientId, p.suppliersMap]);
+  type Ligne = (typeof lignes)[number];
+  /** Vue par catégorie : catégories dans l'ordre des libellés, sous-catégories triées, « sans sous-catégorie » en dernier */
+  const groupes = useMemo(() => {
+    if (affichage !== "cat") return [];
+    const parCat = new Map<Category, Ligne[]>();
+    for (const l of lignes) { const liste = parCat.get(l.x.category); if (liste) liste.push(l); else parCat.set(l.x.category, [l]); }
+    const ordre = [...p.categories, ...[...parCat.keys()].filter((c) => !p.categories.includes(c))];
+    return ordre.filter((c) => parCat.has(c)).map((cat) => {
+      const items = [...parCat.get(cat)!].sort((a, b) =>
+        (a.x.sub_category ?? "\uffff").localeCompare(b.x.sub_category ?? "\uffff", "fr") || (a.x.name ?? "").localeCompare(b.x.name ?? "", "fr"));
+      const aDesSous = items.some((l) => l.x.sub_category);
+      const sous: { nom: string | null; cle: string; items: Ligne[] }[] = [];
+      for (const l of items) {
+        const nom = aDesSous ? (l.x.sub_category ?? "Sans sous-catégorie") : null;
+        const dernier = sous[sous.length - 1];
+        if (dernier && dernier.nom === nom) dernier.items.push(l); else sous.push({ nom, cle: `${cat}|${nom ?? ""}`, items: [l] });
+      }
+      return { cat, couleur: CAT_COLORS[cat] ?? "#939597", items, sous };
+    });
+  }, [affichage, lignes, p.categories]);
+  const bascule = (
+    <span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3, flexShrink: 0 }}>
+      {(["az", "cat"] as const).map((v) => (
+        <button key={v} type="button" onClick={() => changerAffichage(v)} aria-pressed={affichage === v} style={{
+          border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+          background: affichage === v ? "#fff" : "transparent", color: affichage === v ? "#1a1a1a" : MUTED, boxShadow: affichage === v ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+        }}>{v === "az" ? "A → Z" : "Par catégorie"}</button>
+      ))}
+    </span>
+  );
+  const boutonSous = (couleur: string, nom: string, cle: string, n: number, style?: CSSProperties) => {
+    const ouverte = !sousFermees.has(cle) || recherche;
+    return (
+      <button type="button" onClick={() => basculerSous(cle)} aria-expanded={ouverte} style={{ ...styleSousCategorie(couleur, ouverte), ...style }}>
+        <span>{nom} <span style={{ fontWeight: 500, opacity: 0.8 }}>({n})</span></span>
+        <span style={{ fontSize: 10, transition: "transform 0.2s", transform: ouverte ? "rotate(0)" : "rotate(-90deg)" }}>▼</span>
+      </button>
+    );
+  };
+  const carte = (l: Ligne, sansCategorie = false) => (
+    <CarteProduit key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)}
+      selectionnee={p.selectedIds.has(l.x.id)} enEdition={p.editingId === l.x.id} peutEcrire={p.peutEcrire} sansCategorie={sansCategorie}
+      onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} />
+  );
+  const ligne = (l: Ligne, sansCategorie = false) => (
+    <LigneProduit key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)}
+      selectionnee={p.selectedIds.has(l.x.id)} enEdition={p.editingId === l.x.id} peutEcrire={p.peutEcrire} sansCategorie={sansCategorie}
+      onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} />
+  );
+  const nbColonnes = (sansCategorie: boolean) => 8 + (p.peutEcrire ? 1 : 0) - (sansCategorie ? 1 : 0);
+  const enTete = (sansCategorie: boolean) => (
+    <thead>
+      <tr>
+        <th style={{ ...TH, width: 6, padding: 0 }} />
+        {p.peutEcrire && <th style={{ ...TH, width: 36, paddingRight: 0 }} />}
+        <th style={TH}>Produit</th>
+        {!sansCategorie && <th style={TH}>Catégorie</th>}
+        <th style={TH}>Fournisseur</th>
+        <th style={{ ...TH, textAlign: "right" }}>Prix d&apos;achat</th>
+        <th style={TH}>Zone</th>
+        <th style={TH}>État</th>
+        <th style={TH} />
+      </tr>
+    </thead>
+  );
+  const vide = !p.loading && tries.length === 0;
   const boutonPlus = p.hasMore && (
     <button type="button" onClick={p.loadMore} disabled={p.loadingMore} style={{ ...BTN, height: 32, padding: "0 12px", fontSize: 12.5, opacity: p.loadingMore ? 0.6 : 1 }}>
       {p.loadingMore ? "Chargement…" : "Afficher plus de produits"}
@@ -347,8 +435,9 @@ export function BaseProduits(p: BaseProduitsProps) {
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, color: MUTED, fontSize: 12.5, flexWrap: "wrap" }}>
             <span>{p.loading ? "Chargement…" : compteur}</span>
-            <span style={{ display: "flex", gap: 10, alignItems: "center" }}>{caseInactives}{boutonTout}</span>
+            {bascule}
           </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>{caseInactives}{boutonTout}</div>
         </div>
 
         {p.erreur && (
@@ -364,12 +453,23 @@ export function BaseProduits(p: BaseProduitsProps) {
                 <div style={{ height: 10, borderRadius: 3, background: "#ede6d9", width: "35%", animation: "pulse 1.5s ease-in-out infinite" }} />
               </div>
             ))}
-            {!p.loading && lignes.map(({ x, offer, fournisseur }) => (
-              <CarteProduit key={x.id} x={x} offer={offer} fournisseur={fournisseur} alerte={p.alertMap.get(x.id)}
-                selectionnee={p.selectedIds.has(x.id)} enEdition={p.editingId === x.id} peutEcrire={p.peutEcrire}
-                onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} />
+            {!p.loading && affichage === "az" && lignes.map((l) => carte(l))}
+            {!p.loading && affichage === "cat" && groupes.map((g) => (
+              <div key={g.cat}>
+                <CategoryHeader cat={g.cat} count={g.items.length} isCollapsed={!estOuverte(g.cat)} onToggle={basculerCat} />
+                {estOuverte(g.cat) && (
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {g.sous.map((sg) => (
+                      <React.Fragment key={sg.cle}>
+                        {sg.nom != null && boutonSous(g.couleur, sg.nom, sg.cle, sg.items.length)}
+                        {(sg.nom == null || !sousFermees.has(sg.cle) || recherche) && sg.items.map((l) => carte(l, true))}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
-            {!p.loading && tries.length === 0 && (
+            {vide && (
               <div style={{ padding: "40px 20px", textAlign: "center", color: "#999", fontSize: 14 }}>Aucun produit ne correspond.</div>
             )}
             {!p.loading && tries.length > 0 && (
@@ -423,6 +523,7 @@ export function BaseProduits(p: BaseProduitsProps) {
         {caseInactives}
         <span style={{ marginLeft: "auto", color: MUTED, fontSize: 12.5, whiteSpace: "nowrap" }}>{compteur}</span>
         {boutonTout}
+        {bascule}
       </div>
 
       {/* Liste A → Z */}
@@ -431,40 +532,59 @@ export function BaseProduits(p: BaseProduitsProps) {
           Erreur de chargement : {p.erreur}
         </div>
       )}
-      {!p.erreur && (
+      {!p.erreur && affichage === "cat" && !p.loading && (
+        <div style={{ display: "grid", gap: 2 }}>
+          {groupes.map((g) => (
+            <div key={g.cat}>
+              <CategoryHeader cat={g.cat} count={g.items.length} isCollapsed={!estOuverte(g.cat)} onToggle={basculerCat} />
+              {estOuverte(g.cat) && (
+                <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 14, overflow: "hidden", margin: "0 6px" }}>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 760 }}>
+                      {enTete(true)}
+                      <tbody>
+                        {g.sous.map((sg) => (
+                          <React.Fragment key={sg.cle}>
+                            {sg.nom != null && (
+                              <tr><td colSpan={nbColonnes(true)} style={{ padding: "4px 10px 2px", borderBottom: `1px solid #ece6db` }}>
+                                {boutonSous(g.couleur, sg.nom, sg.cle, sg.items.length, { margin: "2px 0" })}
+                              </td></tr>
+                            )}
+                            {(sg.nom == null || !sousFermees.has(sg.cle) || recherche) && sg.items.map((l) => ligne(l, true))}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          {vide && <div style={{ padding: "40px 20px", textAlign: "center", color: "#999", fontSize: 14 }}>Aucun produit ne correspond.</div>}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 4px", color: MUTED, fontSize: 12.5 }}>
+            <span>{`${nombre(tries.length)} produit${tries.length > 1 ? "s" : ""} dans ${groupes.length} catégorie${groupes.length > 1 ? "s" : ""}`}</span>
+            {boutonPlus}
+          </div>
+        </div>
+      )}
+      {!p.erreur && (affichage === "az" || p.loading) && (
         <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 14, overflow: "hidden" }}>
           <div style={{ overflowX: "auto" }}>
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 860 }}>
-              <thead>
-                <tr>
-                  <th style={{ ...TH, width: 6, padding: 0 }} />
-                  {p.peutEcrire && <th style={{ ...TH, width: 36, paddingRight: 0 }} />}
-                  <th style={TH}>Produit</th>
-                  <th style={TH}>Catégorie</th>
-                  <th style={TH}>Fournisseur</th>
-                  <th style={{ ...TH, textAlign: "right" }}>Prix d&apos;achat</th>
-                  <th style={TH}>Zone</th>
-                  <th style={TH}>État</th>
-                  <th style={TH} />
-                </tr>
-              </thead>
+              {enTete(false)}
               <tbody>
                 {p.loading && [0, 1, 2, 3, 4, 5].map((i) => (
                   <tr key={i}>
                     <td style={{ ...TD, padding: 0, width: 6, background: "#e5ddd0" }} />
-                    <td style={TD} colSpan={p.peutEcrire ? 7 : 6}>
+                    <td style={TD} colSpan={nbColonnes(false) - 1}>
                       <div style={{ height: 13, borderRadius: 4, background: "#e5ddd0", width: `${35 + (i % 3) * 15}%`, marginBottom: 6, animation: "pulse 1.5s ease-in-out infinite" }} />
                       <div style={{ height: 10, borderRadius: 3, background: "#ede6d9", width: "25%", animation: "pulse 1.5s ease-in-out infinite" }} />
                     </td>
                   </tr>
                 ))}
-                {!p.loading && lignes.map(({ x, offer, fournisseur }) => (
-                  <LigneProduit key={x.id} x={x} offer={offer} fournisseur={fournisseur} alerte={p.alertMap.get(x.id)}
-                    selectionnee={p.selectedIds.has(x.id)} enEdition={p.editingId === x.id} peutEcrire={p.peutEcrire}
-                    onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} />
-                ))}
-                {!p.loading && tries.length === 0 && (
-                  <tr><td style={{ ...TD, padding: "40px 20px", textAlign: "center", color: "#999", fontSize: 14 }} colSpan={p.peutEcrire ? 9 : 8}>Aucun produit ne correspond.</td></tr>
+                {!p.loading && lignes.map((l) => ligne(l))}
+                {vide && (
+                  <tr><td style={{ ...TD, padding: "40px 20px", textAlign: "center", color: "#999", fontSize: 14 }} colSpan={nbColonnes(false)}>Aucun produit ne correspond.</td></tr>
                 )}
               </tbody>
             </table>
