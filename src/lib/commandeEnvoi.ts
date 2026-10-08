@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { mapToPermRole } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { libelleColisage, libelleElement, nomUnite, quantiteLisible, taille, type CommandeArticle } from "@/lib/commandeArticles";
 import { livraisonPrecommande, prochaineLivraison, type RegleLivraison } from "@/lib/commandeLivraison";
 
@@ -13,25 +13,42 @@ import { livraisonPrecommande, prochaineLivraison, type RegleLivraison } from "@
 const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
 
 /**
- * Équipier : seulement les fournisseurs réglés « envoi_equipier » (Maël, Terre Azur) ; sinon il prépare
- * la commande et un admin ou un manager l'envoie. Manager et admin : tous les fournisseurs.
+ * Qui peut valider et envoyer une commande (même règle que le bouton à l'écran, `can("commandes.valider")`) :
+ * - manager et admin : tous les fournisseurs ;
+ * - équipier avec l'exception « Valider les commandes » sur sa fiche employé : tous les fournisseurs ;
+ * - autre équipier : seulement les fournisseurs réglés « envoi_equipier » (Maël, Terre Azur) ; sinon il
+ *   prépare la commande et un manager l'envoie.
  * (commande_simplifiee ne décide plus que de l'écran utilisé.)
  */
-export function peutValiderEnvoyer(role: string | null | undefined, envoiEquipier: boolean): boolean {
+export function peutValiderEnvoyer(role: string | null | undefined, envoiEquipier: boolean, permissions?: Record<string, boolean>): boolean {
   if (!role) return false;
-  const r = mapToPermRole(role);
-  if (r === "admin" || r === "manager") return true;
+  if (hasPermission(role, "commandes.valider", permissions)) return true;
   return envoiEquipier;
+}
+
+/**
+ * Exceptions de permissions de l'utilisateur (employes.custom_permissions), fusionnées entre ses fiches
+ * actives : en cas de conflit l'accès accordé l'emporte, comme dans ProfileContext.
+ */
+export async function permissionsEmploye(userId: string): Promise<Record<string, boolean>> {
+  const { data } = await supabaseAdmin.from("employes").select("custom_permissions").eq("auth_user_id", userId).eq("actif", true);
+  const fusion: Record<string, boolean> = {};
+  for (const e of data ?? []) {
+    const perms = (e.custom_permissions ?? {}) as Record<string, boolean>;
+    for (const [k, v] of Object.entries(perms)) fusion[k] = fusion[k] === true ? true : v;
+  }
+  return fusion;
 }
 
 /** Message d'erreur si l'utilisateur ne peut pas valider ni envoyer pour ce fournisseur, sinon null */
 export async function refusDroit(userId: string, supplierId: string): Promise<string | null> {
-  const [{ data: profil }, { data: fournisseur }] = await Promise.all([
+  const [{ data: profil }, { data: fournisseur }, permissions] = await Promise.all([
     supabaseAdmin.from("profiles").select("role").eq("id", userId).maybeSingle(),
     supabaseAdmin.from("suppliers").select("envoi_equipier").eq("id", supplierId).maybeSingle(),
+    permissionsEmploye(userId),
   ]);
-  if (peutValiderEnvoyer(profil?.role as string | null, !!fournisseur?.envoi_equipier)) return null;
-  return "Seuls un manager ou un admin peuvent valider et envoyer les commandes de ce fournisseur.";
+  if (peutValiderEnvoyer(profil?.role as string | null, !!fournisseur?.envoi_equipier, permissions)) return null;
+  return "Vous n'avez pas le droit de valider et d'envoyer les commandes de ce fournisseur : demandez à un manager, ou l'autorisation « Valider les commandes » sur votre fiche employé.";
 }
 
 export type LigneEnvoi = { rayon: string; rayonOrdre: number; nom: string; quantite: number; unite: string; texte: string; ref: string | null };

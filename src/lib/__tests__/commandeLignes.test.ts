@@ -32,4 +32,16 @@ describe("peutValiderEnvoyer (envoi_equipier)", () => {
     expect(peutValiderEnvoyer("manager", false)).toBe(true);
     expect(peutValiderEnvoyer("group_admin", false)).toBe(true);
   });
+  it("équipier avec l'exception « Valider les commandes » sur sa fiche : partout, comme le bouton à l'écran", () => {
+    expect(peutValiderEnvoyer("equipier", false, { "commandes.valider": true })).toBe(true);
+    expect(peutValiderEnvoyer("equipier", false, { "achats.inventaire": true })).toBe(false);
+    expect(peutValiderEnvoyer("equipier", false, {})).toBe(false);
+  });
+  it("manager à qui on a retiré l'exception : seulement les fournisseurs envoi_equipier", () => {
+    expect(peutValiderEnvoyer("manager", false, { "commandes.valider": false })).toBe(false);
+    expect(peutValiderEnvoyer("manager", true, { "commandes.valider": false })).toBe(true);
+  });
+  it("sans rôle : jamais", () => {
+    expect(peutValiderEnvoyer(null, true, { "commandes.valider": true })).toBe(false);
+  });
 });
