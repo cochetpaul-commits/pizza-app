@@ -41,7 +41,9 @@ import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
 import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
 import { parseAllergens } from "@/lib/allergens";
-import { CategoryHeader, IngredientRow, type EditState, type StorageZoneOption } from "@/components/IngredientRow";
+import { CategoryHeader, IngredientRow, type EditState, type IngredientRowProps, type StorageZoneOption } from "@/components/IngredientRow";
+import { BaseProduitsBureau, VoletDroit } from "@/components/produits/BaseProduitsBureau";
+import { useBureau } from "@/hooks/useBureau";
 import { useProfile } from "@/lib/ProfileContext";
 import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from "@/lib/rendement";
@@ -164,6 +166,10 @@ function IngredientsPageInner() {
   const [tab, setTab] = useState<Tab>("all");
   const [filterCategory, setFilterCategory] = useState<"all" | Category>("all");
   const [filterSupplier, setFilterSupplier] = useState<"all" | string>(supplierParam ?? "all");
+  // Zone de stockage (vue bureau) : sur les zones de l'établissement courant (storage_zone / storage_zone_2)
+  const [filterZone, setFilterZone] = useState<"all" | string>("all");
+  // Présentation bureau (liste A → Z + volet droit) ; la version téléphone reste celle d'avant
+  const bureau = useBureau();
   const [storageZones, setStorageZones] = useState<StorageZoneOption[]>([]);
 
   useEffect(() => {
@@ -229,8 +235,9 @@ function IngredientsPageInner() {
         return supplierForFilter != null && aliasIds.has(supplierForFilter);
       });
     }
+    if (filterZone !== "all") base = base.filter((x) => x.storage_zone === filterZone || x.storage_zone_2 === filterZone);
     return base;
-  }, [visibleItems, tab, filterCategory, filterSupplier, supplierAliases, offersByIngredientId]);
+  }, [visibleItems, tab, filterCategory, filterSupplier, filterZone, supplierAliases, offersByIngredientId]);
 
   // Categories sorted alphabetically by label (French locale)
   const CATEGORIES_ALPHA = useMemo(
@@ -281,11 +288,11 @@ function IngredientsPageInner() {
 
   // Multi-select
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const toggleSelect = (id: string) => setSelectedIds(prev => {
+  const toggleSelect = useCallback((id: string) => setSelectedIds(prev => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
-  });
+  }), []);
   const clearSelection = () => setSelectedIds(new Set());
 
   // Bulk actions
@@ -570,10 +577,10 @@ function IngredientsPageInner() {
     return null;
   }
 
-  async function addIngredient(e: React.FormEvent) {
+  async function addIngredient(e: React.FormEvent): Promise<boolean> {
     e.preventDefault();
     const name = newName.trim();
-    if (!name) { alert("Nom obligatoire."); return; }
+    if (!name) { alert("Nom obligatoire."); return false; }
     const supplier_id = newCategory === "preparation" ? null : (normalizeSupplierId(newSupplierId) || null);
     const baseIngredient: IngredientUpsert = {
       name, category: newCategory,
@@ -602,18 +609,19 @@ function IngredientsPageInner() {
       } else {
         alert(ins.error.message);
       }
-      return;
+      return false;
     }
     const ingredient_id = ins.data.id as string;
     if (supplier_id && newCategory !== "preparation") {
-      if (!userId) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return; }
+      if (!userId) { alert("Utilisateur non connecté. Impossible d'enregistrer l'offre."); return false; }
       const offerPayload = buildOfferFromCreate(ingredient_id, userId);
-      if (!offerPayload) return;
+      if (!offerPayload) return false;
       const erreur = await writeActiveOffer(offerPayload);
-      if (erreur) { alert(erreur); return; }
+      if (erreur) { alert(erreur); return false; }
     }
     setNewName(""); setNewCategory("preparation"); setNewSupplierId(""); setPriceKind("unit"); resetCreatePriceBlocks();
     await mutate();
+    return true;
   }
 
   /**
@@ -1012,6 +1020,9 @@ function IngredientsPageInner() {
     } finally { savingRef.current = false; }
   }, [runSaveEdit]);
 
+  /** Fermer la fiche sans enregistrer (volet bureau : croix, Échap, clic à côté) */
+  const cancelEdit = useCallback(() => { setEditingId(null); setEdit(null); }, []);
+
   const del = useCallback(async (id: string, name: string) => {
     if (!confirm(`Supprimer "${name}" ?`)) return;
     // Check all recipe tables in parallel
@@ -1186,6 +1197,54 @@ function IngredientsPageInner() {
   // recherche + filtres + ajout, le CTA flottant faisait doublon.
   useBottomBarActions(() => [], []);
 
+  /** Props d'une ligne produit : la liste téléphone et le volet bureau affichent la même fiche */
+  const propsLigne = (x: Ingredient): IngredientRowProps => {
+    const offer = offersByIngredientId.get(x.id);
+    const supplierIdForDisplay = offer?.supplier_id ?? x.supplier_id ?? null;
+    const supplierName = supplierIdForDisplay ? suppliersMap.get(supplierIdForDisplay)?.name ?? null : null;
+    const enEdition = editingId === x.id;
+    return {
+      item: x,
+      offer,
+      altOffers: allOffersByIngredientId.get(x.id) ?? [],
+      suppliersMap,
+      supplierName,
+      supplierIdForDisplay,
+      selected: selectedIds.has(x.id),
+      onToggleSelect: userCanWrite ? toggleSelect : undefined,
+      alert: alertMap.get(x.id),
+      isEditing: enEdition,
+      compactMode,
+      edit: enEdition ? edit : null,
+      suppliers,
+      storageZones,
+      previewEditPack: enEdition ? previewEditPack : "",
+      onStartEdit: userCanWrite ? startEdit : () => {},
+      onSaveEdit: userCanWrite ? saveEdit : () => {},
+      onDelete: userCanWrite ? del : () => {},
+      onSetStatus: userCanWrite ? setIngredientStatus : () => {},
+      onEditChange,
+      onEditImportName,
+      onCreateDerived: userCanWrite ? openDeriveModal : undefined,
+      onOpenSupplier: openSupplierModal,
+      onToggleEstablishment: userCanWrite ? toggleEstablishment : undefined,
+      duplicateMatch: enEdition ? editingDuplicateMatch : null,
+      onMergeDuplicate: userCanWrite ? handleMergeDuplicate : undefined,
+      onIgnoreDuplicate: (id1, id2) => {
+        const key = [id1, id2].sort().join(":");
+        setIgnoreKeys(prev => {
+          const next = new Set(prev);
+          next.add(key);
+          localStorage.setItem("ingredient-duplicate-ignores", JSON.stringify([...next]));
+          return next;
+        });
+      },
+      subCategorySuggestions: sousCategoriesParCategorie[(enEdition && edit ? edit.category : x.category)] ?? [],
+    };
+  };
+  /** Fiche ouverte dans le volet bureau */
+  const ficheEnCours = bureau && editingId ? items.find((x) => x.id === editingId) ?? null : null;
+
   return (
     <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
       <style>{`
@@ -1201,7 +1260,18 @@ function IngredientsPageInner() {
       {/* ══════════════════════════════════════════════
           TOOLBAR (no header bandeau — global header handles nav)
       ══════════════════════════════════════════════ */}
-      <div style={{ position: "sticky", top: "var(--topbar-desktop-height, 0px)", zIndex: 40, background: "#f2ede4" }}>
+      {bureau && backUrl && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 28px 0" }}>
+          <button type="button" onClick={() => router.push(backUrl)}
+            style={{ border: "1.5px solid #8a4b2f", background: "#fff", color: "#8a4b2f", borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+            {backUrl.startsWith("/commandes") ? "← Retour à la commande" : "← Retour à la fiche"}
+          </button>
+          <span style={{ fontSize: 12.5, color: "#7a6a52" }}>{backUrl.startsWith("/commandes")
+            ? "La commande en cours est conservée : corrige le produit, enregistre, et tu y reviens."
+            : "La fiche en cours est conservée : modifie le produit, enregistre, et tu y reviens."}</span>
+        </div>
+      )}
+      {!bureau && <div style={{ position: "sticky", top: "var(--topbar-desktop-height, 0px)", zIndex: 40, background: "#f2ede4" }}>
         {backUrl && (
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", background: "#fff6e0", borderBottom: "1px solid #e8d9b8" }}>
             <button type="button" onClick={() => router.push(backUrl)}
@@ -1422,12 +1492,12 @@ function IngredientsPageInner() {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* ══════════════════════════════════════════════
           MAIN
       ══════════════════════════════════════════════ */}
-      <main style={{ padding: "0 20px 60px", boxSizing: "border-box" }}>
+      <main style={{ padding: bureau ? "18px 28px 60px" : "0 20px 60px", boxSizing: "border-box" }}>
 
         {/* Variations panel */}
         {isVariations && userId && (
@@ -1446,7 +1516,40 @@ function IngredientsPageInner() {
             {showImportExport && (
               <ImportExportModal etabSlug={etab?.slug ?? "bello_mio"} onClose={() => { setShowImportExport(false); void mutate(); }} onDone={() => { void mutate(); }} />
             )}</>
-            <BottomSheet open={showCreateForm} onClose={() => setShowCreateForm(false)} title="Créer un ingrédient">
+            {bureau && showCreateForm && (
+              <VoletDroit titre="Nouveau produit" sousTitre="Nom, catégorie, fournisseur et prix : le reste se complète dans la fiche." onFermer={() => setShowCreateForm(false)} largeur={560}>
+                <form onSubmit={(e) => { void addIngredient(e).then((ok) => { if (ok) setShowCreateForm(false); }); }} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div><div className={lCls}>Ingrédient</div><input className={iCls} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => handleNewNameChange(e.target.value)} autoFocus /></div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div><div className={lCls}>Catégorie</div>
+                      <select className={sCls} value={newCategory} onChange={(e) => setNewCategory(e.target.value as Category)}>
+                        {CATEGORIES_ALPHA.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+                      </select>
+                    </div>
+                    <div><div className={lCls}>Fournisseur</div>
+                      <select className={sCls} value={newSupplierId} onChange={(e) => setNewSupplierId(e.target.value)}>
+                        <option value="">—</option>
+                        {suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div><div className={lCls}>Unité</div>
+                      <select className={sCls} value={newUnit} onChange={(e) => setNewUnit(e.target.value as "kg" | "l" | "pc")}>
+                        <option value="kg">Kilo (kg)</option><option value="l">Litre (L)</option><option value="pc">Pièce (pc)</option>
+                      </select>
+                    </div>
+                    <div><div className={lCls}>Prix ({newUnit === "kg" ? "€/kg" : newUnit === "l" ? "€/L" : "€/pc"})</div>
+                      <input className={iCls} placeholder={newUnit === "pc" ? "Ex: 1.79" : newUnit === "l" ? "Ex: 2.07" : "Ex: 12.50"} inputMode="decimal" value={newUnitPrice} onChange={(e) => setNewUnitPrice(e.target.value)} />
+                    </div>
+                  </div>
+                  <button type="submit" style={{ width: "100%", height: 44, borderRadius: 10, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                    Ajouter le produit
+                  </button>
+                </form>
+              </VoletDroit>
+            )}
+            <BottomSheet open={!bureau && showCreateForm} onClose={() => setShowCreateForm(false)} title="Créer un ingrédient">
               <div style={{ padding: "0 4px 16px" }}>
                 <form onSubmit={addIngredient} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   <div><div className={lCls}>Ingrédient</div><input className={iCls} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => handleNewNameChange(e.target.value)} /></div>
@@ -1485,18 +1588,87 @@ function IngredientsPageInner() {
               </div>
             </BottomSheet>
 
+            {bureau && (
+              <BaseProduitsBureau
+                accent={accentColor}
+                peutEcrire={userCanWrite}
+                produits={filtered}
+                loading={loading}
+                erreur={dataError ? ((dataError as Error).message ?? String(dataError)) : null}
+                hasMore={hasMore}
+                loadingMore={loadingMore}
+                loadMore={loadMore}
+                offersByIngredientId={offersByIngredientId}
+                suppliersMap={suppliersMap}
+                suppliers={suppliers}
+                zones={storageZones}
+                alertMap={alertMap}
+                tab={tab}
+                setTab={setTab}
+                total={TABS_MAIN[0].count}
+                valides={TABS_MAIN[1].count}
+                aControler={TABS_MAIN[2].count}
+                nbDoublons={duplicatePairs.length}
+                onDoublons={() => setShowDoublons(true)}
+                q={q}
+                setQ={setQ}
+                categorie={filterCategory}
+                setCategorie={setFilterCategory}
+                categories={CATEGORIES_ALPHA}
+                fournisseur={filterSupplier}
+                setFournisseur={setFilterSupplier}
+                zone={filterZone}
+                setZone={setFilterZone}
+                showInactive={showInactive}
+                setShowInactive={setShowInactive}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onToutSelectionner={selectAllFiltered}
+                onToutDecocher={clearSelection}
+                editingId={editingId}
+                onOuvrir={userCanWrite ? startEdit : (x) => router.push(`/ingredients/${x.id}`)}
+                onOpenSupplier={openSupplierModal}
+                onAjouter={() => setShowCreateForm(true)}
+                onImportExport={() => setShowImportExport(true)}
+                onRecuperer={() => setShowRecover(true)}
+              />
+            )}
+            {ficheEnCours && (
+              <VoletDroit
+                titre={ficheEnCours.name}
+                sousTitre={`Paramétrage de la fiche · ${CAT_LABELS[ficheEnCours.category] ?? ficheEnCours.category}`}
+                onFermer={cancelEdit}
+                pied={<>
+                  <button type="button" onClick={() => { void del(ficheEnCours.id, ficheEnCours.name); }}
+                    style={{ border: "none", background: "transparent", color: "#b4443a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: "8px 0" }}>
+                    Supprimer
+                  </button>
+                  <button type="button" onClick={cancelEdit}
+                    style={{ marginLeft: "auto", border: "1px solid #ddd6c8", background: "#fff", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a" }}>
+                    Fermer sans enregistrer
+                  </button>
+                  <button type="button" onClick={() => { void saveEdit(); }}
+                    style={{ border: "1px solid #1a1a1a", background: "#1a1a1a", color: "#f2ede4", borderRadius: 10, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                    Enregistrer
+                  </button>
+                </>}
+              >
+                <IngredientRow {...propsLigne(ficheEnCours)} compactMode={false} />
+              </VoletDroit>
+            )}
+
             {/* Skeleton loader */}
-            {loading && <SkeletonTable />}
+            {!bureau && loading && <SkeletonTable />}
 
             {/* Erreur de chargement */}
-            {!loading && dataError && (
+            {!bureau && !loading && dataError && (
               <div style={{ margin: "12px 0", padding: "14px 16px", background: "#FEF2F2", border: "1px solid rgba(220,38,38,0.25)", borderRadius: 10, fontSize: 12, color: "#DC2626", fontWeight: 600 }}>
                 Erreur de chargement : {(dataError as Error).message ?? String(dataError)}
               </div>
             )}
 
             {/* ── Card-based list container ── */}
-            {!loading && !dataError && (
+            {!bureau && !loading && !dataError && (
               <div style={{ marginTop: 4 }}>
 
                 {/* Rows */}
@@ -1512,9 +1684,6 @@ function IngredientsPageInner() {
                       let lastSubCat: string | null | undefined = undefined;
                       const hasSubCats = catItems.some(x => x.sub_category);
                       return catItems.map((x) => {
-                      const offer = offersByIngredientId.get(x.id);
-                      const supplierIdForDisplay = offer?.supplier_id ?? x.supplier_id ?? null;
-                      const supplierName = supplierIdForDisplay ? suppliersMap.get(supplierIdForDisplay)?.name ?? null : null;
                       const showSubHeader = hasSubCats && x.sub_category !== lastSubCat;
                       lastSubCat = x.sub_category;
                       const subKey = `${cat}|${x.sub_category ?? ""}`;
@@ -1530,46 +1699,7 @@ function IngredientsPageInner() {
                               <span style={{ fontSize: 10, transition: "transform 0.2s", transform: subCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
                             </button>
                           )}
-                          {subCollapsed ? null : (
-                          <IngredientRow
-                            item={x}
-                            offer={offer}
-                            altOffers={allOffersByIngredientId.get(x.id) ?? []}
-                            suppliersMap={suppliersMap}
-                            supplierName={supplierName}
-                            supplierIdForDisplay={supplierIdForDisplay}
-                            selected={selectedIds.has(x.id)}
-                            onToggleSelect={userCanWrite ? toggleSelect : undefined}
-                            alert={alertMap.get(x.id)}
-                            isEditing={editingId === x.id}
-                            compactMode={compactMode}
-                            edit={editingId === x.id ? edit : null}
-                            suppliers={suppliers}
-                            storageZones={storageZones}
-                            previewEditPack={editingId === x.id ? previewEditPack : ""}
-                            onStartEdit={userCanWrite ? startEdit : () => {}}
-                            onSaveEdit={userCanWrite ? saveEdit : () => {}}
-                            onDelete={userCanWrite ? del : () => {}}
-                            onSetStatus={userCanWrite ? setIngredientStatus : () => {}}
-                            onEditChange={onEditChange}
-                            onEditImportName={onEditImportName}
-                            onCreateDerived={userCanWrite ? openDeriveModal : undefined}
-                            onOpenSupplier={openSupplierModal}
-                            onToggleEstablishment={userCanWrite ? toggleEstablishment : undefined}
-                            duplicateMatch={editingId === x.id ? editingDuplicateMatch : null}
-                            onMergeDuplicate={userCanWrite ? handleMergeDuplicate : undefined}
-                            onIgnoreDuplicate={(id1, id2) => {
-                              const key = [id1, id2].sort().join(":");
-                              setIgnoreKeys(prev => {
-                                const next = new Set(prev);
-                                next.add(key);
-                                localStorage.setItem("ingredient-duplicate-ignores", JSON.stringify([...next]));
-                                return next;
-                              });
-                            }}
-                            subCategorySuggestions={sousCategoriesParCategorie[(editingId === x.id && edit ? edit.category : x.category)] ?? []}
-                          />
-                          )}
+                          {subCollapsed ? null : <IngredientRow {...propsLigne(x)} />}
                         </div>
                       );
                     });
@@ -1587,7 +1717,7 @@ function IngredientsPageInner() {
 
             {/* Infinite scroll sentinel */}
             {hasMore && <div ref={sentinelRef} style={{ height: 1 }} />}
-            {loadingMore && (
+            {!bureau && loadingMore && (
               <div style={{ padding: "16px 0", textAlign: "center", fontSize: 13, color: "#888" }}>
                 Chargement…
               </div>
