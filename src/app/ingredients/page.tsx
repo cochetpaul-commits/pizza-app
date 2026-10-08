@@ -1319,20 +1319,38 @@ function IngredientsPageInner() {
                 titre={ficheEnCours.name}
                 sousTitre={`Paramétrage de la fiche · ${CAT_LABELS[ficheEnCours.category] ?? ficheEnCours.category}`}
                 onFermer={cancelEdit}
-                pied={<>
+                pied={bureau ? <>
                   <button type="button" onClick={() => { void del(ficheEnCours.id, ficheEnCours.name); }}
                     style={{ border: "none", background: "transparent", color: "#b4443a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: "8px 0" }}>
                     Supprimer
                   </button>
                   <button type="button" onClick={cancelEdit}
                     style={{ marginLeft: "auto", border: "1px solid #ddd6c8", background: "#fff", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a" }}>
-                    {bureau ? "Fermer sans enregistrer" : "Fermer"}
+                    Fermer sans enregistrer
                   </button>
                   <button type="button" onClick={() => { void saveEdit(); }}
                     style={{ border: "1px solid #1a1a1a", background: "#1a1a1a", color: "#f2ede4", borderRadius: 10, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
                     Enregistrer
                   </button>
-                </>}
+                </> : (
+                  // Téléphone (comme ComandR) : Supprimer au centre, puis Fermer / Enregistrer côte à côte
+                  <div style={{ width: "100%", display: "grid", gap: 10 }}>
+                    <button type="button" onClick={() => { void del(ficheEnCours.id, ficheEnCours.name); }}
+                      style={{ border: "none", background: "transparent", color: "#b4443a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: "4px 0", justifySelf: "center" }}>
+                      Supprimer
+                    </button>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      <button type="button" onClick={cancelEdit}
+                        style={{ height: 46, border: "1px solid #ddd6c8", background: "#fff", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a" }}>
+                        Fermer
+                      </button>
+                      <button type="button" onClick={() => { void saveEdit(); }}
+                        style={{ height: 46, border: "none", background: "#1a1a1a", color: "#f2ede4", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                        Enregistrer
+                      </button>
+                    </div>
+                  </div>
+                )}
               >
                 <IngredientRow {...propsLigne(ficheEnCours)} compactMode={false} presentation="volet" />
               </VoletDroit>

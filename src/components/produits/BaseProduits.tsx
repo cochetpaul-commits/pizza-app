@@ -499,14 +499,17 @@ export function VoletDroit({ titre, sousTitre, onFermer, pied, largeur = 640, ch
 
   return (
     <>
-      <div onClick={onFermer} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(26,26,26,0.18)" }} />
+      <div onClick={onFermer} className="volet-fond" style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(26,26,26,0.18)" }} />
       <style>{`
+        /* Téléphone : tiroir qui monte du bas, au-dessus de l'en-tête (110) et de la barre d'onglets (100),
+           comme la feuille du bas de l'application (200). Les boutons du pied restent visibles. */
         @media (max-width: 767px) {
-          .volet-droit { top: 40px !important; right: 0 !important; bottom: 0 !important; left: 0; width: auto !important; border-radius: 20px 20px 0 0 !important; border: none !important; box-shadow: 0 -8px 40px rgba(0,0,0,0.18) !important; animation: voletMonte .25s ease; }
-          .volet-droit > div { padding-left: 14px !important; padding-right: 14px !important; }
+          .volet-fond { z-index: 200 !important; background: rgba(26,26,26,0.45) !important; }
+          .volet-droit { z-index: 201 !important; top: 48px !important; right: 0 !important; bottom: 0 !important; left: 0; width: auto !important; border-radius: 20px 20px 0 0 !important; border: none !important; box-shadow: 0 -8px 40px rgba(0,0,0,0.25) !important; animation: voletMonte .3s cubic-bezier(.2,.8,.2,1); }
+          .volet-droit > div { padding-left: 16px !important; padding-right: 16px !important; }
           .volet-droit > div:last-child { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; }
         }
-        @keyframes voletMonte { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+        @keyframes voletMonte { from { transform: translateY(100%); } to { transform: none; } }
       `}</style>
       <aside role="dialog" aria-modal="true" className="volet-droit" style={{
         position: "fixed", top: "calc(var(--topbar-desktop-height, 0px) + 12px)", right: 12, bottom: 12,
