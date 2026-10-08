@@ -1349,6 +1349,18 @@ function CommandesPage() {
       const data = await res.json();
       if (data.ok) {
         setEnvoiAConfirmer(null);
+        // Vécu 08/10 : envoyée depuis la liste « en cours », la commande y restait affichée en brouillon
+        // avec son bouton Supprimer ; une commande Carniato déjà partie chez le fournisseur a été effacée.
+        const envoyee = activeSessions.find((s) => s.id === sessionId);
+        if (envoyee) {
+          setActiveSessions((prev) => prev.filter((s) => s.id !== sessionId));
+          setPendingReceptions((prev) => [{ ...envoyee, email_sent_at: new Date().toISOString() }, ...prev.filter((p) => p.id !== sessionId)]);
+          setDraftSupplierIds((prev) => {
+            const next = new Set(prev);
+            if (!activeSessions.some((s) => s.id !== sessionId && s.supplier_id === envoyee.supplier_id && s.status === "brouillon")) next.delete(envoyee.supplier_id);
+            return next;
+          });
+        }
         // Retour à l'accueil des commandes : le bandeau vert confirme l'envoi
         setConfirmation(`✓ Commande envoyée à ${data.recipients?.join(", ") || "au fournisseur"}${data.livraison?.libelle ? ` — livraison ${data.livraison.libelle}` : ""}`);
         setSession(null);
@@ -1379,12 +1391,29 @@ function CommandesPage() {
 
   // ── Delete session ──────────────────────────────────────────────────
 
+  /**
+   * Supprime un brouillon (lignes puis session). Une commande déjà envoyée ou reçue ne se supprime pas :
+   * on relit son statut avant d'agir (la liste à l'écran peut être en retard) et la base le refuse de toute
+   * façon (déclencheur). Retourne le message d'erreur à afficher, ou null.
+   */
+  async function supprimerBrouillon(sessionId: string): Promise<string | null> {
+    const { data: actuel } = await supabase.from("commande_sessions").select("status").eq("id", sessionId).maybeSingle();
+    if (actuel && (actuel.status === "envoyee" || actuel.status === "recue")) {
+      return "Cette commande a déjà été envoyée au fournisseur : elle ne peut plus être supprimée. Elle est dans « Réceptions en attente ».";
+    }
+    const lignes = await supabase.from("commande_lignes").delete().eq("session_id", sessionId);
+    if (lignes.error) return `Suppression impossible : ${lignes.error.message}`;
+    const sess = await supabase.from("commande_sessions").delete().eq("id", sessionId);
+    if (sess.error) return `Suppression impossible : ${sess.error.message}`;
+    return null;
+  }
+
   async function deleteSession() {
     if (!session) return;
     if (!confirm("Supprimer cette commande ? Cette action est irréversible.")) return;
     setSaving(true);
-    await supabase.from("commande_lignes").delete().eq("session_id", session.id);
-    await supabase.from("commande_sessions").delete().eq("id", session.id);
+    const erreur = await supprimerBrouillon(session.id);
+    if (erreur) { setSaving(false); alert(erreur); return; }
     setSession(null);
     setQuantities({});
     setNotes("");
@@ -2463,8 +2492,8 @@ function CommandesPage() {
                           onClick={async () => {
                             setActiveMenuId(null);
                             if (!confirm(`Supprimer la commande ${s.supplier_name} ?`)) return;
-                            await supabase.from("commande_lignes").delete().eq("session_id", s.id);
-                            await supabase.from("commande_sessions").delete().eq("id", s.id);
+                            const erreur = await supprimerBrouillon(s.id);
+                            if (erreur) { alert(erreur); return; }
                             setActiveSessions((prev) => prev.filter((x) => x.id !== s.id));
                             if (session?.id === s.id) { setSession(null); setQuantities({}); }
                             setConfirmation("Commande supprimée");
