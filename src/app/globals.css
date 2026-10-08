@@ -222,15 +222,29 @@ html, body{
 /* Pages sur bureau : les racines de page plafonnées à 900–1100 px en style inline s'élargissent
    jusqu'à --page-max-width. Les grilles en auto-fit et les tableaux occupent la place ; sur mobile
    et tablette, rien ne change. */
+/* Racines de page (ou un niveau en dessous) plafonnées entre 760 et 1180 px en style inline, et la
+   classe .container : elles s'élargissent jusqu'à --page-max-width. Les largeurs plus étroites
+   (formulaires, fenêtres) sont laissées telles quelles. */
 @media (min-width: 1100px) {
-  .app-main main > div[style*="max-width: 900px"],
-  .app-main main > div[style*="max-width: 980px"],
-  .app-main main > div[style*="max-width: 1000px"],
-  .app-main main > div[style*="max-width: 1100px"] {
+  .app-main main > :is(div, main, section)[style*="max-width: 760px"],
+  .app-main main > * > :is(div, main, section)[style*="max-width: 760px"],
+  .app-main main > :is(div, main, section)[style*="max-width: 820px"],
+  .app-main main > * > :is(div, main, section)[style*="max-width: 820px"],
+  .app-main main > :is(div, main, section)[style*="max-width: 900px"],
+  .app-main main > * > :is(div, main, section)[style*="max-width: 900px"],
+  .app-main main > :is(div, main, section)[style*="max-width: 980px"],
+  .app-main main > * > :is(div, main, section)[style*="max-width: 980px"],
+  .app-main main > :is(div, main, section)[style*="max-width: 1000px"],
+  .app-main main > * > :is(div, main, section)[style*="max-width: 1000px"],
+  .app-main main > :is(div, main, section)[style*="max-width: 1100px"],
+  .app-main main > * > :is(div, main, section)[style*="max-width: 1100px"],
+  .app-main main > :is(div, main, section)[style*="max-width: 1180px"],
+  .app-main main > * > :is(div, main, section)[style*="max-width: 1180px"] {
     max-width: var(--page-max-width) !important;
     padding-left: 32px !important;
     padding-right: 32px !important;
   }
+  .app-main main .container { max-width: var(--page-max-width); padding-left: 32px; padding-right: 32px; }
 }
 
 /* Barre du haut bureau : fixe, alignée sur la zone de contenu, suit le repli de la barre latérale */

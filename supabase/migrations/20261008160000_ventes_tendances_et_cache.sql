@@ -70,3 +70,34 @@ returns text language sql stable as $fn$
            where v.etablissement_id = p_etab and v.date_service >= p_from and v.date_service <= p_to)
          || '-' || (select count(*)::text from public.popina_products p where p.active)
 $fn$;
+
+-- Accueil « point du jour » (étape 2 de la refonte) : ventes par jour et service, et compteurs.
+create or replace function public.accueil_ventes_jour(p_etab uuid, p_from date, p_to date)
+returns table(jour text, service text, ca_ttc numeric, tickets bigint, couverts bigint)
+language sql stable as $fn$
+  with t as (
+    select v.date_service, coalesce(v.service, 'autre') as service, v.num_fiscal,
+           sum(case when v.type_ligne = 'Produit' and v.annule = false then v.ttc else 0 end) as ttc,
+           max(coalesce(v.couverts, 0)) as couverts
+      from public.ventes_lignes v
+     where v.etablissement_id = p_etab and v.date_service >= p_from and v.date_service <= p_to
+     group by 1, 2, 3)
+  select to_char(t.date_service, 'YYYY-MM-DD') as jour, t.service,
+         round(sum(t.ttc)::numeric, 2) as ca_ttc, count(*) as tickets, sum(t.couverts)::bigint as couverts
+    from t group by 1, 2 order by 1, 2
+$fn$;
+
+create or replace function public.accueil_compteurs(p_etab uuid, p_debut_mois date)
+returns table(produits_actifs bigint, produits_sans_prix bigint, fiches bigint, employes bigint,
+              commandes_brouillon bigint, commandes_envoyees bigint, factures_mois bigint, factures_mois_ht numeric)
+language sql stable as $fn$
+  select (select count(*) from public.ingredients i where i.is_active),
+         (select count(*) from public.ingredients i where i.is_active
+             and not exists (select 1 from public.supplier_offers o where o.ingredient_id = i.id and o.is_active)),
+         (select count(*) from public.kitchen_recipes k where k.is_active),
+         (select count(*) from public.employes e where e.actif and e.etablissement_id = p_etab),
+         (select count(*) from public.commande_sessions c where c.etablissement_id = p_etab and c.status in ('brouillon', 'en_attente')),
+         (select count(*) from public.commande_sessions c where c.etablissement_id = p_etab and c.status in ('validee', 'envoyee')),
+         (select count(*) from public.supplier_invoices f where f.etablissement_id = p_etab and f.invoice_date >= p_debut_mois),
+         (select coalesce(round(sum(f.total_ht)::numeric), 0) from public.supplier_invoices f where f.etablissement_id = p_etab and f.invoice_date >= p_debut_mois)
+$fn$;
