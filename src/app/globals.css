@@ -9,6 +9,7 @@
   --noir: #2c2c2c;
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 60px;
+  --topbar-desktop-height: 56px;
   --etab-color: #b45f57;
   --sauge: #4a6741;
   --sauge-light: #e8ede6;
@@ -212,7 +213,20 @@ html, body{
   margin-left: calc(var(--sidebar-width) + 16px);
   min-height: 100dvh;
   background: var(--creme);
+  /* Place pour la barre du haut fixe (bureau) */
+  padding-top: var(--topbar-desktop-height);
 }
+
+/* Barre du haut bureau : fixe, alignée sur la zone de contenu, suit le repli de la barre latérale */
+.topbar-desktop {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: calc(var(--sidebar-width) + 16px);
+  z-index: 45;
+  transition: left 0.25s ease;
+}
+html.sidebar-collapsed .topbar-desktop { left: 16px; }
 
 body {
   background: var(--creme) !important;
@@ -224,6 +238,8 @@ body {
 }
 
 @media (max-width: 767px) {
+  :root { --topbar-desktop-height: 0px; }
+  .topbar-desktop { display: none !important; }
   .sidebar-desktop {
     display: none;
   }
@@ -320,7 +336,7 @@ body {
 /* ── Barre de période sticky (style Zenchef) ──────── */
 .period-sticky {
   position: sticky;
-  top: 0;
+  top: var(--topbar-desktop-height, 0px);
   z-index: 60;
   background: rgba(242, 237, 228, 0.88);
   backdrop-filter: blur(14px) saturate(160%);
@@ -361,6 +377,8 @@ html.sidebar-collapsed .sidebar-toggle-btn { left: 12px; }
   .app-main {
     margin-left: calc(200px + 16px) !important;
   }
+  .topbar-desktop { left: calc(200px + 16px); }
+  html.sidebar-collapsed .topbar-desktop { left: 16px; }
   .sidebar-toggle-btn { left: calc(200px - 46px); }
   html.sidebar-collapsed .sidebar-toggle-btn { left: 12px; }
   html.sidebar-collapsed .app-main { margin-left: 16px !important; }
@@ -1479,7 +1497,7 @@ button:active { transform: scale(0.98); }
 }
 
 /* Commande Maël : titre du rayon ouvert collé sous l'en-tête pendant le défilement */
-.rayon-collant { position: sticky; top: 0; z-index: 5; }
+.rayon-collant { position: sticky; top: var(--topbar-desktop-height, 0px); z-index: 5; }
 @media (max-width: 767px) {
   .rayon-collant { top: calc(52px + var(--mobile-header-extra, 0px) + env(safe-area-inset-top, 0px)); }
 }

@@ -3,8 +3,6 @@
 import Link from "next/link";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-import { EtablissementSelector } from "@/components/EtablissementSelector";
-import { NotificationBell } from "@/components/NotificationBell";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
 export type MenuItem = {
@@ -65,14 +63,7 @@ export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }:
           )}
         </div>
 
-        {/* ── Center: establishment selector ── */}
-        <div style={{ flex: "0 0 auto" }}>
-          <EtablissementSelector />
-        </div>
-
-        {/* ── Notification bell ── */}
-        <NotificationBell />
-
+        {/* Établissement et cloche : désormais dans la barre du haut (TopBarDesktop) */}
         {/* ── Right: structured or legacy ── */}
         {hasStructuredRight ? (
           <div style={rightStyle}>
@@ -133,7 +124,8 @@ export function NavBar({ backHref, backLabel, right, primaryAction, menuItems }:
 
 const navStyle: React.CSSProperties = {
   position: "sticky",
-  top: 0,
+  // Sous la barre du haut fixe (bureau)
+  top: "var(--topbar-desktop-height, 0px)",
   zIndex: 50,
   width: "100%",
   maxWidth: "100vw",

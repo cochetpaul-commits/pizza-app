@@ -311,7 +311,7 @@ export default function MonTableauPage() {
       {/* Barre de période sticky (ordinateur) — masquée sur mobile où le
           ranker vit dans le bandeau du haut, comme sur Ventes */}
       <div className="montableau-periodbar" style={{
-        position: "sticky", top: 0, zIndex: 60,
+        position: "sticky", top: "var(--topbar-desktop-height, 0px)", zIndex: 60,
         display: "flex", justifyContent: "center", alignItems: "center", gap: 8,
         margin: "-16px -16px 12px", padding: "10px 16px",
         background: "rgba(242,237,228,0.88)",

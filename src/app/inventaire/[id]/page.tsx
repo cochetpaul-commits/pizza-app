@@ -590,7 +590,7 @@ function Feuille() {
       ) : null}
 
       {/* Zones, dans l'ordre des feuilles */}
-      <div className="inventaire-zones" style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none", margin: "14px 0 10px", padding: "6px 0", position: "sticky", top: 0, zIndex: 5, background: "#f2ede4" }}>
+      <div className="inventaire-zones" style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none", margin: "14px 0 10px", padding: "6px 0", position: "sticky", top: "var(--topbar-desktop-height, 0px)", zIndex: 5, background: "#f2ede4" }}>
         {/* Une zone reste visible tant qu'elle a des lignes, même toutes retirées (grisée) ; seules les zones sans aucune ligne passent dans « + zone » */}
         {zones.filter((z) => z === zone || (parZone.get(z) ?? []).length > 0).map((z) => {
           const toutes = parZone.get(z) ?? [];

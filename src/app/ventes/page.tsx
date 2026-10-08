@@ -685,7 +685,7 @@ function PerformancesPage() {
         {/* Barre de période sticky (style Zenchef) : toujours visible en scrollant,
             flèches au pas de la période affichée (jour, semaine, mois...) */}
         <div className="ventes-periodbar" style={{
-          position: "sticky", top: 0, zIndex: 60,
+          position: "sticky", top: "var(--topbar-desktop-height, 0px)", zIndex: 60,
           display: "flex", justifyContent: "center", alignItems: "center", gap: 8,
           margin: "-16px -16px 10px", padding: "10px 16px",
           background: "rgba(242,237,228,0.88)",

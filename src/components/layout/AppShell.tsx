@@ -6,6 +6,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { canAccess } from "@/lib/rbac";
 import { Sidebar } from "./Sidebar";
 import { MobileHeader } from "./MobileHeader";
+import { TopBarDesktop } from "./TopBarDesktop";
 import { BottomTabBar } from "./BottomTabBar";
 import { BottomBarProvider } from "@/lib/BottomBarContext";
 
@@ -60,6 +61,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
 
       <div className="app-main">
+        <TopBarDesktop />
         <MobileHeader />
         <main>{allowed ? children : <AccessDenied />}</main>
       </div>

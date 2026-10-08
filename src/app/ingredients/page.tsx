@@ -1201,7 +1201,7 @@ function IngredientsPageInner() {
       {/* ══════════════════════════════════════════════
           TOOLBAR (no header bandeau — global header handles nav)
       ══════════════════════════════════════════════ */}
-      <div style={{ position: "sticky", top: 0, zIndex: 40, background: "#f2ede4" }}>
+      <div style={{ position: "sticky", top: "var(--topbar-desktop-height, 0px)", zIndex: 40, background: "#f2ede4" }}>
         {backUrl && (
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", background: "#fff6e0", borderBottom: "1px solid #e8d9b8" }}>
             <button type="button" onClick={() => router.push(backUrl)}
