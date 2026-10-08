@@ -14,6 +14,7 @@ import { fetchApi } from "@/lib/fetchApi";
 import { useDebounce } from "@/lib/useDebounce";
 import { useIngredientsData } from "@/lib/useIngredientsData";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { cleEtab } from "@/lib/zonesEtablissement";
 
 import {
   CATEGORIES,
@@ -212,15 +213,30 @@ function IngredientsPageInner() {
     [],
   );
 
-  // Sous-catégories déjà utilisées, par catégorie (orthographes distinctes, triées)
+  // Sous-catégories déjà utilisées, par catégorie : lues en base pour l'établissement (toute la base,
+  // pas seulement les produits affichés : après une recherche, le menu ne proposait plus que la
+  // sous-catégorie du produit trouvé, vécu 08/10/2026), complétées par celles des produits chargés.
+  const [sousCategoriesBase, setSousCategoriesBase] = useState<Record<string, string[]>>({});
+  useEffect(() => {
+    let actif = true;
+    (async () => {
+      const { data } = await supabase.rpc("sous_categories_produits", { p_etab: cleEtab(etab?.slug) });
+      if (!actif || !data) return;
+      const m: Record<string, string[]> = {};
+      for (const r of data as { category: string; sub_category: string }[]) (m[r.category] ??= []).push(r.sub_category);
+      setSousCategoriesBase(m);
+    })();
+    return () => { actif = false; };
+  }, [etab?.slug]);
   const sousCategoriesParCategorie = useMemo(() => {
     const m: Record<string, Set<string>> = {};
+    for (const [c, liste] of Object.entries(sousCategoriesBase)) m[c] = new Set(liste);
     for (const x of items) {
       if (!x.sub_category) continue;
       (m[x.category] ??= new Set()).add(x.sub_category);
     }
     return Object.fromEntries(Object.entries(m).map(([c, s]) => [c, [...s].sort((a, b) => a.localeCompare(b, "fr"))])) as Record<string, string[]>;
-  }, [items]);
+  }, [items, sousCategoriesBase]);
 
   // Multi-select
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
