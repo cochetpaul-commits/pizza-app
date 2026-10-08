@@ -110,8 +110,8 @@ export function TopBarDesktop() {
     <header className="topbar-desktop" style={{
       display: "flex", alignItems: "center", gap: 14,
       height: "var(--topbar-desktop-height, 56px)", padding: "0 20px 0 16px",
-      background: "rgba(242,237,228,0.92)",
-      backdropFilter: "blur(12px) saturate(160%)", WebkitBackdropFilter: "blur(12px) saturate(160%)",
+      // Fond opaque, sans flou : un flou d'arrière-plan sur toute la largeur fait ramer le défilement sur grand écran
+      background: "#f2ede4",
       borderBottom: "1px solid rgba(0,0,0,0.06)",
       fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
     }}>

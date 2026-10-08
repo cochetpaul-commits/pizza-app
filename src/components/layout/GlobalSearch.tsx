@@ -78,37 +78,26 @@ export function GlobalSearch() {
     const id = ++requete.current;
     if (t.length < 2) { setResultats([]); setChargement(false); return; }
     setChargement(true);
-    const motif = `%${t.replace(/[%_,()]/g, "")}%`;
     const etabId = !isGroupView ? current?.id : undefined;
-    const peutVoirEquipe = can("profil.view_team");
-
-    const [produits, fiches, pizzas, fournisseurs, employes] = await Promise.all([
-      supabase.from("ingredients").select("id, name, category").ilike("name", motif).eq("is_active", true).order("name").limit(5),
-      supabase.from("kitchen_recipes").select("id, name, category, fiche_type").ilike("name", motif).eq("is_active", true).order("name").limit(5),
-      supabase.from("pizzas").select("id, name").ilike("name", motif).order("name").limit(3),
-      (() => {
-        let r = supabase.from("suppliers").select("id, name, etablissement_id").ilike("name", motif).eq("is_active", true).order("name").limit(5);
-        if (etabId) r = r.or(`etablissement_id.eq.${etabId},etablissement_id.is.null`);
-        return r;
-      })(),
-      peutVoirEquipe
-        ? (() => {
-            let r = supabase.from("employes").select("id, prenom, nom, role").eq("actif", true).or(`prenom.ilike.${motif},nom.ilike.${motif}`).order("nom").limit(5);
-            if (etabId) r = r.eq("etablissement_id", etabId);
-            return r;
-          })()
-        : Promise.resolve({ data: [] as { id: string; prenom: string; nom: string; role: string | null }[] }),
-    ]);
+    // Une seule requête (fonction SQL recherche_globale) au lieu de cinq : moins de connexions,
+    // réponse plus rapide, surtout quand une page charge déjà beaucoup de données.
+    const { data } = await supabase.rpc("recherche_globale", {
+      q: t.replace(/[%_]/g, ""),
+      etab: etabId ?? null,
+      avec_employes: can("profil.view_team"),
+    });
     if (id !== requete.current) return; // une frappe plus récente a pris le relais
 
     const nq = norm(t);
     const out: Resultat[] = [];
     for (const e of ecrans) if (norm(e.label).includes(nq)) out.push({ type: "ecran", id: e.href, titre: e.label, href: e.href });
-    for (const p of produits.data ?? []) out.push({ type: "produit", id: p.id, titre: p.name, sous: p.category, href: `/ingredients/${p.id}` });
-    for (const f of fiches.data ?? []) out.push({ type: "fiche", id: f.id, titre: f.name, sous: f.category, href: f.fiche_type === "cocktail" ? `/recettes/cocktail/${f.id}` : `/fiche/${f.id}` });
-    for (const p of pizzas.data ?? []) out.push({ type: "fiche", id: `pizza-${p.id}`, titre: p.name, sous: "Pizza", href: `/recettes/pizza/${p.id}` });
-    for (const s of fournisseurs.data ?? []) out.push({ type: "fournisseur", id: s.id, titre: s.name, href: `/fournisseurs/${s.id}` });
-    for (const e of employes.data ?? []) out.push({ type: "employe", id: e.id, titre: `${e.prenom ?? ""} ${e.nom ?? ""}`.trim(), sous: e.role, href: `/rh/employe/${e.id}` });
+    for (const r of (data ?? []) as { type: string; id: string; titre: string; sous: string | null; extra: string | null }[]) {
+      if (r.type === "produit") out.push({ type: "produit", id: r.id, titre: r.titre, sous: r.sous, href: `/ingredients/${r.id}` });
+      else if (r.type === "fiche") out.push({ type: "fiche", id: r.id, titre: r.titre, sous: r.sous, href: r.extra === "cocktail" ? `/recettes/cocktail/${r.id}` : `/fiche/${r.id}` });
+      else if (r.type === "pizza") out.push({ type: "fiche", id: `pizza-${r.id}`, titre: r.titre, sous: "Pizza", href: `/recettes/pizza/${r.id}` });
+      else if (r.type === "fournisseur") out.push({ type: "fournisseur", id: r.id, titre: r.titre, href: `/fournisseurs/${r.id}` });
+      else if (r.type === "employe") out.push({ type: "employe", id: r.id, titre: r.titre, sous: r.sous, href: `/rh/employe/${r.id}` });
+    }
     out.sort((a, b) => ORDRE.indexOf(a.type) - ORDRE.indexOf(b.type));
     setResultats(out);
     setIndex(0);
