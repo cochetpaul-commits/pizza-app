@@ -52,7 +52,6 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/rh/equipe":       "profil.view_team",
   "/rh/employe":      "profil.view_team",
   "/personnel":       "profil.view_team",
-  "/rh/pointage":     "heures.edit_team",
   "/rh/emargement":   "heures.edit_team",
 };
 

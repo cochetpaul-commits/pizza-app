@@ -1120,7 +1120,7 @@ export default function EmployeDetailPage() {
                     <option key={m.id} value={m.id}>{m.label}</option>
                   ))}
                 </select>
-                <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Le responsable recevra les notifications relatives aux demandes d&apos;absence et aux absences de pointage de ce salarié.</div>
+                <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Le responsable recevra les notifications relatives aux demandes d&apos;absence de ce salarié.</div>
               </div>
 
               <Checkbox label="Ne pas afficher dans le registre du personnel" checked={(emp as Record<string, unknown>).affichage_rup === false} onChange={async (v) => {

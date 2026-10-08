@@ -79,7 +79,6 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     { kind: "page", label: "Accueil", href: accueil, icon: "dashboard" },
     { kind: "page", label: "Équipe", href: "/rh/equipe", icon: "users", roles: MANAGERS },
     { kind: "page", label: "Congés", href: "/rh/conges", icon: "beach", roles: MANAGERS },
-    { kind: "page", label: "Pointage", href: "/rh/pointage", icon: "clock", permission: "heures.edit_team" },
     { kind: "page", label: "Fiches techniques", href: "/recettes", icon: "fileText", permission: "operations.recettes" },
     { kind: "page", label: "Catalogue", href: "/catalogue", icon: "book", permission: "operations.recettes" },
     { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },

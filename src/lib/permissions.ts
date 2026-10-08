@@ -24,7 +24,7 @@ export const ROLE_INFO: Record<PermRole, { label: string; description: string; c
   },
   manager: {
     label: "Manager",
-    description: "Equipier + pilotage et ventes, validation des commandes, fiches de l'equipe, pointage, tableau de bord equipe.",
+    description: "Equipier + pilotage et ventes, validation des commandes, fiches de l'equipe, émargement, tableau de bord equipe.",
     color: "#2563EB", bg: "rgba(37,99,235,0.06)",
   },
   admin: {
@@ -72,7 +72,7 @@ export const PERM_SECTIONS: PermSection[] = [
     label: "Personnel",
     permissions: [
       { key: "profil.view_team", label: "Voir les fiches employes" },
-      { key: "heures.edit_team", label: "Pointage de l'equipe" },
+      { key: "heures.edit_team", label: "Émargement de l'équipe" },
     ],
   },
 ];
