@@ -693,6 +693,35 @@ function IngredientsPageInner() {
           }
         }
       }
+    } else {
+      // Sans offre active (produit créé par l'import, ou prix jamais saisi) : l'unité, le contenu et le colisage
+      // viennent de la fiche elle-même. Avant, la fiche s'ouvrait « au kilo, sans conditionnement » et le prix
+      // tapé au pot était perdu (confiture Agrisicilia, 08/10/2026).
+      const PIECE_LABELS = new Set(["piece", "pièce", "bac", "barquette", "bidon", "bloc", "boite", "bouteille", "brick", "cagette", "carton", "fut", "meule", "pack", "paquet", "plateau", "poche", "pot", "sac", "sachet", "seau"]);
+      const unite = (x.purchase_unit_name ?? "").toLowerCase();
+      const label = (x.purchase_unit_label ?? "").toLowerCase();
+      if (unite === "pc" || unite === "piece" || unite === "pièce" || (unite === "" && PIECE_LABELS.has(label))) {
+        baseUnit = "piece";
+        baseUnitLabel = PIECE_LABELS.has(label) ? (label === "pièce" ? "piece" : label) : "piece";
+        if (x.piece_volume_ml != null && x.piece_volume_ml > 0) {
+          if (x.piece_volume_ml >= 1000) { pieceContentQty = String(x.piece_volume_ml / 1000); pieceContentUnit = "L"; }
+          else if (x.piece_volume_ml % 10 === 0) { pieceContentQty = String(x.piece_volume_ml / 10); pieceContentUnit = "cl"; }
+          else { pieceContentQty = String(x.piece_volume_ml); pieceContentUnit = "ml"; }
+        } else if (x.piece_weight_g != null && x.piece_weight_g > 0) {
+          if (x.piece_weight_g >= 1000) { pieceContentQty = String(x.piece_weight_g / 1000); pieceContentUnit = "kg"; }
+          else { pieceContentQty = String(x.piece_weight_g); pieceContentUnit = "g"; }
+        }
+      } else if (unite === "l" || unite === "litre" || label === "l") {
+        baseUnit = "litre";
+      } else {
+        baseUnit = "kg";
+      }
+      const colis = (x.order_unit_label ?? "").toLowerCase();
+      if (colis && !["kg", "litre", "l", "piece", "pièce"].includes(colis) && (x.order_quantity ?? 0) > 1) {
+        hasConditionnement = true;
+        conditionnementLabel = colis;
+        qtyPerConditionnement = String(x.order_quantity);
+      }
     }
 
     const editState: EditState = {
@@ -830,6 +859,17 @@ function IngredientsPageInner() {
     const name = edit.name.trim();
     if (!name) { alert("Nom obligatoire."); return; }
     const supplier_id = normalizeSupplierId(edit.supplierId);
+    // Un prix a été saisi : il faut un fournisseur et une offre complète, sinon le prix était perdu en silence
+    // (la fiche s'enregistrait, pas l'offre ; vécu 08/10/2026). On prévient et on laisse la fiche ouverte.
+    const prixSaisi = (parseNum(edit.pricePerBaseUnit) ?? 0) > 0 || (parseNum(edit.pricePerConditionnement) ?? 0) > 0 || (parseNum(edit.pricePerKgOrL) ?? 0) > 0;
+    if (edit.is_active && edit.useOffer && prixSaisi) {
+      if (!supplier_id) { alert("Choisis un fournisseur pour enregistrer le prix d'achat (« Interne (sans facture) » s'il n'y a pas de facture)."); return; }
+      if (!userId) { alert("Utilisateur non connecté : le prix ne peut pas être enregistré."); return; }
+      if (!buildOfferFromEdit(editingId, userId, items.find((i) => i.id === editingId)?.etablissement_id)) {
+        alert("Prix incomplet : avec un conditionnement, il faut le prix et la quantité par colis ; sinon le prix à l'unité.");
+        return;
+      }
+    }
     // Quantité par unité de commande : celle du bloc « Conditionnement » quand il est actif (une seule source, pas deux chiffres)
     const orderQuantity = (edit.hasConditionnement ? parseNum(edit.qtyPerConditionnement) : null) ?? parseNum(edit.orderQuantity) ?? null;
     // When conditionnement is active, persist its label in order_unit_label (used to reload it)
