@@ -701,7 +701,11 @@ function IngredientsPageInner() {
       establishments: x.establishments ?? ["bellomio", "piccola"],
     };
 
-    // Run auto-calc to fill missing prices (e.g. kgL from base price)
+    // Run auto-calc to fill missing prices (e.g. kgL from base price). Source déduite du champ rempli si inconnue.
+    if (!editState.priceSource) {
+      const bp0 = parseFloat(editState.pricePerBaseUnit) || 0, cp0 = parseFloat(editState.pricePerConditionnement) || 0;
+      editState.priceSource = bp0 > 0 ? "base" : cp0 > 0 ? "cond" : null;
+    }
     if (editState.priceSource) {
       const contentQty = parseFloat(editState.pieceContentQty) || 0;
       const isWeightContent = (u: string) => u === "g" || u === "kg";
@@ -709,6 +713,8 @@ function IngredientsPageInner() {
       const contentToMl = (q: number, u: string) => u === "cl" ? q * 10 : u === "ml" ? q : u === "L" ? q * 1000 : null;
       const contentToG = (q: number, u: string) => u === "g" ? q : u === "kg" ? q * 1000 : null;
       const bp = parseFloat(editState.pricePerBaseUnit) || 0;
+      const cq = parseFloat(editState.qtyPerConditionnement) || 0;
+      if (editState.hasConditionnement && bp > 0 && cq > 0 && !editState.pricePerConditionnement) editState.pricePerConditionnement = (bp * cq).toFixed(2);
       if (editState.baseUnit === "piece" && contentQty > 0 && bp > 0 && !editState.pricePerKgOrL) {
         const cu = editState.pieceContentUnit;
         if (isWeightContent(cu)) {

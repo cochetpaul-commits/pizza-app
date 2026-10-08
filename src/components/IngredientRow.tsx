@@ -491,6 +491,9 @@ export const IngredientRow = React.memo(function IngredientRow({
           const kgLP = parseFloat(next.pricePerKgOrL) || 0;
           const condQty = parseFloat(next.qtyPerConditionnement) || 0;
           const contentQty = parseFloat(next.pieceContentQty) || 0;
+          // Source de prix inconnue (prix saisi puis unité changée, fiche ouverte sans offre) : on la déduit
+          // du champ rempli, sinon les autres prix ne se recalculaient plus (vécu 08/10/2026, confiture Agrisicilia).
+          if (!next.priceSource) next.priceSource = baseP > 0 ? "base" : condP > 0 ? "cond" : kgLP > 0 ? "kgL" : null;
 
           if (next.priceSource === "base" && baseP > 0) {
             if (next.hasConditionnement && condQty > 0) next.pricePerConditionnement = (baseP * condQty).toFixed(2);
@@ -562,9 +565,12 @@ export const IngredientRow = React.memo(function IngredientRow({
                     pieceContentQty: u !== "piece" ? "" : edit.pieceContentQty,
                     pieceContentUnit: u !== "piece" ? "cl" : edit.pieceContentUnit,
                     pricePerKgOrL: u !== "piece" ? "" : edit.pricePerKgOrL,
-                    priceSource: null, pricePerBaseUnit: edit.pricePerBaseUnit,
+                    // Le prix au kg/L n'a plus de sens hors « pièce » ; le prix de base ou de colis reste la source
+                    priceSource: edit.priceSource === "kgL" && u !== "piece" ? null : edit.priceSource,
+                    pricePerBaseUnit: edit.pricePerBaseUnit,
                     pricePerConditionnement: edit.pricePerConditionnement,
                   };
+                  autoCalc(next);
                   onEditChange(next);
                 }}>
                 {u === "kg" ? "kg" : u === "litre" ? "Litre" : "Piece"}
@@ -585,12 +591,12 @@ export const IngredientRow = React.memo(function IngredientRow({
               <div>
                 <div style={fieldLabel}>Contenu</div>
                 <input style={{ ...inputStyle, width: 65 }} value={edit.pieceContentQty}
-                  onChange={(e) => { const next = { ...edit, pieceContentQty: numVal(e.target.value) }; if (edit.priceSource) autoCalc(next); onEditChange(next); }}
+                  onChange={(e) => { const next = { ...edit, pieceContentQty: numVal(e.target.value) }; autoCalc(next); onEditChange(next); }}
                   placeholder="ex: 75" />
               </div>
               <div>
                 <StyledSelect width={60} value={edit.pieceContentUnit}
-                  onChange={(v) => { const next = { ...edit, pieceContentUnit: v }; if (edit.priceSource) autoCalc(next); onEditChange(next); }}
+                  onChange={(v) => { const next = { ...edit, pieceContentUnit: v }; autoCalc(next); onEditChange(next); }}
                   options={CONTENT_UNITS.map(u => ({ value: u, label: u }))}
                 />
               </div>
@@ -625,7 +631,7 @@ export const IngredientRow = React.memo(function IngredientRow({
                 <div>
                   <div style={fieldLabel}>Qté/{edit.conditionnementLabel || "cond."}</div>
                   <input style={{ ...inputStyle, width: 60 }} value={edit.qtyPerConditionnement}
-                    onChange={(e) => { const next = { ...edit, qtyPerConditionnement: numVal(e.target.value) }; if (edit.priceSource) autoCalc(next); onEditChange(next); }}
+                    onChange={(e) => { const next = { ...edit, qtyPerConditionnement: numVal(e.target.value) }; autoCalc(next); onEditChange(next); }}
                     placeholder="ex: 6" />
                 </div>
                 <span style={{ fontSize: 11, color: "#888", paddingBottom: 8 }}>
