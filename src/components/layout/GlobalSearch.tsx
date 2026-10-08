@@ -73,10 +73,18 @@ export function GlobalSearch() {
     return () => document.removeEventListener("mousedown", onClick);
   }, [ouvert]);
 
+  // Une seule requête en vol : si l'on tape pendant qu'une réponse est attendue, on mémorise le
+  // texte et on relance à la fin (vécu 08/10 : six frappes = trente requêtes simultanées, 504).
+  const enVol = useRef(false);
+  const enAttente = useRef<string | null>(null);
+  const [relance, setRelance] = useState(0);
+
   const chercher = useCallback(async (texte: string) => {
     const t = texte.trim();
+    if (t.length < 2) { requete.current++; enAttente.current = null; setResultats([]); setChargement(false); return; }
+    if (enVol.current) { enAttente.current = t; return; }
+    enVol.current = true;
     const id = ++requete.current;
-    if (t.length < 2) { setResultats([]); setChargement(false); return; }
     setChargement(true);
     const etabId = !isGroupView ? current?.id : undefined;
     // Une seule requête (fonction SQL recherche_globale) au lieu de cinq : moins de connexions,
@@ -86,6 +94,10 @@ export function GlobalSearch() {
       etab: etabId ?? null,
       avec_employes: can("profil.view_team"),
     });
+    enVol.current = false;
+    const suivant = enAttente.current;
+    enAttente.current = null;
+    if (suivant !== null && suivant !== t) { setRelance((n) => n + 1); return; } // l'effet relance avec le texte courant
     if (id !== requete.current) return; // une frappe plus récente a pris le relais
 
     const nq = norm(t);
@@ -106,9 +118,9 @@ export function GlobalSearch() {
 
   // Frappe avec un léger délai
   useEffect(() => {
-    const h = setTimeout(() => { chercher(q); }, 180);
+    const h = setTimeout(() => { chercher(q); }, 220);
     return () => clearTimeout(h);
-  }, [q, chercher]);
+  }, [q, chercher, relance]);
 
   const ouvrir = (r: Resultat) => {
     setOuvert(false);

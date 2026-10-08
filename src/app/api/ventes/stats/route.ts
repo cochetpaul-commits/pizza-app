@@ -70,11 +70,22 @@ async function fetchRange(etabId: string, from: string, to: string): Promise<Row
   const total = count ?? 0;
   if (total === 0) return [];
 
+  // Vécu 08/10 : douze mois = 124 pages lancées d'un coup, le pool de connexions PostgREST sature et
+  // toutes les autres requêtes de l'application attendent (504). On garde le parallélisme, par
+  // paquets de PARALLELE pages : quelques secondes pour un an, sans bloquer le reste.
+  const PARALLELE = 6;
   const nPages = Math.ceil(total / PAGE);
-  const pages = await Promise.all(
-    Array.from({ length: nPages }, (_, i) => base().range(i * PAGE, i * PAGE + PAGE - 1)),
-  );
-  return pages.flatMap(p => (p.data ?? []) as Row[]);
+  const rows: Row[] = [];
+  for (let debut = 0; debut < nPages; debut += PARALLELE) {
+    const paquet = await Promise.all(
+      Array.from({ length: Math.min(PARALLELE, nPages - debut) }, (_, k) => {
+        const i = debut + k;
+        return base().range(i * PAGE, i * PAGE + PAGE - 1);
+      }),
+    );
+    for (const p of paquet) rows.push(...((p.data ?? []) as Row[]));
+  }
+  return rows;
 }
 
 export async function GET(req: NextRequest) {
