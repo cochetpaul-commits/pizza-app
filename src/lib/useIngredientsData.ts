@@ -119,6 +119,8 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [validatedCount, setValidatedCount] = useState<number | null>(null);
+  // Produits sans offre fournisseur active (même règle que le compteur de l'accueil)
+  const [sansPrixCount, setSansPrixCount] = useState<number | null>(null);
   const includeInactiveRef = useRef(includeInactive);
   includeInactiveRef.current = includeInactive;
   const [error, setError] = useState<Error | null>(null);
@@ -187,18 +189,28 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
    * rattachées à Bello par etablissement_id mais réservées à Piccola, jamais affichées)
    */
   const refreshCounts = useCallback(async (fetchId?: number) => {
-    const base = () => {
-      let cq = supabase.from("ingredients").select("id", { count: "exact", head: true });
+    const base = (colonnes = "id") => {
+      let cq = supabase.from("ingredients").select(colonnes, { count: "exact", head: true });
       if (!includeInactiveRef.current) cq = cq.eq("is_active", true);
       const estabFilter = estabOrFilter(etabSlugRef.current);
       if (estabFilter) cq = cq.or(estabFilter);
       return cq;
     };
-    const [tous, valides] = await Promise.all([base(), base().eq("status", "validated")]);
+    // « A un prix » = offre active (jointure interne) OU prix legacy (cost_per_unit > 0, ou prix et unité
+    // d'achat > 0), même règle que offerHasPrice / legacyHasPrice sur la ligne. PostgREST ne sait pas
+    // faire NOT EXISTS : avec prix = A (offre) + B (legacy) − C (les deux) ; sans prix = tous − avec prix.
+    const LEGACY = "cost_per_unit.gt.0,and(purchase_price.gt.0,purchase_unit.gt.0)";
+    const avecOffre = () => base("id, supplier_offers!inner(id)").eq("supplier_offers.is_active", true);
+    const [tous, valides, a, b, c] = await Promise.all([
+      base(), base().eq("status", "validated"),
+      avecOffre(), base().or(LEGACY), avecOffre().or(LEGACY),
+    ]);
     if (fetchId !== undefined && fetchIdRef.current !== fetchId) return;
     if (tous.error || valides.error) return;
     setTotalCount(tous.count);
     setValidatedCount(valides.count);
+    const ok = !a.error && !b.error && !c.error && tous.count != null && a.count != null && b.count != null && c.count != null;
+    setSansPrixCount(ok ? Math.max(0, tous.count! - (a.count! + b.count! - c.count!)) : null);
   }, []);
 
   const doLoad = useCallback(async (q: string, fetchId: number) => {
@@ -355,6 +367,7 @@ export function useIngredientsData(searchQuery: string, etablissementId?: string
     hasMore,
     totalCount,
     validatedCount,
+    sansPrixCount,
     loadMore,
     error,
     mutate,

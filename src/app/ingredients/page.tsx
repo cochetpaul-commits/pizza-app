@@ -102,7 +102,7 @@ function IngredientsPageInner() {
   const debouncedQ = useDebounce(q, 300);
   // Fiches désactivées (is_active = false) : hors liste et hors compteurs, sauf case « Afficher les désactivées »
   const [showInactive, setShowInactive] = useState(false);
-  const { items, suppliers, supplierAliases, offers, allOffers, alertMap, loading, loadingMore, hasMore, totalCount, validatedCount, loadMore, error: dataError, mutate, mutateOne, removeItem } = useIngredientsData(debouncedQ, etab?.id, etab?.slug, showInactive);
+  const { items, suppliers, supplierAliases, offers, allOffers, alertMap, loading, loadingMore, hasMore, totalCount, validatedCount, sansPrixCount, loadMore, error: dataError, mutate, mutateOne, removeItem } = useIngredientsData(debouncedQ, etab?.id, etab?.slug, showInactive);
   // Filtre aussi côté client : une fiche passée inactive à l'édition (rechargée seule) disparaît aussitôt
   const visibleItems = useMemo(() => showInactive ? items : items.filter((x) => x.is_active !== false), [items, showInactive]);
 
@@ -177,20 +177,22 @@ function IngredientsPageInner() {
   }, [offers]);
 
   const counts = useMemo(() => {
-    const c = { to_check: 0, validated: 0, all: visibleItems.length };
+    const c = { to_check: 0, validated: 0, sansPrix: 0, all: visibleItems.length };
     for (const x of visibleItems) {
       const s = (x.status ?? "to_check") as IngredientStatus;
       if (s === "validated") c.validated += 1;
       else c.to_check += 1;
+      if (!(offerHasPrice(offersByIngredientId.get(x.id), { piece_volume_ml: x.piece_volume_ml }) || legacyHasPrice(x))) c.sansPrix += 1;
     }
     return c;
-  }, [visibleItems]);
+  }, [visibleItems, offersByIngredientId]);
 
   const filtered = useMemo(() => {
     // Deduplicate by id (pagination can produce duplicates)
     const seen = new Set<string>();
     let base = visibleItems.filter((x) => { if (seen.has(x.id)) return false; seen.add(x.id); return true; });
-    if (tab !== "all") base = base.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
+    if (tab === "sans_prix") base = base.filter((x) => !(offerHasPrice(offersByIngredientId.get(x.id), { piece_volume_ml: x.piece_volume_ml }) || legacyHasPrice(x)));
+    else if (tab !== "all") base = base.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
     if (filterCategory !== "all") base = base.filter((x) => x.category === filterCategory);
     if (filterSupplier !== "all") {
       const aliasIds = supplierAliases.get(filterSupplier) ?? new Set([filterSupplier]);
@@ -1095,12 +1097,12 @@ function IngredientsPageInner() {
 
   const isVariations = tab === ("variations" as Tab);
 
-  const TABS_MAIN = [
-    // Compteurs en base (toute la base, pas seulement les pages chargées) : Tous = Validés + À contrôler
-    { t: "all"       as Tab, label: "Tous",         count: totalCount ?? counts.all },
-    { t: "validated" as Tab, label: "Validés",      count: validatedCount ?? counts.validated },
-    { t: "to_check"  as Tab, label: "À contrôler",  count: totalCount != null && validatedCount != null ? totalCount - validatedCount : counts.to_check },
-  ] as const;
+  // Compteurs en base (toute la base, pas seulement les pages chargées) : Tous = Validés + À contrôler
+  const compteurs = {
+    tous: totalCount ?? counts.all,
+    aControler: totalCount != null && validatedCount != null ? totalCount - validatedCount : counts.to_check,
+    sansPrix: sansPrixCount ?? counts.sansPrix,
+  };
 
   // Register contextual actions in the bottom bar
   const accentColor = etab?.couleur ?? "#D4775A";
@@ -1285,9 +1287,9 @@ function IngredientsPageInner() {
                 alertMap={alertMap}
                 tab={tab}
                 setTab={setTab}
-                total={TABS_MAIN[0].count}
-                valides={TABS_MAIN[1].count}
-                aControler={TABS_MAIN[2].count}
+                total={compteurs.tous}
+                aControler={compteurs.aControler}
+                sansPrix={compteurs.sansPrix}
                 nbDoublons={duplicatePairs.length}
                 onDoublons={() => setShowDoublons(true)}
                 q={q}

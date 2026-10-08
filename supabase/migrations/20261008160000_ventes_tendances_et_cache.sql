@@ -92,8 +92,10 @@ returns table(produits_actifs bigint, produits_sans_prix bigint, fiches bigint, 
               commandes_brouillon bigint, commandes_envoyees bigint, factures_mois bigint, factures_mois_ht numeric)
 language sql stable as $fn$
   select (select count(*) from public.ingredients i where i.is_active),
+         -- sans prix : ni offre active, ni prix legacy (même règle que la Base produits, 08/10/2026)
          (select count(*) from public.ingredients i where i.is_active
-             and not exists (select 1 from public.supplier_offers o where o.ingredient_id = i.id and o.is_active)),
+             and not exists (select 1 from public.supplier_offers o where o.ingredient_id = i.id and o.is_active)
+             and not (coalesce(i.cost_per_unit, 0) > 0 or (coalesce(i.purchase_price, 0) > 0 and coalesce(i.purchase_unit, 0) > 0))),
          (select count(*) from public.kitchen_recipes k where k.is_active),
          (select count(*) from public.employes e where e.actif and e.etablissement_id = p_etab),
          (select count(*) from public.commande_sessions c where c.etablissement_id = p_etab and c.status in ('brouillon', 'en_attente')),

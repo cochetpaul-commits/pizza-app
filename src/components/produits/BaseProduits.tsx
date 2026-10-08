@@ -24,7 +24,6 @@ import { libelleColisage } from "@/lib/commandeArticles";
 const BORD = "#ddd6c8";
 const MUTED = "#6f6a61";
 const FAIBLE = "#a39d92";
-const BON = "#4a6741";
 const ATTENTION = "#b7791f";
 const MAUVAIS = "#b4443a";
 const INFO = "#2563EB";
@@ -68,11 +67,12 @@ function dateCourte(iso: string | null | undefined): string | null {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
-function etatFiche(x: Ingredient, aUnPrix: boolean): { libelle: string; fond: string; couleur: string } {
+/** Pastille d'état : seulement les exceptions (un produit en ordre n'en a pas ; 94 % des fiches sont validées) */
+function etatFiche(x: Ingredient, aUnPrix: boolean): { libelle: string; fond: string; couleur: string } | null {
   if (x.is_active === false) return { libelle: "Désactivée", fond: "rgba(0,0,0,0.06)", couleur: "#999" };
   if (!aUnPrix) return { libelle: "Sans prix", fond: "rgba(180,68,58,0.12)", couleur: MAUVAIS };
-  if (((x.status ?? "to_check") as IngredientStatus) === "validated") return { libelle: "Validé", fond: "rgba(74,103,65,0.12)", couleur: BON };
-  return { libelle: "À contrôler", fond: "rgba(183,121,31,0.12)", couleur: ATTENTION };
+  if (((x.status ?? "to_check") as IngredientStatus) !== "validated") return { libelle: "À contrôler", fond: "rgba(183,121,31,0.12)", couleur: ATTENTION };
+  return null;
 }
 
 type LigneProps = {
@@ -124,8 +124,9 @@ const CarteProduit = React.memo(function CarteProduit({ x, offer, fournisseur, a
           {x.name}{x.is_derived && <span style={{ marginLeft: 6, fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", verticalAlign: "middle" }}>DÉRIVÉ</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <Chip fond={a.etat.fond} couleur={a.etat.couleur}>{a.etat.libelle}</Chip>
+          {a.etat && <Chip fond={a.etat.fond} couleur={a.etat.couleur}>{a.etat.libelle}</Chip>}
           <span style={{ fontWeight: 700, fontSize: 13, color: a.aUnPrix ? "#1a1a1a" : FAIBLE, fontVariantNumeric: "tabular-nums" }}>{a.aUnPrix ? a.prix : "Aucun prix"}</span>
+          {a.colisage && <span style={{ fontSize: 12, color: MUTED }}>{a.colisage}</span>}
           {alerte && <span style={{ fontSize: 10.5, fontWeight: 700, color: alerte.direction === "up" ? "#DC2626" : "#16A34A" }}>{alerte.direction === "up" ? "+" : "-"}{(Math.abs(alerte.change_pct) * 100).toFixed(0)} %</span>}
         </div>
         <div style={{ fontSize: 11.5, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -182,7 +183,7 @@ const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, a
         ) : null}
       </td>
       <td style={{ ...TD, color: x.storage_zone ? "#1a1a1a" : FAIBLE }}>{x.storage_zone ?? "—"}</td>
-      <td style={TD}><Chip fond={etat.fond} couleur={etat.couleur}>{etat.libelle}</Chip></td>
+      <td style={TD}>{etat && <Chip fond={etat.fond} couleur={etat.couleur}>{etat.libelle}</Chip>}</td>
       <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
         <a href={`/ingredients/${x.id}`} title="Fiche détaillée (historique des prix, recettes)"
           style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 8, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", textDecoration: "none", fontWeight: 700, fontSize: 13 }}>→</a>
@@ -211,8 +212,9 @@ export type BaseProduitsProps = {
   tab: Tab;
   setTab: (t: Tab) => void;
   total: number;
-  valides: number;
   aControler: number;
+  /** Produits sans offre fournisseur active (compté en base) */
+  sansPrix: number;
   nbDoublons: number;
   onDoublons: () => void;
   q: string;
@@ -331,8 +333,8 @@ export function BaseProduits(p: BaseProduitsProps) {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
           <Tuile compacte libelle="Produits actifs" valeur={nombre(p.total)} sous="" active={p.tab === "all"} onClick={() => p.setTab("all")} />
-          <Tuile compacte libelle="Validés" valeur={nombre(p.valides)} sous="" active={p.tab === "validated"} couleur={BON} onClick={() => p.setTab("validated")} />
           <Tuile compacte libelle="À contrôler" valeur={nombre(p.aControler)} sous="" active={p.tab === "to_check"} couleur={ATTENTION} onClick={() => p.setTab("to_check")} />
+          <Tuile compacte libelle="Sans prix" valeur={nombre(p.sansPrix)} sous="" active={p.tab === "sans_prix"} couleur={MAUVAIS} onClick={() => p.setTab("sans_prix")} />
           <Tuile compacte libelle="Doublons probables" valeur={nombre(p.nbDoublons)} sous="" couleur={INFO} onClick={p.onDoublons} />
         </div>
 
@@ -407,8 +409,8 @@ export function BaseProduits(p: BaseProduitsProps) {
       {/* Tuiles : elles changent la vue (Tous / Validés / À contrôler) ; la quatrième ouvre les doublons */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
         <Tuile libelle="Produits actifs" valeur={nombre(p.total)} sous={`dans ${nbCategories} catégorie${nbCategories > 1 ? "s" : ""} affichée${nbCategories > 1 ? "s" : ""}`} active={p.tab === "all"} onClick={() => p.setTab("all")} />
-        <Tuile libelle="Validés" valeur={nombre(p.valides)} sous="prix et fiche vérifiés" active={p.tab === "validated"} couleur={BON} onClick={() => p.setTab("validated")} />
-        <Tuile libelle="À contrôler" valeur={nombre(p.aControler)} sous="prix à compléter ou à vérifier" active={p.tab === "to_check"} couleur={ATTENTION} onClick={() => p.setTab("to_check")} />
+        <Tuile libelle="À contrôler" valeur={nombre(p.aControler)} sous="unité, contenance ou prix à vérifier" active={p.tab === "to_check"} couleur={ATTENTION} onClick={() => p.setTab("to_check")} />
+        <Tuile libelle="Sans prix d'achat" valeur={nombre(p.sansPrix)} sous="aucune offre fournisseur active" active={p.tab === "sans_prix"} couleur={MAUVAIS} onClick={() => p.setTab("sans_prix")} />
         <Tuile libelle="Doublons probables" valeur={nombre(p.nbDoublons)} sous="paires détectées dans les fiches chargées" couleur={INFO} onClick={p.onDoublons} />
       </div>
 
