@@ -18,7 +18,6 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import {
   CATEGORIES,
   CAT_LABELS,
-  CAT_COLORS,
   type Category,
   type Ingredient,
   type IngredientStatus,
@@ -41,15 +40,15 @@ import { detectAllergensFromName } from "@/lib/invoices/allergenDetector";
 import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
 import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
 import { parseAllergens } from "@/lib/allergens";
-import { CategoryHeader, IngredientRow, type EditState, type IngredientRowProps, type StorageZoneOption } from "@/components/IngredientRow";
-import { BaseProduitsBureau, VoletDroit } from "@/components/produits/BaseProduitsBureau";
+import { IngredientRow, type EditState, type IngredientRowProps, type StorageZoneOption } from "@/components/IngredientRow";
+import { BaseProduits, VoletDroit } from "@/components/produits/BaseProduits";
 import { useBureau } from "@/hooks/useBureau";
 import { useProfile } from "@/lib/ProfileContext";
 import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import DuplicatePanel from "@/components/DuplicatePanel";
 import { detectDuplicates, similarity, type DuplicatePair } from "@/lib/duplicateDetection";
-import { normaliserSousCategorie, styleSousCategorie } from "@/lib/styleCategories";
+import { normaliserSousCategorie } from "@/lib/styleCategories";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { dateFermeture, fermerOffresActives } from "@/lib/offerClosing";
@@ -93,40 +92,6 @@ const iCls = "w-full h-[44px] rounded-[10px] border border-black/[.12] px-3 text
 const sCls = "w-full h-[44px] rounded-[10px] border border-black/[.12] pl-3 pr-[34px] text-base bg-white/65";
 const lCls = "text-[12px] opacity-75 mb-1.5";
 
-// ─── Skeleton loader ──────────────────────────────────────────────────────
-function SkeletonCard() {
-  return (
-    <div style={{
-      background: "white", borderRadius: 12, border: "1.5px solid #ddd6c8",
-      borderLeft: "3px solid #ddd6c8", padding: "14px 16px", marginBottom: 6,
-      display: "flex", alignItems: "center", gap: 12,
-    }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ height: 13, borderRadius: 4, background: "#e5ddd0", width: "60%", marginBottom: 6, animation: "pulse 1.5s ease-in-out infinite" }} />
-        <div style={{ height: 10, borderRadius: 3, background: "#ede6d9", width: "40%", animation: "pulse 1.5s ease-in-out infinite" }} />
-      </div>
-      <div style={{ height: 16, borderRadius: 4, background: "#e5ddd0", width: 60, animation: "pulse 1.5s ease-in-out infinite" }} />
-    </div>
-  );
-}
-
-function SkeletonTable() {
-  return (
-    <div style={{ marginTop: 16, padding: "0 4px" }}>
-      {[0, 1, 2].map(i => (
-        <div key={i}>
-          <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, marginTop: 12, marginBottom: 6 }}>
-            <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ddd6c8" }} />
-            <div style={{ height: 9, borderRadius: 3, background: "#ddd6c8", width: 100, animation: "pulse 1.5s ease-in-out infinite" }} />
-          </div>
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function IngredientsPageInner() {
   const router = useRouter();
   const { can } = useProfile();
@@ -168,7 +133,7 @@ function IngredientsPageInner() {
   const [filterSupplier, setFilterSupplier] = useState<"all" | string>(supplierParam ?? "all");
   // Zone de stockage (vue bureau) : sur les zones de l'établissement courant (storage_zone / storage_zone_2)
   const [filterZone, setFilterZone] = useState<"all" | string>("all");
-  // Présentation bureau (liste A → Z + volet droit) ; la version téléphone reste celle d'avant
+  // Ordinateur / tablette (tableau + volet à droite) ou téléphone (cartes + feuille du bas)
   const bureau = useBureau();
   const [storageZones, setStorageZones] = useState<StorageZoneOption[]>([]);
 
@@ -245,22 +210,6 @@ function IngredientsPageInner() {
     [],
   );
 
-  const grouped = useMemo(() => {
-    const byCategory = new Map<Category, Ingredient[]>();
-    for (const cat of CATEGORIES_ALPHA) byCategory.set(cat, []);
-    for (const x of filtered) byCategory.get(x.category)?.push(x);
-    for (const arr of byCategory.values()) {
-      // Sort by sub_category first, then by name
-      arr.sort((a, b) => {
-        const sa = a.sub_category ?? "";
-        const sb = b.sub_category ?? "";
-        if (sa !== sb) return sa.localeCompare(sb, "fr");
-        return (a.name ?? "").localeCompare(b.name ?? "", "fr");
-      });
-    }
-    return CATEGORIES_ALPHA.map((cat) => ({ cat, items: byCategory.get(cat) ?? [] })).filter((g) => g.items.length > 0);
-  }, [filtered, CATEGORIES_ALPHA]);
-
   // Sous-catégories déjà utilisées, par catégorie (orthographes distinctes, triées)
   const sousCategoriesParCategorie = useMemo(() => {
     const m: Record<string, Set<string>> = {};
@@ -270,21 +219,6 @@ function IngredientsPageInner() {
     }
     return Object.fromEntries(Object.entries(m).map(([c, s]) => [c, [...s].sort((a, b) => a.localeCompare(b, "fr"))])) as Record<string, string[]>;
   }, [items]);
-
-  // Collapsed by default; open all when searching
-  const [collapsedCats, setCollapsedCats] = useState<Set<Category>>(() => new Set(CATEGORIES));
-  /** Sous-catégories repliées (clé « catégorie|sous-catégorie »), même accordéon que l'inventaire */
-  const [collapsedSubs, setCollapsedSubs] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (debouncedQ.trim()) {
-      setCollapsedCats(new Set());
-    } else {
-      setCollapsedCats(new Set(CATEGORIES));
-    }
-  }, [debouncedQ]);
-
-  const filterActive = filterCategory !== "all" || filterSupplier !== "all" || showInactive;
 
   // Multi-select
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -364,24 +298,11 @@ function IngredientsPageInner() {
 
   const selectAllFiltered = () => setSelectedIds(new Set(filtered.map((x) => x.id)));
 
-  const [compactMode, setCompactMode] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("ingredients:compactMode") === "1";
-  });
-  const toggleCompact = () => setCompactMode(v => {
-    const next = !v;
-    localStorage.setItem("ingredients:compactMode", next ? "1" : "0");
-    return next;
-  });
-  const [showFilters, setShowFilters] = useState(false);
-  const [filterDropdown, setFilterDropdown] = useState<"supplier" | "category" | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showRecover, setShowRecover] = useState(false);
   const [showDoublons, setShowDoublons] = useState(false);
   const [showImportExport, setShowImportExport] = useState(false);
-  const [showTools, setShowTools] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
-  const [showSearchSheet, setShowSearchSheet] = useState(false);
 
   // Supplier modal
   const [modalSupplierId, setModalSupplierId] = useState<string | null>(null);
@@ -405,14 +326,6 @@ function IngredientsPageInner() {
   );
 
   // ─── Stable callbacks ────────────────────────────────────────────────────
-  const toggleCat = useCallback((cat: Category) => {
-    setCollapsedCats((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat); else next.add(cat);
-      return next;
-    });
-  }, []);
-
   const setIngredientStatus = useCallback(async (id: string, next: IngredientStatus) => {
     const ing = items.find((x) => x.id === id);
     const off = offersByIngredientId.get(id);
@@ -1169,7 +1082,6 @@ function IngredientsPageInner() {
     if (target) {
       startEdit(target);
       setTab("all");
-      setCollapsedCats((prev) => { const n = new Set(prev); n.delete(target.category); return n; });
       requestAnimationFrame(() => {
         document.getElementById(`ing-${editParam}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
       });
@@ -1214,7 +1126,7 @@ function IngredientsPageInner() {
       onToggleSelect: userCanWrite ? toggleSelect : undefined,
       alert: alertMap.get(x.id),
       isEditing: enEdition,
-      compactMode,
+      compactMode: false,
       edit: enEdition ? edit : null,
       suppliers,
       storageZones,
@@ -1242,26 +1154,17 @@ function IngredientsPageInner() {
       subCategorySuggestions: sousCategoriesParCategorie[(enEdition && edit ? edit.category : x.category)] ?? [],
     };
   };
-  /** Fiche ouverte dans le volet bureau */
-  const ficheEnCours = bureau && editingId ? items.find((x) => x.id === editingId) ?? null : null;
+  /** Fiche ouverte dans le volet (à droite sur bureau, feuille du bas sur téléphone) */
+  const ficheEnCours = editingId ? items.find((x) => x.id === editingId) ?? null : null;
 
   return (
     <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
-      <style>{`
-        .ing-desktop-filters { display: grid; }
-        .ing-mobile-search { display: none !important; }
-        @media (max-width: 767px) {
-          .ing-desktop-filters { display: none !important; }
-          .ing-mobile-search { display: flex !important; }
-          .ing-add-btn { padding: 6px 12px !important; font-size: 12px !important; }
-        }
-      `}</style>
 
       {/* ══════════════════════════════════════════════
           TOOLBAR (no header bandeau — global header handles nav)
       ══════════════════════════════════════════════ */}
-      {bureau && backUrl && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 28px 0" }}>
+      {backUrl && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: bureau ? "10px 28px 0" : "10px 14px 0", flexWrap: "wrap" }}>
           <button type="button" onClick={() => router.push(backUrl)}
             style={{ border: "1.5px solid #8a4b2f", background: "#fff", color: "#8a4b2f", borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
             {backUrl.startsWith("/commandes") ? "← Retour à la commande" : "← Retour à la fiche"}
@@ -1271,233 +1174,10 @@ function IngredientsPageInner() {
             : "La fiche en cours est conservée : modifie le produit, enregistre, et tu y reviens."}</span>
         </div>
       )}
-      {!bureau && <div style={{ position: "sticky", top: "var(--topbar-desktop-height, 0px)", zIndex: 40, background: "#f2ede4" }}>
-        {backUrl && (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", background: "#fff6e0", borderBottom: "1px solid #e8d9b8" }}>
-            <button type="button" onClick={() => router.push(backUrl)}
-              style={{ border: "1.5px solid #8a4b2f", background: "#fff", color: "#8a4b2f", borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-              {backUrl.startsWith("/commandes") ? "← Retour à la commande" : "← Retour à la fiche"}
-            </button>
-            <span style={{ fontSize: 12.5, color: "#7a6a52" }}>{backUrl.startsWith("/commandes")
-              ? "La commande en cours est conservée : corrige le produit, enregistre, et tu y reviens."
-              : "La fiche en cours est conservée : modifie le produit, enregistre, et tu y reviens."}</span>
-          </div>
-        )}
-        {!isVariations ? (
-          <div style={{
-            margin: "12px 20px", padding: 16, background: "#f9f5ef",
-            borderRadius: 16, border: "1px solid #ece4d4",
-            display: "flex", flexDirection: "column", gap: 12,
-          }}>
-            {/* Row 1 — Tabs : 3 onglets égaux, jamais tronqués sur mobile ; case des fiches désactivées à côté */}
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flexWrap: "wrap", gap: "8px 14px" }}>
-              <div style={{ display: "flex", gap: 4, padding: 3, background: "#ece4d4", borderRadius: 10, width: "100%", maxWidth: 430 }}>
-                {TABS_MAIN.map(({ t, label, count }) => (
-                  <button key={t} onClick={() => setTab(t)} style={{
-                    flex: 1, minWidth: 0, padding: "5px 4px", fontSize: 12, fontWeight: 700, cursor: "pointer",
-                    borderRadius: 8, whiteSpace: "nowrap", border: "none",
-                    background: tab === t ? (etab?.couleur ? etab.couleur + "20" : "#fff") : "transparent",
-                    color: tab === t ? "#1a1a1a" : "#999",
-                    boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-                    transition: "all 0.15s",
-                  }}>
-                    {label} <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.75 }}>({count})</span>
-                  </button>
-                ))}
-              </div>
-              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: showInactive ? "#1a1a1a" : "#999", cursor: "pointer", whiteSpace: "nowrap" }}>
-                <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} style={{ accentColor: "#D4775A", cursor: "pointer" }} />
-                Afficher les désactivées
-              </label>
-              {userCanWrite && filtered.length > 0 && (
-                <button
-                  type="button"
-                  onClick={selectedIds.size === filtered.length ? clearSelection : selectAllFiltered}
-                  title="Coche toutes les fiches affichées (filtres et recherche compris) pour une action groupée"
-                  style={{ fontSize: 12, fontWeight: 600, color: "#D4775A", background: "transparent", border: "1px solid #D4775A", borderRadius: 20, padding: "3px 10px", cursor: "pointer", whiteSpace: "nowrap" }}
-                >
-                  {selectedIds.size === filtered.length ? "Tout décocher" : `Tout sélectionner (${filtered.length})`}
-                </button>
-              )}
-            </div>
-
-            {/* Dropdowns + Search + Add — all on one row */}
-            <div className="ing-desktop-filters" style={{ gridTemplateColumns: "minmax(190px, 1fr) minmax(190px, 1fr) minmax(220px, 2fr) auto auto", gap: 8, alignItems: "center" }}>
-              {/* Fournisseur dropdown desktop */}
-              <div style={{ position: "relative" }}>
-                <button type="button" onClick={() => setFilterDropdown(filterDropdown === "supplier" ? null : "supplier")}
-                  style={{ display: "flex", alignItems: "center", width: "100%", padding: "0 14px", height: 40, background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 10, cursor: "pointer" }}>
-                  {filterSupplier !== "all" && (() => { const s = suppliers.find(x => x.id === filterSupplier); return s ? <span style={{ width: 8, height: 8, borderRadius: "50%", background: cachedSupplierColor(s.name), flexShrink: 0, marginRight: 8 }} /> : null; })()}
-                  <span style={{ flex: 1, textAlign: "left", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: filterSupplier === "all" ? "#999" : "#1a1a1a" }}>
-                    {filterSupplier === "all" ? "Tous fournisseurs" : suppliers.find(s => s.id === filterSupplier)?.name ?? "Fournisseur"}
-                  </span>
-                  <span style={{ color: "#999", fontSize: 10, transform: filterDropdown === "supplier" ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}>▼</span>
-                </button>
-                {filterDropdown === "supplier" && (
-                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 280, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
-                    <button type="button" onClick={() => { setFilterSupplier("all"); setFilterDropdown(null); }}
-                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterSupplier === "all" ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
-                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flex: 1, textAlign: "left" }}>Tous</span>
-                      {filterSupplier === "all" && <span style={{ color: "#D4775A", fontWeight: 700, fontSize: 13 }}>✓</span>}
-                    </button>
-                    {suppliers.filter(s => s.is_active).map(s => (
-                      <button key={s.id} type="button" onClick={() => { setFilterSupplier(s.id); setFilterDropdown(null); }}
-                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterSupplier === s.id ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: cachedSupplierColor(s.name), flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flex: 1, textAlign: "left" }}>{s.name}</span>
-                        {filterSupplier === s.id && <span style={{ color: "#D4775A", fontWeight: 700, fontSize: 13 }}>✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {/* Categorie dropdown desktop */}
-              <div style={{ position: "relative" }}>
-                <button type="button" onClick={() => setFilterDropdown(filterDropdown === "category" ? null : "category")}
-                  style={{ display: "flex", alignItems: "center", width: "100%", padding: "0 14px", height: 40, background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 10, cursor: "pointer" }}>
-                  {filterCategory !== "all" && <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT_COLORS[filterCategory as Category], flexShrink: 0, marginRight: 8 }} />}
-                  <span style={{ flex: 1, textAlign: "left", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: filterCategory === "all" ? "#999" : "#1a1a1a" }}>
-                    {filterCategory === "all" ? "Toutes categories" : CAT_LABELS[filterCategory as Category]}
-                  </span>
-                  <span style={{ color: "#999", fontSize: 10, transform: filterDropdown === "category" ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s" }}>▼</span>
-                </button>
-                {filterDropdown === "category" && (
-                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 280, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
-                    <button type="button" onClick={() => { setFilterCategory("all"); setFilterDropdown(null); }}
-                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterCategory === "all" ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
-                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flex: 1, textAlign: "left" }}>Toutes</span>
-                      {filterCategory === "all" && <span style={{ color: "#D4775A", fontWeight: 700, fontSize: 13 }}>✓</span>}
-                    </button>
-                    {CATEGORIES_ALPHA.map(c => (
-                      <button key={c} type="button" onClick={() => { setFilterCategory(c); setFilterDropdown(null); }}
-                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", width: "100%", background: filterCategory === c ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer" }}>
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT_COLORS[c], flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", flex: 1, textAlign: "left" }}>{CAT_LABELS[c]}</span>
-                        {filterCategory === c && <span style={{ color: "#D4775A", fontWeight: 700, fontSize: 13 }}>✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div style={{ position: "relative" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
-                  <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-                </svg>
-                <input
-                  placeholder="Rechercher un ingredient…"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  style={{
-                    width: "100%", borderRadius: 10, border: "1.5px solid #e5ddd0",
-                    padding: "9px 14px 9px 36px", fontSize: 13, background: "#fff",
-                    outline: "none", color: "#1a1a1a", boxSizing: "border-box",
-                  }}
-                />
-              </div>
-              {userCanWrite && (
-                <button onClick={() => setShowImportExport(true)} title="Import / Export Excel de la base produits"
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 12px", height: 40, borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-                  ⇅ Excel
-                </button>
-              )}
-              {userCanWrite && (
-                <button
-                  onClick={() => setShowCreateForm(true)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 6, padding: "0 16px", height: 40,
-                    borderRadius: 10, border: "none", background: accentColor,
-                    color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
-                  }}
-                >
-                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                  Ajouter
-                </button>
-              )}
-            </div>
-            {/* Mobile only: Search + Filtres + compact */}
-            <div className="ing-mobile-search" style={{ display: "none", gap: 8 }}>
-              <div style={{ flex: 1, position: "relative" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
-                  <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-                </svg>
-                <input
-                  placeholder="Rechercher un ingredient…"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  style={{
-                    width: "100%", borderRadius: 10, border: "1.5px solid #e5ddd0",
-                    padding: "9px 14px 9px 36px", fontSize: 13, background: "#fff",
-                    outline: "none", color: "#1a1a1a", boxSizing: "border-box",
-                  }}
-                />
-              </div>
-              <button onClick={() => setShowFilters(true)} style={{ padding: "9px 14px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                Filtres{filterActive ? " ●" : ""}
-              </button>
-              {/* Outils secondaires regroupés : la barre débordait sur téléphone */}
-              {userCanWrite && (
-                <div style={{ position: "relative" }}>
-                  <button onClick={() => setShowTools((v) => !v)} aria-label="Outils" aria-expanded={showTools}
-                    style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: showTools ? "#f0ebe2" : "#fff", fontSize: 16, lineHeight: 1, cursor: "pointer" }}>
-                    ⋯
-                  </button>
-                  {showTools && (
-                    <>
-                      <div onClick={() => setShowTools(false)} style={{ position: "fixed", inset: 0, zIndex: 45 }} />
-                      <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 46, background: "#fff", border: "1px solid #e5ddd0", borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,.14)", minWidth: 230, padding: 6 }}>
-                        {[
-                          { label: compactMode ? "Affichage détaillé" : "Affichage compact", icon: compactMode ? "⊞" : "☰", act: toggleCompact },
-                          { label: "Import / Export Excel", icon: "⇅", act: () => setShowImportExport(true) },
-                          { label: "Doublons à fusionner", icon: "⧉", act: () => setShowDoublons(true) },
-                          { label: "Récupérer un produit supprimé", icon: "🛟", act: () => setShowRecover(true) },
-                        ].map((o) => (
-                          <button key={o.label} onClick={() => { setShowTools(false); o.act(); }}
-                            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 10px", border: "none", background: "transparent", borderRadius: 8, fontSize: 13.5, fontWeight: 600, cursor: "pointer", color: "#1a1a1a" }}>
-                            <span style={{ width: 22, textAlign: "center", fontSize: 15 }}>{o.icon}</span>{o.label}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-              {!userCanWrite && (
-                <button onClick={toggleCompact} style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e5ddd0", background: "#fff", fontSize: 14, cursor: "pointer" }}>
-                  {compactMode ? "⊞" : "☰"}
-                </button>
-              )}
-              {userCanWrite && (
-                <button onClick={() => setShowCreateForm(true)} aria-label="Ajouter un produit"
-                  style={{ padding: "9px 12px", borderRadius: 10, border: "none", background: accentColor, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center" }}>
-                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                </button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", justifyContent: "center", padding: "12px 20px" }}>
-            <div style={{ display: "inline-flex", gap: 4, padding: 3, background: "#ece4d4", borderRadius: 10 }}>
-              {TABS_MAIN.map(({ t, label, count }) => (
-                <button key={t} onClick={() => setTab(t)} style={{
-                  flexShrink: 0, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
-                  borderRadius: 8, whiteSpace: "nowrap", border: "none",
-                  background: tab === t ? (etab?.couleur ? etab.couleur + "20" : "#fff") : "transparent",
-                  color: tab === t ? "#1a1a1a" : "#999",
-                  boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-                  transition: "all 0.15s",
-                }}>{label} ({count})</button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>}
-
       {/* ══════════════════════════════════════════════
           MAIN
       ══════════════════════════════════════════════ */}
-      <main style={{ padding: bureau ? "18px 28px 60px" : "0 20px 60px", boxSizing: "border-box" }}>
+      <main style={{ padding: bureau ? "18px 28px 60px" : "12px 14px 90px", boxSizing: "border-box" }}>
 
         {/* Variations panel */}
         {isVariations && userId && (
@@ -1588,8 +1268,8 @@ function IngredientsPageInner() {
               </div>
             </BottomSheet>
 
-            {bureau && (
-              <BaseProduitsBureau
+            <BaseProduits
+                bureau={bureau}
                 accent={accentColor}
                 peutEcrire={userCanWrite}
                 produits={filtered}
@@ -1631,8 +1311,7 @@ function IngredientsPageInner() {
                 onAjouter={() => setShowCreateForm(true)}
                 onImportExport={() => setShowImportExport(true)}
                 onRecuperer={() => setShowRecover(true)}
-              />
-            )}
+            />
             {ficheEnCours && (
               <VoletDroit
                 titre={ficheEnCours.name}
@@ -1645,7 +1324,7 @@ function IngredientsPageInner() {
                   </button>
                   <button type="button" onClick={cancelEdit}
                     style={{ marginLeft: "auto", border: "1px solid #ddd6c8", background: "#fff", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a" }}>
-                    Fermer sans enregistrer
+                    {bureau ? "Fermer sans enregistrer" : "Fermer"}
                   </button>
                   <button type="button" onClick={() => { void saveEdit(); }}
                     style={{ border: "1px solid #1a1a1a", background: "#1a1a1a", color: "#f2ede4", borderRadius: 10, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
@@ -1657,71 +1336,8 @@ function IngredientsPageInner() {
               </VoletDroit>
             )}
 
-            {/* Skeleton loader */}
-            {!bureau && loading && <SkeletonTable />}
-
-            {/* Erreur de chargement */}
-            {!bureau && !loading && dataError && (
-              <div style={{ margin: "12px 0", padding: "14px 16px", background: "#FEF2F2", border: "1px solid rgba(220,38,38,0.25)", borderRadius: 10, fontSize: 12, color: "#DC2626", fontWeight: 600 }}>
-                Erreur de chargement : {(dataError as Error).message ?? String(dataError)}
-              </div>
-            )}
-
-            {/* ── Card-based list container ── */}
-            {!bureau && !loading && !dataError && (
-              <div style={{ marginTop: 4 }}>
-
-                {/* Rows */}
-                {grouped.map(({ cat, items: catItems }) => (
-                  <div key={cat}>
-                    <CategoryHeader
-                      cat={cat}
-                      count={catItems.length}
-                      isCollapsed={collapsedCats.has(cat)}
-                      onToggle={toggleCat}
-                    />
-                    {!collapsedCats.has(cat) && (() => {
-                      let lastSubCat: string | null | undefined = undefined;
-                      const hasSubCats = catItems.some(x => x.sub_category);
-                      return catItems.map((x) => {
-                      const showSubHeader = hasSubCats && x.sub_category !== lastSubCat;
-                      lastSubCat = x.sub_category;
-                      const subKey = `${cat}|${x.sub_category ?? ""}`;
-                      const subCollapsed = hasSubCats && collapsedSubs.has(subKey) && !debouncedQ;
-                      if (subCollapsed && !showSubHeader) return null;
-                      const nbSub = hasSubCats ? catItems.filter((y) => (y.sub_category ?? null) === (x.sub_category ?? null)).length : 0;
-                      return (
-                        <div key={x.id} id={`ing-${x.id}`}>
-                          {showSubHeader && (
-                            <button type="button" onClick={() => setCollapsedSubs((prev) => { const n = new Set(prev); if (n.has(subKey)) n.delete(subKey); else n.add(subKey); return n; })}
-                              aria-expanded={!subCollapsed} style={styleSousCategorie(CAT_COLORS[cat] ?? "#999", !subCollapsed)}>
-                              <span>{x.sub_category ?? "Autre"} <span style={{ fontWeight: 500, opacity: 0.8 }}>({nbSub})</span></span>
-                              <span style={{ fontSize: 10, transition: "transform 0.2s", transform: subCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
-                            </button>
-                          )}
-                          {subCollapsed ? null : <IngredientRow {...propsLigne(x)} />}
-                        </div>
-                      );
-                    });
-                    })()}
-                  </div>
-                ))}
-
-                {grouped.length === 0 && !loading && (
-                  <div style={{ padding: "40px 20px", textAlign: "center", color: "#999", fontSize: 14 }}>
-                    Aucun ingredient trouve.
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Infinite scroll sentinel */}
             {hasMore && <div ref={sentinelRef} style={{ height: 1 }} />}
-            {!bureau && loadingMore && (
-              <div style={{ padding: "16px 0", textAlign: "center", fontSize: 13, color: "#888" }}>
-                Chargement…
-              </div>
-            )}
 
             <div style={{ marginTop: 10, fontSize: 11, color: "#bbb" }}>
               User: {userId ?? "non connecté"}
@@ -1885,130 +1501,6 @@ function IngredientsPageInner() {
         );
       })()}
 
-      <BottomSheet open={showFilters} onClose={() => { setShowFilters(false); setFilterDropdown(null); }} title="Filtres">
-        <div style={{ display: "grid", gap: 14 }}>
-          {/* ── Fournisseur dropdown ── */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setFilterDropdown(filterDropdown === "supplier" ? null : "supplier")}
-              style={{
-                display: "flex", alignItems: "center", width: "100%", padding: "14px 16px",
-                background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12, cursor: "pointer",
-              }}
-            >
-              {filterSupplier !== "all" && (() => {
-                const s = suppliers.find(x => x.id === filterSupplier);
-                return s ? <span style={{ width: 10, height: 10, borderRadius: "50%", background: cachedSupplierColor(s.name), flexShrink: 0, marginRight: 10 }} /> : null;
-              })()}
-              <span style={{ flex: 1, textAlign: "left", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 15, color: filterSupplier === "all" ? "#999" : "#1a1a1a", textTransform: "uppercase" }}>
-                {filterSupplier === "all" ? "Fournisseur" : suppliers.find(s => s.id === filterSupplier)?.name ?? "Fournisseur"}
-              </span>
-              <span style={{ color: "#999", fontSize: 12, transition: "transform .2s", transform: filterDropdown === "supplier" ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
-            </button>
-            {filterDropdown === "supplier" && (
-              <div style={{ background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 12px 12px", maxHeight: 300, overflowY: "auto", marginTop: -2 }}>
-                <button
-                  type="button"
-                  onClick={() => { setFilterSupplier("all"); setFilterDropdown(null); }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", width: "100%",
-                    background: filterSupplier === "all" ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer",
-                  }}
-                >
-                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
-                  <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#1a1a1a", textTransform: "uppercase", flex: 1, textAlign: "left" }}>Tous</span>
-                  {filterSupplier === "all" && <span style={{ color: "#D4775A", fontSize: 15, fontWeight: 700 }}>✓</span>}
-                </button>
-                {suppliers.filter(s => s.is_active).map(s => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => { setFilterSupplier(s.id); setFilterDropdown(null); }}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", width: "100%",
-                      background: filterSupplier === s.id ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer",
-                    }}
-                  >
-                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: cachedSupplierColor(s.name), flexShrink: 0 }} />
-                    <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#1a1a1a", textTransform: "uppercase", flex: 1, textAlign: "left" }}>{s.name}</span>
-                    {filterSupplier === s.id && <span style={{ color: "#D4775A", fontSize: 15, fontWeight: 700 }}>✓</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {/* ── Categorie dropdown ── */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setFilterDropdown(filterDropdown === "category" ? null : "category")}
-              style={{
-                display: "flex", alignItems: "center", width: "100%", padding: "14px 16px",
-                background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12, cursor: "pointer",
-              }}
-            >
-              {filterCategory !== "all" && <span style={{ width: 10, height: 10, borderRadius: "50%", background: CAT_COLORS[filterCategory as Category], flexShrink: 0, marginRight: 10 }} />}
-              <span style={{ flex: 1, textAlign: "left", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 15, color: filterCategory === "all" ? "#999" : "#1a1a1a", textTransform: "uppercase" }}>
-                {filterCategory === "all" ? "Categorie" : CAT_LABELS[filterCategory as Category]}
-              </span>
-              <span style={{ color: "#999", fontSize: 12, transition: "transform .2s", transform: filterDropdown === "category" ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
-            </button>
-            {filterDropdown === "category" && (
-              <div style={{ background: "#fff", border: "1.5px solid #e5ddd0", borderTop: "none", borderRadius: "0 0 12px 12px", maxHeight: 300, overflowY: "auto", marginTop: -2 }}>
-                <button
-                  type="button"
-                  onClick={() => { setFilterCategory("all"); setFilterDropdown(null); }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", width: "100%",
-                    background: filterCategory === "all" ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer",
-                  }}
-                >
-                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
-                  <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#1a1a1a", textTransform: "uppercase", flex: 1, textAlign: "left" }}>Toutes</span>
-                  {filterCategory === "all" && <span style={{ color: "#D4775A", fontSize: 15, fontWeight: 700 }}>✓</span>}
-                </button>
-                {CATEGORIES_ALPHA.map(c => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => { setFilterCategory(c); setFilterDropdown(null); }}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", width: "100%",
-                      background: filterCategory === c ? "#f5f0e8" : "none", border: "none", borderBottom: "1px solid #f0ebe2", cursor: "pointer",
-                    }}
-                  >
-                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: CAT_COLORS[c], flexShrink: 0 }} />
-                    <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 14, color: "#1a1a1a", textTransform: "uppercase", flex: 1, textAlign: "left" }}>{CAT_LABELS[c]}</span>
-                    {filterCategory === c && <span style={{ color: "#D4775A", fontSize: 15, fontWeight: 700 }}>✓</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => { setShowFilters(false); setShowDuplicates(true); }}
-            style={{
-              width: "100%", height: 44, borderRadius: 10,
-              border: "1.5px solid #ddd6c8", background: "#fff",
-              color: "#1a1a1a", fontSize: 14, fontWeight: 700, cursor: "pointer",
-            }}
-          >
-            Detecter les doublons {duplicatePairs.length > 0 ? `(${duplicatePairs.length})` : ""}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowFilters(false)}
-            style={{
-              width: "100%", height: 44, borderRadius: 10, border: "none",
-              background: "#D4775A", color: "white", fontSize: 15, fontWeight: 700, cursor: "pointer",
-            }}
-          >
-            Appliquer
-          </button>
-        </div>
-      </BottomSheet>
 
       {/* ═══ MODALE FICHE FOURNISSEUR ═══ */}
       {modalSupplierId && (() => {
@@ -2048,34 +1540,6 @@ function IngredientsPageInner() {
 
 
 
-      {/* ── Search BottomSheet (mobile) ── */}
-      <BottomSheet open={showSearchSheet} onClose={() => setShowSearchSheet(false)} title="Rechercher">
-        <div style={{ padding: "0 4px 8px" }}>
-          <input
-            autoFocus
-            placeholder="Rechercher un ingredient..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") setShowSearchSheet(false);
-            }}
-            style={{
-              width: "100%", borderRadius: 12, border: "1.5px solid #e5ddd0",
-              padding: "12px 16px", fontSize: 15, background: "#fff",
-              outline: "none", color: "#1a1a1a", boxSizing: "border-box",
-            }}
-          />
-          {q && (
-            <button type="button" onClick={() => { setQ(""); setShowSearchSheet(false); }} style={{
-              marginTop: 10, width: "100%", padding: "10px 0", borderRadius: 10,
-              border: "1px solid #ddd6c8", background: "#fff", color: "#999",
-              fontSize: 13, fontWeight: 600, cursor: "pointer",
-            }}>
-              Effacer la recherche
-            </button>
-          )}
-        </div>
-      </BottomSheet>
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
