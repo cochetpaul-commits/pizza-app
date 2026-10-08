@@ -546,7 +546,7 @@ export function BaseProduits(p: BaseProduitsProps) {
                         {g.sous.map((sg) => (
                           <React.Fragment key={sg.cle}>
                             {sg.nom != null && (
-                              <tr><td colSpan={nbColonnes(true)} style={{ padding: "4px 10px 2px", borderBottom: `1px solid #ece6db` }}>
+                              <tr><td colSpan={nbColonnes(true)} style={{ padding: "6px 10px 4px", background: "#f2ede4", borderBottom: "none" }}>
                                 {boutonSous(g.couleur, sg.nom, sg.cle, sg.items.length, { margin: "2px 0" })}
                               </td></tr>
                             )}
