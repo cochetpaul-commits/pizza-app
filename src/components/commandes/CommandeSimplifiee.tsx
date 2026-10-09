@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { fetchApi } from "@/lib/fetchApi";
+import { useBureau } from "@/hooks/useBureau";
 import { SEUIL_HABITUEL } from "@/lib/commandeHabituels";
 import { libelleZone, nomUnite, quantiteAffichee, type UniteCommande, type UniteTaille } from "@/lib/commandeArticles";
 
@@ -98,6 +99,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   /** La page masque ses boutons « Valider / Envoyer » (commande du jour) sur l'onglet Précommande */
   onOngletChange?: (onglet: Onglet) => void;
 }) {
+  const bureau = useBureau();
   // Commande du jour / précommande du mercredi : deux brouillons séparés
   const router = useRouter();
   const { canWrite: peutCorrigerFiche } = useProfile();
@@ -387,6 +389,99 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     );
   }
 
+  /** Bureau : une ligne de tableau par article, tout sur une ligne (gabarit Base produits) */
+  function ligne(a: Article, couleur: string = ACCENT) {
+    const m = modeDe(a);
+    const l = ligneDe(a, m);
+    const total = l?.quantite ?? 0;
+    const maPart = l?.apports.find((p) => p.user_id === data!.moi)?.quantite ?? 0;
+    const pas = m === "uc" && a.au_poids ? 0.5 : 1;
+    const prix = m === "element" ? a.prix_element : a.prix_uc;
+    const unite = uniteDe(a, m);
+    const autreMode: Mode = m === "uc" ? "element" : "uc";
+    const autreLigne = a.unite_element ? ligneDe(a, autreMode) : undefined;
+    const detail = l && l.apports.length > 0 && (l.apports.length > 1 || l.apports[0].user_id !== data!.moi)
+      ? l.apports.map((p) => `${p.user_id === data!.moi ? "moi" : p.nom} ${qteTexte(p.quantite)}`).join(" · ")
+      : null;
+    const indication = data!.indication === "derniere_commande"
+      ? (a.derniere ? `Dernière commande : ${quantiteAffichee(a, a.derniere.quantite, a.derniere.mode)}` : null)
+      : (estHabituel(a) && a.habituel ? `D'habitude : ${quantiteAffichee(a, a.habituel.quantite, a.habituel.mode)} par livraison` : null);
+    const TD: React.CSSProperties = { padding: "9px 14px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13, whiteSpace: "nowrap", background: total > 0 ? "rgba(212,119,90,0.08)" : undefined };
+    const pilule = (actif: boolean): React.CSSProperties => ({
+      padding: "4px 9px", borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: "pointer", lineHeight: 1.2, fontFamily: "inherit",
+      border: actif ? `1.5px solid ${ACCENT}` : "1px solid #ddd6c8", background: actif ? "#FFF0EB" : "#f7f3ec", color: actif ? ACCENT : "#8a8378",
+    });
+    return (
+      <tr key={a.ingredient_id}>
+        <td style={{ ...TD, padding: 0, width: 4, background: couleur }} />
+        <td style={{ ...TD, fontWeight: 600, color: "#1a1a1a", whiteSpace: "normal", minWidth: 220 }}>
+          {a.nom}
+          {total > 0 && !a.au_poids && a.contenu_nb > 1 && <div style={{ fontSize: 12, color: "#1a1a1a", fontWeight: 700 }}>En cours : {quantiteAffichee(a, total, m)}</div>}
+          {(detail || (autreLigne && autreLigne.quantite > 0)) && (
+            <div style={{ fontSize: 12, color: "#6f6656", fontWeight: 400 }}>{detail}{autreLigne && autreLigne.quantite > 0 && <>{detail ? " — " : ""}aussi {quantiteAffichee(a, autreLigne.quantite, autreMode)}</>}</div>
+          )}
+        </td>
+        <td style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>{unite}{a.ref ? <span style={{ color: "#a39d92" }}> · réf. {a.ref}</span> : null}</td>
+        <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: prix != null ? "#1a1a1a" : "#a39d92" }}>{prix != null ? `${euros(prix)} HT` : "—"}</td>
+        <td style={TD}>
+          <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {a.zones.map((z) => <span key={z.nom} className="pastille" style={{ "--pastille-c": z.couleur ?? "#8a8378" } as React.CSSProperties}>{libelleZone(z.nom)}</span>)}
+          </span>
+        </td>
+        <td style={{ ...TD, fontSize: 12.5, color: ACCENT, whiteSpace: "normal", minWidth: 180 }}>
+          {indication}
+          {a.stock_objectif != null && <div style={{ color: "#6f6656" }}>Stock idéal : {quantiteAffichee(a, a.stock_objectif, a.contenu_nb > 1 ? "element" : "uc")}</div>}
+        </td>
+        <td style={TD}>
+          {a.unite_element && brouillon ? (
+            <span style={{ display: "inline-flex", gap: 4 }}>
+              {(["uc", "element"] as Mode[]).map((x) => (
+                <button key={x} type="button" onClick={() => setModes((st) => ({ ...st, [a.ingredient_id]: x }))} style={pilule(m === x)}>
+                  Par {x === "element" ? a.unite_element : a.contenu_nb > 1 && a.element ? `${nomUnite(a.unite_commande)} de ${qteTexte(a.contenu_nb)}` : a.unite_uc}
+                </button>
+              ))}
+            </span>
+          ) : <span style={{ color: "#a39d92" }}>—</span>}
+        </td>
+        <td style={{ ...TD, textAlign: "right" }}>
+          {brouillon ? (total === 0 ? (
+            <button type="button" aria-label={`Ajouter ${a.nom}`} onClick={() => fixerMaPart(a, m, 1)} style={{
+              height: 36, minWidth: 60, padding: "0 14px", borderRadius: 18, border: "none", background: ACCENT, color: "#fff", fontSize: 15, fontWeight: 700,
+              cursor: "pointer", touchAction: "manipulation", fontFamily: "inherit",
+            }}>+ 1</button>
+          ) : (
+            <span style={{ display: "inline-flex" }}>
+              <Compteur valeur={qteTexte(total)} moinsActif={maPart > 0}
+                onMoins={() => fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2))}
+                onPlus={() => fixerMaPart(a, m, Math.round((maPart + pas) * 2) / 2)} />
+            </span>
+          )) : <span style={{ fontWeight: 700 }}>{total > 0 ? qteTexte(total) : "—"}</span>}
+        </td>
+        <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: total > 0 && prix != null ? "#1a1a1a" : "#a39d92" }}>
+          {total > 0 && prix != null ? euros(total * prix) : "—"}
+        </td>
+        <td style={{ ...TD, textAlign: "right", width: 40 }}>
+          {peutCorrigerFiche && <BoutonCrayon onClick={() => void ouvrirFiche(a)} title="Ouvrir la fiche produit" />}
+        </td>
+      </tr>
+    );
+  }
+
+  function tableau(articles: Article[], couleur: string = ACCENT) {
+    const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+    return (
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 960 }}>
+          <thead><tr>
+            <th style={{ ...TH, padding: 0, width: 4 }} /><th style={TH}>Produit</th><th style={TH}>Conditionnement</th><th style={{ ...TH, textAlign: "right" }}>Prix</th>
+            <th style={TH}>Zones</th><th style={TH}>Repère</th><th style={TH}>Unité</th><th style={{ ...TH, textAlign: "right" }}>Quantité</th><th style={{ ...TH, textAlign: "right" }}>Total HT</th><th style={TH} />
+          </tr></thead>
+          <tbody>{articles.map((a) => ligne(a, couleur))}</tbody>
+        </table>
+      </div>
+    );
+  }
+
   return (
     <div>
       {data.a_precommande && (
@@ -444,7 +539,9 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
       {onglet === "jour" && recherche.trim().length >= 2 ? (
         <div>
           {resultats.length === 0 && <div style={{ color: "#999", fontSize: 14, padding: 12 }}>Aucun produit trouvé.</div>}
-          {resultats.map((a) => carte(a))}
+          {bureau && resultats.length > 0
+            ? <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden" }}>{tableau(resultats)}</div>
+            : resultats.map((a) => carte(a))}
         </div>
       ) : sections.length === 0 ? (
         <div style={{ color: "#999", fontSize: 14, padding: 12 }}>
@@ -456,8 +553,10 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
           return (
             <div key={r.code} style={{ marginBottom: 10 }}>
               {/* Titre de rayon : fond plein, texte blanc ; collé en haut de l'écran tant que le rayon ouvert défile */}
-              <div className={ouvert ? "rayon-collant" : undefined} style={{ background: "#f2ede4", paddingBottom: ouvert ? 8 : 0 }}>
-              <button type="button" onClick={() => setBascules((s) => ({ ...s, [r.code]: !ouvert }))} aria-expanded={ouvert} style={styleBarreCategorie(couleurRayon(r.code))}>
+              <div className={ouvert && !bureau ? "rayon-collant" : undefined} style={{ background: "#f2ede4", paddingBottom: ouvert && !bureau ? 8 : 0 }}>
+              <button type="button" onClick={() => setBascules((s) => ({ ...s, [r.code]: !ouvert }))} aria-expanded={ouvert}
+                className={`barre-categorie${bureau && ouvert ? " ouverte" : ""}`}
+                style={{ ...styleBarreCategorie(couleurRayon(r.code)), ...(bureau ? { minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: ouvert ? "14px 14px 0 0" : 14 } : {}) }}>
                 <span style={styleTitreCategorie(couleurRayon(r.code))}>
                   {r.libelle} <span style={{ opacity: 0.75, fontWeight: 400 }}>({r.articles.length})</span>
                 </span>
@@ -467,7 +566,9 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
                 <span style={styleChevronBarre(couleurRayon(r.code), ouvert)}>▼</span>
               </button>
               </div>
-              {ouvert && r.articles.map((a) => carte(a, couleurRayon(r.code)))}
+              {ouvert && (bureau
+                ? <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>{tableau(r.articles, couleurRayon(r.code))}</div>
+                : r.articles.map((a) => carte(a, couleurRayon(r.code))))}
             </div>
           );
         })
