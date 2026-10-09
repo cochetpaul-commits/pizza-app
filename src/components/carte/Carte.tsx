@@ -8,6 +8,8 @@ import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { useBureau } from "@/hooks/useBureau";
 import { VoletDroit } from "@/components/produits/BaseProduits";
 import { OSWALD } from "@/components/TuileProduit";
+import { Tuile } from "@/components/ui/Tuile";
+import { EtatVide } from "@/components/ui/EtatVide";
 import { couleurTexteSur, styleBarreCategorie } from "@/lib/styleCategories";
 import { CatalogueContent } from "@/components/production/CatalogueTab";
 import { CatalogueSalleContent } from "@/components/production/CatalogueSalleTab";
@@ -119,17 +121,6 @@ function libelleLien(a: ArticleCarte): string {
   if (a.lien === "produit" && a.produit) return `Produit · ${a.produit.nom}`;
   if (a.lien_orphelin) return "Lien à refaire";
   return "Non relié";
-}
-
-function Tuile({ libelle, valeur, sous, couleur, active, onClick }: { libelle: string; valeur: ReactNode; sous: string; couleur?: string; active?: boolean; onClick?: () => void }) {
-  return (
-    <button type="button" onClick={onClick} disabled={!onClick}
-      style={{ background: "#fff", border: `1px solid ${active ? "#1a1a1a" : BORD}`, borderRadius: 12, padding: "12px 14px", display: "grid", gap: 2, minWidth: 0, textAlign: "left", cursor: onClick ? "pointer" : "default", fontFamily: "inherit" }}>
-      <span style={{ fontSize: 12, color: MUTED, fontWeight: 600 }}>{libelle}</span>
-      <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 26, lineHeight: 1.1, color: couleur ?? "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{valeur}</span>
-      <span style={{ fontSize: 11.5, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sous}</span>
-    </button>
-  );
 }
 
 /* ── Relier une touche à une fiche ou un produit ─────────────────────────── */
@@ -504,10 +495,10 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
       <style>{`.ca-ligne:hover td{background:#f7f3ec}.ca-ligne.on td{background:rgba(212,119,90,0.12)}.ca-ligne:last-child td{border-bottom:0}`}</style>
 
       <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, 1fr)" : "repeat(2, 1fr)", gap: 10 }}>
-        <Tuile libelle="Articles reliés" valeur={<>{compteurs.relies} <span style={{ fontSize: 14, color: MUTED }}>/ {compteurs.total}</span></>} sous={`${compteurs.fiches} à une fiche, ${compteurs.produits} à un produit`} active={lien === "tous" && fc === "tous"} onClick={() => { setLien("tous"); setFc("tous"); }} />
-        <Tuile libelle="Non reliés" valeur={String(compteurs.nonRelies)} sous={compteurs.messages ? `hors ${compteurs.messages} touche${compteurs.messages > 1 ? "s" : ""} « Messages » de la caisse` : "touches de caisse sans fiche ni produit"} couleur={compteurs.nonRelies ? ATTENTION : undefined} active={lien === "aucun"} onClick={() => { setLien(lien === "aucun" ? "tous" : "aucun"); setFc("tous"); }} />
-        <Tuile libelle="Food cost cuisine" valeur={compteurs.fcMoyen != null ? pct(compteurs.fcMoyen) : "—"} sous={compteurs.parCat || "pizze, antipasti, cucina, dolci"} couleur={compteurs.fcMoyen != null ? (verdictFoodCost(compteurs.fcMoyen)?.couleur ?? undefined) : undefined} />
-        <Tuile libelle="Fiches à vérifier" valeur={String(compteurs.aVerifier.length)} sous={compteurs.aVerifier.length ? compteurs.aVerifier.slice(0, 2).map((a) => `${a.nom} ${a.food_cost != null ? pct(a.food_cost) : ""}`).join(", ") : "food cost cohérent partout"} couleur={compteurs.aVerifier.length ? MAUVAIS : BON} active={fc === "mauvais"} onClick={() => { setFc(fc === "mauvais" ? "tous" : "mauvais"); setLien("tous"); }} />
+        <Tuile couleur="#1a1a1a" icone="lien" libelle="Articles reliés" valeur={<>{compteurs.relies} <span style={{ fontSize: 14, color: MUTED }}>/ {compteurs.total}</span></>} sous={`${compteurs.fiches} à une fiche, ${compteurs.produits} à un produit`} active={lien === "tous" && fc === "tous"} onClick={() => { setLien("tous"); setFc("tous"); }} />
+        <Tuile icone="sans" libelle="Non reliés" valeur={String(compteurs.nonRelies)} sous={compteurs.messages ? `hors ${compteurs.messages} touche${compteurs.messages > 1 ? "s" : ""} « Messages » de la caisse` : "touches de caisse sans fiche ni produit"} couleur={compteurs.nonRelies ? ATTENTION : undefined} active={lien === "aucun"} onClick={() => { setLien(lien === "aucun" ? "tous" : "aucun"); setFc("tous"); }} />
+        <Tuile icone="foodcost" libelle="Food cost cuisine" valeur={compteurs.fcMoyen != null ? pct(compteurs.fcMoyen) : "—"} sous={compteurs.parCat || "pizze, antipasti, cucina, dolci"} couleur={compteurs.fcMoyen != null ? (verdictFoodCost(compteurs.fcMoyen)?.couleur ?? undefined) : undefined} />
+        <Tuile icone="fiche" libelle="Fiches à vérifier" valeur={String(compteurs.aVerifier.length)} sous={compteurs.aVerifier.length ? compteurs.aVerifier.slice(0, 2).map((a) => `${a.nom} ${a.food_cost != null ? pct(a.food_cost) : ""}`).join(", ") : "food cost cohérent partout"} couleur={compteurs.aVerifier.length ? MAUVAIS : BON} active={fc === "mauvais"} onClick={() => { setFc(fc === "mauvais" ? "tous" : "mauvais"); setLien("tous"); }} />
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
@@ -534,7 +525,7 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
 
       {erreur && <div style={{ padding: 14, borderRadius: 12, background: "rgba(180,68,58,0.08)", color: MAUVAIS, fontSize: 13 }}>{erreur}</div>}
       {!donnees && !erreur && <div style={{ padding: 30, textAlign: "center", color: MUTED }}>Chargement de la carte…</div>}
-      {donnees && tries.length === 0 && <div style={{ padding: 30, textAlign: "center", color: MUTED }}>Aucun article ne correspond.</div>}
+      {donnees && tries.length === 0 && <EtatVide icone="recherche" titre="Aucun article ne correspond" texte="Modifiez la recherche ou les filtres de la carte." />}
 
       {donnees && tries.length > 0 && !bureau && (
         <div style={{ display: "grid", gap: 8 }}>

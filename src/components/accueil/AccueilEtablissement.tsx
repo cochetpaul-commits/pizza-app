@@ -8,6 +8,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { T } from "@/lib/tokens";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
+import { Tuile, type TuileIcone } from "@/components/ui/Tuile";
+import { IconBook, IconPackage, IconTruck, IconUsers } from "@/components/layout/Icons";
 
 /**
  * Accueil « point du jour » d'un établissement (étape 2 de la refonte, 08/10/2026) :
@@ -271,10 +273,10 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
       {/* Indicateurs */}
       {canSeePilotage && (
         <div className="accueil-kpis" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-          <Kpi label={`CA TTC ${titrePeriode}`} value={fmtEur(total.ca)} delta={delta(total.ca, totalA1.ca)} sub={totalA1.ca > 0 ? `${fmtEur(totalA1.ca)} l'an dernier (${jourCourt(periodeA1.from)}${periodeA1.from !== periodeA1.to ? ` → ${jourCourt(periodeA1.to)}` : ""})` : "pas de comparaison l'an dernier"} loading={loading} href={`/ventes?from=${periode.from}&to=${periode.to}`} />
-          <Kpi label="Couverts" value={String(total.couverts)} delta={delta(total.couverts, totalA1.couverts)} sub={`${total.midi.couverts} midi · ${total.soir.couverts} soir`} loading={loading} />
-          <Kpi label="Ticket moyen" value={fmtDec(ticket)} delta={delta(ticket, ticketA1)} sub={ticketA1 > 0 ? `par couvert · ${fmtDec(ticketA1)} l'an dernier` : "par couvert"} loading={loading} />
-          <Kpi label="Achats HT du mois" value={fmtEur(num(compteurs?.factures_mois_ht))} badge={compteurs ? `${compteurs.factures_mois} facture${compteurs.factures_mois > 1 ? "s" : ""}` : undefined} sub="factures importées depuis le 1er" loading={!compteurs} href="/achats" />
+          <Kpi couleur={couleur} icone="euro" label={`CA TTC ${titrePeriode}`} value={fmtEur(total.ca)} delta={delta(total.ca, totalA1.ca)} sub={totalA1.ca > 0 ? `${fmtEur(totalA1.ca)} l'an dernier (${jourCourt(periodeA1.from)}${periodeA1.from !== periodeA1.to ? ` → ${jourCourt(periodeA1.to)}` : ""})` : "pas de comparaison l'an dernier"} loading={loading} href={`/ventes?from=${periode.from}&to=${periode.to}`} />
+          <Kpi couleur="#b7791f" icone="couverts" label="Couverts" value={String(total.couverts)} delta={delta(total.couverts, totalA1.couverts)} sub={`${total.midi.couverts} midi · ${total.soir.couverts} soir`} loading={loading} />
+          <Kpi couleur="#5F4B8B" icone="ticket" label="Ticket moyen" value={fmtDec(ticket)} delta={delta(ticket, ticketA1)} sub={ticketA1 > 0 ? `par couvert · ${fmtDec(ticketA1)} l'an dernier` : "par couvert"} loading={loading} />
+          <Kpi couleur="#4a6741" icone="facture" label="Achats HT du mois" value={fmtEur(num(compteurs?.factures_mois_ht))} badge={compteurs ? `${compteurs.factures_mois} facture${compteurs.factures_mois > 1 ? "s" : ""}` : undefined} sub="factures importées depuis le 1er" loading={!compteurs} href="/achats" />
         </div>
       )}
 
@@ -374,10 +376,10 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
       <div>
         <Titre>Mon restaurant</Titre>
         <div className="accueil-raccourcis" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-          <Raccourci href="/commandes" titre="Commandes" sous={compteurs ? `${compteurs.commandes_brouillon + compteurs.commandes_envoyees} en cours` : "…"} couleur={couleur} />
-          <Raccourci href="/ingredients" titre="Base produits" sous={compteurs ? `${compteurs.produits_actifs.toLocaleString("fr-FR")} produits actifs` : "…"} couleur={couleur} />
-          <Raccourci href="/recettes" titre="Fiches techniques" sous={compteurs ? `${compteurs.fiches} fiches` : "…"} couleur={couleur} />
-          <Raccourci href="/rh/equipe" titre="Équipe" sous={compteurs ? `${compteurs.employes} employés` : "…"} couleur={couleur} />
+          <Raccourci icone={<IconTruck size={18} />} href="/commandes" titre="Commandes" sous={compteurs ? `${compteurs.commandes_brouillon + compteurs.commandes_envoyees} en cours` : "…"} couleur={couleur} />
+          <Raccourci icone={<IconPackage size={18} />} href="/ingredients" titre="Base produits" sous={compteurs ? `${compteurs.produits_actifs.toLocaleString("fr-FR")} produits actifs` : "…"} couleur={couleur} />
+          <Raccourci icone={<IconBook size={18} />} href="/carte?vue=fiches" titre="Fiches techniques" sous={compteurs ? `${compteurs.fiches} fiches` : "…"} couleur={couleur} />
+          <Raccourci icone={<IconUsers size={18} />} href="/rh/equipe" titre="Équipe" sous={compteurs ? `${compteurs.employes} employés` : "…"} couleur={couleur} />
         </div>
       </div>
 
@@ -410,22 +412,15 @@ function Titre({ children, droite }: { children: React.ReactNode; droite?: React
   );
 }
 
-function Kpi({ label, value, delta: d, sub, badge: b, loading, href }: { label: string; value: string; delta?: number | null; sub?: string; badge?: string; loading: boolean; href?: string }) {
+function Kpi({ label, value, delta: d, sub, badge: b, loading, href, couleur, icone }: { label: string; value: string; delta?: number | null; sub?: string; badge?: string; loading: boolean; href?: string; couleur: string; icone: TuileIcone }) {
   const ton = d == null ? null : Math.abs(d) < 1 ? "flat" : d > 0 ? "up" : "down";
-  const inner = (
-    <div style={{ ...CARD, display: "grid", gap: 4, cursor: href ? "pointer" : "default" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: T.muted, fontWeight: 600 }}>
-        <span>{label}</span>
-        {ton && <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 7px", borderRadius: 8, color: ton === "up" ? "#4a6741" : ton === "down" ? "#b4443a" : T.muted, background: ton === "up" ? "rgba(74,103,65,0.12)" : ton === "down" ? "rgba(180,68,58,0.12)" : "rgba(0,0,0,0.05)" }}>
-          {d! > 0 ? "▲" : d! < 0 ? "▼" : ""} {Math.abs(d!).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %
-        </span>}
-        {b && <span style={badge("neutre")}>{b}</span>}
-      </div>
-      <div style={{ fontFamily: OSWALD, fontSize: 30, lineHeight: 1, fontVariantNumeric: "tabular-nums", color: T.dark, opacity: loading ? 0.4 : 1, transition: "opacity .2s" }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: T.muted }}>{sub}</div>}
-    </div>
-  );
-  return href ? <Link href={href} style={{ textDecoration: "none", display: "block" }}>{inner}</Link> : inner;
+  const droite = ton ? (
+    <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 7px", borderRadius: 8, color: ton === "up" ? "#4a6741" : ton === "down" ? "#b4443a" : T.muted, background: ton === "up" ? "rgba(74,103,65,0.12)" : ton === "down" ? "rgba(180,68,58,0.12)" : "rgba(0,0,0,0.05)" }}>
+      {d! > 0 ? "▲" : d! < 0 ? "▼" : ""} {Math.abs(d!).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %
+    </span>
+  ) : b ? <span style={badge("neutre")}>{b}</span> : undefined;
+  const tuile = <Tuile libelle={label} icone={icone} couleur={couleur} droite={droite} sous={sub} valeur={<span style={{ opacity: loading ? 0.4 : 1, transition: "opacity .2s" }}>{value}</span>} />;
+  return href ? <Link href={href} style={{ textDecoration: "none", display: "block" }}>{tuile}</Link> : tuile;
 }
 
 function Attention({ n, ton, titre, sous, href }: { n: number; ton: "good" | "warn" | "bad"; titre: string; sous: string; href: string }) {
@@ -447,11 +442,11 @@ function Repart({ label, couleur, valeur }: { label: string; couleur: string; va
   );
 }
 
-function Raccourci({ href, titre, sous, couleur }: { href: string; titre: string; sous: string; couleur: string }) {
+function Raccourci({ href, titre, sous, couleur, icone }: { href: string; titre: string; sous: string; couleur: string; icone: React.ReactNode }) {
   return (
     <Link href={href} style={{ ...CARD, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, textDecoration: "none", color: T.dark }}>
-      <span style={{ width: 36, height: 36, borderRadius: 10, background: `${couleur}1f`, display: "grid", placeItems: "center" }}>
-        <span style={{ width: 14, height: 14, border: `1.5px solid ${couleur}`, borderRadius: 4 }} />
+      <span style={{ width: 38, height: 38, borderRadius: "50%", background: `${couleur}1f`, color: couleur, display: "grid", placeItems: "center", flexShrink: 0 }}>
+        {icone}
       </span>
       <span><b style={{ display: "block", fontSize: 13.5 }}>{titre}</b><span style={{ fontSize: 12, color: T.muted }}>{sous}</span></span>
       <span style={{ marginLeft: "auto", color: "#a39d92" }}>→</span>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
+import { EtatVide } from "@/components/ui/EtatVide";
 import { useEtablissement } from "@/lib/EtablissementContext";
 
 type Devis = {
@@ -116,8 +117,8 @@ export default function DevisListPage() {
         {loading && <p className="muted">Chargement...</p>}
 
         {!loading && filtered.length === 0 && (
-          <div className="card" style={{ textAlign: "center", padding: "2rem" }}>
-            <p className="muted">Aucun devis</p>
+          <div className="card" style={{ padding: 0 }}>
+            <EtatVide icone="ventes" titre="Aucun devis" texte={filterStatus === "all" ? "Créez votre premier devis avec le bouton « Nouveau devis »." : "Aucun devis dans ce statut."} />
           </div>
         )}
 

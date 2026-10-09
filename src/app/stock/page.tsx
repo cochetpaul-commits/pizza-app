@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { NavBar } from "@/components/NavBar";
 import { RequireRole } from "@/components/RequireRole";
+import { EtatVide } from "@/components/ui/EtatVide";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { fetchApi } from "@/lib/fetchApi";
 import { CAT_LABELS, CAT_COLORS, type Category } from "@/types/ingredients";
@@ -397,9 +398,7 @@ function StockContent() {
         {loading ? (
           <p style={{ textAlign: "center", color: "#999", padding: 40 }}>Chargement...</p>
         ) : filtered.length === 0 ? (
-          <p style={{ textAlign: "center", color: "#999", padding: 40 }}>
-            {items.length === 0 ? "Aucun mouvement de stock enregistre." : "Aucun resultat."}
-          </p>
+          <EtatVide icone={items.length === 0 ? "produit" : "recherche"} titre={items.length === 0 ? "Aucun mouvement de stock" : "Aucun produit ne correspond"} texte={items.length === 0 ? "Les entrées et sorties apparaîtront ici après le premier inventaire ou la première réception." : "Modifiez la recherche ou les filtres."} />
         ) : (
           /* Categories accordion */
           grouped.map(([cat, catItems]) => {

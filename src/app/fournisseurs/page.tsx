@@ -8,6 +8,7 @@ import { ColorPicker } from "@/components/ColorPicker";
 
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { EtatVide } from "@/components/ui/EtatVide";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { fetchApi } from "@/lib/fetchApi";
 import { useBureau } from "@/hooks/useBureau";
@@ -1244,9 +1245,7 @@ export default function FournisseursPage() {
             )}
 
             {filtered.length === 0 && (
-              <p style={{ color: "#999", fontSize: 14, textAlign: "center" }}>
-                {search.trim() ? "Aucun fournisseur ne correspond a la recherche." : "Aucun fournisseur en base."}
-              </p>
+              <EtatVide icone={search.trim() ? "recherche" : "camion"} titre={search.trim() ? "Aucun fournisseur ne correspond" : "Aucun fournisseur"} texte={search.trim() ? "Essayez un autre nom ou une autre ville." : "Ajoutez votre premier fournisseur avec le bouton « Nouveau fournisseur »."} />
             )}
           </div>
         )}

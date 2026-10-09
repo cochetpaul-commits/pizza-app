@@ -9,6 +9,8 @@ import { legacyHasPrice, offerHasPrice } from "@/lib/offers";
 import { cachedSupplierColor } from "@/lib/supplierColors";
 import { couleurTexte, couleurTexteSur, styleBarreCategorie, styleSousCategorie } from "@/lib/styleCategories";
 import { OSWALD } from "@/components/TuileProduit";
+import { Tuile } from "@/components/ui/Tuile";
+import { EtatVide } from "@/components/ui/EtatVide";
 import { articleDeFiche, type FicheConditionnement } from "@/lib/inventaire";
 import { libelleColisage } from "@/lib/commandeArticles";
 
@@ -34,22 +36,6 @@ function Chip({ fond, couleur, children, title }: { fond: string; couleur: strin
     <span title={title} style={{ display: "inline-block", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 8, whiteSpace: "nowrap", background: fond, color: couleur }}>
       {children}
     </span>
-  );
-}
-
-function Tuile({ libelle, valeur, sous, active, couleur, onClick, compacte }: {
-  libelle: string; valeur: number | string; sous: string; active?: boolean; couleur?: string; onClick: () => void; compacte?: boolean;
-}) {
-  return (
-    <button type="button" onClick={onClick} style={{
-      background: "#fff", border: `1px solid ${active ? "#D4775A" : BORD}`, borderRadius: 12, padding: compacte ? "10px 12px" : "12px 14px",
-      display: "grid", gap: 2, textAlign: "left", cursor: "pointer", fontFamily: "inherit", minWidth: 0,
-      boxShadow: active ? "0 0 0 2px rgba(212,119,90,0.12)" : "none",
-    }}>
-      <span style={{ fontSize: 12, color: MUTED, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{libelle}</span>
-      <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: compacte ? 22 : 26, lineHeight: 1.1, color: couleur ?? "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{valeur}</span>
-      {!compacte && <span style={{ fontSize: 11.5, color: MUTED }}>{sous}</span>}
-    </button>
   );
 }
 
@@ -433,10 +419,10 @@ export function BaseProduits(p: BaseProduitsProps) {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
-          <Tuile compacte libelle="Produits actifs" valeur={nombre(p.total)} sous="" active={p.tab === "all"} onClick={() => p.setTab("all")} />
-          <Tuile compacte libelle="À contrôler" valeur={nombre(p.aControler)} sous="" active={p.tab === "to_check"} couleur={ATTENTION} onClick={() => p.setTab("to_check")} />
-          <Tuile compacte libelle="Sans prix" valeur={nombre(p.sansPrix)} sous="" active={p.tab === "sans_prix"} couleur={MAUVAIS} onClick={() => p.setTab("sans_prix")} />
-          <Tuile compacte libelle="Doublons probables" valeur={nombre(p.nbDoublons)} sous="" couleur={INFO} onClick={p.onDoublons} />
+          <Tuile compacte couleur="#1a1a1a" icone="produit" libelle="Produits actifs" valeur={nombre(p.total)} sous="" active={p.tab === "all"} onClick={() => p.setTab("all")} />
+          <Tuile compacte icone="alerte" libelle="À contrôler" valeur={nombre(p.aControler)} sous="" active={p.tab === "to_check"} couleur={ATTENTION} onClick={() => p.setTab("to_check")} />
+          <Tuile compacte icone="sans" libelle="Sans prix" valeur={nombre(p.sansPrix)} sous="" active={p.tab === "sans_prix"} couleur={MAUVAIS} onClick={() => p.setTab("sans_prix")} />
+          <Tuile compacte icone="doublon" libelle="Doublons probables" valeur={nombre(p.nbDoublons)} sous="" couleur={INFO} onClick={p.onDoublons} />
         </div>
 
         <div style={{ display: "grid", gap: 8 }}>
@@ -483,7 +469,7 @@ export function BaseProduits(p: BaseProduitsProps) {
               </div>
             ))}
             {vide && (
-              <div style={{ padding: "40px 20px", textAlign: "center", color: "#999", fontSize: 14 }}>Aucun produit ne correspond.</div>
+              <EtatVide compact icone="recherche" titre="Aucun produit ne correspond" texte="Modifiez la recherche ou les filtres, ou affichez les fiches désactivées." />
             )}
             {!p.loading && tries.length > 0 && (
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 2px", color: MUTED, fontSize: 12.5 }}>
@@ -522,10 +508,10 @@ export function BaseProduits(p: BaseProduitsProps) {
 
       {/* Tuiles : elles changent la vue (Tous / Validés / À contrôler) ; la quatrième ouvre les doublons */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-        <Tuile libelle="Produits actifs" valeur={nombre(p.total)} sous={`dans ${nbCategories} catégorie${nbCategories > 1 ? "s" : ""} affichée${nbCategories > 1 ? "s" : ""}`} active={p.tab === "all"} onClick={() => p.setTab("all")} />
-        <Tuile libelle="À contrôler" valeur={nombre(p.aControler)} sous="unité, contenance ou prix à vérifier" active={p.tab === "to_check"} couleur={ATTENTION} onClick={() => p.setTab("to_check")} />
-        <Tuile libelle="Sans prix d'achat" valeur={nombre(p.sansPrix)} sous="aucune offre fournisseur active" active={p.tab === "sans_prix"} couleur={MAUVAIS} onClick={() => p.setTab("sans_prix")} />
-        <Tuile libelle="Doublons probables" valeur={nombre(p.nbDoublons)} sous="paires détectées dans les fiches chargées" couleur={INFO} onClick={p.onDoublons} />
+        <Tuile couleur="#1a1a1a" icone="produit" libelle="Produits actifs" valeur={nombre(p.total)} sous={`dans ${nbCategories} catégorie${nbCategories > 1 ? "s" : ""} affichée${nbCategories > 1 ? "s" : ""}`} active={p.tab === "all"} onClick={() => p.setTab("all")} />
+        <Tuile icone="alerte" libelle="À contrôler" valeur={nombre(p.aControler)} sous="unité, contenance ou prix à vérifier" active={p.tab === "to_check"} couleur={ATTENTION} onClick={() => p.setTab("to_check")} />
+        <Tuile icone="sans" libelle="Sans prix d'achat" valeur={nombre(p.sansPrix)} sous="aucune offre fournisseur active" active={p.tab === "sans_prix"} couleur={MAUVAIS} onClick={() => p.setTab("sans_prix")} />
+        <Tuile icone="doublon" libelle="Doublons probables" valeur={nombre(p.nbDoublons)} sous="paires détectées dans les fiches chargées" couleur={INFO} onClick={p.onDoublons} />
       </div>
 
       {/* Filtres : recherche + menus déroulants, pas de pastilles */}
@@ -574,7 +560,7 @@ export function BaseProduits(p: BaseProduitsProps) {
               )}
             </div>
           ))}
-          {vide && <div style={{ padding: "40px 20px", textAlign: "center", color: "#999", fontSize: 14 }}>Aucun produit ne correspond.</div>}
+          {vide && <EtatVide compact icone="recherche" titre="Aucun produit ne correspond" texte="Modifiez la recherche ou les filtres, ou affichez les fiches désactivées." />}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 4px", color: MUTED, fontSize: 12.5 }}>
             <span>{`${nombre(tries.length)} produit${tries.length > 1 ? "s" : ""} dans ${groupes.length} catégorie${groupes.length > 1 ? "s" : ""}`}</span>
             {boutonPlus}
@@ -598,7 +584,7 @@ export function BaseProduits(p: BaseProduitsProps) {
                 ))}
                 {!p.loading && lignes.map((l) => ligne(l))}
                 {vide && (
-                  <tr><td style={{ ...TD, padding: "40px 20px", textAlign: "center", color: "#999", fontSize: 14 }} colSpan={nbColonnes(false)}>Aucun produit ne correspond.</td></tr>
+                  <tr><td style={{ ...TD, padding: 0 }} colSpan={nbColonnes(false)}><EtatVide compact icone="recherche" titre="Aucun produit ne correspond" texte="Modifiez la recherche ou les filtres, ou affichez les fiches désactivées." /></td></tr>
                 )}
               </tbody>
             </table>

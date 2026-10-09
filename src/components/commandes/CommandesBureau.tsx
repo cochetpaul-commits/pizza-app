@@ -3,6 +3,8 @@
 import React, { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { VoletDroit } from "@/components/produits/BaseProduits";
 import { OSWALD } from "@/components/TuileProduit";
+import { Tuile } from "@/components/ui/Tuile";
+import { EtatVide } from "@/components/ui/EtatVide";
 
 /**
  * Commandes, présentation bureau (09/10/2026, maquette validée) : compteurs détaillés, puis un tableau plat
@@ -51,16 +53,6 @@ const abonner = (f: () => void) => { abonnes.add(f); return () => { abonnes.dele
 
 function Chip({ fond, couleur, children }: { fond: string; couleur: string; children: ReactNode }) {
   return <span style={{ display: "inline-block", fontSize: 11.5, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", background: fond, color: couleur }}>{children}</span>;
-}
-
-function Tuile({ libelle, valeur, sous, couleur }: { libelle: string; valeur: string; sous: string; couleur?: string }) {
-  return (
-    <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 12, padding: "12px 14px", display: "grid", gap: 2, minWidth: 0 }}>
-      <span style={{ fontSize: 12, color: MUTED, fontWeight: 600 }}>{libelle}</span>
-      <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 26, lineHeight: 1.1, color: couleur ?? "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{valeur}</span>
-      <span style={{ fontSize: 11.5, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sous}</span>
-    </div>
-  );
 }
 
 export type CommandesBureauProps = {
@@ -150,7 +142,7 @@ export function CommandesBureau(p: CommandesBureauProps) {
         </tr></thead>
         <tbody>
           {liste.map((c) => ligne(c, enSection))}
-          {liste.length === 0 && <tr><td style={{ ...TD, padding: "28px 16px", textAlign: "center", color: "#999" }} colSpan={7}>{vide}</td></tr>}
+          {liste.length === 0 && <tr><td style={{ ...TD, padding: 0 }} colSpan={7}><EtatVide compact icone="commande" titre={vide.split(". ")[0].replace(/\.$/, "")} texte={vide.split(". ").slice(1).join(". ") || undefined} /></td></tr>}
         </tbody>
       </table>
     </div>
@@ -216,10 +208,10 @@ export function CommandesBureau(p: CommandesBureauProps) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-        <Tuile libelle="Brouillons" valeur={nombre(brouillons.length)} couleur={brouillons.length ? BRUN : FAIBLE} sous={brouillons.length ? noms(brouillons) : "aucun brouillon"} />
-        <Tuile libelle="En attente de validation" valeur={nombre(enAttente.length)} couleur={enAttente.length ? "#2563EB" : FAIBLE} sous={enAttente.length ? noms(enAttente) : "aucune commande d'équipier à valider"} />
-        <Tuile libelle="À recevoir" valeur={nombre(p.aRecevoir.length)} couleur={p.aRecevoir.length ? VERT : FAIBLE} sous={p.aRecevoir.length ? p.aRecevoir.map((c) => `${c.supplier_name} ${euros(c.total_ht)}`).join(" · ") : "rien en attente de livraison"} />
-        <Tuile libelle="Reçues ce mois" valeur={euros(recuesMois.reduce((t, c) => t + c.total_ht, 0))} couleur={recuesMois.length ? "#16a34a" : FAIBLE} sous={`${recuesMois.length} commande${recuesMois.length > 1 ? "s" : ""} depuis le 1er du mois`} />
+        <Tuile icone="brouillon" libelle="Brouillons" valeur={nombre(brouillons.length)} couleur={brouillons.length ? BRUN : FAIBLE} sous={brouillons.length ? noms(brouillons) : "aucun brouillon"} />
+        <Tuile icone="attente" libelle="En attente de validation" valeur={nombre(enAttente.length)} couleur={enAttente.length ? "#2563EB" : FAIBLE} sous={enAttente.length ? noms(enAttente) : "aucune commande d'équipier à valider"} />
+        <Tuile icone="camion" libelle="À recevoir" valeur={nombre(p.aRecevoir.length)} couleur={p.aRecevoir.length ? VERT : FAIBLE} sous={p.aRecevoir.length ? p.aRecevoir.map((c) => `${c.supplier_name} ${euros(c.total_ht)}`).join(" · ") : "rien en attente de livraison"} />
+        <Tuile icone="recu" libelle="Reçues ce mois" valeur={euros(recuesMois.reduce((t, c) => t + c.total_ht, 0))} couleur={recuesMois.length ? "#16a34a" : FAIBLE} sous={`${recuesMois.length} commande${recuesMois.length > 1 ? "s" : ""} depuis le 1er du mois`} />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 
 import { RequireRole } from "@/components/RequireRole";
+import { EtatVide } from "@/components/ui/EtatVide";
 import { supabase } from "@/lib/supabaseClient";
 
 type Client = {
@@ -163,9 +164,7 @@ export default function CarnetClientsPage() {
         {loading && <p style={{ color: "#999", fontSize: 13 }}>Chargement...</p>}
 
         {!loading && filtered.length === 0 && (
-          <p style={{ color: "#999", fontSize: 13, textAlign: "center", marginTop: 40 }}>
-            {search.trim() ? "Aucun resultat" : "Aucun client pour le moment"}
-          </p>
+          <EtatVide icone={search.trim() ? "recherche" : "equipe"} titre={search.trim() ? "Aucun client ne correspond" : "Aucun client pour le moment"} texte={search.trim() ? "Essayez un autre nom, téléphone ou email." : "Les clients des devis et des événements apparaîtront ici."} />
         )}
 
         {!loading && filtered.length > 0 && (

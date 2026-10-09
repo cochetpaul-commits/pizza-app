@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
+import { EtatVide } from "@/components/ui/EtatVide";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { AddCollaborateurModal } from "@/components/rh/AddCollaborateurModal";
 
@@ -128,9 +129,7 @@ export default function EquipePage() {
         {loading ? (
           <div style={{ textAlign: "center", padding: 40, color: "#999" }}>Chargement...</div>
         ) : filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 40, color: "#999" }}>
-            Aucun employe trouve.
-          </div>
+          <EtatVide icone="equipe" titre="Aucun employé trouvé" texte="Modifiez la recherche ou le filtre, ou ajoutez un collaborateur." />
         ) : (
           <div style={cadreStyle}>
             <style>{`.eq-ligne:hover td { background: #f7f3ec; }`}</style>
