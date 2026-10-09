@@ -40,7 +40,8 @@ interface Props {
 
 const TH_ING: CSSProperties = { fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", fontWeight: 600, whiteSpace: "nowrap" };
 const COLONNES_ING = "18px minmax(180px, 1.5fr) minmax(120px, 1fr) 96px 64px 64px 26px";
-const CHAMP_ING: CSSProperties = { height: 32, borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 13, background: "#fff" };
+const HAUTEUR = 30; // hauteur commune de tous les champs d'une ligne (stepper, unité, nom, croix)
+const CHAMP_ING: CSSProperties = { height: HAUTEUR, borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 13, background: "#fff", boxSizing: "border-box" };
 
 function tmpId() {
   return `tmp-${Math.random().toString(36).slice(2)}`;
@@ -183,7 +184,7 @@ export function IngredientListDnD({
                             </button>
                           )}
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <SmartSelect options={ingredientOptions} value={line.ingredient_id} onChange={changerIngredient} placeholder="Ingrédient…" inputStyle={{ height: 32, fontSize: 13, fontWeight: 600 }} />
+                            <SmartSelect options={ingredientOptions} value={line.ingredient_id} onChange={changerIngredient} placeholder="Ingrédient…" inputStyle={{ height: HAUTEUR, fontSize: 13, fontWeight: 600, boxSizing: "border-box" }} />
                           </div>
                           {line.ingredient_id && (
                             <a href={`/ingredients?edit=${line.ingredient_id}${returnUrl ? `&back=${encodeURIComponent(returnUrl)}` : ""}`} title="Modifier le produit" style={{ flexShrink: 0, color: "#9a8f84", display: "flex" }}>
@@ -211,7 +212,7 @@ export function IngredientListDnD({
                         <span style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: cost != null ? "#1a1a1a" : "#9a8f84", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                           {cost != null ? `${fmtMoney(cost)} €` : "—"}
                         </span>
-                        <button type="button" onClick={() => removeLine(line.id)} aria-label="Retirer" style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: "transparent", color: "#b0a89a", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>✕</button>
+                        <button type="button" onClick={() => removeLine(line.id)} aria-label="Retirer" style={{ width: 26, height: HAUTEUR, borderRadius: 6, border: "none", background: "transparent", color: "#b0a89a", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>✕</button>
                       </div>
                     ) : (
                       <div
@@ -257,7 +258,7 @@ export function IngredientListDnD({
                               value={line.ingredient_id}
                               onChange={changerIngredient}
                               placeholder="Ingrédient…"
-                              inputStyle={{ height: 34, fontSize: 13 }}
+                              inputStyle={{ height: HAUTEUR, fontSize: 13, boxSizing: "border-box" }}
                             />
                           </div>
 
@@ -325,16 +326,12 @@ export function IngredientListDnD({
                           <select
                             value={line.unit}
                             onChange={e => updateLine(line.id, { unit: e.target.value })}
-                            style={{
-                              height: 34, borderRadius: 8, padding: "0 6px",
-                              border: "1px solid rgba(217,199,182,0.8)", fontSize: 13,
-                              background: "rgba(255,255,255,0.8)",
-                            }}
+                            style={{ ...CHAMP_ING, padding: "0 6px" }}
                           >
                             {units.map(u => <option key={u} value={u}>{u}</option>)}
                           </select>
 
-                          <span className={cost != null ? "pastille-ronde" : undefined} style={{ fontSize: 11, padding: cost != null ? "2px 9px" : undefined, color: cost != null ? undefined : "#9a8f84", fontWeight: 700, flexShrink: 0 }}>
+                          <span className={cost != null ? "pastille-ronde" : undefined} style={{ fontSize: 11, height: HAUTEUR, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: cost != null ? "0 9px" : undefined, color: cost != null ? undefined : "#9a8f84", fontWeight: 700, flexShrink: 0 }}>
                             {cost != null ? `${fmtMoney(cost)} €` : "—"}
                           </span>
 
@@ -342,11 +339,9 @@ export function IngredientListDnD({
                             type="button"
                             onClick={() => removeLine(line.id)}
                             style={{
-                              flexShrink: 0, width: 28, height: 28, borderRadius: 7,
-                              border: "1px solid rgba(217,199,182,0.8)",
-                              background: "rgba(255,255,255,0.5)", color: "#9a8f84",
+                              ...CHAMP_ING, flexShrink: 0, width: HAUTEUR, color: "#9a8f84",
                               fontSize: 12, cursor: "pointer", display: "flex",
-                              alignItems: "center", justifyContent: "center",
+                              alignItems: "center", justifyContent: "center", padding: 0,
                             }}
                           >✕</button>
                         </div>

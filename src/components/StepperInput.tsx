@@ -94,6 +94,7 @@ export function StepperInput({
       display: "inline-flex",
       alignItems: "center",
       height: 30,
+      boxSizing: "border-box",
       border: "1px solid #ddd6c8",
       borderRadius: 8,
       background: "#fff",
