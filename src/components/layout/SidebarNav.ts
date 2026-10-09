@@ -35,9 +35,11 @@ const MANAGERS: Role[] = ["group_admin", "manager"];
 
 // ANALYSE : un indicateur par entrée, dans la logique ComandR (10/10/2026).
 // Les ancres (#couverts, #productivite) ouvrent la page sur la section voulue.
+// Une page par question du quotidien (10/10/2026) ; les anciennes pages Ventes, Rentabilité et
+// Masse salariale restent accessibles par les menus Pilotage et RH.
 export const ANALYSE_ITEMS: NavItemV2[] = [
-  { label: "Chiffre d'affaires", href: "/ventes", icon: "barChart", permission: "performances.view" },
-  { label: "Couverts", href: "/ventes#couverts", icon: "users", permission: "performances.view" },
+  { label: "Chiffre d'affaires", href: "/analyse/chiffre-affaires", icon: "barChart", permission: "performances.view" },
+  { label: "Couverts", href: "/analyse/couverts", icon: "users", permission: "performances.view" },
   { label: "Marge", href: "/rentabilite", icon: "calculator", permission: "performances.pilotage" },
   { label: "Masse salariale", href: "/rh/masse-salariale", icon: "trendingUp", permission: "performances.pilotage" },
   { label: "CA / personne", href: "/rh/masse-salariale#productivite", icon: "users", permission: "performances.pilotage" },
