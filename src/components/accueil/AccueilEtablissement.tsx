@@ -107,6 +107,7 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
   const [ventesA1, setVentesA1] = useState<VenteJour[]>([]);
   const [compteurs, setCompteurs] = useState<Compteurs | null>(null);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [planningIndispo, setPlanningIndispo] = useState(false);
   const [meteo, setMeteo] = useState<Meteo[]>([]);
   const [top, setTop] = useState<Produit[]>([]);
   const [commandes, setCommandes] = useState<Commande[]>([]);
@@ -139,7 +140,7 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
       const [deuxSemaines, cpt, shiftsRes, meteoRes, produits, cmd, evts] = await Promise.all([
         canSeePilotage ? supabase.rpc("accueil_ventes_jour", { p_etab: etab.id, p_from: shift(semaineDebut, -7), p_to: today }) : Promise.resolve({ data: [] }),
         supabase.rpc("accueil_compteurs", { p_etab: etab.id, p_debut_mois: moisDebut }),
-        supabase.from("shifts").select("employe_id, poste_id, heure_debut, heure_fin").eq("etablissement_id", etab.id).eq("date", today).order("heure_debut"),
+        fetchApi(`/api/combo/planning-jour?date=${today}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
         fetchApi(`/api/meteo?from=${today}&to=${shift(today, 2)}`).then((r) => r.json()).catch(() => null),
         canSeePilotage ? supabase.rpc("ventes_par_produit", { p_etab: etab.id, p_from: semaineDebut, p_to: today }) : Promise.resolve({ data: [] }),
         supabase.from("commande_sessions").select("status, created_at, suppliers(name)").eq("etablissement_id", etab.id)
@@ -151,22 +152,9 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
       const c = Array.isArray(cpt.data) ? cpt.data[0] : cpt.data;
       setCompteurs((c ?? null) as Compteurs | null);
 
-      // Équipe du jour : noms et postes en deux requêtes courtes (pas de jointure à deviner)
-      const rows = (shiftsRes.data ?? []) as { employe_id: string | null; poste_id: string | null; heure_debut: string; heure_fin: string }[];
-      const empIds = [...new Set(rows.map((r) => r.employe_id).filter(Boolean))] as string[];
-      const posteIds = [...new Set(rows.map((r) => r.poste_id).filter(Boolean))] as string[];
-      const [emps, postes] = await Promise.all([
-        empIds.length ? supabase.from("employes").select("id, prenom, nom").in("id", empIds) : Promise.resolve({ data: [] }),
-        posteIds.length ? supabase.from("postes").select("id, nom").in("id", posteIds) : Promise.resolve({ data: [] }),
-      ]);
-      if (annule) return;
-      const nomEmp = new Map(((emps.data ?? []) as { id: string; prenom: string; nom: string }[]).map((e) => [e.id, `${e.prenom ?? ""} ${e.nom ?? ""}`.trim()]));
-      const nomPoste = new Map(((postes.data ?? []) as { id: string; nom: string }[]).map((p) => [p.id, p.nom]));
-      setShifts(rows.map((r) => ({
-        employe: (r.employe_id && nomEmp.get(r.employe_id)) || "?",
-        debut: String(r.heure_debut ?? "").slice(0, 5), fin: String(r.heure_fin ?? "").slice(0, 5),
-        poste: (r.poste_id && nomPoste.get(r.poste_id)) || "",
-      })));
+      // Équipe du jour : le planning Combo du jour (le planning n'est pas tenu dans l'application)
+      setShifts(((shiftsRes?.shifts ?? []) as Shift[]).map((r) => ({ employe: r.employe, debut: r.debut, fin: r.fin, poste: r.poste })));
+      setPlanningIndispo(!shiftsRes);
 
       setMeteo(((meteoRes?.meteo ?? []) as { date_service: string; service: string; emoji: string; description: string; temp: number }[])
         .map((m) => ({ date: m.date_service, service: m.service, emoji: m.emoji, desc: m.description, temp: m.temp })));
@@ -224,11 +212,11 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
     }
     const actions: string[] = [];
     if (brouillons.length) actions.push(`${brouillons.length} commande${brouillons.length > 1 ? "s" : ""} attend${brouillons.length > 1 ? "ent" : ""} une validation`);
-    actions.push(shifts.length ? `${shifts.length} personne${shifts.length > 1 ? "s" : ""} au planning aujourd'hui` : "aucun shift n'est planifié aujourd'hui");
+    if (!planningIndispo) actions.push(shifts.length ? `${shifts.length} personne${shifts.length > 1 ? "s" : ""} au planning Combo aujourd'hui` : "aucun shift n'est planifié dans Combo aujourd'hui");
     parts.push(actions.join(", et ") + ".");
     return parts.join(" ");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSeePilotage, hierTotal, ventesA1, hier, mode, meteo, today, brouillons.length, shifts.length]);
+  }, [canSeePilotage, hierTotal, ventesA1, hier, mode, meteo, today, brouillons.length, shifts.length, planningIndispo]);
 
   const titrePeriode = mode === "hier" ? `hier` : mode === "semaine" ? "cette semaine" : mode === "mois" ? "ce mois" : "sur la période";
   const nomEtab = etab?.nom ?? (slug === "piccola" ? "Piccola Mia" : "Bello Mio");
@@ -331,11 +319,16 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
       {/* Équipe + meilleures ventes (+ événements) */}
       <div className="accueil-deux" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div style={CARD}>
-          <Titre droite={<Link href="/rh/equipe" style={lien}>Équipe →</Link>}>Équipe du jour</Titre>
-          {shifts.length === 0 ? (
+          <Titre droite={<a href="https://app.combohr.com" target="_blank" rel="noreferrer" style={lien}>Planning Combo →</a>}>Équipe du jour</Titre>
+          {planningIndispo ? (
             <div style={{ padding: "18px 10px", textAlign: "center", color: T.muted, fontSize: 13 }}>
-              <b style={{ display: "block", color: T.dark, marginBottom: 4 }}>Aucun shift planifié pour aujourd&apos;hui</b>
-              Le planning de la semaine du {jourCourt(semaineDebut)} n&apos;est pas rempli.
+              <b style={{ display: "block", color: T.dark, marginBottom: 4 }}>Planning Combo indisponible</b>
+              Impossible de lire le planning du jour pour le moment.
+            </div>
+          ) : shifts.length === 0 ? (
+            <div style={{ padding: "18px 10px", textAlign: "center", color: T.muted, fontSize: 13 }}>
+              <b style={{ display: "block", color: T.dark, marginBottom: 4 }}>Aucun shift dans Combo aujourd&apos;hui</b>
+              Le planning du {jourCourt(today)} est vide ou pas encore publié.
             </div>
           ) : shifts.map((s, i) => (
             <div key={i} style={ligne}>
@@ -389,7 +382,7 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
           .accueil-page { padding: 16px 14px 100px !important; }
           .accueil-kpis { grid-template-columns: repeat(2, 1fr) !important; }
           .accueil-trois, .accueil-deux { grid-template-columns: 1fr !important; }
-          .accueil-raccourcis { grid-template-columns: repeat(2, 1fr) !important; }
+          .accueil-raccourcis { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>
