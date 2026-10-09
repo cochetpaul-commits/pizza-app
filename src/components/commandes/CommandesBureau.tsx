@@ -31,8 +31,11 @@ const FAIBLE = "#a39d92";
 const BRUN = "#A0845C";
 const VERT = "#4a6741";
 const GRIS = "#939597";
-const TH: CSSProperties = { textAlign: "left", fontSize: 12.5, color: "#1a1a1a", padding: "12px 16px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
-const TD: CSSProperties = { padding: "12px 16px", borderBottom: `1px solid ${BORD}`, verticalAlign: "middle", fontSize: 13 };
+const TH_PLAT: CSSProperties = { textAlign: "left", fontSize: 12.5, color: "#1a1a1a", padding: "12px 16px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
+const TD_PLAT: CSSProperties = { padding: "12px 16px", borderBottom: `1px solid ${BORD}`, verticalAlign: "middle", fontSize: 13 };
+/** Tableaux dans les accordéons (maquette) : en-tête en petites capitales discrètes, lignes plus serrées */
+const TH_SEC: CSSProperties = { ...{ textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: FAIBLE, padding: "8px 14px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" } };
+const TD_SEC: CSSProperties = { padding: "10px 14px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13 };
 const BTN: CSSProperties = { height: 36, padding: "0 14px", borderRadius: 10, border: `1px solid ${BORD}`, background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a", whiteSpace: "nowrap" };
 const PETIT: CSSProperties = { fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 8, border: `1px solid ${BORD}`, background: "#fff", cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a", whiteSpace: "nowrap" };
 
@@ -122,7 +125,7 @@ export function CommandesBureau(p: CommandesBureauProps) {
     if (s === "a_recevoir") return <button type="button" disabled={p.saving} style={{ ...PETIT, background: VERT, color: "#fff", borderColor: VERT, fontWeight: 700 }} onClick={(e) => { e.stopPropagation(); p.onPointer(c); }}>Pointer</button>;
     return <button type="button" style={PETIT} onClick={(e) => { e.stopPropagation(); p.onPdf(c); }}>PDF</button>;
   };
-  const ligne = (c: CommandeLigne) => (
+  const ligne = (c: CommandeLigne, enSection = false) => { const TD = enSection ? TD_SEC : TD_PLAT; return (
     <tr key={c.id} className={`cb-ligne${ouverte?.id === c.id ? " on" : ""}`} onClick={() => setOuverteId(c.id)} style={{ cursor: "pointer" }}>
       <td style={TD}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 600 }}>
@@ -137,8 +140,8 @@ export function CommandesBureau(p: CommandesBureauProps) {
       <td style={{ ...TD, color: MUTED, fontSize: 12.5 }}>{section(c) === "a_recevoir" ? (c.email_sent_at ? "✓ envoyée par mail" : "à envoyer") : ""}</td>
       <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{actionLigne(c)}</td>
     </tr>
-  );
-  const tableau = (liste: CommandeLigne[], vide: string) => (
+  ); };
+  const tableau = (liste: CommandeLigne[], vide: string, enSection = false) => { const TH = enSection ? TH_SEC : TH_PLAT; const TD = enSection ? TD_SEC : TD_PLAT; return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 760 }}>
         <thead><tr>
@@ -146,12 +149,12 @@ export function CommandesBureau(p: CommandesBureauProps) {
           <th style={{ ...TH, textAlign: "right" }}>Total HT</th><th style={TH}>Envoi</th><th style={TH} />
         </tr></thead>
         <tbody>
-          {liste.map(ligne)}
+          {liste.map((c) => ligne(c, enSection))}
           {liste.length === 0 && <tr><td style={{ ...TD, padding: "28px 16px", textAlign: "center", color: "#999" }} colSpan={7}>{vide}</td></tr>}
         </tbody>
       </table>
     </div>
-  );
+  ); };
   const barre = (s: Section, titre: string, couleur: string, n: number) => {
     const fermee = sectionsFermees.has(s);
     return (
@@ -241,7 +244,7 @@ export function CommandesBureau(p: CommandesBureauProps) {
             <div key={s}>
               {barre(s, titre, couleur, liste.length)}
               {!sectionsFermees.has(s) && (
-                <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>{tableau(liste, vide)}</div>
+                <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>{tableau(liste, vide, true)}</div>
               )}
             </div>
           ))}

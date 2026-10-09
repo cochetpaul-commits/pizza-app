@@ -65,8 +65,11 @@ const euros = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigit
 const pct = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: n >= 100 ? 0 : 1, maximumFractionDigits: n >= 100 ? 0 : 1 })} %`;
 const qte = (q: number | null, u: string | null) => (q == null ? "—" : `${q.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${u ?? ""}`.trim());
 
-const TH: CSSProperties = { textAlign: "left", fontSize: 12.5, color: "#1a1a1a", padding: "12px 16px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
-const TD: CSSProperties = { padding: "12px 16px", borderBottom: `1px solid ${BORD}`, verticalAlign: "middle", fontSize: 13 };
+const TH_PLAT: CSSProperties = { textAlign: "left", fontSize: 12.5, color: "#1a1a1a", padding: "12px 16px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
+const TD_PLAT: CSSProperties = { padding: "12px 16px", borderBottom: `1px solid ${BORD}`, verticalAlign: "middle", fontSize: 13 };
+/** Tableaux dans les accordéons (maquette) : en-tête en petites capitales discrètes, lignes plus serrées, séparateurs plus légers */
+const TH_SEC: CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: FAIBLE, padding: "8px 14px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
+const TD_SEC: CSSProperties = { padding: "10px 14px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13 };
 const BTN: CSSProperties = { height: 36, padding: "0 14px", borderRadius: 10, border: `1px solid ${BORD}`, background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a", whiteSpace: "nowrap" };
 const SELECT: CSSProperties = { height: 36, padding: "0 10px", borderRadius: 10, border: `1px solid ${BORD}`, background: "#fff", fontSize: 12.5, fontFamily: "inherit", color: "#1a1a1a", maxWidth: "100%" };
 const PETIT: CSSProperties = { fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 8, border: `1px solid ${ACCENT}`, background: "#fff", cursor: "pointer", fontFamily: "inherit", color: ACCENT, whiteSpace: "nowrap" };
@@ -89,6 +92,11 @@ function ChipFoodCost({ a }: { a: ArticleCarte }) {
   const v = verdictFoodCost(a.food_cost);
   if (!v || a.food_cost == null) return <span style={{ color: FAIBLE }}>—</span>;
   return <Chip fond={v.fond} couleur={v.couleur} bord={`${v.couleur}55`}>{pct(a.food_cost)}</Chip>;
+}
+function FoodCostTexte({ a }: { a: ArticleCarte }) {
+  const v = verdictFoodCost(a.food_cost);
+  if (!v || a.food_cost == null) return <span style={{ color: FAIBLE }}>—</span>;
+  return <span style={{ fontWeight: 600, color: v.couleur, fontVariantNumeric: "tabular-nums" }}><Point couleur={v.couleur} />{pct(a.food_cost)}</span>;
 }
 function Point({ couleur }: { couleur: string }) {
   return <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: couleur, marginRight: 7, verticalAlign: 1 }} />;
@@ -412,7 +420,7 @@ export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean;
     } finally { setSynchro(false); }
   }
 
-  const sousArticle = (a: ArticleCarte) => a.fiche?.description ?? (a.fiche && a.fiche.nom.toLowerCase() !== a.nom.toLowerCase() ? `Fiche « ${a.fiche.nom} »` : null) ?? (a.produit ? `Produit « ${a.produit.nom} »${a.produit.dose ? ` · dose ${a.produit.dose}` : ""}` : null) ?? (a.cout_detail && !a.lien ? null : a.cout_detail);
+  const sousArticle = (a: ArticleCarte) => a.fiche?.description ?? (a.fiche && a.fiche.nom.toLowerCase() !== a.nom.toLowerCase() ? `Fiche « ${a.fiche.nom} »` : null) ?? (a.produit ? `Produit « ${a.produit.nom} »${a.produit.dose ? ` · dose ${a.produit.dose}` : ""}` : null) ?? (a.cout_detail && a.cout_detail !== "la pizza" && a.cout_detail !== "la portion" ? a.cout_detail : null);
   const urlCreation = (a: ArticleCarte) => `/fiche/new?nom=${encodeURIComponent(a.nom)}&popina=${a.id}&prix=${a.prix_ttc}${CAT_FICHE[a.categorie] ? `&cat=${CAT_FICHE[a.categorie]}` : ""}`;
 
   const celluleLien = (a: ArticleCarte) => (
@@ -430,7 +438,7 @@ export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean;
         : <span style={{ color: FAIBLE }}>—</span>
   );
 
-  const ligne = (a: ArticleCarte, enSection: boolean) => (
+  const ligne = (a: ArticleCarte, enSection: boolean) => { const TD = enSection ? TD_SEC : TD_PLAT; return (
     <tr key={a.id} className={`ca-ligne${ouvert?.id === a.id ? " on" : ""}`} onClick={() => { setOuvertId(a.id); setRelierOuvert(false); }} style={{ cursor: "pointer" }}>
       {enSection && <td style={{ ...TD, padding: 0, width: 4, background: infoCategorie(a.categorie).couleur }} />}
       <td style={{ ...TD, minWidth: 240 }}>
@@ -444,14 +452,14 @@ export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean;
       <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: a.cout == null ? FAIBLE : "#1a1a1a" }}>
         {a.cout != null ? euros(a.cout) : "—"}{enSection && a.cout_source === "produit" && <div style={{ fontSize: 11, color: FAIBLE }}>prix d&apos;achat</div>}
       </td>
-      <td style={{ ...TD, textAlign: enSection ? "right" : "left", whiteSpace: "nowrap" }}><ChipFoodCost a={a} /></td>
+      <td style={{ ...TD, textAlign: enSection ? "right" : "left", whiteSpace: "nowrap" }}>{enSection ? <FoodCostTexte a={a} /> : <ChipFoodCost a={a} />}</td>
       {enSection && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: a.marge_ht == null ? FAIBLE : a.marge_ht < 0 ? MAUVAIS : "#1a1a1a" }}>{a.marge_ht != null ? euros(a.marge_ht) : "—"}</td>}
-      <td style={TD}>{celluleLien(a)}</td>
+      <td style={TD}>{enSection && a.lien ? <span style={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap" }}>{libelleLien(a)}</span> : celluleLien(a)}</td>
       <td style={TD}>{celluleFiche(a)}</td>
       <td style={{ ...TD, textAlign: "right", width: 40, color: FAIBLE, fontWeight: 700 }}>→</td>
     </tr>
-  );
-  const entete = (enSection: boolean) => (
+  ); };
+  const entete = (enSection: boolean) => { const TH = enSection ? TH_SEC : TH_PLAT; return (
     <tr>
       {enSection && <th style={{ ...TH, padding: 0, width: 4 }} />}
       <th style={TH}>Article</th>
@@ -464,7 +472,7 @@ export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean;
       <th style={TH}>Fiche</th>
       <th style={TH} />
     </tr>
-  );
+  ); };
 
   const carte = (a: ArticleCarte) => (
     <button key={a.id} type="button" onClick={() => { setOuvertId(a.id); setRelierOuvert(false); }}
