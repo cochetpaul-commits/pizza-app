@@ -132,15 +132,19 @@ export default function EquipePage() {
             Aucun employe trouve.
           </div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <div style={cadreStyle}>
+            <style>{`.eq-ligne:hover td { background: #f7f3ec; }`}</style>
+            <div style={{ overflowX: "auto" }}>
             <table style={tableStyle}>
               <thead>
                 <tr>
+                  <th style={{ ...thStyle, padding: 0, width: 4 }} />
                   <th style={{ ...thStyle, textAlign: "left" }}>Nom</th>
-                  <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Role</th>
+                  <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Rôle</th>
                   <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Email</th>
-                  <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Telephone</th>
-                  <th style={{ ...thStyle, textAlign: "center" }}>Actions</th>
+                  <th style={{ ...thStyle, textAlign: "left" }} className="hide-mobile">Téléphone</th>
+                  <th style={{ ...thStyle, textAlign: "left" }}>Compte</th>
+                  <th style={thStyle} />
                 </tr>
               </thead>
               <tbody>
@@ -149,17 +153,8 @@ export default function EquipePage() {
                   const role = emp.role ?? "employe";
 
                   return (
-                    <tr
-                      key={emp.id}
-                      onClick={() => router.push(`/rh/employe/${emp.id}`)}
-                      style={trStyle}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.background = "#f5f0e8";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.background = "transparent";
-                      }}
-                    >
+                    <tr key={emp.id} className="eq-ligne" onClick={() => router.push(`/rh/employe/${emp.id}`)} style={trStyle}>
+                      <td style={{ ...tdStyle, padding: 0, width: 4, background: etabColor }} />
                       {/* Nom + Avatar + badge */}
                       <td style={{ ...tdStyle, minWidth: 180 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -208,12 +203,12 @@ export default function EquipePage() {
                         {emp.tel_mobile ?? <span style={{ color: "#ccc" }}>—</span>}
                       </td>
 
-                      {/* Actions */}
-                      <td style={{ ...tdStyle, textAlign: "center" }}>
+                      {/* Compte : connecté, ou invitation */}
+                      <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
                         {emp.auth_user_id ? (
                           <span style={{ fontSize: 10, fontWeight: 700, color: "#2D6A4F", padding: "3px 8px", borderRadius: 6, background: "#2D6A4F10", border: "1px solid #2D6A4F30" }}>Connecte</span>
                         ) : emp.email && isGroupAdmin ? (
-                          <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+                          <div style={{ display: "flex", gap: 4 }}>
                             {inviteStatus[emp.id] === "sending" ? (
                               <span style={{ fontSize: 10, color: "#999", fontWeight: 600 }}>Envoi...</span>
                             ) : inviteStatus[emp.id] === "sent" ? (
@@ -259,11 +254,13 @@ export default function EquipePage() {
                           <span style={{ fontSize: 10, color: "#ccc" }}>Pas d&apos;email</span>
                         )}
                       </td>
+                      <td style={{ ...tdStyle, textAlign: "right", width: 40, color: "#a39d92", fontWeight: 700 }}>→</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>
@@ -293,36 +290,35 @@ export default function EquipePage() {
 /* ── Styles ───────────────────────────────────────────────────── */
 
 const pageStyle: React.CSSProperties = {
-  maxWidth: 900,
+  maxWidth: 1100,
   margin: "0 auto",
   padding: "16px 16px 60px",
 };
 
 
+/* Cadre et tableau : gabarit commun (Base produits, Commandes, Carte…) */
+const cadreStyle: React.CSSProperties = { background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden" };
+
 const tableStyle: React.CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
-  background: "#fff",
-  borderRadius: 14,
-  overflow: "hidden",
-  border: "1px solid #ddd6c8",
 };
 
 const thStyle: React.CSSProperties = {
-  padding: "10px 12px",
-  fontSize: 11,
-  fontWeight: 700,
+  padding: "8px 14px",
+  fontSize: 10.5,
+  fontWeight: 600,
   textTransform: "uppercase",
-  letterSpacing: 0.5,
-  color: "#999",
+  letterSpacing: ".08em",
+  color: "#a39d92",
   borderBottom: "1px solid #ddd6c8",
-  fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+  whiteSpace: "nowrap",
 };
 
 const tdStyle: React.CSSProperties = {
-  padding: "10px 12px",
-  fontSize: 14,
-  borderBottom: "1px solid #f0ebe3",
+  padding: "10px 14px",
+  fontSize: 13,
+  borderBottom: "1px solid #f0ebe2",
   verticalAlign: "middle",
 };
 
