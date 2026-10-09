@@ -16,6 +16,7 @@ import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingre
 import { couleurRayon, rayonDuProduit, RAYON_AUTRES, RAYON_PREPARATIONS } from "@/lib/rayons";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { BoutonCrayon, BoutonCroix, Compteur, Conditionnement as CondLibelle, TuileProduit } from "@/components/TuileProduit";
+import { useBureau } from "@/hooks/useBureau";
 import { couleurTexte, styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie } from "@/lib/styleCategories";
 import { correspondRecherche, filtrerRecherche, normaliserRecherche } from "@/lib/rechercheTolerante";
 void categorieDeFamille;
@@ -75,6 +76,7 @@ export default function InventaireFeuillePage() {
 }
 
 function Feuille() {
+  const bureau = useBureau();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { isGroupAdmin } = useProfile();
@@ -503,6 +505,97 @@ function Feuille() {
     );
   };
 
+
+  /** Bureau : une ligne de tableau par produit, tout sur une ligne (gabarit Base produits) ; compteurs dans la colonne Comptage */
+  const ligne = (l: Ligne, couleur: string) => {
+    const s = saisies[l.id] ?? { colis: "", unites: "" };
+    const contenu = l.cond_contenu;
+    const deuxChamps = contenu != null && contenu > 1;
+    const total = totalLigne(num(s.colis), num(s.unites), contenu);
+    const etat = etatLigne[l.id];
+    const c = condProduit(l);
+    const peutColis = !!c && c.contenu > 1;
+    const valo = coutDe(l);
+    const f = fiches[l.ingredient_id];
+    const fournisseur = fournisseurDe(l, c);
+    const detailPiece = f?.piece_weight_g ? `${f.piece_weight_g >= 1000 ? `${txt(f.piece_weight_g / 1000)} kg` : `${txt(f.piece_weight_g)} g`} la pièce` : f?.piece_volume_ml ? `${f.piece_volume_ml >= 1000 ? `${txt(f.piece_volume_ml / 1000)} L` : `${txt(f.piece_volume_ml)} mL`} la pièce` : null;
+    const couleurCat = (f?.category && CAT_COLORS[f.category as Category]) || couleur;
+    const nomColis = deuxChamps && l.cond_libelle ? pluriel(l.cond_libelle.split(" ")[0], 2) : null;
+    const auPoids = l.unite === "kg" || l.unite === "litre";
+    const compteur = (champ: keyof Saisie, etiquette: string, pas: number) => {
+      const v = num(s[champ]) ?? 0;
+      const fixer = (x: number) => saisir(l, champ, txt(Math.max(0, Math.round(x * 100) / 100)));
+      return (
+        <Compteur valeur={s[champ]} etiquette={etiquette} desactive={lectureSeule} moinsActif={v > 0}
+          onMoins={() => fixer(v - pas)} onPlus={() => fixer(v + pas)} onSaisie={(x) => saisir(l, champ, x)} onEntree={entreeSuivante} />
+      );
+    };
+    const remarque = l.rattachement === "approché" || l.rattachement === "rattaché par ressemblance" || l.aVerifier || l.inactive;
+    const TD: React.CSSProperties = { padding: "8px 14px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13, whiteSpace: "nowrap", background: compte(l) ? "rgba(45,106,79,0.07)" : undefined };
+    return (
+      <tr key={l.id}>
+        <td style={{ ...TD, padding: 0, width: 4, background: couleurCat }} />
+        <td style={{ ...TD, whiteSpace: "normal", minWidth: 220 }}>
+          <div style={{ fontWeight: 600, color: l.inactive ? "#999" : "#1a1a1a", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            {l.nom_feuille ?? l.nom}
+            {remarque && (
+              <span style={{ fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8, background: l.inactive ? "#fde7e7" : l.aVerifier ? "#fde7ef" : "#fdf3d4", color: l.inactive ? "#a12b2b" : l.aVerifier ? "#b0306a" : "#8a6a12" }}>
+                {l.inactive ? (f ? "fiche désactivée" : "fiche supprimée") : l.aVerifier ? "fiche à vérifier" : "rattaché par ressemblance"}
+              </span>
+            )}
+          </div>
+          {valo.cout == null && <div style={{ fontSize: 11.5, color: "#b45309" }}>sans prix{valo.raison ? ` (${valo.raison})` : ""}</div>}
+        </td>
+        <td style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>
+          <CondLibelle>{c?.libelle ?? l.cond_libelle ?? l.unite ?? "unité"}</CondLibelle>{!c && detailPiece ? ` · ${detailPiece}` : ""}
+          {!lectureSeule && peutColis && !deuxChamps && (
+            <div><button type="button" onClick={() => void basculerComptage(l)} style={lien}>compter par {c!.libelle.split(" ")[0]}</button></div>
+          )}
+        </td>
+        <td style={TD}>
+          {fournisseur
+            ? <span className="pastille" style={{ "--pastille-c": getSupplierColor(fournisseur.name, fournisseur.color) } as React.CSSProperties}>{fournisseur.name}</span>
+            : recettes[l.ingredient_id]
+              ? <span className="pastille" title={`Valorisée au coût de la recette « ${recettes[l.ingredient_id].name} »`} style={{ "--pastille-c": CAT_COLORS.preparation } as React.CSSProperties}>recette maison</span>
+              : <span style={{ color: "#a39d92" }}>—</span>}
+        </td>
+        <td style={TD}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 20 }}>
+            {contenu != null && compteur("colis", deuxChamps ? nomColis ?? "colis" : pluriel(l.unite ?? "colis", 2), !deuxChamps && auPoids ? 0.5 : 1)}
+            {(deuxChamps || contenu == null) && compteur("unites", pluriel(l.unite ?? "unités", 2), contenu == null && auPoids ? 0.5 : 1)}
+          </div>
+        </td>
+        <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+          {total != null
+            ? <><strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong>{valo.cout != null && <div style={{ fontSize: 11.5, color: "#6f6656" }}>{eur(total * valo.cout)}</div>}</>
+            : <span style={{ color: "#c4bcae" }}>non compté</span>}
+        </td>
+        <td style={{ ...TD, textAlign: "right", width: 90 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span title={etat === "erreur" ? "Pas enregistré" : etat === "attente" ? "Enregistrement…" : etat === "ok" ? "Enregistré" : ""} style={{ width: 8, height: 8, borderRadius: 4, background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent" }} />
+            {f && <BoutonCrayon href={`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(`/inventaire/${id}`)}`} title="Modifier la fiche produit (prix, conditionnement, zone)" />}
+            {!lectureSeule && <BoutonCroix onClick={() => void retirer(l)} title="Retirer de la liste (la fiche n'est pas touchée)" />}
+          </span>
+        </td>
+      </tr>
+    );
+  };
+
+  const tableau = (ls: Ligne[], couleur: string) => {
+    const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+    return (
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 900 }}>
+          <thead><tr>
+            <th style={{ ...TH, padding: 0, width: 4 }} /><th style={TH}>Produit</th><th style={TH}>Conditionnement</th><th style={TH}>Fournisseur</th>
+            <th style={TH}>Comptage</th><th style={{ ...TH, textAlign: "right" }}>Total</th><th style={TH} />
+          </tr></thead>
+          <tbody>{ls.map((l) => ligne(l, couleur))}</tbody>
+        </table>
+      </div>
+    );
+  };
+
   if (erreur) return <div style={{ maxWidth: 900, margin: "0 auto", padding: 24, color: "#8a2b2b" }}>{erreur}</div>;
   if (!inv) return <div style={{ maxWidth: 900, margin: "0 auto", padding: 24, color: "#999" }}>Chargement…</div>;
 
@@ -703,7 +796,9 @@ function Feuille() {
               return (
                 <div key={r.code} style={{ margin: `${i === 0 ? 4 : 10}px 0 6px` }}>
                   {/* Titre de rayon : fond plein, texte blanc, exactement comme l'écran de commande */}
-                  <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleFamille(zone, r.code)]: !ouverte }))} aria-expanded={ouverte} style={styleBarreCategorie(couleur)}>
+                  <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleFamille(zone, r.code)]: !ouverte }))} aria-expanded={ouverte}
+                    className={`barre-categorie${bureau && ouverte ? " ouverte" : ""}`}
+                    style={{ ...styleBarreCategorie(couleur), ...(bureau ? { minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: ouverte ? "14px 14px 0 0" : 14 } : {}) }}>
                     <span style={styleTitreCategorie(couleur)}>
                       {r.libelle} <span style={{ opacity: 0.75, fontWeight: 400 }}>({r.lignes.length})</span>
                     </span>
@@ -719,7 +814,34 @@ function Feuille() {
                     )}
                     <span style={styleChevronBarre(couleur, ouverte)}>▼</span>
                   </button>
-                  {ouverte && r.sous.map((g) => {
+                  {/* Bureau : cadre collé à la barre, sous-catégories en bandeau, produits en tableau */}
+                  {ouverte && bureau && (
+                    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>
+                      {r.sous.map((g) => {
+                        const compteesSous = g.lignes.filter(compte).length;
+                        return (
+                          <div key={g.nom ?? "∅"}>
+                            {plusieursSous && (
+                              <div style={{ ...styleSousCategorie(couleur, true), cursor: "default", borderRadius: 0 }}>
+                                <span>{g.nom ?? "Autre"} <span style={{ fontWeight: 500, opacity: 0.8 }}>({g.lignes.length})</span></span>
+                                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  {compteesSous > 0 && <span style={{ fontSize: 10.5, color: compteesSous === g.lignes.length ? "#2D6A4F" : "#8a7e6b" }}>{compteesSous}/{g.lignes.length}</span>}
+                                  {!lectureSeule && (
+                                    <span role="button" tabIndex={0} title={`Retirer « ${g.nom ?? "Autre"} » de cette zone`} aria-label={`Retirer la sous-catégorie ${g.nom ?? "Autre"}`}
+                                      onClick={() => void retirerLot(g.lignes, `${r.libelle} · ${g.nom ?? "Autre"}`)}
+                                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); void retirerLot(g.lignes, `${r.libelle} · ${g.nom ?? "Autre"}`); } }}
+                                      style={croixPetite}>×</span>
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                            {tableau(g.lignes, couleur)}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {ouverte && !bureau && r.sous.map((g) => {
                     const cleSous = `${cleFamille(zone, r.code)}|${g.nom ?? ""}`;
                     // Sans en-tête de sous-catégorie (rayon sans sous-catégories), les cartes sont toujours visibles
                     const sousOuverte = enRecherche || !plusieursSous || (bascules[cleSous] ?? false);
