@@ -147,23 +147,8 @@ const readonlyBadge: React.CSSProperties = {
 
 const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_bouteilles,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code,color";
 
-// Accordion header pour la fiche fournisseur
-function AccordionHeader({ label, isOpen, onToggle }: { label: string; isOpen: boolean; onToggle: () => void }) {
-  return (
-    <button type="button" onClick={onToggle} style={{
-      width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "12px 14px", marginBottom: 8,
-      background: isOpen ? "#f0ebe3" : "#fff",
-      border: "1.5px solid #e5ddd0", borderRadius: 10,
-      cursor: "pointer",
-      fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700,
-      color: "#8a7e6b", textTransform: "uppercase", letterSpacing: "0.08em",
-    }}>
-      <span>{label}</span>
-      <span style={{ fontSize: 10, transition: "transform 0.2s", transform: isOpen ? "rotate(0)" : "rotate(-90deg)" }}>{"▼"}</span>
-    </button>
-  );
-}
+// Titres de section de la fiche fournisseur : tout est affiché, plus d'accordéons (09/10/2026)
+const titreSection: React.CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "#6f6a61", padding: "14px 0 8px", marginBottom: 4, borderTop: "1px solid #ece6db" };
 
 export default function FournisseursPage() {
   const bureau = useBureau();
@@ -180,9 +165,7 @@ export default function FournisseursPage() {
   const [modalSupplier, setModalSupplier] = useState<SupplierRow | null>(null);
   const [modalMode, setModalMode] = useState<"edit" | "create">("edit");
   // Accordion: which section is open ("coord" by default)
-  const [openSection, setOpenSection] = useState<string>("coord");
   const [showPortalPassword, setShowPortalPassword] = useState(false);
-  const toggleSection = (k: string) => setOpenSection(prev => prev === k ? "" : k);
   const [form, setForm] = useState<ModalForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [schedule, setSchedule] = useState<{day:string;cutoff:string;delivery_day:string}[]>([]);
@@ -622,8 +605,8 @@ export default function FournisseursPage() {
         </div>
 
         {/* ── Accordion: Coordonnees ── */}
-        <AccordionHeader label="Coordonnees" isOpen={openSection === "coord"} onToggle={() => toggleSection("coord")} />
-        {openSection === "coord" && (
+        <div style={titreSection}>Coordonnees</div>
+        {(
           <div style={{ padding: "0 2px 16px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
               <div>
@@ -649,8 +632,8 @@ export default function FournisseursPage() {
         )}
 
         {/* ── Accordion: Adresse ── */}
-        <AccordionHeader label="Adresse" isOpen={openSection === "addr"} onToggle={() => toggleSection("addr")} />
-        {openSection === "addr" && (
+        <div style={titreSection}>Adresse</div>
+        {(
           <div style={{ padding: "0 2px 16px" }}>
             <div style={{ marginBottom: 12 }}>
               <div style={labelStyle}>Adresse</div>
@@ -670,8 +653,8 @@ export default function FournisseursPage() {
         )}
 
         {/* ── Accordion: Infos commerciales ── */}
-        <AccordionHeader label="Infos commerciales" isOpen={openSection === "infos"} onToggle={() => toggleSection("infos")} />
-        {openSection === "infos" && (
+        <div style={titreSection}>Infos commerciales</div>
+        {(
           <div style={{ padding: "0 2px 16px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
               <div>
@@ -700,8 +683,8 @@ export default function FournisseursPage() {
         )}
 
         {/* ── Accordion: Franco & Livraison ── */}
-        <AccordionHeader label="Franco & Livraison" isOpen={openSection === "franco"} onToggle={() => toggleSection("franco")} />
-        {openSection === "franco" && (
+        <div style={titreSection}>Franco & Livraison</div>
+        {(
           <div style={{ background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12, padding: 14, marginBottom: 16 }}>
             {/* Franco row */}
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
@@ -778,8 +761,8 @@ export default function FournisseursPage() {
         )}
 
         {/* ── Accordion: Administratif ── */}
-        <AccordionHeader label="Administratif" isOpen={openSection === "admin"} onToggle={() => toggleSection("admin")} />
-        {openSection === "admin" && (
+        <div style={titreSection}>Administratif</div>
+        {(
           <div style={{ padding: "0 2px 16px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
               <div>
@@ -805,8 +788,8 @@ export default function FournisseursPage() {
         )}
 
         {/* ── Accordion: Portail fournisseur ── */}
-        <AccordionHeader label="Portail fournisseur" isOpen={openSection === "portal"} onToggle={() => toggleSection("portal")} />
-        {openSection === "portal" && (
+        <div style={titreSection}>Portail fournisseur</div>
+        {(
           <div style={{ padding: "0 2px 16px" }}>
             <div style={{ marginBottom: 12 }}>
               <div style={labelStyle}>URL du portail de commande</div>
@@ -838,8 +821,8 @@ export default function FournisseursPage() {
         )}
 
         {/* ── Accordion: Contacts / Destinataires ── */}
-        <AccordionHeader label="Contacts / Destinataires" isOpen={openSection === "contacts"} onToggle={() => toggleSection("contacts")} />
-        {openSection === "contacts" && (
+        <div style={titreSection}>Contacts / Destinataires</div>
+        {(
           <div style={{ padding: "0 2px 16px" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
               {contacts.map((c, idx) => (
@@ -957,6 +940,7 @@ export default function FournisseursPage() {
           <td style={{ ...TD, padding: 0, width: 4, background: sColor }} />
           <td style={{ ...TD, whiteSpace: "normal", minWidth: 200 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: sColor, flexShrink: 0 }} />
               <span style={{ fontWeight: 700, color: s.is_active ? "#1a1a1a" : "#999" }}>{s.name}</span>
               <EtabBadge etablissementId={s.etablissement_id} />
               {!s.is_active && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 6, background: "rgba(0,0,0,0.08)", color: "#999" }}>inactif</span>}
@@ -1191,7 +1175,7 @@ export default function FournisseursPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin", "equipier"]}>
-      <main style={{ maxWidth: bureau ? 1400 : 900, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "24px 16px 40px" }}>
+      <main style={{ maxWidth: bureau ? 1400 : 900, width: "100%", boxSizing: "border-box", margin: "0 auto", padding: bureau ? "18px 28px 60px" : "24px 16px 40px" }}>
 
         {/* Desktop action buttons */}
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
