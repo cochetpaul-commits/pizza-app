@@ -10,6 +10,7 @@ import { T } from "@/lib/tokens";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
 import { Tuile, type TuileIcone } from "@/components/ui/Tuile";
 import { IconBook, IconPackage, IconTruck, IconUsers } from "@/components/layout/Icons";
+import { useBureau } from "@/hooks/useBureau";
 
 /**
  * Accueil « point du jour » d'un établissement (étape 2 de la refonte, 08/10/2026) :
@@ -456,20 +457,25 @@ function Raccourci({ href, titre, sous, couleur, icone }: { href: string; titre:
   );
 }
 
-/** Barres de la semaine : semaine courante en couleur, semaine précédente (mêmes jours) en gris derrière. Une seule échelle. */
-function GraphSemaine({ jours, couleur }: { jours: { date: string; ca: number; caPrec: number; futur: boolean }[]; couleur: string }) {
+/** Barres de la semaine : semaine courante en couleur, semaine précédente (mêmes jours) en gris derrière. Une seule échelle.
+ *  Le dessin est fait à la largeur réelle de l'écran (640 sur bureau, 360 sur téléphone) : textes lisibles, barres qui remplissent les colonnes. */
+export function GraphSemaine({ jours, couleur }: { jours: { date: string; ca: number; caPrec: number; futur: boolean }[]; couleur: string }) {
+  const bureau = useBureau();
   const max = Math.max(1000, ...jours.flatMap((j) => [j.ca, j.caPrec]));
   const pas = max > 8000 ? 5000 : max > 4000 ? 2500 : 1000;
   const haut = Math.ceil(max / pas) * pas;
-  const H = 150, base = 170, gauche = 52, largeur = 580;
+  const L = bureau ? 640 : 360, gauche = bureau ? 52 : 44, droite = bureau ? 8 : 6;
+  const H = bureau ? 150 : 190, base = H + 22, largeur = L - gauche - droite, hauteurTotale = base + 30;
   const y = (v: number) => base - (v / haut) * H;
   const col = largeur / Math.max(1, jours.length);
+  const barre = Math.min(bureau ? 26 : 30, Math.floor(col * 0.38)), ecart = 3;
   const totalCur = jours.reduce((s, j) => s + j.ca, 0);
   const totalPrec = jours.filter((j) => !j.futur).reduce((s, j) => s + j.caPrec, 0);
   const graduations = Array.from({ length: haut / pas + 1 }, (_, i) => i * pas);
+  const etiquette = (v: number) => (bureau || v >= 10000 ? Math.round(v).toLocaleString("fr-FR") : `${(v / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} k`);
   return (
     <div>
-      <svg viewBox="0 0 640 215" style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label="CA TTC par jour, semaine courante et semaine précédente">
+      <svg viewBox={`0 0 ${L} ${hauteurTotale}`} style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label="CA TTC par jour, semaine courante et semaine précédente">
         {graduations.map((g) => (
           <g key={g}>
             <line x1={gauche} x2={gauche + largeur} y1={y(g)} y2={y(g)} stroke="#ddd6c8" strokeWidth={1} strokeDasharray={g === 0 ? undefined : "2 4"} />
@@ -477,13 +483,13 @@ function GraphSemaine({ jours, couleur }: { jours: { date: string; ca: number; c
           </g>
         ))}
         {jours.map((j, i) => {
-          const x0 = gauche + i * col;
+          const x0 = gauche + i * col, milieu = x0 + col / 2;
           return (
             <g key={j.date}>
-              {j.caPrec > 0 && <rect x={x0 + col / 2 - 24} y={y(j.caPrec)} width={22} height={base - y(j.caPrec)} rx={4} fill="#d9d0c2" />}
-              {j.ca > 0 && <rect x={x0 + col / 2 + 2} y={y(j.ca)} width={22} height={base - y(j.ca)} rx={4} fill={couleur} />}
-              {j.ca > 0 && <text x={x0 + col / 2 + 13} y={y(j.ca) - 6} fontSize={11} fontWeight={600} fill="#1a1a1a" textAnchor="middle">{Math.round(j.ca).toLocaleString("fr-FR")}</text>}
-              <text x={x0 + col / 2} y={190} fontSize={11} fill="#6f6a61" textAnchor="middle">{jourCourt(j.date)}</text>
+              {j.caPrec > 0 && <rect x={milieu - barre - ecart / 2} y={y(j.caPrec)} width={barre} height={base - y(j.caPrec)} rx={5} fill="#d9d0c2" />}
+              {j.ca > 0 && <rect x={milieu + ecart / 2} y={y(j.ca)} width={barre} height={base - y(j.ca)} rx={5} fill={couleur} />}
+              {j.ca > 0 && <text x={milieu + ecart / 2 + barre / 2} y={y(j.ca) - 6} fontSize={11} fontWeight={700} fill="#1a1a1a" textAnchor="middle">{etiquette(j.ca)}</text>}
+              <text x={milieu} y={base + 20} fontSize={11.5} fill="#6f6a61" textAnchor="middle">{jourCourt(j.date)}</text>
             </g>
           );
         })}
