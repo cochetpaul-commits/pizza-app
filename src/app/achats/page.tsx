@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Suspense, useEffect, useState, useMemo, type CSSProperties } from "react";
+import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie, couleurTexteSur } from "@/lib/styleCategories";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
@@ -535,9 +536,42 @@ function AchatsContent() {
     setDashLinesLoading(false);
   };
 
-  const thStyle: React.CSSProperties = { padding: "8px 10px", fontWeight: 600, color: "#999", fontSize: 11, textAlign: "left" };
-  const tdStyle: React.CSSProperties = { padding: "8px 10px", fontSize: 13 };
-  const tdR: React.CSSProperties = { ...tdStyle, textAlign: "right" };
+  const thStyle: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+  const tdStyle: React.CSSProperties = { padding: "9px 14px", fontSize: 13, borderBottom: "1px solid #f0ebe2", verticalAlign: "middle" };
+  const tdR: React.CSSProperties = { ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
+
+  // ── Tableau des factures d'un fournisseur (gabarit commun) : bande de couleur, date, numéro, totaux, flèche ; les lignes de la facture choisie dessous ──
+  const tableauFactures = (invoices: InvoiceRow[], couleur: string) => (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 520 }}>
+        <thead><tr>
+          <th style={{ ...thStyle, padding: 0, width: 4 }} /><th style={thStyle}>Date</th><th style={thStyle}>N° facture</th>
+          <th style={{ ...thStyle, textAlign: "right" }}>Total HT</th><th style={{ ...thStyle, textAlign: "right" }}>Total TTC</th><th style={thStyle} />
+        </tr></thead>
+        <tbody>
+          {invoices.map((inv) => {
+            const isSelected = dashSelectedInvoice === inv.id;
+            const fond = isSelected ? "rgba(212,119,90,0.08)" : undefined;
+            return (
+              <React.Fragment key={inv.id}>
+                <tr className="ac-ligne" onClick={() => loadDashLines(inv.id)} style={{ cursor: "pointer" }}>
+                  <td style={{ ...tdStyle, padding: 0, width: 4, background: couleur }} />
+                  <td style={{ ...tdStyle, background: fond, whiteSpace: "nowrap" }}>{fmtDate(inv.invoice_date)}</td>
+                  <td style={{ ...tdStyle, background: fond, color: "#666" }}>{inv.invoice_number ?? "\u2014"}</td>
+                  <td style={{ ...tdR, background: fond, fontWeight: 600 }}>{fmt(inv.total_ht)}</td>
+                  <td style={{ ...tdR, background: fond }}>{fmt(inv.total_ttc)}</td>
+                  <td style={{ ...tdR, background: fond, width: 40, color: "#a39d92", fontWeight: 700, transform: isSelected ? "rotate(90deg)" : "none" }}>→</td>
+                </tr>
+                {isSelected && (
+                  <tr><td style={{ padding: 0, width: 4, background: couleur }} /><td colSpan={5} style={{ padding: 0 }}>{renderLinesTable(dashLines, dashLinesLoading)}</td></tr>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 
   // ── Render helper: invoice lines table ──
   const renderLinesTable = (lns: InvoiceLine[], isLoading: boolean) => (
@@ -549,22 +583,22 @@ function AchatsContent() {
       ) : (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-              <th style={{ ...thStyle, fontSize: 10 }}>Article</th>
-              <th style={{ ...thStyle, fontSize: 10, textAlign: "right" }}>Qte</th>
-              <th style={{ ...thStyle, fontSize: 10 }}>Unite</th>
-              <th style={{ ...thStyle, fontSize: 10, textAlign: "right" }}>PU</th>
-              <th style={{ ...thStyle, fontSize: 10, textAlign: "right" }}>Total</th>
+            <tr>
+              <th style={thStyle}>Article</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Qté</th>
+              <th style={thStyle}>Unité</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>PU</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Total</th>
             </tr>
           </thead>
           <tbody>
             {lns.map((l) => (
-              <tr key={l.id} style={{ borderBottom: "1px solid #eee6d8" }}>
-                <td style={{ padding: "6px 10px", fontSize: 12 }}>{l.name ?? "\u2014"}</td>
-                <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right" }}>{l.quantity ?? "\u2014"}</td>
-                <td style={{ padding: "6px 10px", fontSize: 12, color: "#999" }}>{l.unit ?? ""}</td>
-                <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right" }}>{fmt(l.unit_price)}</td>
-                <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right" }}>{fmt(l.total_price)}</td>
+              <tr key={l.id}>
+                <td style={{ padding: "6px 14px", fontSize: 12, borderBottom: "1px solid #eee6d8" }}>{l.name ?? "\u2014"}</td>
+                <td style={{ padding: "6px 14px", fontSize: 12, textAlign: "right", borderBottom: "1px solid #eee6d8" }}>{l.quantity ?? "\u2014"}</td>
+                <td style={{ padding: "6px 14px", fontSize: 12, color: "#999", borderBottom: "1px solid #eee6d8" }}>{l.unit ?? ""}</td>
+                <td style={{ padding: "6px 14px", fontSize: 12, textAlign: "right", borderBottom: "1px solid #eee6d8" }}>{fmt(l.unit_price)}</td>
+                <td style={{ padding: "6px 14px", fontSize: 12, textAlign: "right", borderBottom: "1px solid #eee6d8" }}>{fmt(l.total_price)}</td>
               </tr>
             ))}
           </tbody>
@@ -576,98 +610,34 @@ function AchatsContent() {
   // ── Render helper: month accordion for invoices ──
   const renderMonthAccordion = (mg: MonthGroup) => {
     const isOpen = openDashMonth === mg.key;
+    const gris = "#939597";
     return (
-      <div key={mg.key} style={{ border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden" }}>
-        <div
+      <div key={mg.key}>
+        <button type="button" aria-expanded={isOpen} className={`barre-categorie${isOpen ? " ouverte" : ""}`}
           onClick={() => { setOpenDashMonth(isOpen ? null : mg.key); setDashOpenSupplier(null); setDashSelectedInvoice(null); setDashLines([]); }}
-          style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "12px 16px", cursor: "pointer",
-            background: isOpen ? "#f5f0e8" : "#fff", transition: "background 0.15s",
-          }}
-          onMouseEnter={(e) => { if (!isOpen) e.currentTarget.style.background = "#faf6ef"; }}
-          onMouseLeave={(e) => { if (!isOpen) e.currentTarget.style.background = isOpen ? "#f5f0e8" : "#fff"; }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 12, color: "#999", transition: "transform 0.2s", transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
-            <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 14, color: "#1a1a1a" }}>{mg.label}</span>
-            <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, color: "#999", background: "#f2ede4", borderRadius: 8, padding: "2px 8px" }}>
-              {mg.nbInvoices} facture{mg.nbInvoices > 1 ? "s" : ""}
-            </span>
-          </div>
-          <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{fmt(mg.totalHT)} HT</span>
-        </div>
-
+          style={{ ...styleBarreCategorie(gris), minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: isOpen ? "14px 14px 0 0" : 14 }}>
+          <span style={styleTitreCategorie(gris)}>{mg.label} <span style={{ opacity: 0.75, fontWeight: 400 }}>({mg.nbInvoices})</span></span>
+          <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 14, fontWeight: 700, color: couleurTexteSur(gris) }}>{fmt(mg.totalHT)} HT</span>
+          <span style={styleChevronBarre(gris, isOpen)}>▼</span>
+        </button>
         {isOpen && (
-          <div style={{ borderTop: "1px solid #ddd6c8", padding: "0" }}>
+          <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>
             {mg.bySupplier.map((sup) => {
               const suppKey = sup.name.toLowerCase().trim();
               const isSuppOpen = dashOpenSupplier === `${mg.key}-${suppKey}`;
-              const suppTotal = sup.invoices.reduce((s, i) => s + (i.total_ht ?? 0), 0);
+              const suppTotal = sup.invoices.reduce((t, i) => t + (i.total_ht ?? 0), 0);
               return (
                 <div key={suppKey}>
-                  <div
+                  <button type="button" aria-expanded={isSuppOpen}
                     onClick={() => { setDashOpenSupplier(isSuppOpen ? null : `${mg.key}-${suppKey}`); setDashSelectedInvoice(null); setDashLines([]); }}
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "10px 16px 10px 32px", cursor: "pointer", borderBottom: "1px solid #eee6d8",
-                      background: isSuppOpen ? "#faf6ef" : "transparent",
-                    }}
-                    onMouseEnter={(e) => { if (!isSuppOpen) e.currentTarget.style.background = "#faf6ef"; }}
-                    onMouseLeave={(e) => { if (!isSuppOpen) e.currentTarget.style.background = isSuppOpen ? "#faf6ef" : "transparent"; }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: sup.color, flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, color: "#999", transition: "transform 0.2s", transform: isSuppOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
-                      <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 13, color: "#1a1a1a" }}>{sup.name}</span>
-                      <span style={{ fontSize: 10, color: "#999" }}>{sup.invoices.length} fact.</span>
-                    </div>
-                    <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>{fmt(suppTotal)} HT</span>
-                  </div>
-
-                  {isSuppOpen && (
-                    <div style={{ borderTop: "1px solid #eee6d8" }}>
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif" }}>
-                        <thead>
-                          <tr style={{ borderBottom: "1px solid #eee6d8" }}>
-                            <th style={{ ...thStyle, paddingLeft: 48 }}>Date</th>
-                            <th style={thStyle}>N facture</th>
-                            <th style={thStyle}>Fournisseur</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>Total HT</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>Total TTC</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sup.invoices.map((inv) => {
-                            const isSelected = dashSelectedInvoice === inv.id;
-                            return (
-                              <React.Fragment key={inv.id}>
-                                <tr
-                                  onClick={() => loadDashLines(inv.id)}
-                                  style={{ borderBottom: "1px solid #eee6d8", cursor: "pointer", background: isSelected ? "#f5f0e8" : "transparent" }}
-                                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#faf6ef"; }}
-                                  onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = isSelected ? "#f5f0e8" : "transparent"; }}
-                                >
-                                  <td style={{ ...tdStyle, paddingLeft: 48 }}>{fmtDate(inv.invoice_date)}</td>
-                                  <td style={{ ...tdStyle, color: "#666" }}>{inv.invoice_number ?? "\u2014"}</td>
-                                  <td style={tdStyle}>{inv.suppliers?.name ?? "Inconnu"}</td>
-                                  <td style={tdR}>{fmt(inv.total_ht)}</td>
-                                  <td style={tdR}>{fmt(inv.total_ttc)}</td>
-                                </tr>
-                                {isSelected && (
-                                  <tr>
-                                    <td colSpan={5} style={{ padding: 0 }}>
-                                      {renderLinesTable(dashLines, dashLinesLoading)}
-                                    </td>
-                                  </tr>
-                                )}
-                              </React.Fragment>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                    style={{ ...styleSousCategorie(sup.color, isSuppOpen), borderRadius: 0 }}>
+                    <span>{sup.name} <span style={{ fontWeight: 500, opacity: 0.8 }}>({sup.invoices.length})</span></span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontWeight: 700 }}>{fmt(suppTotal)} HT</span>
+                      <span style={{ fontSize: 10, transition: "transform 0.2s", transform: isSuppOpen ? "rotate(0)" : "rotate(-90deg)" }}>▼</span>
+                    </span>
+                  </button>
+                  {isSuppOpen && tableauFactures(sup.invoices, sup.color)}
                 </div>
               );
             })}
@@ -1019,88 +989,32 @@ function AchatsContent() {
             {/* ══════════════════════════════════════════════════ */}
             {/*  D) FACTURES — filtered by range, by supplier     */}
             {/* ══════════════════════════════════════════════════ */}
-            <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e0d8ce", padding: "18px 20px", marginBottom: 20 }}>
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ ...S.sec, marginBottom: 0 }}>Factures — {periodLabel}</div>
-              </div>
-
+            <div style={{ ...S.sec, marginBottom: 12 }}>Factures — {periodLabel}</div>
+            <style>{`.ac-ligne:hover td { background: #f7f3ec; }`}</style>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
               {rangeInvoiceGroups.length === 0 ? (
                 <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Aucune facture pour cette periode.</p>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                  {rangeInvoiceGroups.map((sup, idx) => {
-                    const suppKey = sup.name.toLowerCase().trim();
-                    const isSuppOpen = dashOpenSupplier === suppKey;
-                    const suppTotal = sup.invoices.reduce((s, i) => s + (i.total_ht ?? 0), 0);
-                    const isLast = idx === rangeInvoiceGroups.length - 1;
-                    return (
-                      <div key={suppKey} style={{ borderBottom: isLast ? "none" : "1px solid #eee6d8" }}>
-                        <div
-                          onClick={() => { setDashOpenSupplier(isSuppOpen ? null : suppKey); setDashSelectedInvoice(null); setDashLines([]); }}
-                          style={{
-                            display: "flex", alignItems: "center", justifyContent: "space-between",
-                            padding: "11px 8px", cursor: "pointer", borderRadius: 8,
-                            background: isSuppOpen ? "#f5f0e8" : "transparent",
-                            transition: "background 0.15s",
-                          }}
-                          onMouseEnter={(e) => { if (!isSuppOpen) e.currentTarget.style.background = "#faf6ef"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = isSuppOpen ? "#f5f0e8" : "transparent"; }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span style={{ width: 8, height: 8, borderRadius: "50%", background: sup.color, flexShrink: 0 }} />
-                            <span style={{ fontSize: 11, color: "#bbb", transition: "transform 0.2s", transform: isSuppOpen ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
-                            <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 13, color: "#1a1a1a" }}>{sup.name}</span>
-                            <span style={{ fontSize: 10, color: "#999", background: "#f2ede4", borderRadius: 8, padding: "2px 8px" }}>{sup.invoices.length} facture{sup.invoices.length > 1 ? "s" : ""}</span>
-                          </div>
-                          <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{fmt(suppTotal)} HT</span>
-                        </div>
-
-                        {isSuppOpen && (
-                          <div style={{ padding: "0 0 8px 26px" }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif" }}>
-                              <thead>
-                                <tr style={{ borderBottom: "1px solid #eee6d8" }}>
-                                  <th style={{ ...thStyle, paddingLeft: 12 }}>Date</th>
-                                  <th style={thStyle}>N facture</th>
-                                  <th style={{ ...thStyle, textAlign: "right" }}>Total HT</th>
-                                  <th style={{ ...thStyle, textAlign: "right" }}>Total TTC</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {sup.invoices.map((inv) => {
-                                  const isSelected = dashSelectedInvoice === inv.id;
-                                  return (
-                                    <React.Fragment key={inv.id}>
-                                      <tr
-                                        onClick={() => loadDashLines(inv.id)}
-                                        style={{ borderBottom: "1px solid #f2ede4", cursor: "pointer", background: isSelected ? "#f5f0e8" : "transparent", borderRadius: 6 }}
-                                        onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#faf6ef"; }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.background = isSelected ? "#f5f0e8" : "transparent"; }}
-                                      >
-                                        <td style={{ ...tdStyle, paddingLeft: 12 }}>{fmtDate(inv.invoice_date)}</td>
-                                        <td style={{ ...tdStyle, color: "#666" }}>{inv.invoice_number ?? "\u2014"}</td>
-                                        <td style={tdR}>{fmt(inv.total_ht)}</td>
-                                        <td style={tdR}>{fmt(inv.total_ttc)}</td>
-                                      </tr>
-                                      {isSelected && (
-                                        <tr>
-                                          <td colSpan={4} style={{ padding: 0 }}>
-                                            {renderLinesTable(dashLines, dashLinesLoading)}
-                                          </td>
-                                        </tr>
-                                      )}
-                                    </React.Fragment>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
+              ) : rangeInvoiceGroups.map((sup) => {
+                const suppKey = sup.name.toLowerCase().trim();
+                const isSuppOpen = dashOpenSupplier === suppKey;
+                const suppTotal = sup.invoices.reduce((t, i) => t + (i.total_ht ?? 0), 0);
+                return (
+                  <div key={suppKey}>
+                    <button type="button" aria-expanded={isSuppOpen} className={`barre-categorie${isSuppOpen ? " ouverte" : ""}`}
+                      onClick={() => { setDashOpenSupplier(isSuppOpen ? null : suppKey); setDashSelectedInvoice(null); setDashLines([]); }}
+                      style={{ ...styleBarreCategorie(sup.color), minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: isSuppOpen ? "14px 14px 0 0" : 14 }}>
+                      <span style={styleTitreCategorie(sup.color)}>{sup.name} <span style={{ opacity: 0.75, fontWeight: 400 }}>({sup.invoices.length})</span></span>
+                      <span style={stylePastilleBarre(sup.color)}>{fmt(suppTotal)} HT</span>
+                      <span style={styleChevronBarre(sup.color, isSuppOpen)}>▼</span>
+                    </button>
+                    {isSuppOpen && (
+                      <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>
+                        {tableauFactures(sup.invoices, sup.color)}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* ══════════════════════════════════════════════════ */}
