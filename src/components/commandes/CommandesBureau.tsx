@@ -205,7 +205,7 @@ export function CommandesBureau(p: CommandesBureauProps) {
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
-      <style>{`.cb-ligne:hover td { background: #f7f3ec; } .cb-ligne.on td { background: rgba(212,119,90,0.08); }`}</style>
+      <style>{`.cb-ligne:hover td { background: #f7f3ec; } .cb-ligne.on td { background: rgba(212,119,90,0.08); }.cb-ligne:last-child td{border-bottom:0}`}</style>
 
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
         <div>

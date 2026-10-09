@@ -491,7 +491,7 @@ export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean;
 
   return (
     <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
-      <style>{`.ca-ligne:hover td{background:#f7f3ec}.ca-ligne.on td{background:rgba(212,119,90,0.12)}`}</style>
+      <style>{`.ca-ligne:hover td{background:#f7f3ec}.ca-ligne.on td{background:rgba(212,119,90,0.12)}.ca-ligne:last-child td{border-bottom:0}`}</style>
 
       <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, 1fr)" : "repeat(2, 1fr)", gap: 10 }}>
         <Tuile libelle="Articles reliés" valeur={<>{compteurs.relies} <span style={{ fontSize: 14, color: MUTED }}>/ {compteurs.total}</span></>} sous={`${compteurs.fiches} à une fiche, ${compteurs.produits} à un produit`} active={lien === "tous" && fc === "tous"} onClick={() => { setLien("tous"); setFc("tous"); }} />

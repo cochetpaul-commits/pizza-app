@@ -502,6 +502,7 @@ export function BaseProduits(p: BaseProduitsProps) {
       <style>{`
         .bp-ligne:hover td { background: #f7f3ec; }
         .bp-ligne.on td { background: rgba(212,119,90,0.08); }
+        .bp-ligne:last-child td { border-bottom: 0; }
       `}</style>
 
       {/* En-tête */}
