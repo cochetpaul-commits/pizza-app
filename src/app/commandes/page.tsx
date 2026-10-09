@@ -1611,15 +1611,11 @@ function CommandesPage() {
     );
   }
 
-  function renderProductCard(item: CatalogItem, isFav: boolean) {
-    const qty = Number(quantities[item.id] ?? 0);
-    const hasQty = qty > 0;
+  /** Libellé du conditionnement d'un article (« 1 Carton de 6 Bouteilles », « 12 pièces »…), partagé entre la tuile et la ligne de tableau */
+  function libelleConditionnement(item: CatalogItem): string | null {
     const packCount = item.pack_count ?? 0;
     const packEach = item.pack_each_qty ?? 1;
     const indiv = individualUnitLabel(item);
-    const obj = item.stock_objectif;
-
-    // Conditioning label — reprend la logique produit
     const orderU = (item.order_unit_label ?? item.order_unit ?? "").toLowerCase();
     const isPackUnit = orderU.includes("pack") || orderU.includes("carton") || orderU.includes("colis") || orderU.includes("bloc") || orderU.includes("caisse");
     let condLabel: string | null = null;
@@ -1647,6 +1643,17 @@ function CommandesPage() {
         condLabel = packEach > 1 ? `${packCount} x ${packEach} ${indiv}s` : `${packCount} ${indiv}${packCount > 1 ? "s" : ""}`;
       }
     }
+    return condLabel;
+  }
+
+  function renderProductCard(item: CatalogItem, isFav: boolean) {
+    const qty = Number(quantities[item.id] ?? 0);
+    const hasQty = qty > 0;
+    const packCount = item.pack_count ?? 0;
+    const indiv = individualUnitLabel(item);
+    const obj = item.stock_objectif;
+
+    const condLabel = libelleConditionnement(item);
 
 
     return (
@@ -1738,6 +1745,83 @@ function CommandesPage() {
           <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
           {packCount > 0 && unitToggle(item)}
         </div>
+      </div>
+    );
+  }
+
+  /** Bureau : une ligne de tableau par article (même gabarit que la Base produits), stepper et bascule d'unité dans la colonne Quantité */
+  function renderLigneProduit(item: CatalogItem, isFav: boolean, couleur: string) {
+    const qty = Number(quantities[item.id] ?? 0);
+    const hasQty = qty > 0;
+    const packCount = item.pack_count ?? 0;
+    const condLabel = libelleConditionnement(item);
+    const si = stockData[item.id];
+    const min = item.stock_min ?? 0;
+    const objG = item.stock_objectif ?? 0;
+    const stockVal = si ? Math.round(si.stock * 10) / 10 : null;
+    const couleurStock = si == null ? "#999" : si.stock <= min ? "#DC2626" : objG > 0 && si.stock < objG ? "#b45309" : "#2D6A4F";
+    const total = hasQty && item.prix_commande != null ? qty * item.prix_commande : null;
+    const TDL: React.CSSProperties = { padding: "10px 14px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13, background: hasQty ? "rgba(212,119,90,0.08)" : undefined };
+    return (
+      <tr key={item.id}>
+        <td style={{ ...TDL, padding: 0, width: 4, background: couleur }} />
+        <td style={{ ...TDL, width: 32, paddingRight: 0 }}>
+          <button type="button" onClick={() => toggleFavori(item.id, isFav)} title={isFav ? "Retirer des habituels" : "Ajouter aux habituels"}
+            style={{ background: "none", border: "none", fontSize: 14, cursor: "pointer", opacity: isFav ? 1 : 0.3, padding: 0 }}>&#x2B50;</button>
+        </td>
+        <td style={{ ...TDL, minWidth: 260 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={32} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600, color: "#1a1a1a" }}>{item.name}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginTop: 3 }}>
+                {condLabel && <span className="pastille-cadre">{condLabel}</span>}
+                {item.order_unit && <span className="pastille-cadre">cmd : {item.order_unit}</span>}
+                {item.storage_zone && (
+                  <span className="pastille" style={{ "--pastille-c": zoneColors[item.storage_zone] ?? "#b0a894" } as React.CSSProperties}>{item.storage_zone}</span>
+                )}
+                <a href={`/ingredients?edit=${item.id}&back=${encodeURIComponent("/commandes")}`} title="Modifier la fiche produit" className="pastille-cadre" style={{ textDecoration: "none", cursor: "pointer" }}>✎ produit</a>
+              </div>
+            </div>
+          </div>
+        </td>
+        <td style={{ ...TDL, whiteSpace: "nowrap" }}>
+          {stockVal != null ? <div style={{ fontWeight: 700, color: couleurStock }}>Stock {stockVal}</div> : <span style={{ color: "#a39d92" }}>—</span>}
+          {objG > 0 && <div style={{ fontSize: 11, color: "#999" }}>min {min} · objectif {objG}</div>}
+          {si && si.qty_to_order > 0 && <div style={{ fontSize: 11, fontWeight: 700, color: "#2563EB" }}>À commander : {si.qty_to_order} {si.unit ?? ""}</div>}
+        </td>
+        <td style={{ ...TDL, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+          {item.prix_commande != null ? (
+            <>
+              <div style={{ fontWeight: 700 }}>{item.prix_commande.toFixed(2).replace(".", ",")} € HT</div>
+              {item.order_unit && <div style={{ fontSize: 11, color: "#999" }}>{item.prix_par_colis ? "le colis" : `l'unité · ${item.order_unit}`}</div>}
+            </>
+          ) : <span style={{ color: "#a39d92" }}>—</span>}
+        </td>
+        <td style={{ ...TDL, whiteSpace: "nowrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+            {packCount > 0 && unitToggle(item)}
+          </div>
+        </td>
+        <td style={{ ...TDL, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: total != null ? "#1a1a1a" : "#a39d92" }}>
+          {total != null ? `${total.toFixed(2).replace(".", ",")} €` : "—"}
+        </td>
+      </tr>
+    );
+  }
+
+  function tableauProduits(items: CatalogItem[], fav: boolean, couleur: string) {
+    const THL: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+    return (
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 820 }}>
+          <thead><tr>
+            <th style={{ ...THL, padding: 0, width: 4 }} /><th style={{ ...THL, width: 32, paddingRight: 0 }} />
+            <th style={THL}>Produit</th><th style={THL}>Stock</th><th style={{ ...THL, textAlign: "right" }}>Prix</th><th style={THL}>Quantité</th><th style={{ ...THL, textAlign: "right" }}>Total HT</th>
+          </tr></thead>
+          <tbody>{items.map((item) => renderLigneProduit(item, fav, couleur))}</tbody>
+        </table>
       </div>
     );
   }
@@ -2076,7 +2160,9 @@ function CommandesPage() {
           return (
             <div key={cat} style={{ marginTop: 10, marginBottom: 6 }}>
               {/* Barre de catégorie : même trame que le menu produits, l'inventaire et la commande simplifiée (src/lib/styleCategories.ts) */}
-              <button type="button" onClick={() => setOpenCats((prev) => ({ ...prev, [cat]: !isOpen }))} aria-expanded={isOpen} style={styleBarreCategorie(couleur)}>
+              <button type="button" onClick={() => setOpenCats((prev) => ({ ...prev, [cat]: !isOpen }))} aria-expanded={isOpen}
+                className={`barre-categorie${bureau && isOpen ? " ouverte" : ""}`}
+                style={{ ...styleBarreCategorie(couleur), ...(bureau ? { minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: isOpen ? "14px 14px 0 0" : 14 } : {}) }}>
                 <span style={styleTitreCategorie(couleur)}>
                   {catLabel(cat)} <span style={{ opacity: 0.75, fontWeight: 400 }}>({allItems.length})</span>
                 </span>
@@ -2084,7 +2170,34 @@ function CommandesPage() {
                 <span style={styleChevronBarre(couleur, isOpen)}>▼</span>
               </button>
 
-              <div style={{
+              {/* Bureau : tableau par sous-catégorie dans un cadre collé à la barre (gabarit Base produits) */}
+              {bureau && isOpen && (
+                <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>
+                  {favoris.length > 0 && (
+                    <>
+                      <div style={{ ...styleSousCategorie(couleur, true), cursor: "default", borderRadius: 0 }}><span>Habituels <span style={{ fontWeight: 500, opacity: 0.8 }}>({favoris.length})</span></span></div>
+                      {tableauProduits(favoris, true, couleur)}
+                    </>
+                  )}
+                  {others.length > 0 && (() => {
+                    if (!others.some((i) => i.sub_category)) return tableauProduits(others, false, couleur);
+                    const groupes: { sub: string; items: CatalogItem[] }[] = [];
+                    for (const item of others) {
+                      const sub = item.sub_category ?? "Autre";
+                      const dernier = groupes[groupes.length - 1];
+                      if (dernier && dernier.sub === sub) dernier.items.push(item); else groupes.push({ sub, items: [item] });
+                    }
+                    return groupes.map((g) => (
+                      <div key={g.sub}>
+                        <div style={{ ...styleSousCategorie(couleur, true), cursor: "default", borderRadius: 0 }}><span>{g.sub} <span style={{ fontWeight: 500, opacity: 0.8 }}>({g.items.length})</span></span></div>
+                        {tableauProduits(g.items, false, couleur)}
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+
+              {!bureau && <div style={{
                 // Plafond proportionnel au nombre de produits : à 5000 px fixes,
                 // les grosses catégories (cave à vin Vinoflo) étaient coupées.
                 maxHeight: isOpen ? Math.max(5000, allItems.length * 900 + 600) : 0, overflow: "hidden",
@@ -2133,7 +2246,7 @@ function CommandesPage() {
                     </div>
                   );
                 })()}
-              </div>
+              </div>}
             </div>
           );
         })}
