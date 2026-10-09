@@ -2,12 +2,12 @@
 
 import React, { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { CAT_COLORS, CAT_LABELS, type Category, type Ingredient, type IngredientStatus, type LatestOffer, type Supplier, type Tab } from "@/types/ingredients";
-import { CategoryHeader, type StorageZoneOption } from "@/components/IngredientRow";
+import type { StorageZoneOption } from "@/components/IngredientRow";
 import type { PriceAlert } from "@/lib/priceAlerts";
 import { formatIngredientPrice } from "@/lib/formatPrice";
 import { legacyHasPrice, offerHasPrice } from "@/lib/offers";
 import { cachedSupplierColor } from "@/lib/supplierColors";
-import { couleurTexte, styleSousCategorie } from "@/lib/styleCategories";
+import { couleurTexte, couleurTexteSur, styleBarreCategorie, styleSousCategorie } from "@/lib/styleCategories";
 import { OSWALD } from "@/components/TuileProduit";
 import { articleDeFiche, type FicheConditionnement } from "@/lib/inventaire";
 import { libelleColisage } from "@/lib/commandeArticles";
@@ -64,8 +64,8 @@ const nombre = (n: number) => n.toLocaleString("fr-FR");
 // Affichage A → Z ou par catégorie, mémorisé sur l'appareil (store externe : pas de décalage à l'hydratation)
 const CLE_AFFICHAGE = "produits:affichage";
 const abonnesAffichage = new Set<() => void>();
-// Par défaut : par catégorie (volets de catégories et de sous-catégories, comme avant la refonte) ; A → Z sur demande
-const lireAffichage = (): "az" | "cat" => { try { return localStorage.getItem(CLE_AFFICHAGE) === "az" ? "az" : "cat"; } catch { return "cat"; } };
+// Par défaut : tableau plat de A à Z (décision du 09/10/2026) ; les accordéons par catégorie et sous-catégorie restent au choix
+const lireAffichage = (): "az" | "cat" => { try { return localStorage.getItem(CLE_AFFICHAGE) === "cat" ? "cat" : "az"; } catch { return "az"; } };
 const ecrireAffichage = (v: "az" | "cat") => { try { localStorage.setItem(CLE_AFFICHAGE, v); } catch { /* navigation privée */ } abonnesAffichage.forEach((f) => f()); };
 const abonnerAffichage = (f: () => void) => { abonnesAffichage.add(f); return () => { abonnesAffichage.delete(f); }; };
 
@@ -148,6 +148,19 @@ const CarteProduit = React.memo(function CarteProduit({ x, offer, fournisseur, a
     </div>
   );
 });
+
+/** Barre de catégorie (maquette du 09/10/2026) : titre, nombre en léger, chevron ; pas de pastille. Ouverte : coins du bas droits. */
+function BarreCategorie({ cat, couleur, n, ouverte, onToggle }: { cat: Category; couleur: string; n: number; ouverte: boolean; onToggle: (c: Category) => void }) {
+  const texte = couleurTexteSur(couleur);
+  return (
+    <button type="button" onClick={() => onToggle(cat)} aria-expanded={ouverte}
+      style={{ ...styleBarreCategorie(couleur), minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: ouverte ? "14px 14px 0 0" : 14 }}>
+      <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", color: texte }}>{CAT_LABELS[cat] ?? cat}</span>
+      <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, color: texte, opacity: 0.7, marginLeft: -4, flex: 1 }}>{n}</span>
+      <span style={{ color: texte, fontSize: 12, opacity: 0.85, transform: ouverte ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
+    </button>
+  );
+}
 
 const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, onOpenSupplier, sansCategorie }: LigneProps) {
   const { couleurCat, texteCat, inactive, aUnPrix, prix, colisage, maj, etat } = affichageProduit(x, offer);
@@ -256,7 +269,7 @@ export type BaseProduitsProps = {
 export function BaseProduits(p: BaseProduitsProps) {
   const [menuOuvert, setMenuOuvert] = useState(false);
   // A → Z ou par catégorie (mémorisé sur l'appareil) ; volets repliés par défaut, tous ouverts pendant une recherche
-  const affichage = useSyncExternalStore(abonnerAffichage, lireAffichage, () => "cat" as const);
+  const affichage = useSyncExternalStore(abonnerAffichage, lireAffichage, () => "az" as const);
   const changerAffichage = ecrireAffichage;
   const [ouvertes, setOuvertes] = useState<Set<string>>(new Set());
   const [sousFermees, setSousFermees] = useState<Set<string>>(new Set());
@@ -456,9 +469,9 @@ export function BaseProduits(p: BaseProduitsProps) {
             {!p.loading && affichage === "az" && lignes.map((l) => carte(l))}
             {!p.loading && affichage === "cat" && groupes.map((g) => (
               <div key={g.cat}>
-                <CategoryHeader cat={g.cat} count={g.items.length} isCollapsed={!estOuverte(g.cat)} onToggle={basculerCat} />
+                <BarreCategorie cat={g.cat} couleur={g.couleur} n={g.items.length} ouverte={estOuverte(g.cat)} onToggle={basculerCat} />
                 {estOuverte(g.cat) && (
-                  <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ display: "grid", gap: 6, padding: "8px 0 2px" }}>
                     {g.sous.map((sg) => (
                       <React.Fragment key={sg.cle}>
                         {sg.nom != null && boutonSous(g.couleur, sg.nom, sg.cle, sg.items.length)}
@@ -533,12 +546,12 @@ export function BaseProduits(p: BaseProduitsProps) {
         </div>
       )}
       {!p.erreur && affichage === "cat" && !p.loading && (
-        <div style={{ display: "grid", gap: 2 }}>
+        <div style={{ display: "grid", gap: 10 }}>
           {groupes.map((g) => (
             <div key={g.cat}>
-              <CategoryHeader cat={g.cat} count={g.items.length} isCollapsed={!estOuverte(g.cat)} onToggle={basculerCat} />
+              <BarreCategorie cat={g.cat} couleur={g.couleur} n={g.items.length} ouverte={estOuverte(g.cat)} onToggle={basculerCat} />
               {estOuverte(g.cat) && (
-                <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 14, overflow: "hidden", margin: "0 6px" }}>
+                <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 760 }}>
                       {enTete(true)}
