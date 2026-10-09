@@ -15,6 +15,8 @@ import { BarreCommande, MenuCommande } from "@/components/commandes/BarreCommand
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
+import { useBureau } from "@/hooks/useBureau";
+import { CommandesBureau, type CommandeLigne } from "@/components/commandes/CommandesBureau";
 import { inChunks } from "@/lib/supabaseChunks";
 import { ZONES_EMBED, appliquerZonesEtab, type ZoneEtabRow } from "@/lib/zonesEtablissement";
 import { CommandeSimplifiee } from "@/components/commandes/CommandeSimplifiee";
@@ -569,6 +571,8 @@ function CommandesPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierAliases, setSupplierAliases] = useState<Map<string, Set<string>>>(new Map());
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  // Bureau : tableau des commandes + volet (src/components/commandes/CommandesBureau) ; téléphone : la page d'avant
+  const bureau = useBureau();
   const [draftSupplierIds, setDraftSupplierIds] = useState<Set<string>>(new Set());
 
   // Reception modal
@@ -643,6 +647,22 @@ function CommandesPage() {
     });
   }, []);
 
+  /** Charge les articles d'une commande pour le volet bureau (sans dépliage dans la liste) */
+  const chargerLignes = useCallback((id: string) => {
+    setSessionLignes(prev => {
+      if (prev[id]) return prev;
+      (async () => {
+        try {
+          const res = await fetchApi(`/api/commandes/session-lignes?session_id=${id}`);
+          const data = await res.json();
+          setSessionLignes(p2 => ({ ...p2, [id]: (data.lignes ?? []) as SessionLigne[] }));
+        } catch {
+          setSessionLignes(p2 => ({ ...p2, [id]: [] }));
+        }
+      })();
+      return { ...prev, [id]: "loading" };
+    });
+  }, []);
   const renderSessionLignes = (id: string) => {
     const lignes = sessionLignes[id];
     if (openSessionId !== id) return null;
@@ -2167,8 +2187,51 @@ function CommandesPage() {
           </div>
         )}
 
+        {/* Bureau : tableau des commandes, compteurs et volet */}
+        {bureau && !loading && !selectedSupplierId && (
+          <CommandesBureau
+            accent={accentColor}
+            enCours={activeSessions}
+            aRecevoir={pendingReceptions.map((r) => ({ ...r, status: "validee" }))}
+            recentes={recentOrders}
+            articles={sessionLignes}
+            chargerArticles={chargerLignes}
+            couleurFournisseur={supplierColor}
+            libelleStatut={statusLabel}
+            couleurStatut={statusColor}
+            fmtDate={fmtDate}
+            peutEnvoyer={peutEnvoyer}
+            saving={saving}
+            sendingEmail={sendingEmail}
+            onCommander={() => setSupplierListOpen(true)}
+            onOuvrir={(c: CommandeLigne) => {
+              if (!c.supplier_id) return;
+              let canonicalId = c.supplier_id;
+              for (const [cid, aliasSet] of supplierAliases.entries()) {
+                if (aliasSet.has(c.supplier_id)) { canonicalId = cid; break; }
+              }
+              setSelectedSupplierId(canonicalId);
+            }}
+            onPdf={(c) => { void downloadPdfById(c.id, c.supplier_name); }}
+            onEnvoyer={(c) => { void sendEmailForSession(c.id); }}
+            onValider={(c) => { void validerActiveSession(c.id); }}
+            onSupprimer={async (c) => {
+              if (!confirm(`Supprimer la commande ${c.supplier_name} ?`)) return;
+              const erreur = await supprimerBrouillon(c.id);
+              if (erreur) { alert(erreur); return; }
+              setActiveSessions((prev) => prev.filter((x) => x.id !== c.id));
+              if (session?.id === c.id) { setSession(null); setQuantities({}); }
+              setConfirmation("Commande supprimée");
+              setTimeout(() => setConfirmation(null), 3000);
+            }}
+            onModifier={(c) => { if (c.supplier_id) void modifierCommandeValidee({ id: c.id, supplier_id: c.supplier_id, supplier_name: c.supplier_name, email_sent_at: c.email_sent_at }); }}
+            onRenvoyer={(c) => { void renvoyerMailCommande({ id: c.id, supplier_name: c.supplier_name, email_sent_at: c.email_sent_at }); }}
+            onPointer={(c) => setReceptionSessionId(c.id)}
+          />
+        )}
+
         {/* Desktop: new order button */}
-        {!loading && !selectedSupplierId && suppliers.length > 0 && (
+        {!bureau && !loading && !selectedSupplierId && suppliers.length > 0 && (
           <button
             type="button"
             onClick={() => setSupplierListOpen(true)}
@@ -2331,7 +2394,7 @@ function CommandesPage() {
         </BottomSheet>
 
         {/* ── DASHBOARD (no supplier selected) ── */}
-        {!loading && !selectedSupplierId && (
+        {!bureau && !loading && !selectedSupplierId && (
           <>
             {/* KPI row */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginTop: 8 }}>
@@ -2373,7 +2436,7 @@ function CommandesPage() {
         )}
 
         {/* Commandes en cours */}
-        {!loading && !selectedSupplierId && activeSessions.length > 0 && (
+        {!bureau && !loading && !selectedSupplierId && activeSessions.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div style={{
               fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
@@ -2512,7 +2575,7 @@ function CommandesPage() {
         )}
 
         {/* Réceptions en attente */}
-        {!loading && !selectedSupplierId && pendingReceptions.length > 0 && (
+        {!bureau && !loading && !selectedSupplierId && pendingReceptions.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div style={{
               fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
@@ -2671,7 +2734,7 @@ function CommandesPage() {
 
 
         {/* Historique recent */}
-        {!loading && !selectedSupplierId && recentOrders.length > 0 && (
+        {!bureau && !loading && !selectedSupplierId && recentOrders.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div style={{
               fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
