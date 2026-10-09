@@ -7,6 +7,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTopBar } from "@/components/layout/TopBarContext";
 import { supabase } from "@/lib/supabaseClient";
+import { MenuLateral } from "./MenuLateral";
 
 /* ── Helpers ────────────────────────────────────── */
 
@@ -276,8 +277,8 @@ function EtabPill() {
   const canSwitch = isGroupAdmin || etablissements.length > 1;
   const label = isGroupView ? "iFratelli Group" : (current?.nom ?? "Entreprise");
   const color = isGroupView ? "#b45f57" : (current?.couleur ?? "#b45f57");
-  // Le tiroir de choix vit dans BottomTabBar (événement déjà écouté là-bas)
-  const open = () => { if (canSwitch) window.dispatchEvent(new Event("open-etab-drawer")); };
+  // Le choix d'entreprise se fait dans le menu latéral (bouton d'établissement en tête)
+  const open = () => { if (canSwitch) window.dispatchEvent(new Event("open-menu-lateral")); };
   return (
     <button
       type="button"
@@ -332,7 +333,8 @@ export function MobileHeader() {
         display: "flex", alignItems: "center",
         height: 52, padding: "0 12px", gap: 10,
       }}>
-        {/* Gauche : entreprise courante (Bello Mio / Piccola Mia / Groupe) */}
+        {/* Gauche : burger du menu latéral, puis entreprise courante (Bello Mio / Piccola Mia / Groupe) */}
+        <MenuLateral />
         <EtabPill />
         <div style={{ flex: 1 }} />
         {/* Right: bell + avatar */}

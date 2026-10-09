@@ -28,6 +28,17 @@ type RawOffer = {
   created_at: string;
 };
 
+/** Requête « par identifiants » exécutée par lots de 150 (l'URL de PostgREST a une taille limite) */
+async function parLots<T>(ids: string[], requete: (lot: string[]) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+  const tout: T[] = [];
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data, error } = await requete(ids.slice(i, i + 150));
+    if (error) throw new Error(error.message);
+    tout.push(...(data ?? []));
+  }
+  return tout;
+}
+
 export async function fetchPriceAlerts(
   supabase: SupabaseClient,
   userId: string,
@@ -50,18 +61,16 @@ export async function fetchPriceAlerts(
 
   const ingredientIds = [...new Set((active as RawOffer[]).map(r => r.ingredient_id))];
 
-  const q2 = supabase
+  // Vécu 10/10/2026 : 1 300 identifiants dans un seul `.in()` font une URL de 50 Ko, refusée
+  // (« Bad Request ») ; les requêtes par identifiants passent donc par lots de 150.
+  const previous = await parLots(ingredientIds, (lot) => supabase
     .from("supplier_offers")
     .select("ingredient_id, supplier_id, unit, unit_price, supplier_label, created_at")
     .eq("user_id", userId)
     .eq("is_active", false)
-    .in("ingredient_id", ingredientIds)
+    .in("ingredient_id", lot)
     .not("unit_price", "is", null)
-    .order("created_at", { ascending: false });
-  // No establishment filter on offers — unified catalog
-  const { data: previous, error: e2 } = await q2;
-
-  if (e2) throw new Error(e2.message);
+    .order("created_at", { ascending: false }));
 
   const prevMap = new Map<string, RawOffer>();
   for (const r of (previous ?? []) as RawOffer[]) {
@@ -69,15 +78,11 @@ export async function fetchPriceAlerts(
     if (!prevMap.has(key)) prevMap.set(key, r);
   }
 
-  const q3 = supabase
+  const ingredients = await parLots(ingredientIds, (lot) => supabase
     .from("ingredients")
     .select("id, name, supplier_id, category")
     .eq("user_id", userId)
-    .in("id", ingredientIds);
-  // No establishment filter on ingredients — unified catalog
-  const { data: ingredients, error: e3 } = await q3;
-
-  if (e3) throw new Error(e3.message);
+    .in("id", lot));
 
   const ingMap = new Map<string, { name: string; supplier_id: string; category?: string }>();
   for (const i of (ingredients ?? []) as Array<{ id: string; name: string; supplier_id: string; category?: string }>) {
@@ -85,12 +90,7 @@ export async function fetchPriceAlerts(
   }
 
   const supplierIds = [...new Set((active as RawOffer[]).map(r => r.supplier_id))];
-  const q4 = supabase
-    .from("suppliers")
-    .select("id, name")
-    .in("id", supplierIds);
-  // No establishment filter on suppliers — unified catalog
-  const { data: suppliers } = await q4;
+  const suppliers = await parLots(supplierIds, (lot) => supabase.from("suppliers").select("id, name").in("id", lot));
 
   const supMap = new Map<string, string>();
   for (const s of (suppliers ?? []) as Array<{ id: string; name: string }>) {

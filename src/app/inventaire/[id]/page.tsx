@@ -17,6 +17,7 @@ import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingre
 import { couleurRayon, rayonDuProduit, RAYON_AUTRES, RAYON_PREPARATIONS } from "@/lib/rayons";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { BoutonCrayon, BoutonCroix, Compteur, Conditionnement as CondLibelle } from "@/components/TuileProduit";
+import { TableauMobile } from "@/components/ui/TableauMobile";
 import { useBureau, useLarge } from "@/hooks/useBureau";
 import { couleurTexte, styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie } from "@/lib/styleCategories";
 import { correspondRecherche, filtrerRecherche, normaliserRecherche } from "@/lib/rechercheTolerante";
@@ -587,10 +588,9 @@ function Feuille() {
   const tableau = (ls: Ligne[], couleur: string) => {
     const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
     if (!large) return (
-      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-        <colgroup><col style={{ width: 4 }} /><col /><col style={{ width: 150 }} /><col style={{ width: 34 }} /></colgroup>
-        <tbody>{ls.map((l) => ligneMobile(l, couleur))}</tbody>
-      </table>
+      <TableauMobile sansCadre colonnes={[{ libelle: "Produit" }, { libelle: "Comptage", align: "right", largeur: 150 }, { largeur: 34 }]}>
+        {ls.map((l) => ligneMobile(l, couleur))}
+      </TableauMobile>
     );
     return (
       <div style={{ overflowX: "auto" }}>

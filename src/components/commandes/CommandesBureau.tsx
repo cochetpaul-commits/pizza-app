@@ -5,6 +5,7 @@ import { VoletDroit } from "@/components/produits/BaseProduits";
 import { OSWALD } from "@/components/TuileProduit";
 import { Tuile } from "@/components/ui/Tuile";
 import { EtatVide } from "@/components/ui/EtatVide";
+import { TableauMobile } from "@/components/ui/TableauMobile";
 
 /**
  * Commandes, présentation bureau (09/10/2026, maquette validée) : compteurs détaillés, puis un tableau plat
@@ -159,13 +160,10 @@ export function CommandesBureau(p: CommandesBureauProps) {
     );
   };
   const tableau = (liste: CommandeLigne[], vide: string, enSection = false) => { const TH = enSection ? TH_SEC : TH_PLAT; const TD = enSection ? TD_SEC : TD_PLAT; if (!bureau) return (
-    <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-      <colgroup><col style={{ width: 4 }} /><col /><col style={{ width: 92 }} /><col style={{ width: 22 }} /></colgroup>
-      <tbody>
-        {liste.map(ligneMobile)}
-        {liste.length === 0 && <tr><td style={{ padding: 0 }} colSpan={4}><EtatVide compact icone="commande" titre={vide.split(". ")[0].replace(/\.$/, "")} texte={vide.split(". ").slice(1).join(". ") || undefined} /></td></tr>}
-      </tbody>
-    </table>
+    <TableauMobile sansCadre colonnes={[{ libelle: "Fournisseur" }, { libelle: "Total HT", align: "right", largeur: 92 }, { largeur: 22 }]}>
+      {liste.map(ligneMobile)}
+      {liste.length === 0 && <tr><td style={{ padding: 0 }} colSpan={4}><EtatVide compact icone="commande" titre={vide.split(". ")[0].replace(/\.$/, "")} texte={vide.split(". ").slice(1).join(". ") || undefined} /></td></tr>}
+    </TableauMobile>
   ); return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 760 }}>
@@ -239,8 +237,7 @@ export function CommandesBureau(p: CommandesBureauProps) {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <a href="/commandes/theoriques" style={{ ...BTN, display: "inline-flex", alignItems: "center", textDecoration: "none" }} title="Ce qu'il faudrait commander d'après le stock théorique">{bureau ? "Proposition de commande" : "Proposition"}</a>
-          {/* Téléphone : « Commander » est dans la barre du bas */}
-          {bureau && <button type="button" onClick={p.onCommander} style={{ ...BTN, background: p.accent, color: "#fff", border: "none", fontWeight: 700 }}>+ Commander</button>}
+          <button type="button" onClick={p.onCommander} style={{ ...BTN, background: p.accent, color: "#fff", border: "none", fontWeight: 700 }}>+ Commander</button>
         </div>
       </div>
 

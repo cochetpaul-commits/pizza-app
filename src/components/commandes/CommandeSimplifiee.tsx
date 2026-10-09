@@ -72,6 +72,7 @@ const qteTexte = (n: number) => String(Math.round(n * 100) / 100).replace(".", "
 import { couleurRayon } from "@/lib/rayons";
 import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
 import { BoutonCrayon, Compteur } from "@/components/TuileProduit";
+import { TableauMobile } from "@/components/ui/TableauMobile";
 
 /**
  * Aller-retour vers la fiche produit (admins, managers) : l'état de l'écran est gardé le temps de corriger
@@ -469,10 +470,9 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   function tableau(articles: Article[], couleur: string = ACCENT) {
     const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
     if (!large) return (
-      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-        <colgroup><col style={{ width: 4 }} /><col /><col style={{ width: 132 }} /><col style={{ width: 30 }} /></colgroup>
-        <tbody>{articles.map((a) => ligneMobile(a, couleur))}</tbody>
-      </table>
+      <TableauMobile sansCadre colonnes={[{ libelle: "Produit" }, { libelle: "Quantité", align: "right", largeur: 132 }, { largeur: 30 }]}>
+        {articles.map((a) => ligneMobile(a, couleur))}
+      </TableauMobile>
     );
     return (
       <div style={{ overflowX: "auto" }}>

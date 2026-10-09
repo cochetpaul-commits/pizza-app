@@ -6,6 +6,7 @@ import { VoletDroit } from "@/components/produits/BaseProduits";
 import { OSWALD } from "@/components/TuileProduit";
 import { Tuile } from "@/components/ui/Tuile";
 import { EtatVide } from "@/components/ui/EtatVide";
+import { TableauMobile } from "@/components/ui/TableauMobile";
 import { couleurTexteSur, styleBarreCategorie } from "@/lib/styleCategories";
 import type { DonneesCarte, EditionFiche } from "./Carte";
 import type { FicheCarte, ReponseCarte } from "@/app/api/carte/route";
@@ -289,9 +290,9 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
     return (
       <tr key={l.id} className="cf-ligne" onClick={() => ouvrir(l)} style={{ cursor: "pointer" }}>
         <td style={{ ...TD, padding: 0, width: 4, background: g?.couleur }} />
-        <td style={{ ...TD, padding: "10px 12px", minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{l.nom}</div>
-          <div style={{ fontSize: 12, color: MUTED, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "52vw" }}>{[enSection ? null : g?.libelle, l.sous, l.statut ? STATUTS[l.statut]?.libelle : null].filter(Boolean).join(" · ")}</div>
+        <td style={{ ...TD, padding: "10px 8px 10px 10px", minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 13.5, lineHeight: 1.25 }}>{l.nom}</div>
+          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[enSection ? null : g?.libelle, l.sous, l.statut ? STATUTS[l.statut]?.libelle : null].filter(Boolean).join(" · ")}</div>
         </td>
         <td style={{ ...TD, padding: "10px 6px 10px 8px", textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
           <div style={{ fontWeight: 700 }}>{valeur}</div>
@@ -302,11 +303,9 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
     );
   };
   const tableauMobile = (liste: Ligne[], enSection: boolean) => (
-    <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderTop: enSection ? 0 : undefined, borderRadius: enSection ? "0 0 14px 14px" : 14, overflow: "hidden" }}>
-      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
-        <tbody>{liste.map((l) => ligneMobile(l, enSection))}</tbody>
-      </table>
-    </div>
+    <TableauMobile enSection={enSection} colonnes={[{ libelle: mode === "fiches" ? "Fiche" : "Préparation" }, { libelle: mode === "fiches" ? "Prix · food cost" : "Coût", align: "right", largeur: 108 }, { largeur: 24 }]}>
+      {liste.map((l) => ligneMobile(l, enSection))}
+    </TableauMobile>
   );
 
   const creation: EditionFiche = mode === "preparations" ? { cat: "preparation" } : {};

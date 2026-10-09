@@ -7,8 +7,6 @@ import { canAccess } from "@/lib/rbac";
 import { Sidebar } from "./Sidebar";
 import { MobileHeader } from "./MobileHeader";
 import { TopBarDesktop } from "./TopBarDesktop";
-import { BottomTabBar } from "./BottomTabBar";
-import { BottomBarProvider } from "@/lib/BottomBarContext";
 
 const EXCLUDED_PATHS = ["/login", "/auth", "/installer"];
 
@@ -57,7 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const allowed = canAccess(role, pathname, can);
 
   return (
-    <BottomBarProvider>
+    <>
       <Sidebar />
 
       <div className="app-main">
@@ -65,8 +63,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <MobileHeader />
         <main>{allowed ? children : <AccessDenied />}</main>
       </div>
-
-      <BottomTabBar />
-    </BottomBarProvider>
+    </>
   );
 }

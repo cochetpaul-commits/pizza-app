@@ -8,7 +8,6 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult } from "@/lib/pateEngine";
 import { BottomSheet } from "@/components/layout/BottomSheet";
-import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { useCategories, filterCategoriesForEtab } from "@/lib/useCategories";
 import { inChunks } from "@/lib/supabaseChunks";
 import { fetchApi } from "@/lib/fetchApi";
@@ -1119,14 +1118,6 @@ export function CatalogueContent({ preparations = false }: { preparations?: bool
     }
   }, [dupTarget, dupCat, dupSubCat, etabSlug]);
 
-  // Register FAB in bottom bar for "produit" mode
-  const produitAccent = TYPE_COLORS.produit;
-  useBottomBarActions(() => canWrite && mainFilter === "produit" ? [{
-    key: "new-produit", label: "Nouveau produit", accent: produitAccent,
-    onClick: () => setShowProduitForm(true),
-    icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
-  }] : [], [canWrite, mainFilter, produitAccent]);
-
   return (
     <main className="container" style={{ paddingBottom: 80 }}>
 
@@ -1163,6 +1154,16 @@ export function CatalogueContent({ preparations = false }: { preparations?: bool
                 }}>
                 + Categorie
               </button>
+              {mainFilter === "produit" && (
+                <button type="button" onClick={() => setShowProduitForm(true)}
+                  style={{
+                    padding: "8px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    border: `1.5px solid ${TYPE_COLORS.produit}`, background: "#fff", color: TYPE_COLORS.produit,
+                    cursor: "pointer", whiteSpace: "nowrap",
+                  }}>
+                  + Nouveau produit
+                </button>
+              )}
             </>
           )}
         </div>

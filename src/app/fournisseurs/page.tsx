@@ -9,7 +9,7 @@ import { ColorPicker } from "@/components/ColorPicker";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { EtatVide } from "@/components/ui/EtatVide";
-import { useBottomBarActions } from "@/lib/BottomBarContext";
+import { TableauMobile } from "@/components/ui/TableauMobile";
 import { fetchApi } from "@/lib/fetchApi";
 import { useBureau } from "@/hooks/useBureau";
 
@@ -960,7 +960,7 @@ export default function FournisseursPage() {
       <React.Fragment key={s.id}>
         <tr className="fo-ligne" onClick={() => isExpanded ? closeModal() : openModal(s)} style={{ cursor: "pointer" }}>
           <td style={{ ...TD, padding: 0, width: 4, background: sColor }} />
-          <td style={{ ...TD, whiteSpace: "normal", minWidth: 200 }}>
+          <td style={{ ...TD, whiteSpace: "normal", minWidth: 150 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span style={{ width: 10, height: 10, borderRadius: "50%", background: sColor, flexShrink: 0 }} />
               <span style={{ fontWeight: 700, color: s.is_active ? "#1a1a1a" : "#999" }}>{s.name}</span>
@@ -973,8 +973,10 @@ export default function FournisseursPage() {
           </td>
           <td style={TD}>{s.category ? <span style={{ ...readonlyBadge, background: `${sColor}18`, color: sColor }}>{CATEGORY_LABELS[s.category] ?? s.category}</span> : <span style={{ color: "#a39d92" }}>—</span>}</td>
           <td className="fo-col-large" style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>{s.city ? `${s.city}${s.postal_code ? ` (${s.postal_code})` : ""}` : "—"}</td>
-          <td className="fo-col-large" style={{ ...TD, color: "#6f6656", fontSize: 12.5, whiteSpace: "normal", minWidth: 220 }}>
-            {[s.contact_name, s.email, s.phone].filter(Boolean).join(" · ") || <span style={{ color: "#a39d92" }}>Coordonnées non renseignées</span>}
+          <td className="fo-col-large" style={{ ...TD, color: "#6f6656", fontSize: 12.5, whiteSpace: "normal", maxWidth: 230, overflowWrap: "anywhere" }}>
+            {s.contact_name || s.phone ? <div>{[s.contact_name, s.phone].filter(Boolean).join(" · ")}</div> : null}
+            {s.email && <div style={{ fontSize: 11.5, color: "#a39d92", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.email}</div>}
+            {!s.contact_name && !s.phone && !s.email && <span style={{ color: "#a39d92" }}>Coordonnées non renseignées</span>}
             {s.client_code && <div style={{ fontSize: 11.5, color: "#a39d92" }}>Code client {s.client_code}</div>}
           </td>
           <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums" }}><strong>{st?.refCount ?? 0}</strong></td>
@@ -982,7 +984,7 @@ export default function FournisseursPage() {
             {s.delivery_days && s.delivery_days.length > 0 ? s.delivery_days.map(d => d.slice(0, 3)).join(", ") : "—"}
           </td>
           <td className="fo-col-large" style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>
-            {st?.lastImport ? <>{fmtDate(st.lastImport)}{st.lastImportNumber ? <span style={{ color: "#a39d92" }}> · {st.lastImportNumber}</span> : null}</> : <span style={{ color: "#a39d92" }}>Aucun import</span>}
+            {st?.lastImport ? <>{fmtDate(st.lastImport)}{st.lastImportNumber ? <div style={{ fontSize: 11, color: "#a39d92" }}>{st.lastImportNumber}</div> : null}</> : <span style={{ color: "#a39d92" }}>Aucun import</span>}
           </td>
           <td style={{ ...TD, textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
             <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
@@ -995,8 +997,8 @@ export default function FournisseursPage() {
                     if (error) { alert(error.message); return; }
                     window.location.reload();
                   }}
-                  style={{ height: 28, padding: "0 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,0.2)", background: "rgba(37,99,235,0.06)", color: "#2563EB", cursor: "pointer", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap", fontFamily: "inherit" }}>
-                  + {otherEtab.nom.slice(0, 10)}
+                  style={{ height: 28, padding: "0 8px", borderRadius: 8, border: "1px solid rgba(37,99,235,0.2)", background: "rgba(37,99,235,0.06)", color: "#2563EB", cursor: "pointer", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap", fontFamily: "inherit" }}>
+                  + {otherEtab.nom.split(/\s+/).map((m) => m[0]).join("").toUpperCase()}
                 </button>
               )}
               <button type="button" onClick={(e) => handleDeleteSupplier(s, e)} title="Supprimer le fournisseur" aria-label="Supprimer"
@@ -1028,7 +1030,7 @@ export default function FournisseursPage() {
           @media (max-width: 1150px){ .fo-fiche{ grid-template-columns: minmax(0, 1fr) !important; } }
           @media (max-width: 1100px){ .fo-table{ min-width: 0 !important; } .fo-col-large{ display: none; } .fo-inline{ display: block; } }`}</style>
         <div style={{ overflowX: "auto" }}>
-          <table className="fo-table" style={{ borderCollapse: "collapse", width: "100%", minWidth: 980 }}>
+          <table className="fo-table" style={{ borderCollapse: "collapse", width: "100%" }}>
             <thead><tr>
               <th style={{ ...TH, padding: 0, width: 4 }} /><th style={TH}>Fournisseur</th><th style={TH}>Catégorie</th><th className="fo-col-large" style={TH}>Ville</th><th className="fo-col-large" style={TH}>Contact</th>
               <th style={{ ...TH, textAlign: "right" }}>Réf.</th><th style={TH}>Livraison</th><th className="fo-col-large" style={TH}>Dernier import</th><th style={TH} />
@@ -1102,13 +1104,12 @@ export default function FournisseursPage() {
 
   function tableauMobile(liste: SupplierRow[]) {
     return (
-      <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden" }}>
+      <>
         <style>{`.fo-ligne:hover td{background:#f7f3ec} .fo-ligne:last-child td{border-bottom:0}`}</style>
-        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-          <colgroup><col style={{ width: 4 }} /><col /><col style={{ width: 96 }} /><col style={{ width: 22 }} /></colgroup>
-          <tbody>{liste.map(renderLigneMobile)}</tbody>
-        </table>
-      </div>
+        <TableauMobile colonnes={[{ libelle: "Fournisseur" }, { libelle: "Réf. · import", align: "right", largeur: 96 }, { largeur: 22 }]}>
+          {liste.map(renderLigneMobile)}
+        </TableauMobile>
+      </>
     );
   }
 
@@ -1118,13 +1119,6 @@ export default function FournisseursPage() {
   // Etab filter pills
   const bmEtab = etablissements.find(e => e.slug === "bello-mio");
   const pmEtab = etablissements.find(e => e.slug === "piccola-mia");
-
-  // Bottom bar FAB
-  useBottomBarActions(() => [{
-    key: "add", label: "Nouveau fournisseur", accent: "#D4775A",
-    onClick: openCreateModal,
-    icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
-  }], []);
 
   return (
     <RequireRole allowedRoles={["group_admin", "equipier"]}>

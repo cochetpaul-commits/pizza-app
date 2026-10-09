@@ -9,10 +9,10 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
-import { setPendingInvoiceFile } from "@/lib/pendingInvoiceFile";
-import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { useSearchParams } from "next/navigation";
 import { StatsAchatsContent } from "@/components/achats/StatsAchatsContent";
+import { useBureau } from "@/hooks/useBureau";
+import { TableauMobile } from "@/components/ui/TableauMobile";
 
 // Chart.js chargé à la demande, hors du bundle initial de la page
 const EvolutionChart = dynamic(() => import("./EvolutionChart"), { ssr: false });
@@ -140,6 +140,7 @@ export default function AchatsPage() {
 
 function AchatsContent() {
   const router = useRouter();
+  const bureau = useBureau();
   const searchParams = useSearchParams();
   const etab = useEtablissement();
   const etabId = etab.current?.id ?? null;
@@ -541,7 +542,30 @@ function AchatsContent() {
   const tdR: React.CSSProperties = { ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
 
   // ── Tableau des factures d'un fournisseur (gabarit commun) : bande de couleur, date, numéro, totaux, flèche ; les lignes de la facture choisie dessous ──
-  const tableauFactures = (invoices: InvoiceRow[], couleur: string) => (
+  const tableauFactures = (invoices: InvoiceRow[], couleur: string) => !bureau ? (
+    <TableauMobile sansCadre colonnes={[{ libelle: "Facture" }, { libelle: "Total HT", align: "right", largeur: 100 }, { largeur: 22 }]}>
+      {invoices.map((inv) => {
+        const isSelected = dashSelectedInvoice === inv.id;
+        const fond = isSelected ? "rgba(212,119,90,0.08)" : undefined;
+        return (
+          <React.Fragment key={inv.id}>
+            <tr className="ac-ligne" onClick={() => loadDashLines(inv.id)} style={{ cursor: "pointer" }}>
+              <td style={{ ...tdStyle, padding: 0, width: 4, background: couleur }} />
+              <td style={{ ...tdStyle, padding: "10px 8px 10px 10px", background: fond }}>
+                <div style={{ fontWeight: 600 }}>{fmtDate(inv.invoice_date)}</div>
+                <div style={{ fontSize: 11.5, color: "#6f6a61", marginTop: 2 }}>{inv.invoice_number ?? "\u2014"}{inv.total_ttc != null ? ` · ${fmt(inv.total_ttc)} TTC` : ""}</div>
+              </td>
+              <td style={{ ...tdR, padding: "10px 4px 10px 0", background: fond, fontWeight: 700 }}>{fmt(inv.total_ht)}</td>
+              <td style={{ ...tdStyle, padding: "10px 10px 10px 2px", background: fond, color: "#a39d92", fontSize: 18, textAlign: "right" }} aria-hidden><span style={{ display: "inline-block", transform: isSelected ? "rotate(90deg)" : "none", transition: "transform .15s" }}>›</span></td>
+            </tr>
+            {isSelected && (
+              <tr><td style={{ padding: 0, width: 4, background: couleur }} /><td colSpan={3} style={{ padding: 0 }}>{renderLinesTable(dashLines, dashLinesLoading)}</td></tr>
+            )}
+          </React.Fragment>
+        );
+      })}
+    </TableauMobile>
+  ) : (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 520 }}>
         <thead><tr>
@@ -647,15 +671,7 @@ function AchatsContent() {
     );
   };
 
-  // Register import FAB in bottom bar
   const accentColor = etab.current?.couleur ?? "#D4775A";
-  useBottomBarActions(() => [{
-    key: "import", label: "Import facture", accent: accentColor,
-    onClick: () => {},
-    fileAccept: "image/*,.pdf",
-    onFileChange: (f: File) => { setPendingInvoiceFile(f); router.push("/invoices"); },
-    icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>,
-  }], [accentColor, router]);
 
   return (
     <RequireRole allowedRoles={["group_admin"]}>
@@ -694,7 +710,6 @@ function AchatsContent() {
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginBottom: 24 }}>
           <button
             type="button"
-            className="desktop-only"
             onClick={() => router.push("/invoices")}
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
@@ -944,6 +959,20 @@ function AchatsContent() {
                       ))}
                     </select>
                   </div>
+                  {!bureau ? (
+                    <TableauMobile colonnes={[{ libelle: "Produit" }, { libelle: "Total", align: "right", largeur: 92 }]}>
+                      {filteredTopProducts.slice(0, topProductsLimit).map((p, idx) => (
+                        <tr key={idx}>
+                          <td style={{ ...tdStyle, padding: 0, width: 4, background: cachedSupplierColor(p.supplier) }} />
+                          <td style={{ ...tdStyle, padding: "9px 8px 9px 10px" }}>
+                            <div style={{ fontWeight: 600, color: "#1a1a1a", lineHeight: 1.25 }}>{p.name}</div>
+                            <div style={{ fontSize: 11.5, color: "#6f6a61", marginTop: 2 }}>{p.supplier} · {p.quantity % 1 === 0 ? p.quantity : p.quantity.toFixed(2)} {p.unit} · dernier PU {fmt(p.lastUnitPrice)}</div>
+                          </td>
+                          <td style={{ ...tdR, padding: "9px 10px 9px 0", fontWeight: 700 }}>{fmt(p.totalPrice)}</td>
+                        </tr>
+                      ))}
+                    </TableauMobile>
+                  ) : (
                   <div className="achats-top-table-scroll" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "DM Sans, sans-serif", minWidth: 560 }}>
                       <thead>
@@ -968,6 +997,7 @@ function AchatsContent() {
                       </tbody>
                     </table>
                   </div>
+                  )}
                   {filteredTopProducts.length > topProductsLimit && (
                     <div style={{ textAlign: "center", marginTop: 12 }}>
                       <button

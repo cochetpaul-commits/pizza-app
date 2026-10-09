@@ -53,7 +53,6 @@ import DuplicatePanel from "@/components/DuplicatePanel";
 import { detectDuplicates, similarity, type DuplicatePair } from "@/lib/duplicateDetection";
 import { normaliserSousCategorie } from "@/lib/styleCategories";
 import { BottomSheet } from "@/components/layout/BottomSheet";
-import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { dateFermeture, fermerOffresActives } from "@/lib/offerClosing";
 import { desactiverProduits, reactiverProduits } from "@/lib/produitsActifs";
 
@@ -1209,7 +1208,6 @@ function IngredientsPageInner() {
 
   // Pas de FAB contextuel sur cette page : la rangée mobile a déjà
   // recherche + filtres + ajout, le CTA flottant faisait doublon.
-  useBottomBarActions(() => [], []);
 
   /** Props d'une ligne produit : la liste téléphone et le volet bureau affichent la même fiche */
   const propsLigne = (x: Ingredient): IngredientRowProps => {

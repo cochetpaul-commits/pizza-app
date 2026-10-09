@@ -17,7 +17,6 @@ import { useTopBar } from "@/components/layout/TopBarContext";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
 import { supabase } from "@/lib/supabaseClient";
-import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { getCached, setCache } from "@/lib/apiCache";
 import { fetchApi } from "@/lib/fetchApi";
@@ -672,13 +671,6 @@ function PerformancesPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range.from, range.to, accent]);
 
-  // Register PDF action in the bottom tab bar FAB
-  useBottomBarActions(() => [{
-    key: "pdf", label: "PDF / Export", accent,
-    onClick: () => setPdfDrawerOpen(true),
-    icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>,
-  }], [accent]);
-
   return (
     <RequireRole permission="performances.view">
       <PilotageSwipeWrapper dateFrom={range.from} dateTo={range.to}>
@@ -745,7 +737,7 @@ function PerformancesPage() {
             }} />
           </label>
           {data && (
-            <button className="desktop-only" type="button" onClick={() => setPdfDrawerOpen(true)} disabled={exporting} style={{
+            <button type="button" onClick={() => setPdfDrawerOpen(true)} disabled={exporting} style={{
               padding: "6px 14px", borderRadius: 8, border: "1px solid #e0d8ce",
               background: "#fff", color: "#1a1a1a", fontSize: 12, fontWeight: 700, cursor: "pointer",
               opacity: exporting ? 0.5 : 1,

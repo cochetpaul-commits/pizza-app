@@ -9,6 +9,7 @@ import { VoletDroit } from "@/components/produits/BaseProduits";
 import { OSWALD } from "@/components/TuileProduit";
 import { Tuile } from "@/components/ui/Tuile";
 import { EtatVide } from "@/components/ui/EtatVide";
+import { TableauMobile } from "@/components/ui/TableauMobile";
 import { couleurTexteSur, styleBarreCategorie } from "@/lib/styleCategories";
 import { VueFiches } from "./VueFiches";
 import { useDonneesCarte } from "./useDonneesCarte";
@@ -463,9 +464,9 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
   const ligneMobile = (a: ArticleCarte, enSection: boolean) => (
     <tr key={a.id} className={`ca-ligne${ouvert?.id === a.id ? " on" : ""}`} onClick={() => { setOuvertId(a.id); setRelierOuvert(false); }} style={{ cursor: "pointer" }}>
       <td style={{ ...TD_SEC, padding: 0, width: 4, background: infoCategorie(a.categorie).couleur }} />
-      <td style={{ ...TD_SEC, padding: "10px 12px", minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{a.nom}</div>
-        <div style={{ fontSize: 12, color: MUTED, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "52vw" }}>{[enSection ? null : infoCategorie(a.categorie).libelle, a.lien ? libelleLien(a) : "non relié"].filter(Boolean).join(" · ")}</div>
+      <td style={{ ...TD_SEC, padding: "10px 8px 10px 10px", minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 13.5, lineHeight: 1.25 }}>{a.nom}</div>
+        <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[enSection ? null : infoCategorie(a.categorie).libelle, a.lien ? libelleLien(a) : "non relié"].filter(Boolean).join(" · ")}</div>
       </td>
       <td style={{ ...TD_SEC, padding: "10px 6px 10px 8px", textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
         <div style={{ fontWeight: 700 }}>{euros(a.prix_ttc)}</div>
@@ -475,11 +476,9 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
     </tr>
   );
   const tableauMobile = (liste: ArticleCarte[], enSection: boolean) => (
-    <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderTop: enSection ? 0 : undefined, borderRadius: enSection ? "0 0 14px 14px" : 14, overflow: "hidden" }}>
-      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
-        <tbody>{liste.map((a) => ligneMobile(a, enSection))}</tbody>
-      </table>
-    </div>
+    <TableauMobile enSection={enSection} colonnes={[{ libelle: "Article" }, { libelle: "Prix · food cost", align: "right", largeur: 108 }, { largeur: 24 }]}>
+      {liste.map((a) => ligneMobile(a, enSection))}
+    </TableauMobile>
   );
 
   return (

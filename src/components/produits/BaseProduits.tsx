@@ -13,6 +13,7 @@ import { Tuile } from "@/components/ui/Tuile";
 import Link from "next/link";
 import { dateInventaire, fmtQte, type StockItem } from "@/lib/stockTypes";
 import { EtatVide } from "@/components/ui/EtatVide";
+import { TableauMobile } from "@/components/ui/TableauMobile";
 import { articleDeFiche, type FicheConditionnement } from "@/lib/inventaire";
 import { libelleColisage } from "@/lib/commandeArticles";
 
@@ -407,18 +408,9 @@ export function BaseProduits(p: BaseProduitsProps) {
   const nbColonnesMobile = 4 + (p.peutEcrire ? 1 : 0);
   /** Cadre blanc du tableau téléphone : accroché sous une barre de catégorie (coins du haut droits) ou autonome */
   const tableauMobile = (corps: ReactNode, enSection: boolean) => (
-    <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderTop: enSection ? 0 : `1px solid ${BORD}`, borderRadius: enSection ? "0 0 14px 14px" : 14, overflow: "hidden" }}>
-      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-        <colgroup>
-          <col style={{ width: 4 }} />
-          {p.peutEcrire && <col style={{ width: 30 }} />}
-          <col />
-          <col style={{ width: 112 }} />
-          <col style={{ width: 22 }} />
-        </colgroup>
-        <tbody>{corps}</tbody>
-      </table>
-    </div>
+    <TableauMobile enSection={enSection} colonnes={[...(p.peutEcrire ? [{ largeur: 30 }] : []), { libelle: "Produit" }, { libelle: "Prix · stock", align: "right", largeur: 112 }, { largeur: 22 }]}>
+      {corps}
+    </TableauMobile>
   );
   const ligne = (l: Ligne, sansCategorie = false) => (
     <LigneProduit key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)} stock={p.stockMap.get(l.x.id) ?? null} onToggleActif={p.peutEcrire ? p.onToggleActif : undefined}
@@ -718,7 +710,8 @@ export function VoletDroit({ titre, sousTitre, onFermer, pied, largeur = 640, ch
            comme la feuille du bas de l'application (200). Les boutons du pied restent visibles. */
         @media (max-width: 767px) {
           .volet-fond { z-index: 200 !important; background: rgba(26,26,26,0.45) !important; }
-          .volet-droit { z-index: 201 !important; top: 48px !important; right: 0 !important; bottom: 0 !important; left: 0; width: auto !important; border-radius: 20px 20px 0 0 !important; border: none !important; box-shadow: 0 -8px 40px rgba(0,0,0,0.25) !important; animation: voletMonte .3s cubic-bezier(.2,.8,.2,1); }
+          /* Sous la zone sûre (encoche) : le titre et la croix ne passent plus sous le flou de la barre du haut */
+          .volet-droit { z-index: 201 !important; top: calc(env(safe-area-inset-top, 0px) + 12px) !important; right: 0 !important; bottom: 0 !important; left: 0; width: auto !important; border-radius: 20px 20px 0 0 !important; border: none !important; box-shadow: 0 -8px 40px rgba(0,0,0,0.25) !important; animation: voletMonte .3s cubic-bezier(.2,.8,.2,1); }
           .volet-droit > div { padding-left: 16px !important; padding-right: 16px !important; }
           .volet-droit > div:last-child { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; }
           /* Les boutons du pied passent à la ligne au lieu de déborder */

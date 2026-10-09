@@ -156,7 +156,6 @@ select.input option {
   border: none !important;
   border-bottom: none !important;
 }
-/* bottom-tab-bar pill overrides handled inline — no extra glass needed */
 
 *{ box-sizing: border-box; }
 
@@ -280,10 +279,6 @@ body {
 }
 
 /* Mobile bottom tab bar — hidden on desktop */
-.bottom-tab-bar {
-  display: none !important;
-}
-
 @media (max-width: 767px) {
   :root { --topbar-desktop-height: 0px; }
   .topbar-desktop { display: none !important; }
@@ -300,14 +295,8 @@ body {
     -webkit-backdrop-filter: none !important;
     /* Reserve space for fixed mobile header (52px) + safe-area */
     padding-top: calc(52px + var(--mobile-header-extra, 0px) + env(safe-area-inset-top, 0px));
-    /* Reserve space for bottom pill + FAB + safe-area */
-    padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
-  }
-  .bottom-tab-bar {
-    display: block !important;
-  }
-  .bottom-bar-fab {
-    display: flex !important;
+    /* Plus de barre du bas (menu latéral depuis le 10/10/2026) : seule la zone sûre est réservée */
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -443,11 +432,7 @@ html.sidebar-collapsed .sidebar-toggle-btn { left: 12px; }
 .no-money [data-money] { filter: blur(8px); pointer-events: none; user-select: none; }
 .no-money .money-hide { display: none !important; }
 
-/* Écran de commande : barre Menu / Achats masquée, une seule barre fixe en bas (BarreCommande) */
-body.commande-en-cours .bottom-tab-bar,
-body.commande-en-cours .bottom-bar-fab {
-  display: none !important;
-}
+/* Écran de commande : une barre fixe en bas (BarreCommande), le contenu lui laisse la place */
 body.commande-en-cours .app-main {
   padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
 }
@@ -469,12 +454,6 @@ body.commande-en-cours .app-main {
 @media (min-width: 768px) {
   .barre-commande { left: calc(var(--sidebar-width) + 16px); justify-content: flex-end; }
   html.sidebar-collapsed .barre-commande { left: 16px; }
-}
-
-/* Hide bottom tab bar pill when a bottom sheet drawer is open */
-body.bottom-sheet-open .bottom-tab-bar,
-body.bottom-sheet-open .bottom-bar-fab {
-  display: none !important;
 }
 
 

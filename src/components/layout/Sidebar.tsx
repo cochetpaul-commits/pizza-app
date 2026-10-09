@@ -21,8 +21,9 @@ import type { Role } from "@/lib/rbac";
  * Barre latérale bureau, calquée sur ComandR (08/10/2026) : logo, un bouton
  * d'établissement avec chevron, puis une liste à plat avec une icône par
  * entrée ; seules Analyse, HACCP, Événementiel et Paramètres se déploient.
- * Changer d'établissement garde la page ouverte. Le mobile (MobileHeader,
- * BottomTabBar) n'est pas concerné.
+ * Changer d'établissement garde la page ouverte. Depuis le 10/10/2026 le même
+ * contenu sert au téléphone, dans un tiroir latéral ouvert par le burger de
+ * la barre du haut (MenuLateral) : plus de barre d'onglets ni de bouton flottant.
  */
 
 const ICON_MAP: Record<string, React.FC<{ size?: number; color?: string }>> = {
@@ -69,7 +70,7 @@ function isRoleAllowed(roles: Role[] | undefined, role: Role | null): boolean {
    CONTENU
    ═══════════════════════════════════════════════════════ */
 
-function SidebarContent() {
+export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const { role, can } = useProfile();
@@ -125,6 +126,7 @@ function SidebarContent() {
   /* ── Choix de l'établissement ── */
   const choisirEtab = (etab: (typeof etablissements)[number]) => {
     setEtabOpen(false);
+    onNaviguer?.();
     const depuisGroupe = isGroupView || pathname === "/dashboard" || pathname === "/groupe";
     setGroupView(false);
     setCurrent(etab);
@@ -133,6 +135,7 @@ function SidebarContent() {
   };
   const choisirGroupe = () => {
     setEtabOpen(false);
+    onNaviguer?.();
     setGroupView(true);
     router.push("/dashboard");
   };
@@ -148,6 +151,7 @@ function SidebarContent() {
       <Link
         key={item.href}
         href={item.href}
+        onClick={onNaviguer}
         onMouseEnter={() => setHovered(item.href)}
         onMouseLeave={() => setHovered(null)}
         style={{

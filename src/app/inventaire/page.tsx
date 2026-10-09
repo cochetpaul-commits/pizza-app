@@ -948,7 +948,8 @@ export default function InventairePage() {
           </button>
         )}
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <style>{`@media (max-width: 767px) { .inv-entete { flex-direction: column; align-items: stretch !important; } .inv-entete > div:last-child { flex-wrap: wrap; } }`}</style>
+        <div className="inv-entete" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 16 }}>
           <div>
             <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>
               {isViewing ? `Inventaire du ${fmtDate(currentInv?.date ?? "")}` : "Inventaire en cours"}
