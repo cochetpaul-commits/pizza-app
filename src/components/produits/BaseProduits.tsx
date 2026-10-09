@@ -22,7 +22,7 @@ import { libelleColisage } from "@/lib/commandeArticles";
  * et volet (à droite sur bureau, plein écran sur téléphone) pour paramétrer la fiche avec le
  * formulaire de l'application. Deux affichages : A → Z (liste plate) ou par catégorie (volets de
  * catégorie et de sous-catégorie, repliés sauf pendant une recherche). Sur téléphone (comme ComandR mobile) : tuiles sur deux colonnes,
- * filtres en petits menus alignés, cartes « nom / état + prix / fournisseur » avec chevron, fiche
+ * filtres en petits menus alignés, même tableau que le bureau en trois colonnes (nom, prix + stock, chevron), fiche
  * en feuille qui monte du bas.
  */
 
@@ -128,37 +128,39 @@ function affichageProduit(x: Ingredient, offer: LatestOffer | undefined) {
   };
 }
 
-/** Carte produit sur téléphone : liseré de la catégorie, nom, sous-catégorie · fournisseur · zone, prix et état */
-const CarteProduit = React.memo(function CarteProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, sansCategorie, stock }: LigneProps) {
+/** Ligne produit sur téléphone (10/10/2026, même gabarit que le tableau bureau en trois colonnes) :
+ * liseré de la catégorie, case, nom + catégorie · sous-catégorie · fournisseur · zone + état, prix + stock à droite, chevron */
+const LigneMobile = React.memo(function LigneMobile({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, sansCategorie, stock }: LigneProps) {
   const a = affichageProduit(x, offer);
   const sous = [x.sub_category, fournisseur?.name, x.storage_zone].filter(Boolean).join(" · ");
   return (
-    <div id={`ing-${x.id}`} onClick={() => onOuvrir(x)} style={{
-      background: "#fff", borderRadius: 12, borderStyle: "solid", borderWidth: "1px 1px 1px 4px",
-      borderColor: `${enEdition || selectionnee ? "#D4775A" : "#ece6db"} ${enEdition || selectionnee ? "#D4775A" : "#ece6db"} ${enEdition || selectionnee ? "#D4775A" : "#ece6db"} ${a.couleurCat}`,
-      padding: "11px 12px 11px 12px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
-    }}>
+    <tr id={`ing-${x.id}`} className={`bp-ligne${enEdition ? " on" : ""}`} onClick={() => onOuvrir(x)} style={{ cursor: "pointer" }}>
+      <td style={{ ...TD, padding: 0, width: 4, background: a.couleurCat }} />
       {peutEcrire && (
-        <input type="checkbox" checked={selectionnee} onChange={() => onToggleSelect(x.id)} onClick={(e) => e.stopPropagation()}
-          style={{ width: 16, height: 16, accentColor: a.couleurCat, cursor: "pointer", flexShrink: 0 }} />
+        <td style={{ ...TD, width: 30, padding: "9px 0 9px 10px" }} onClick={(e) => e.stopPropagation()}>
+          <input type="checkbox" checked={selectionnee} onChange={() => onToggleSelect(x.id)} style={{ width: 15, height: 15, accentColor: a.couleurCat, cursor: "pointer", display: "block" }} />
+        </td>
       )}
-      <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 5 }}>
-        <div style={{ fontWeight: 600, fontSize: 14.5, color: a.inactive ? "#999" : "#1a1a1a", lineHeight: 1.25 }}>
+      <td style={{ ...TD, padding: "9px 8px 9px 10px" }}>
+        <div style={{ fontWeight: 600, fontSize: 13.5, color: a.inactive ? "#999" : "#1a1a1a", lineHeight: 1.25 }}>
           {x.name}{x.is_derived && <span style={{ marginLeft: 6, fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", verticalAlign: "middle" }}>DÉRIVÉ</span>}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           {a.etat && <Chip fond={a.etat.fond} couleur={a.etat.couleur}>{a.etat.libelle}</Chip>}
-          <span style={{ fontWeight: 700, fontSize: 13, color: a.aUnPrix ? "#1a1a1a" : FAIBLE, fontVariantNumeric: "tabular-nums" }}>{a.aUnPrix ? a.prix : "Aucun prix"}</span>
-          {a.colisage && <span style={{ fontSize: 12, color: MUTED }}>{a.colisage}</span>}
-          {stock && <span style={{ fontSize: 12.5 }}>· stock <Stock s={stock} compact /></span>}
-          {alerte && <span style={{ fontSize: 10.5, fontWeight: 700, color: alerte.direction === "up" ? "#DC2626" : "#16A34A" }}>{alerte.direction === "up" ? "+" : "-"}{(Math.abs(alerte.change_pct) * 100).toFixed(0)} %</span>}
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {!sansCategorie && <span style={{ color: a.texteCat, fontWeight: 700 }}>{CAT_LABELS[x.category] ?? x.category}</span>}{sous ? (sansCategorie ? sous : ` · ${sous}`) : ""}
+          </span>
         </div>
-        <div style={{ fontSize: 11.5, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {!sansCategorie && <span style={{ color: a.texteCat, fontWeight: 700 }}>{CAT_LABELS[x.category] ?? x.category}</span>}{sous ? (sansCategorie ? sous : ` · ${sous}`) : ""}
+      </td>
+      <td style={{ ...TD, padding: "9px 4px 9px 0", textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: a.aUnPrix ? "#1a1a1a" : FAIBLE }}>{a.aUnPrix ? a.prix : "Aucun prix"}</div>
+        <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>
+          {alerte ? <span style={{ fontWeight: 700, color: alerte.direction === "up" ? "#DC2626" : "#16A34A" }}>{alerte.direction === "up" ? "+" : "-"}{(Math.abs(alerte.change_pct) * 100).toFixed(0)} %</span>
+            : stock ? <>stock <Stock s={stock} compact /></> : a.colisage}
         </div>
-      </div>
-      <span aria-hidden style={{ color: FAIBLE, fontSize: 18, flexShrink: 0 }}>›</span>
-    </div>
+      </td>
+      <td style={{ ...TD, padding: "9px 10px 9px 2px", width: 18, color: FAIBLE, fontSize: 18, textAlign: "right" }} aria-hidden>›</td>
+    </tr>
   );
 });
 
@@ -188,19 +190,22 @@ const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, a
             style={{ width: 15, height: 15, accentColor: couleurCat, cursor: "pointer", display: "block" }} />
         </td>
       )}
-      <td style={TD}>
+      <td style={{ ...TD, minWidth: 200 }}>
         <div style={{ fontWeight: 600, color: inactive ? "#999" : "#1a1a1a", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <span>{x.name}</span>
           {x.is_derived && <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED" }}>DÉRIVÉ</span>}
+          {etat && <span className="bp-etat-inline"><Chip fond={etat.fond} couleur={etat.couleur}>{etat.libelle}</Chip></span>}
         </div>
-        {sousProduit && <div style={{ fontSize: 11.5, color: MUTED }}>{sousProduit}</div>}
+        <div style={{ fontSize: 11.5, color: MUTED }}>
+          {!sansCategorie && <span className="bp-cat-inline" style={{ color: texteCat, fontWeight: 700 }}>{CAT_LABELS[x.category] ?? x.category}{sousProduit ? " · " : ""}</span>}{sousProduit}
+        </div>
       </td>
       {!sansCategorie && (
-        <td style={TD}>
+        <td className="bp-col-cat" style={{ ...TD, whiteSpace: "nowrap" }}>
           <Chip fond={`${couleurCat}24`} couleur={texteCat}>{CAT_LABELS[x.category] ?? x.category}</Chip>
         </td>
       )}
-      <td style={TD}>
+      <td style={{ ...TD, whiteSpace: "nowrap" }}>
         {fournisseur ? (
           <button type="button" onClick={(e) => { e.stopPropagation(); onOpenSupplier(fournisseur.id); }} title="Fiche fournisseur"
             style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "none", background: "transparent", padding: 0, fontFamily: "inherit", fontSize: 13, color: "#1a1a1a", cursor: "pointer" }}>
@@ -212,7 +217,7 @@ const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, a
       <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
         <div style={{ fontWeight: 700, color: aUnPrix ? "#1a1a1a" : FAIBLE }}>{prix}</div>
         {alerte ? (
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: alerte.direction === "up" ? "#DC2626" : "#16A34A" }}>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: alerte.direction === "up" ? "#DC2626" : "#16A34A", whiteSpace: "normal", maxWidth: 150, marginLeft: "auto" }}>
             {alerte.direction === "up" ? "+" : "-"}{(Math.abs(alerte.change_pct) * 100).toFixed(0)} % sur la dernière facture
           </div>
         ) : colisage ? (
@@ -222,8 +227,8 @@ const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, a
         ) : null}
       </td>
       <td style={{ ...TD, textAlign: "right" }}><Stock s={stock} /></td>
-      <td style={{ ...TD, color: x.storage_zone ? "#1a1a1a" : FAIBLE }}>{x.storage_zone ?? "—"}</td>
-      <td style={TD}>{etat && <Chip fond={etat.fond} couleur={etat.couleur}>{etat.libelle}</Chip>}</td>
+      <td className="bp-col-zone" style={{ ...TD, color: x.storage_zone ? "#1a1a1a" : FAIBLE }}>{x.storage_zone ?? "—"}</td>
+      <td className="bp-col-etat" style={TD}>{etat && <Chip fond={etat.fond} couleur={etat.couleur}>{etat.libelle}</Chip>}</td>
       {onToggleActif && (
         <td style={{ ...TD, width: 44 }} onClick={(e) => e.stopPropagation()}>
           <Interrupteur actif={!inactive} onChange={() => onToggleActif(x)} titre={inactive ? "Inactif : cliquer pour réactiver (listes, commandes, inventaire)" : "Actif : cliquer pour désactiver (sort des listes, des commandes et du prochain inventaire)"} />
@@ -394,10 +399,26 @@ export function BaseProduits(p: BaseProduitsProps) {
       </button>
     );
   };
-  const carte = (l: Ligne, sansCategorie = false) => (
-    <CarteProduit key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)} stock={p.stockMap.get(l.x.id) ?? null}
+  const ligneMobile = (l: Ligne, sansCategorie = false) => (
+    <LigneMobile key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)} stock={p.stockMap.get(l.x.id) ?? null}
       selectionnee={p.selectedIds.has(l.x.id)} enEdition={p.editingId === l.x.id} peutEcrire={p.peutEcrire} sansCategorie={sansCategorie}
       onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} />
+  );
+  const nbColonnesMobile = 4 + (p.peutEcrire ? 1 : 0);
+  /** Cadre blanc du tableau téléphone : accroché sous une barre de catégorie (coins du haut droits) ou autonome */
+  const tableauMobile = (corps: ReactNode, enSection: boolean) => (
+    <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderTop: enSection ? 0 : `1px solid ${BORD}`, borderRadius: enSection ? "0 0 14px 14px" : 14, overflow: "hidden" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+        <colgroup>
+          <col style={{ width: 4 }} />
+          {p.peutEcrire && <col style={{ width: 30 }} />}
+          <col />
+          <col style={{ width: 112 }} />
+          <col style={{ width: 22 }} />
+        </colgroup>
+        <tbody>{corps}</tbody>
+      </table>
+    </div>
   );
   const ligne = (l: Ligne, sansCategorie = false) => (
     <LigneProduit key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)} stock={p.stockMap.get(l.x.id) ?? null} onToggleActif={p.peutEcrire ? p.onToggleActif : undefined}
@@ -411,12 +432,12 @@ export function BaseProduits(p: BaseProduitsProps) {
         <th style={{ ...TH, width: 6, padding: 0 }} />
         {p.peutEcrire && <th style={{ ...TH, width: 36, paddingRight: 0 }} />}
         <th style={TH}>Produit</th>
-        {!sansCategorie && <th style={TH}>Catégorie</th>}
+        {!sansCategorie && <th className="bp-col-cat" style={TH}>Catégorie</th>}
         <th style={TH}>Fournisseur</th>
         <th style={{ ...TH, textAlign: "right" }}>Prix d&apos;achat</th>
         <th style={{ ...TH, textAlign: "right" }}>Stock</th>
-        <th style={TH}>Zone</th>
-        <th style={TH}>État</th>
+        <th className="bp-col-zone" style={TH}>Zone</th>
+        <th className="bp-col-etat" style={TH}>État</th>
         {p.peutEcrire && p.onToggleActif && <th style={{ ...TH, width: 44 }}>Actif</th>}
         <th style={TH} />
       </tr>
@@ -500,27 +521,35 @@ export function BaseProduits(p: BaseProduitsProps) {
           </div>
         )}
         {!p.erreur && (
-          <div style={{ display: "grid", gap: 6 }}>
-            {p.loading && [0, 1, 2, 3, 4].map((i) => (
-              <div key={i} style={{ background: "#fff", borderRadius: 12, borderStyle: "solid", borderWidth: "1px 1px 1px 4px", borderColor: "#ece6db #ece6db #ece6db #ddd6c8", padding: "12px 12px" }}>
-                <div style={{ height: 13, borderRadius: 4, background: "#e5ddd0", width: `${45 + (i % 3) * 15}%`, marginBottom: 6, animation: "pulse 1.5s ease-in-out infinite" }} />
-                <div style={{ height: 10, borderRadius: 3, background: "#ede6d9", width: "35%", animation: "pulse 1.5s ease-in-out infinite" }} />
-              </div>
-            ))}
-            {!p.loading && affichage === "az" && lignes.map((l) => carte(l))}
+          <div style={{ display: "grid", gap: 10 }}>
+            <style>{`
+              .bp-ligne:hover td { background: #f7f3ec; }
+              .bp-ligne.on td { background: rgba(212,119,90,0.08); }
+              .bp-ligne:last-child td { border-bottom: 0; }
+            `}</style>
+            {p.loading && tableauMobile([0, 1, 2, 3, 4].map((i) => (
+              <tr key={i}>
+                <td style={{ ...TD, padding: 0, background: "#e5ddd0" }} />
+                <td style={{ ...TD, padding: "11px 10px" }} colSpan={nbColonnesMobile - 1}>
+                  <div style={{ height: 13, borderRadius: 4, background: "#e5ddd0", width: `${45 + (i % 3) * 15}%`, marginBottom: 6, animation: "pulse 1.5s ease-in-out infinite" }} />
+                  <div style={{ height: 10, borderRadius: 3, background: "#ede6d9", width: "35%", animation: "pulse 1.5s ease-in-out infinite" }} />
+                </td>
+              </tr>
+            )), false)}
+            {!p.loading && affichage === "az" && tries.length > 0 && tableauMobile(lignes.map((l) => ligneMobile(l)), false)}
             {!p.loading && affichage === "cat" && groupes.map((g) => (
               <div key={g.cat}>
                 <BarreCategorie cat={g.cat} couleur={g.couleur} n={g.items.length} ouverte={estOuverte(g.cat)} onToggle={basculerCat} />
-                {estOuverte(g.cat) && (
-                  <div style={{ display: "grid", gap: 6, padding: "8px 0 2px" }}>
-                    {g.sous.map((sg) => (
-                      <React.Fragment key={sg.cle}>
-                        {sg.nom != null && boutonSous(g.couleur, sg.nom, sg.cle, sg.items.length)}
-                        {(sg.nom == null || !sousFermees.has(sg.cle) || recherche) && sg.items.map((l) => carte(l, true))}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                )}
+                {estOuverte(g.cat) && tableauMobile(g.sous.map((sg) => (
+                  <React.Fragment key={sg.cle}>
+                    {sg.nom != null && (
+                      <tr><td colSpan={nbColonnesMobile} style={{ padding: "4px 8px 2px", background: "#f2ede4", borderBottom: "none" }}>
+                        {boutonSous(g.couleur, sg.nom, sg.cle, sg.items.length, { margin: "2px 0" })}
+                      </td></tr>
+                    )}
+                    {(sg.nom == null || !sousFermees.has(sg.cle) || recherche) && sg.items.map((l) => ligneMobile(l, true))}
+                  </React.Fragment>
+                )), true)}
               </div>
             ))}
             {vide && (
@@ -544,6 +573,13 @@ export function BaseProduits(p: BaseProduitsProps) {
         .bp-ligne:hover td { background: #f7f3ec; }
         .bp-ligne.on td { background: rgba(212,119,90,0.08); }
         .bp-ligne:last-child td { border-bottom: 0; }
+        .bp-etat-inline, .bp-cat-inline { display: none; }
+        /* Tablette (iPad) : le tableau tient dans la largeur ; la catégorie et l'état passent sous et à côté du nom, Zone disparaît */
+        @media (max-width: 1100px) {
+          .bp-table { min-width: 0 !important; }
+          .bp-col-zone, .bp-col-etat, .bp-col-cat { display: none; }
+          .bp-etat-inline, .bp-cat-inline { display: inline; }
+        }
       `}</style>
 
       {/* En-tête */}
@@ -597,7 +633,7 @@ export function BaseProduits(p: BaseProduitsProps) {
               {estOuverte(g.cat) && (
                 <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 760 }}>
+                    <table className="bp-table" style={{ borderCollapse: "collapse", width: "100%", minWidth: 760 }}>
                       {enTete(true)}
                       <tbody>
                         {g.sous.map((sg) => (
@@ -627,7 +663,7 @@ export function BaseProduits(p: BaseProduitsProps) {
       {!p.erreur && (affichage === "az" || p.loading) && (
         <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 14, overflow: "hidden" }}>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 860 }}>
+            <table className="bp-table" style={{ borderCollapse: "collapse", width: "100%", minWidth: 860 }}>
               {enTete(false)}
               <tbody>
                 {p.loading && [0, 1, 2, 3, 4, 5].map((i) => (
