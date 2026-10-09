@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { Carte, type VueCarte } from "@/components/carte/Carte";
 
-const VUES: VueCarte[] = ["articles", "fiches", "preparations", "equipe"];
+const VUES: VueCarte[] = ["articles", "fiches", "preparations"];
 
 function Inner() {
   const sp = useSearchParams();

@@ -13,20 +13,21 @@ import { TableauMobile } from "@/components/ui/TableauMobile";
 import { couleurTexteSur, styleBarreCategorie } from "@/lib/styleCategories";
 import { VueFiches } from "./VueFiches";
 import { useDonneesCarte } from "./useDonneesCarte";
-import { CatalogueSalleContent } from "@/components/production/CatalogueSalleTab";
 import FicheWizard from "@/components/fiche/FicheWizard";
+import { useEtablissement } from "@/lib/EtablissementContext";
+import { prechargerReferentielFiche } from "@/lib/referentielFiche";
 import type { ArticleCarte, ReponseCarte } from "@/app/api/carte/route";
 
 /**
  * Carte (maquette validée le 09/10/2026) : une seule page qui réunit les touches de caisse Popina
- * (vue Articles), les fiches techniques, les préparations et le catalogue de l'équipe. Les lignes
+ * (vue Articles), les fiches techniques et les préparations. Les lignes
  * de la vue Articles sont les touches Popina : prix de vente de la caisse, coût matière de la fiche
  * (ou prix d'achat du produit relié), food cost et marge. Tableau plat de A à Z par défaut, ou
  * accordéons par catégorie de caisse ; un clic ouvre le volet de lecture, « Modifier la fiche »
  * ouvre la fiche complète. Les équipiers sans accès aux valeurs monétaires n'ont pas la vue Articles.
  */
 
-export type VueCarte = "articles" | "fiches" | "preparations" | "equipe";
+export type VueCarte = "articles" | "fiches" | "preparations";
 
 /** Fiche ouverte dans le volet de droite : existante (recipeId) ou à créer depuis une touche de caisse */
 export type EditionFiche = { recipeId?: string; nom?: string; popina?: string; prix?: number; cat?: string };
@@ -605,7 +606,6 @@ const ICONES: Record<VueCarte, ReactNode> = {
   articles: <svg {...svg}><path d="M7 3v7M4 3v4a3 3 0 0 0 6 0V3M7 10v11" /><path d="M17 3c-2 2-2.5 6-2.5 8a2.5 2.5 0 0 0 2.5 2.5V21M17 3v10.5" /></svg>,
   fiches: <svg {...svg}><path d="M5 4h14v16H5z" /><path d="M9 8h6M9 12h6M9 16h3" /></svg>,
   preparations: <svg {...svg}><path d="M4 10h16l-1.5 9a2 2 0 0 1-2 1.7h-9a2 2 0 0 1-2-1.7z" /><path d="M2 10h20M8 10V7a4 4 0 0 1 8 0v3" /></svg>,
-  equipe: <svg {...svg}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><circle cx="17" cy="9" r="2.5" /><path d="M16 15a5 5 0 0 1 5.5 5" /></svg>,
 };
 
 export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
@@ -617,19 +617,24 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
     ...(voitArticles ? [{ cle: "articles" as const, libelle: "Articles", icone: ICONES.articles }] : []),
     { cle: "fiches", libelle: "Fiches techniques", icone: ICONES.fiches },
     { cle: "preparations", libelle: "Préparations", icone: ICONES.preparations },
-    { cle: "equipe", libelle: "Vue équipe", icone: ICONES.equipe },
   ];
   const [vueChoisie, setVueChoisie] = useState<VueCarte | null>(vueInitiale ?? null);
   const [edition, setEdition] = useState<EditionFiche | null>(null);
   const [rechargeTick, setRechargeTick] = useState(0);
   const source = useDonneesCarte(rechargeTick);
+  // Le référentiel des fiches (produits, offres, catégories…) est préchargé dès l'arrivée sur la Carte :
+  // la première fiche ouverte n'attend plus ces ~3 000 lignes.
+  const { current: etabCourant, etablissements } = useEtablissement();
+  const etabFiche = etabCourant ?? etablissements?.[0];
+  const slugFiche = etabFiche?.slug?.includes("piccola") ? "piccola" : "bello_mio";
+  useEffect(() => { if (etabFiche) prechargerReferentielFiche(slugFiche); }, [etabFiche, slugFiche]);
   const compteurs = useMemo(() => {
     const d = source.donnees;
     if (!d) return null;
     const preps = d.fiches.filter((f) => f.categorie === "preparation" || f.categorie === "sauce").length;
     return { articles: d.articles.filter((a) => a.categorie !== "MESSAGES").length, fiches: d.fiches.length - preps + d.vins.length, preparations: preps + d.empatements.length + d.preparations_anciennes.length };
   }, [source.donnees]);
-  const vue: VueCarte = vueChoisie && vues.some((v) => v.cle === vueChoisie) ? vueChoisie : voitArticles ? "articles" : "equipe";
+  const vue: VueCarte = vueChoisie && vues.some((v) => v.cle === vueChoisie) ? vueChoisie : voitArticles ? "articles" : "fiches";
 
   if (loading) return <div style={{ padding: 40, textAlign: "center", color: MUTED }}>Chargement…</div>;
 
@@ -642,8 +647,7 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
             <div style={{ color: MUTED, fontSize: 13 }}>
               {vue === "articles" ? "Ce qui se vend en caisse, relié à sa fiche technique : prix, coût matière, food cost, marge."
                 : vue === "fiches" ? "Les fiches techniques de ce qui se vend : pizze, cuisine, cocktails, vins."
-                : vue === "preparations" ? "Sauces, bases, fonds et empâtements : ce qui entre dans les fiches."
-                : "Ce que la salle doit savoir : photo, description, allergènes, accords."}
+                : "Sauces, bases, fonds et empâtements : ce qui entre dans les fiches."}
             </div>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -652,11 +656,11 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
                 <button key={v.cle} type="button" onClick={() => setVueChoisie(v.cle)} title={v.libelle}
                   style={{ padding: "6px 12px", borderRadius: 8, border: "none", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", background: vue === v.cle ? "#fff" : "transparent", color: vue === v.cle ? "#1a1a1a" : MUTED, boxShadow: vue === v.cle ? "0 1px 4px rgba(0,0,0,0.08)" : "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
                   {v.icone}{v.libelle}
-                  {compteurs && v.cle !== "equipe" && <span style={{ fontWeight: 500, color: vue === v.cle ? MUTED : FAIBLE }}>({v.cle === "articles" ? compteurs.articles : v.cle === "fiches" ? compteurs.fiches : compteurs.preparations})</span>}
+                  {compteurs && <span style={{ fontWeight: 500, color: vue === v.cle ? MUTED : FAIBLE }}>({v.cle === "articles" ? compteurs.articles : v.cle === "fiches" ? compteurs.fiches : compteurs.preparations})</span>}
                 </button>
               ))}
             </span>
-            {bureau && peutEcrire && vue !== "equipe" && (
+            {bureau && peutEcrire && (
               <button type="button" onClick={() => setEdition(vue === "preparations" ? { cat: "preparation" } : {})} style={{ ...BTN, background: ACCENT, color: "#fff", border: "none", fontWeight: 700 }}>+ Nouvelle fiche</button>
             )}
           </div>
@@ -665,7 +669,6 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
         {vue === "articles" && voitArticles && <VueArticles bureau={bureau} peutEcrire={peutEcrire} estAdmin={isGroupAdmin} onEditer={setEdition} editionOuverte={edition != null} source={source} />}
         {vue === "fiches" && <VueFiches mode="fiches" bureau={bureau} peutEcrire={peutEcrire} onEditer={setEdition} editionOuverte={edition != null} source={source} />}
         {vue === "preparations" && <VueFiches mode="preparations" bureau={bureau} peutEcrire={peutEcrire} onEditer={setEdition} editionOuverte={edition != null} source={source} />}
-        {vue === "equipe" && <CatalogueSalleContent sansTitre />}
       </div>
       {edition && <VoletFiche edition={edition} onFermer={() => setEdition(null)} onEnregistre={() => { setEdition(null); setRechargeTick((t) => t + 1); }} />}
     </div>

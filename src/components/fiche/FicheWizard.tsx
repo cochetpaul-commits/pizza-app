@@ -21,6 +21,7 @@ import { openApiFile } from "@/lib/fetchApi";
 import { couleurTexte } from "@/lib/styleCategories";
 import { useBureau } from "@/hooks/useBureau";
 import { fermerOffresActives } from "@/lib/offerClosing";
+import { chargerReferentielFiche, invaliderReferentielFiche } from "@/lib/referentielFiche";
 
 // ── Brouillons non enregistrés ──────────────────────────────────────
 // Le 03/09/2026, des fiches saisies sur un appareil dont la session était
@@ -131,18 +132,16 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const [metaByIngredient, setMetaByIngredient] = useState<Record<string, RecipeIngredientMeta>>({});
 
   // ── Load data ──
+  // Référentiel (produits, offres, catégories…) servi depuis la mémoire de l'appareil (src/lib/referentielFiche.ts),
+  // et la fiche elle-même chargée en même temps, pas après : la fiche s'ouvre en une fraction de seconde.
   useEffect(() => {
     (async () => {
-    const [fRes, cRes, iRes, empRes, offRes, popRes] = await Promise.all([
-      supabase.from("familles").select("*"),
-      supabase.from("categories").select("*").order("sort_order").order("nom")
-        .or(`establishments.cs.{"${etabSlug === "piccola" ? "piccola" : "bellomio"}"},establishments.is.null`),
-      supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, cost_per_kg, purchase_price, purchase_unit, purchase_unit_label, density_g_per_ml, piece_weight_g, piece_volume_ml, establishments, source")
-        .or(`establishments.cs.{"${etabSlug === "piccola" ? "piccola" : "bellomio"}"},establishments.is.null`),
-      supabase.from("recipes").select("id, name").order("name"),
-      supabase.from("v_latest_offers").select("*"),
-      supabase.from("popina_products").select("id, name, category, price_ttc, kitchen_recipe_id").eq("active", true).order("name"),
+    const [ref, recRes, lignesRes] = await Promise.all([
+      chargerReferentielFiche(etabSlug),
+      recipeId ? supabase.from("kitchen_recipes").select("*").eq("id", recipeId).single() : Promise.resolve(null),
+      recipeId ? supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", recipeId) : Promise.resolve(null),
     ]);
+    const fRes = { data: ref.familles }, cRes = { data: ref.categories }, iRes = { data: ref.ingredients }, empRes = { data: ref.empatements }, offRes = { data: ref.offres }, popRes = { data: ref.popina };
     {
       setFamilles((fRes.data ?? []) as Famille[]);
       setCategories((cRes.data ?? []) as Categorie[]);
@@ -150,11 +149,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       const popProducts = (popRes.data ?? []) as { id: string; name: string; category: string; price_ttc: number; kitchen_recipe_id: string | null }[];
       setPopinaProducts(popProducts);
 
-      // Load existing sous_categories from recipes (grouped by category)
-      const { data: scData } = await supabase
-        .from("kitchen_recipes")
-        .select("category, sous_categorie")
-        .not("sous_categorie", "is", null);
+      // Sous-catégories déjà utilisées par les fiches (groupées par catégorie), depuis le référentiel
+      const scData = ref.sousCategories;
       // Fusion insensible à la casse/accents (« Sirop » = « SIROP ») :
       // la graphie déclarée sur la catégorie fait référence.
       const foldSc = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
@@ -183,15 +179,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
         offerByIng[iid] = o as unknown as LatestOffer;
       }
 
-      // Fetch supplier names for dropdown display
-      const supplierIds = Array.from(new Set(offerRows.map(o => String(o.supplier_id ?? "")).filter(Boolean)));
-      const supNameById: Record<string, string> = {};
-      if (supplierIds.length) {
-        const { data: sups } = await supabase.from("suppliers").select("id,name").in("id", supplierIds);
-        for (const s of (sups ?? []) as { id: string; name: string }[]) {
-          if (s.id && s.name) supNameById[s.id] = s.name;
-        }
-      }
+      // Noms des fournisseurs pour l'affichage (depuis le référentiel)
+      const supNameById: Record<string, string> = ref.fournisseurs;
       // Build price labels: "METRO · 9,30 €/kg"
       const supByIng: Record<string, string | null> = {};
       for (const o of offerRows) {
@@ -299,8 +288,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
         let lines: Record<string, unknown>[] = [];
         let detectedType: "cuisine" | "pizza" | "cocktail" = recipeType ?? "cuisine";
 
-        // All types (pizza, cuisine, cocktail) are in kitchen_recipes
-        const { data } = await supabase.from("kitchen_recipes").select("*").eq("id", recipeId).single();
+        // All types (pizza, cuisine, cocktail) are in kitchen_recipes (déjà chargée en parallèle du référentiel)
+        const data = recRes?.data ?? null;
         if (data) {
           rec = data;
           const cat = data.category as string;
@@ -310,8 +299,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
         }
 
         if (rec) {
-          const { data: lData } = await supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", recipeId);
-          lines = (lData ?? []) as Record<string, unknown>[];
+          lines = ((lignesRes?.data ?? []) as Record<string, unknown>[]);
 
           const ficheLines: LigneIngredient[] = lines.map((l) => {
             const ing = mercs.find(m => m.id === l.ingredient_id);
@@ -622,6 +610,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       return;
     }
 
+    invaliderReferentielFiche(etabSlug);
     setSaving(false);
     clearDraft();
     showToast("Fiche enregistrée");
@@ -1039,6 +1028,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
               if (!confirm(`Supprimer la fiche « ${fiche.nom} » ?`)) return;
               await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", fiche.id!);
               await supabase.from("kitchen_recipes").delete().eq("id", fiche.id!);
+              invaliderReferentielFiche(etabSlug);
               clearDraft(); retourCarte();
             }} style={{ border: "none", background: "transparent", color: "#b4443a", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit", padding: 0, marginRight: "auto" }}>Supprimer</button>
           )}
