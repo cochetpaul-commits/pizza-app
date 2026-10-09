@@ -72,7 +72,15 @@ function lireAllergenes(brut: unknown): string[] {
 
 const arrondi = (n: number) => Math.round(n * 100) / 100;
 
+// Mémoire d'une minute par établissement (instance serveur) : la Carte rouverte dans la foulée
+// ne recalcule pas tout. `?fresh=1` (après une modification) force le recalcul.
+const CACHE_MS = 60 * 1000;
+const memoire = new Map<string, { quand: number; reponse: ReponseCarte }>();
+
 export async function GET(req: NextRequest) {
+  const chrono: Record<string, number> = {};
+  let t = Date.now();
+  const top = (nom: string) => { const n = Date.now(); chrono[nom] = n - t; t = n; };
   let etabId: string;
   try {
     ({ etabId } = await getEtablissement(req));
@@ -80,13 +88,21 @@ export async function GET(req: NextRequest) {
     if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
+  top("auth");
+  const fresh = req.nextUrl.searchParams.get("fresh") === "1";
+  const enMemoire = memoire.get(etabId);
+  if (!fresh && enMemoire && Date.now() - enMemoire.quand < CACHE_MS) {
+    return NextResponse.json(enMemoire.reponse, { headers: { "Server-Timing": `auth;dur=${chrono.auth}, cache;desc=hit` } });
+  }
 
   const aujourdhui = new Date();
   const depuis = new Date(aujourdhui); depuis.setDate(depuis.getDate() - 30);
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   const periode = { from: iso(depuis), to: iso(aujourdhui) };
 
-  const [{ data: touches, error: errTouches }, ventesRes] = await Promise.all([
+  // Un seul aller-retour pour tout ce qui est petit : touches, ventes, fiches (toutes), lignes (toutes), doses.
+  // Les deux serveurs sont dans la même région, mais chaque étape enchaînée coûte un aller-retour.
+  const [{ data: touches, error: errTouches }, ventesRes, { data: toutesFiches }, { data: toutesLignes }, { data: doses }] = await Promise.all([
     supabaseAdmin
       .from("popina_products")
       .select("id, popina_id, name, category, sub_category, price_ttc, tva_rate, kitchen_recipe_id, ingredient_id, linked_type")
@@ -94,8 +110,14 @@ export async function GET(req: NextRequest) {
       .order("category")
       .order("name"),
     supabaseAdmin.rpc("ventes_par_produit", { p_etab: etabId, p_from: periode.from, p_to: periode.to }),
+    supabaseAdmin
+      .from("kitchen_recipes")
+      .select("id, name, category, fiche_type, statut, nb_parts, portions_count, total_cost, cost_per_portion, cost_per_kg, description_courte, resume_salle, photo_url, output_ingredient_id"),
+    supabaseAdmin.from("kitchen_recipe_lines").select("recipe_id, ingredient_id, qty, unit, sort_order").order("sort_order"),
+    supabaseAdmin.from("popina_dose_map").select("popina_product_id, ingredient_id, dose, dose_unit"),
   ]);
   if (errTouches) return NextResponse.json({ error: errTouches.message }, { status: 500 });
+  top("etape1");
 
   const ventes = new Map<string, { qty: number; ca_ttc: number }>();
   for (const v of (ventesRes.data ?? []) as { description: string; qty: number; ca_ttc: number }[]) {
@@ -108,24 +130,15 @@ export async function GET(req: NextRequest) {
   const ficheIds = [...new Set((touches ?? []).map((t) => t.kitchen_recipe_id).filter((x): x is string => !!x))];
   const produitIds = [...new Set((touches ?? []).map((t) => t.ingredient_id).filter((x): x is string => !!x))];
 
-  const [{ data: fiches }, { data: lignes }, { data: doses }] = await Promise.all([
-    ficheIds.length
-      ? supabaseAdmin
-        .from("kitchen_recipes")
-        .select("id, name, category, fiche_type, statut, nb_parts, portions_count, total_cost, cost_per_portion, cost_per_kg, description_courte, resume_salle, photo_url, output_ingredient_id")
-        .in("id", ficheIds)
-      : Promise.resolve({ data: [] as never[] }),
-    ficheIds.length
-      ? supabaseAdmin.from("kitchen_recipe_lines").select("recipe_id, ingredient_id, qty, unit, sort_order").in("recipe_id", ficheIds).order("sort_order")
-      : Promise.resolve({ data: [] as never[] }),
-    supabaseAdmin.from("popina_dose_map").select("popina_product_id, ingredient_id, dose, dose_unit"),
-  ]);
-
-  type Fiche = NonNullable<typeof fiches>[number];
-  type Ligne = NonNullable<typeof lignes>[number];
-  const ficheParId = new Map<string, Fiche>((fiches ?? []).map((f) => [f.id, f]));
+  type Fiche = NonNullable<typeof toutesFiches>[number];
+  type Ligne = NonNullable<typeof toutesLignes>[number];
+  const ficheIdsSet = new Set(ficheIds);
+  const fiches = (toutesFiches ?? []).filter((f) => ficheIdsSet.has(f.id));
+  const lignes = (toutesLignes ?? []).filter((l) => ficheIdsSet.has(l.recipe_id));
+  const ficheParId = new Map<string, Fiche>(fiches.map((f) => [f.id, f]));
+  // Toutes les lignes, par fiche : les préparations utilisées comme ingrédient y sont déjà (allergènes)
   const lignesParFiche = new Map<string, Ligne[]>();
-  for (const l of lignes ?? []) {
+  for (const l of toutesLignes ?? []) {
     const arr = lignesParFiche.get(l.recipe_id) ?? [];
     arr.push(l);
     lignesParFiche.set(l.recipe_id, arr);
@@ -134,18 +147,26 @@ export async function GET(req: NextRequest) {
 
   // Ingrédients : ceux des lignes (nom, allergènes) et ceux reliés directement (prix)
   const ingredientIds = [...new Set([...produitIds, ...(lignes ?? []).map((l) => l.ingredient_id).filter((x): x is string => !!x)])];
-  const [{ data: ingredients }, { data: offres }, { data: sousFiches }] = await Promise.all([
-    ingredientIds.length
-      ? supabaseAdmin.from("ingredients").select("id, name, allergens, cost_per_unit, cost_per_kg, piece_volume_ml, source_prep_recipe_id").in("id", ingredientIds)
+  // Préparations maison utilisées comme ingrédient : leurs lignes sont déjà chargées, on ajoute leurs ingrédients
+  const ficheParSortie = new Map<string, string>((toutesFiches ?? []).filter((s) => s.output_ingredient_id).map((s) => [s.output_ingredient_id as string, s.id]));
+  const idsAvecSous = new Set(ingredientIds);
+  const pile = ingredientIds.filter((id) => ficheParSortie.has(id));
+  while (pile.length) {
+    const sous = ficheParSortie.get(pile.pop() as string);
+    const lignesSous = sous ? lignesParFiche.get(sous) ?? [] : [];
+    for (const l of lignesSous) {
+      if (l.ingredient_id && !idsAvecSous.has(l.ingredient_id)) { idsAvecSous.add(l.ingredient_id); if (ficheParSortie.has(l.ingredient_id)) pile.push(l.ingredient_id); }
+    }
+  }
+  const [{ data: ingredients }, { data: offres }] = await Promise.all([
+    idsAvecSous.size
+      ? supabaseAdmin.from("ingredients").select("id, name, allergens, cost_per_unit, cost_per_kg, piece_volume_ml, source_prep_recipe_id").in("id", [...idsAvecSous])
       : Promise.resolve({ data: [] as never[] }),
     produitIds.length
       ? supabaseAdmin.from("supplier_offers").select("ingredient_id, unit_price, pack_price, pack_count, pack_each_qty").eq("is_active", true).in("ingredient_id", produitIds)
       : Promise.resolve({ data: [] as never[] }),
-    // Allergènes des préparations maison utilisées comme ingrédient (un niveau)
-    ingredientIds.length
-      ? supabaseAdmin.from("kitchen_recipes").select("id, output_ingredient_id").in("output_ingredient_id", ingredientIds)
-      : Promise.resolve({ data: [] as never[] }),
   ]);
+  top("etape2");
   type Ingredient = NonNullable<typeof ingredients>[number];
   const ingParId = new Map<string, Ingredient>((ingredients ?? []).map((i) => [i.id, i]));
   const prixOffre = new Map<string, number>();
@@ -155,23 +176,6 @@ export async function GET(req: NextRequest) {
     if (o.pack_price && o.pack_count) {
       const u = Number(o.pack_price) / (Number(o.pack_count) * (Number(o.pack_each_qty) || 1));
       if (u > 0) prixOffre.set(o.ingredient_id, u);
-    }
-  }
-  const ficheParSortie = new Map<string, string>((sousFiches ?? []).filter((s) => s.output_ingredient_id).map((s) => [s.output_ingredient_id as string, s.id]));
-
-  // Lignes des préparations utilisées (pour remonter leurs allergènes)
-  const sousFicheIds = [...new Set(ficheParSortie.values())].filter((id) => !lignesParFiche.has(id));
-  if (sousFicheIds.length) {
-    const { data: lignesSous } = await supabaseAdmin.from("kitchen_recipe_lines").select("recipe_id, ingredient_id, qty, unit, sort_order").in("recipe_id", sousFicheIds);
-    const manquants = [...new Set((lignesSous ?? []).map((l) => l.ingredient_id).filter((x): x is string => !!x && !ingParId.has(x)))];
-    if (manquants.length) {
-      const { data: ings2 } = await supabaseAdmin.from("ingredients").select("id, name, allergens, cost_per_unit, cost_per_kg, piece_volume_ml, source_prep_recipe_id").in("id", manquants);
-      for (const i of ings2 ?? []) ingParId.set(i.id, i);
-    }
-    for (const l of lignesSous ?? []) {
-      const arr = lignesParFiche.get(l.recipe_id) ?? [];
-      arr.push(l);
-      lignesParFiche.set(l.recipe_id, arr);
     }
   }
 
@@ -274,5 +278,8 @@ export async function GET(req: NextRequest) {
   });
 
   const reponse: ReponseCarte = { articles, periode_ventes: periode };
-  return NextResponse.json(reponse);
+  top("calcul");
+  memoire.set(etabId, { quand: Date.now(), reponse });
+  console.log("[carte] durées ms", chrono, "articles", articles.length);
+  return NextResponse.json(reponse, { headers: { "Server-Timing": Object.entries(chrono).map(([k, v]) => `${k};dur=${v}`).join(", ") } });
 }

@@ -357,20 +357,33 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
   const [synchro, setSynchro] = useState(false);
 
   const recharger = useCallback(() => setTick((t) => t + 1), []);
+  // La Carte s'affiche tout de suite avec le dernier chargement mémorisé sur l'appareil, puis se rafraîchit.
+  // Après une modification (tick / rechargeTick), on demande un recalcul au serveur (?fresh=1).
+  const cleCache = `carte:${etab?.id ?? ""}`;
   useEffect(() => {
     let annule = false;
+    const fresh = tick > 0 || rechargeTick > 0;
     (async () => {
+      await Promise.resolve();
+      if (annule) return;
+      if (!fresh) {
+        try {
+          const brut = sessionStorage.getItem(cleCache);
+          if (brut) setDonnees(JSON.parse(brut) as ReponseCarte);
+        } catch { /* stockage indisponible */ }
+      }
       try {
-        const res = await fetchApi("/api/carte");
+        const res = await fetchApi(`/api/carte${fresh ? "?fresh=1" : ""}`);
         const json = await res.json();
         if (annule) return;
         if (!res.ok) { setErreur(json?.error ?? "Chargement impossible"); return; }
         setDonnees(json as ReponseCarte);
         setErreur(null);
+        try { sessionStorage.setItem(cleCache, JSON.stringify(json)); } catch { /* quota */ }
       } catch (e) { if (!annule) setErreur(e instanceof Error ? e.message : "Chargement impossible"); }
     })();
     return () => { annule = true; };
-  }, [tick, rechargeTick, etab?.id]);
+  }, [tick, rechargeTick, etab?.id, cleCache]);
 
   const articles = useMemo(() => donnees?.articles ?? [], [donnees]);
   const ouvert = ouvertId ? articles.find((a) => a.id === ouvertId) ?? null : null;
