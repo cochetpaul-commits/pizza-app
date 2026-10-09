@@ -43,6 +43,8 @@ import { PriceAlertsPanel } from "@/components/PriceAlertsPanel";
 import { parseAllergens } from "@/lib/allergens";
 import { IngredientRow, type EditState, type IngredientRowProps, type StorageZoneOption } from "@/components/IngredientRow";
 import { BaseProduits, VoletDroit } from "@/components/produits/BaseProduits";
+import { BlocStock } from "@/components/produits/BlocStock";
+import type { StockItem } from "@/lib/stockTypes";
 import { useBureau } from "@/hooks/useBureau";
 import { useProfile } from "@/lib/ProfileContext";
 import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
@@ -129,7 +131,8 @@ function IngredientsPageInner() {
   const editParam = searchParams.get("edit");
   const supplierParam = searchParams.get("supplier");
 
-  const [tab, setTab] = useState<Tab>("all");
+  // ?tab=a_commander (depuis la proposition de commande) ouvre directement les produits sous le minimum
+  const [tab, setTab] = useState<Tab>(() => (searchParams.get("tab") === "a_commander" ? "a_commander" : "all"));
   const [filterCategory, setFilterCategory] = useState<"all" | Category>("all");
   const [filterSupplier, setFilterSupplier] = useState<"all" | string>(supplierParam ?? "all");
   // Zone de stockage (vue bureau) : sur les zones de l'établissement courant (storage_zone / storage_zone_2)
@@ -137,6 +140,21 @@ function IngredientsPageInner() {
   // Ordinateur / tablette (tableau + volet à droite) ou téléphone (cartes + feuille du bas)
   const bureau = useBureau();
   const [storageZones, setStorageZones] = useState<StorageZoneOption[]>([]);
+  // Stock théorique (dernier inventaire clôturé + réceptions − ventes), une lecture par établissement
+  const [stock, setStock] = useState<{ items: StockItem[]; inventoryDate: string | null } | null>(null);
+  useEffect(() => {
+    if (!etab?.id) return;
+    let annule = false;
+    (async () => {
+      try {
+        const res = await fetchApi("/api/stock");
+        const json = res.ok ? await res.json() : null;
+        if (!annule) setStock(json ? { items: (json.items ?? []) as StockItem[], inventoryDate: json.inventory_date ?? null } : { items: [], inventoryDate: null });
+      } catch { if (!annule) setStock({ items: [], inventoryDate: null }); }
+    })();
+    return () => { annule = true; };
+  }, [etab?.id]);
+  const stockMap = useMemo(() => new Map((stock?.items ?? []).map((i) => [i.ingredient_id, i])), [stock]);
 
   useEffect(() => {
     (async () => {
@@ -193,6 +211,7 @@ function IngredientsPageInner() {
     const seen = new Set<string>();
     let base = visibleItems.filter((x) => { if (seen.has(x.id)) return false; seen.add(x.id); return true; });
     if (tab === "sans_prix") base = base.filter((x) => !(offerHasPrice(offersByIngredientId.get(x.id), { piece_volume_ml: x.piece_volume_ml }) || legacyHasPrice(x)));
+    else if (tab === "a_commander") base = base.filter((x) => stockMap.get(x.id)?.alerte);
     else if (tab !== "all") base = base.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
     if (filterCategory !== "all") base = base.filter((x) => x.category === filterCategory);
     if (filterSupplier !== "all") {
@@ -205,7 +224,7 @@ function IngredientsPageInner() {
     }
     if (filterZone !== "all") base = base.filter((x) => x.storage_zone === filterZone || x.storage_zone_2 === filterZone);
     return base;
-  }, [visibleItems, tab, filterCategory, filterSupplier, filterZone, supplierAliases, offersByIngredientId]);
+  }, [visibleItems, tab, filterCategory, filterSupplier, filterZone, supplierAliases, offersByIngredientId, stockMap]);
 
   // Categories sorted alphabetically by label (French locale)
   const CATEGORIES_ALPHA = useMemo(
@@ -1160,6 +1179,7 @@ function IngredientsPageInner() {
   const isVariations = tab === ("variations" as Tab);
 
   // Compteurs en base (toute la base, pas seulement les pages chargées) : Tous = Validés + À contrôler
+  const aCommander = useMemo(() => visibleItems.filter((x) => stockMap.get(x.id)?.alerte).length, [visibleItems, stockMap]);
   const compteurs = {
     tous: totalCount ?? counts.all,
     aControler: totalCount != null && validatedCount != null ? totalCount - validatedCount : counts.to_check,
@@ -1354,6 +1374,9 @@ function IngredientsPageInner() {
                 sansPrix={compteurs.sansPrix}
                 nbDoublons={duplicatePairs.length}
                 onDoublons={() => setShowDoublons(true)}
+                stockMap={stockMap}
+                inventaireDate={stock?.inventoryDate ?? null}
+                aCommander={aCommander}
                 q={q}
                 setQ={setQ}
                 categorie={filterCategory}
@@ -1415,6 +1438,7 @@ function IngredientsPageInner() {
                 )}
               >
                 <IngredientRow {...propsLigne(ficheEnCours)} compactMode={false} presentation="volet" />
+                <BlocStock ingredientId={ficheEnCours.id} stock={stockMap.get(ficheEnCours.id) ?? null} inventaireDate={stock?.inventoryDate ?? null} />
               </VoletDroit>
             )}
 

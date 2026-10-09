@@ -10,6 +10,8 @@ import { cachedSupplierColor } from "@/lib/supplierColors";
 import { couleurTexte, couleurTexteSur, styleBarreCategorie, styleSousCategorie } from "@/lib/styleCategories";
 import { OSWALD } from "@/components/TuileProduit";
 import { Tuile } from "@/components/ui/Tuile";
+import Link from "next/link";
+import { dateInventaire, fmtQte, type StockItem } from "@/lib/stockTypes";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { articleDeFiche, type FicheConditionnement } from "@/lib/inventaire";
 import { libelleColisage } from "@/lib/commandeArticles";
@@ -30,6 +32,7 @@ const FAIBLE = "#a39d92";
 const ATTENTION = "#b7791f";
 const MAUVAIS = "#b4443a";
 const INFO = "#2563EB";
+const BON = "#4a6741";
 
 function Chip({ fond, couleur, children, title }: { fond: string; couleur: string; children: ReactNode; title?: string }) {
   return (
@@ -83,7 +86,19 @@ type LigneProps = {
   onOpenSupplier: (id: string) => void;
   /** Vue par catégorie : la colonne Catégorie est portée par la barre au-dessus */
   sansCategorie?: boolean;
+  stock?: StockItem | null;
 };
+
+/** Cellule / pastille de stock : quantité et unité, rouge sous le minimum */
+function Stock({ s, compact }: { s: StockItem | null | undefined; compact?: boolean }) {
+  if (!s) return <span style={{ color: FAIBLE }}>—</span>;
+  return (
+    <span style={{ fontWeight: 700, color: s.alerte ? MAUVAIS : "#1a1a1a", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+      {fmtQte(s.stock)} <span style={{ fontWeight: 500, color: MUTED, fontSize: compact ? 11.5 : 12 }}>{s.unit ?? ""}</span>
+      {!compact && s.stock_min != null && <div style={{ fontSize: 11.5, fontWeight: 500, color: s.alerte ? MAUVAIS : MUTED }}>{s.alerte ? "sous le minimum" : `min ${fmtQte(s.stock_min)}`}</div>}
+    </span>
+  );
+}
 
 /** Ce qu'une ligne (tableau bureau) ou une carte (téléphone) affiche d'un produit */
 function affichageProduit(x: Ingredient, offer: LatestOffer | undefined) {
@@ -103,7 +118,7 @@ function affichageProduit(x: Ingredient, offer: LatestOffer | undefined) {
 }
 
 /** Carte produit sur téléphone : liseré de la catégorie, nom, sous-catégorie · fournisseur · zone, prix et état */
-const CarteProduit = React.memo(function CarteProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, sansCategorie }: LigneProps) {
+const CarteProduit = React.memo(function CarteProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, sansCategorie, stock }: LigneProps) {
   const a = affichageProduit(x, offer);
   const sous = [x.sub_category, fournisseur?.name, x.storage_zone].filter(Boolean).join(" · ");
   return (
@@ -124,6 +139,7 @@ const CarteProduit = React.memo(function CarteProduit({ x, offer, fournisseur, a
           {a.etat && <Chip fond={a.etat.fond} couleur={a.etat.couleur}>{a.etat.libelle}</Chip>}
           <span style={{ fontWeight: 700, fontSize: 13, color: a.aUnPrix ? "#1a1a1a" : FAIBLE, fontVariantNumeric: "tabular-nums" }}>{a.aUnPrix ? a.prix : "Aucun prix"}</span>
           {a.colisage && <span style={{ fontSize: 12, color: MUTED }}>{a.colisage}</span>}
+          {stock && <span style={{ fontSize: 12.5 }}>· stock <Stock s={stock} compact /></span>}
           {alerte && <span style={{ fontSize: 10.5, fontWeight: 700, color: alerte.direction === "up" ? "#DC2626" : "#16A34A" }}>{alerte.direction === "up" ? "+" : "-"}{(Math.abs(alerte.change_pct) * 100).toFixed(0)} %</span>}
         </div>
         <div style={{ fontSize: 11.5, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -148,7 +164,7 @@ function BarreCategorie({ cat, couleur, n, ouverte, onToggle }: { cat: Category;
   );
 }
 
-const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, onOpenSupplier, sansCategorie }: LigneProps) {
+const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, onOpenSupplier, sansCategorie, stock }: LigneProps) {
   const { couleurCat, texteCat, inactive, aUnPrix, prix, colisage, maj, etat } = affichageProduit(x, offer);
   const sousProduit = [x.sub_category, maj ? `mis à jour le ${maj}` : null].filter(Boolean).join(" · ");
 
@@ -194,6 +210,7 @@ const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, a
           <div style={{ fontSize: 11.5, color: MUTED }}>aucune offre active</div>
         ) : null}
       </td>
+      <td style={{ ...TD, textAlign: "right" }}><Stock s={stock} /></td>
       <td style={{ ...TD, color: x.storage_zone ? "#1a1a1a" : FAIBLE }}>{x.storage_zone ?? "—"}</td>
       <td style={TD}>{etat && <Chip fond={etat.fond} couleur={etat.couleur}>{etat.libelle}</Chip>}</td>
       <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
@@ -229,6 +246,10 @@ export type BaseProduitsProps = {
   sansPrix: number;
   nbDoublons: number;
   onDoublons: () => void;
+  /** Stock théorique par produit (dernier inventaire + réceptions − ventes), vide tant qu'aucun inventaire n'est clôturé */
+  stockMap: Map<string, StockItem>;
+  inventaireDate: string | null;
+  aCommander: number;
   q: string;
   setQ: (v: string) => void;
   categorie: "all" | Category;
@@ -357,16 +378,16 @@ export function BaseProduits(p: BaseProduitsProps) {
     );
   };
   const carte = (l: Ligne, sansCategorie = false) => (
-    <CarteProduit key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)}
+    <CarteProduit key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)} stock={p.stockMap.get(l.x.id) ?? null}
       selectionnee={p.selectedIds.has(l.x.id)} enEdition={p.editingId === l.x.id} peutEcrire={p.peutEcrire} sansCategorie={sansCategorie}
       onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} />
   );
   const ligne = (l: Ligne, sansCategorie = false) => (
-    <LigneProduit key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)}
+    <LigneProduit key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)} stock={p.stockMap.get(l.x.id) ?? null}
       selectionnee={p.selectedIds.has(l.x.id)} enEdition={p.editingId === l.x.id} peutEcrire={p.peutEcrire} sansCategorie={sansCategorie}
       onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} />
   );
-  const nbColonnes = (sansCategorie: boolean) => 8 + (p.peutEcrire ? 1 : 0) - (sansCategorie ? 1 : 0);
+  const nbColonnes = (sansCategorie: boolean) => 9 + (p.peutEcrire ? 1 : 0) - (sansCategorie ? 1 : 0);
   const enTete = (sansCategorie: boolean) => (
     <thead>
       <tr>
@@ -376,6 +397,7 @@ export function BaseProduits(p: BaseProduitsProps) {
         {!sansCategorie && <th style={TH}>Catégorie</th>}
         <th style={TH}>Fournisseur</th>
         <th style={{ ...TH, textAlign: "right" }}>Prix d&apos;achat</th>
+        <th style={{ ...TH, textAlign: "right" }}>Stock</th>
         <th style={TH}>Zone</th>
         <th style={TH}>État</th>
         <th style={TH} />
@@ -383,6 +405,17 @@ export function BaseProduits(p: BaseProduitsProps) {
     </thead>
   );
   const vide = !p.loading && tries.length === 0;
+  const dateInv = dateInventaire(p.inventaireDate);
+  const ligneInventaire = (
+    <span style={{ color: MUTED, fontSize: 12.5 }}>
+      {dateInv ? <>Stock théorique depuis l&apos;inventaire du <b style={{ color: "#1a1a1a" }}>{dateInv}</b></> : "Aucun inventaire clôturé : pas encore de stock théorique"}
+      {" · "}<Link href="/inventaire" style={{ color: "#D4775A", fontWeight: 600, textDecoration: "none" }}>Faire l&apos;inventaire →</Link>
+      {p.aCommander > 0 && <>{" · "}<Link href="/commandes/theoriques" style={{ color: "#D4775A", fontWeight: 600, textDecoration: "none" }}>Proposition de commande →</Link></>}
+    </span>
+  );
+  const tuileCommander = (compacte: boolean) => (
+    <Tuile compacte={compacte} icone="camion" couleur={p.aCommander ? MAUVAIS : BON} libelle="À commander" valeur={nombre(p.aCommander)} sous={p.aCommander ? "sous le minimum de stock" : "stock au-dessus des minimums"} active={p.tab === "a_commander"} onClick={() => p.setTab(p.tab === "a_commander" ? "all" : "a_commander")} />
+  );
   const boutonPlus = p.hasMore && (
     <button type="button" onClick={p.loadMore} disabled={p.loadingMore} style={{ ...BTN, height: 32, padding: "0 12px", fontSize: 12.5, opacity: p.loadingMore ? 0.6 : 1 }}>
       {p.loadingMore ? "Chargement…" : "Afficher plus de produits"}
@@ -422,7 +455,11 @@ export function BaseProduits(p: BaseProduitsProps) {
           <Tuile compacte couleur="#1a1a1a" icone="produit" libelle="Produits actifs" valeur={nombre(p.total)} sous="" active={p.tab === "all"} onClick={() => p.setTab("all")} />
           <Tuile compacte icone="alerte" libelle="À contrôler" valeur={nombre(p.aControler)} sous="" active={p.tab === "to_check"} couleur={ATTENTION} onClick={() => p.setTab("to_check")} />
           <Tuile compacte icone="sans" libelle="Sans prix" valeur={nombre(p.sansPrix)} sous="" active={p.tab === "sans_prix"} couleur={MAUVAIS} onClick={() => p.setTab("sans_prix")} />
-          <Tuile compacte icone="doublon" libelle="Doublons probables" valeur={nombre(p.nbDoublons)} sous="" couleur={INFO} onClick={p.onDoublons} />
+          {tuileCommander(true)}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {ligneInventaire}
+          <button type="button" onClick={p.onDoublons} style={{ border: "none", background: "transparent", padding: 0, fontFamily: "inherit", fontSize: 12.5, fontWeight: 600, color: INFO, cursor: "pointer" }}>{nombre(p.nbDoublons)} doublons probables →</button>
         </div>
 
         <div style={{ display: "grid", gap: 8 }}>
@@ -495,7 +532,8 @@ export function BaseProduits(p: BaseProduitsProps) {
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
         <div>
           <h1 style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 28, textTransform: "uppercase", letterSpacing: ".02em", margin: 0, lineHeight: 1.05, color: "#1a1a1a" }}>Base produits</h1>
-          <div style={{ color: MUTED, fontSize: 13, marginTop: 4 }}>Vos produits achetés : prix d&apos;achat, conditionnements, fournisseurs. Les fiches techniques s&apos;appuient dessus.</div>
+          <div style={{ color: MUTED, fontSize: 13, marginTop: 4 }}>Vos produits achetés : prix d&apos;achat, conditionnements, fournisseurs, stock. Les fiches techniques s&apos;appuient dessus.</div>
+          <div style={{ marginTop: 4 }}>{ligneInventaire}</div>
         </div>
         {p.peutEcrire && (
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -506,11 +544,12 @@ export function BaseProduits(p: BaseProduitsProps) {
         )}
       </div>
 
-      {/* Tuiles : elles changent la vue (Tous / Validés / À contrôler) ; la quatrième ouvre les doublons */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+      {/* Tuiles : elles changent la vue (Tous / À contrôler / Sans prix / À commander) ; la dernière ouvre les doublons */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
         <Tuile couleur="#1a1a1a" icone="produit" libelle="Produits actifs" valeur={nombre(p.total)} sous={`dans ${nbCategories} catégorie${nbCategories > 1 ? "s" : ""} affichée${nbCategories > 1 ? "s" : ""}`} active={p.tab === "all"} onClick={() => p.setTab("all")} />
         <Tuile icone="alerte" libelle="À contrôler" valeur={nombre(p.aControler)} sous="unité, contenance ou prix à vérifier" active={p.tab === "to_check"} couleur={ATTENTION} onClick={() => p.setTab("to_check")} />
         <Tuile icone="sans" libelle="Sans prix d'achat" valeur={nombre(p.sansPrix)} sous="aucune offre fournisseur active" active={p.tab === "sans_prix"} couleur={MAUVAIS} onClick={() => p.setTab("sans_prix")} />
+        {tuileCommander(false)}
         <Tuile icone="doublon" libelle="Doublons probables" valeur={nombre(p.nbDoublons)} sous="paires détectées dans les fiches chargées" couleur={INFO} onClick={p.onDoublons} />
       </div>
 
