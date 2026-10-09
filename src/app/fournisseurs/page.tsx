@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { getSupplierColor } from "@/lib/supplierColors";
@@ -10,6 +10,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { fetchApi } from "@/lib/fetchApi";
+import { useBureau } from "@/hooks/useBureau";
 
 type SupplierRow = {
   id: string;
@@ -165,6 +166,7 @@ function AccordionHeader({ label, isOpen, onToggle }: { label: string; isOpen: b
 }
 
 export default function FournisseursPage() {
+  const bureau = useBureau();
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [stats, setStats] = useState<Map<string, SupplierStats>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -941,6 +943,91 @@ export default function FournisseursPage() {
     );
   }
 
+  /** Bureau : une ligne de tableau par fournisseur (gabarit Base produits) ; la fiche s'ouvre dessous, sur toute la largeur */
+  function renderLigne(s: SupplierRow) {
+    const st = stats.get(s.id);
+    const sColor = getSupplierColor(s.name, s.color);
+    const isExpanded = modalMode === "edit" && modalSupplier?.id === s.id;
+    const otherEtab = etablissements.find(e => e.id !== s.etablissement_id);
+    const alreadyExists = otherEtab && suppliers.some(x => x.name.toLowerCase() === s.name.toLowerCase() && x.etablissement_id === otherEtab.id);
+    const TD: React.CSSProperties = { padding: "10px 14px", borderBottom: isExpanded ? "none" : "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13, whiteSpace: "nowrap", background: isExpanded ? "rgba(212,119,90,0.08)" : undefined };
+    return (
+      <React.Fragment key={s.id}>
+        <tr className="fo-ligne" onClick={() => isExpanded ? closeModal() : openModal(s)} style={{ cursor: "pointer" }}>
+          <td style={{ ...TD, padding: 0, width: 4, background: sColor }} />
+          <td style={{ ...TD, whiteSpace: "normal", minWidth: 200 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontWeight: 700, color: s.is_active ? "#1a1a1a" : "#999" }}>{s.name}</span>
+              <EtabBadge etablissementId={s.etablissement_id} />
+              {!s.is_active && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 6, background: "rgba(0,0,0,0.08)", color: "#999" }}>inactif</span>}
+            </span>
+          </td>
+          <td style={TD}>{s.category ? <span style={{ ...readonlyBadge, background: `${sColor}18`, color: sColor }}>{CATEGORY_LABELS[s.category] ?? s.category}</span> : <span style={{ color: "#a39d92" }}>—</span>}</td>
+          <td style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>{s.city ? `${s.city}${s.postal_code ? ` (${s.postal_code})` : ""}` : "—"}</td>
+          <td style={{ ...TD, color: "#6f6656", fontSize: 12.5, whiteSpace: "normal", minWidth: 220 }}>
+            {[s.contact_name, s.email, s.phone].filter(Boolean).join(" · ") || <span style={{ color: "#a39d92" }}>Coordonnées non renseignées</span>}
+            {s.client_code && <div style={{ fontSize: 11.5, color: "#a39d92" }}>Code client {s.client_code}</div>}
+          </td>
+          <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums" }}><strong>{st?.refCount ?? 0}</strong></td>
+          <td style={{ ...TD, fontSize: 12, color: s.delivery_days && s.delivery_days.length > 0 ? "#16A34A" : "#a39d92", fontWeight: 600 }}>
+            {s.delivery_days && s.delivery_days.length > 0 ? s.delivery_days.map(d => d.slice(0, 3)).join(", ") : "—"}
+          </td>
+          <td style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>
+            {st?.lastImport ? <>{fmtDate(st.lastImport)}{st.lastImportNumber ? <span style={{ color: "#a39d92" }}> · {st.lastImportNumber}</span> : null}</> : <span style={{ color: "#a39d92" }}>Aucun import</span>}
+          </td>
+          <td style={{ ...TD, textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
+            <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+              {otherEtab && !alreadyExists && (
+                <button type="button" title={`Dupliquer pour ${otherEtab.nom}`}
+                  onClick={async () => {
+                    if (!confirm(`Dupliquer "${s.name}" pour ${otherEtab.nom} ?`)) return;
+                    const { id: _id, etablissement_id: _eid, ...rest } = s;
+                    const { error } = await supabase.from("suppliers").insert({ ...rest, etablissement_id: otherEtab.id, client_code: null });
+                    if (error) { alert(error.message); return; }
+                    window.location.reload();
+                  }}
+                  style={{ height: 28, padding: "0 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,0.2)", background: "rgba(37,99,235,0.06)", color: "#2563EB", cursor: "pointer", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap", fontFamily: "inherit" }}>
+                  + {otherEtab.nom.slice(0, 10)}
+                </button>
+              )}
+              <button type="button" onClick={(e) => handleDeleteSupplier(s, e)} title="Supprimer le fournisseur" aria-label="Supprimer"
+                style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(220,38,38,0.2)", background: "rgba(220,38,38,0.06)", color: "#DC2626", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
+              </button>
+              <span style={{ display: "inline-flex", width: 26, height: 26, borderRadius: 8, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13, transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform .15s" }}>→</span>
+            </span>
+          </td>
+        </tr>
+        {isExpanded && (
+          <tr>
+            <td style={{ padding: 0, width: 4, background: sColor }} />
+            <td colSpan={8} style={{ padding: "16px 16px 20px", background: "#faf8f4", borderBottom: "1px solid #ddd6c8" }} onClick={(e) => e.stopPropagation()}>
+              {renderFormBody()}
+            </td>
+          </tr>
+        )}
+      </React.Fragment>
+    );
+  }
+
+  function tableauFournisseurs(liste: SupplierRow[]) {
+    const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+    return (
+      <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden" }}>
+        <style>{`.fo-ligne:hover td{background:#f7f3ec}`}</style>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 980 }}>
+            <thead><tr>
+              <th style={{ ...TH, padding: 0, width: 4 }} /><th style={TH}>Fournisseur</th><th style={TH}>Catégorie</th><th style={TH}>Ville</th><th style={TH}>Contact</th>
+              <th style={{ ...TH, textAlign: "right" }}>Réf.</th><th style={TH}>Livraison</th><th style={TH}>Dernier import</th><th style={TH} />
+            </tr></thead>
+            <tbody>{liste.map(renderLigne)}</tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   function renderCard(s: SupplierRow) {
     const st = stats.get(s.id);
     const sColor = getSupplierColor(s.name, s.color);
@@ -1104,7 +1191,7 @@ export default function FournisseursPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin", "equipier"]}>
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
+      <main style={{ maxWidth: bureau ? 1400 : 900, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "24px 16px 40px" }}>
 
         {/* Desktop action buttons */}
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
@@ -1136,7 +1223,7 @@ export default function FournisseursPage() {
 
         {!loading && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {active.map(renderCard)}
+            {bureau ? (active.length > 0 && tableauFournisseurs(active)) : active.map(renderCard)}
 
             {inactive.length > 0 && (
               <>
@@ -1147,7 +1234,7 @@ export default function FournisseursPage() {
                 }}>
                   Inactifs
                 </div>
-                {inactive.map(renderCard)}
+                {bureau ? tableauFournisseurs(inactive) : inactive.map(renderCard)}
               </>
             )}
 
