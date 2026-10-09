@@ -6,8 +6,9 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { fetchApi } from "@/lib/fetchApi";
 import { CAT_LABELS, CAT_COLORS, type Category } from "@/types/ingredients";
-import { couleurTexte } from "@/lib/styleCategories";
+import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
 import { TuileProduit } from "@/components/TuileProduit";
+import { useBureau } from "@/hooks/useBureau";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -72,6 +73,7 @@ export default function StockPage() {
 }
 
 function StockContent() {
+  const bureau = useBureau();
   const { current: etab } = useEtablissement();
   const [items, setItems] = useState<StockItem[]>([]);
   const [inventoryDate, setInventoryDate] = useState<string | null>(null);
@@ -401,58 +403,69 @@ function StockContent() {
         ) : (
           /* Categories accordion */
           grouped.map(([cat, catItems]) => {
-            const catColor = couleurTexte(CAT_COLORS[cat as Category] ?? "#999");
+            const couleur = CAT_COLORS[cat as Category] ?? "#999";
             const catLabel = CAT_LABELS[cat as Category] ?? cat;
             const isOpen = openCats.has(cat);
             const catAlertes = catItems.filter((i) => i.alerte).length;
+            const TD: React.CSSProperties = { padding: "9px 14px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13, whiteSpace: "nowrap" };
+            const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+            const chip = (fond: string, texte: string, contenu: string) => <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 6, background: fond, color: texte, marginRight: 4 }}>{contenu}</span>;
 
             return (
               <div key={cat} style={{ marginBottom: 10 }}>
-                {/* Category header */}
-                <div
-                  onClick={() => toggleCat(cat)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 12,
-                    padding: "12px 16px", cursor: "pointer",
-                    background: "#fff", borderRadius: 12,
-                    border: "1px solid #ede6d9",
-                    boxShadow: `inset 4px 0 0 ${catColor}, 0 1px 3px rgba(0,0,0,0.04)`,
-                  }}
-                >
-                  <span style={{
-                    fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 800,
-                    letterSpacing: "0.1em", textTransform: "uppercase", color: catColor,
-                  }}>
-                    {catLabel}
+                {/* Barre de catégorie : même trame que la Base produits, les commandes et l'inventaire */}
+                <button type="button" onClick={() => toggleCat(cat)} aria-expanded={isOpen}
+                  className={`barre-categorie${bureau && isOpen ? " ouverte" : ""}`}
+                  style={{ ...styleBarreCategorie(couleur), ...(bureau ? { minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: isOpen ? "14px 14px 0 0" : 14 } : {}) }}>
+                  <span style={styleTitreCategorie(couleur)}>
+                    {catLabel} <span style={{ opacity: 0.75, fontWeight: 400 }}>({catItems.length})</span>
                   </span>
-                  <span style={{
-                    fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 12,
-                    background: `${catColor}15`, color: catColor,
-                  }}>
-                    {catItems.length}
-                  </span>
-                  {catAlertes > 0 && (
-                    <span style={{
-                      fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 12,
-                      background: "#FEF2F2", color: "#B91C1C",
-                    }}>
-                      {catAlertes} alerte{catAlertes > 1 ? "s" : ""}
-                    </span>
-                  )}
-                  <span style={{
-                    marginLeft: "auto", fontSize: 10, color: "#b0a894",
-                    transition: "transform 0.2s",
-                    transform: isOpen ? "rotate(0)" : "rotate(-90deg)",
-                  }}>
-                    ▼
-                  </span>
-                </div>
+                  {catAlertes > 0 && <span style={{ ...stylePastilleBarre(couleur), color: "#B91C1C" }}>{catAlertes} alerte{catAlertes > 1 ? "s" : ""}</span>}
+                  <span style={styleChevronBarre(couleur, isOpen)}>▼</span>
+                </button>
 
-                {/* Items */}
-                {isOpen && (
+                {/* Bureau : tableau dans un cadre collé à la barre */}
+                {isOpen && bureau && (
+                  <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>
+                    <style>{`.st-ligne:hover td{background:#f7f3ec}`}</style>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 760 }}>
+                        <thead><tr>
+                          <th style={{ ...TH, padding: 0, width: 4 }} /><th style={TH}>Produit</th><th style={TH}>Seuils</th><th style={TH}>Mouvements</th>
+                          <th style={{ ...TH, textAlign: "right" }}>Stock</th><th style={TH}>État</th><th style={TH} />
+                        </tr></thead>
+                        <tbody>
+                          {catItems.map((item) => (
+                            <tr key={item.ingredient_id} className="st-ligne" onClick={() => loadMovements(item)} style={{ cursor: "pointer" }}>
+                              <td style={{ ...TD, padding: 0, width: 4, background: couleur }} />
+                              <td style={{ ...TD, fontWeight: 600, color: "#1a1a1a", whiteSpace: "normal", minWidth: 220 }}>{item.name}</td>
+                              <td style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>
+                                {item.stock_min != null ? <>min {fmtQty(item.stock_min)} {item.unit ?? ""}{item.stock_objectif != null ? ` · objectif ${fmtQty(item.stock_objectif)} ${item.unit ?? ""}` : ""}</> : <span style={{ color: "#a39d92" }}>—</span>}
+                              </td>
+                              <td style={TD}>
+                                {item.receptions > 0 && chip("#E8F5E9", "#2D6A4F", `+${fmtQty(item.receptions)} reçus`)}
+                                {item.ventes > 0 && chip("#FEF2F2", "#D4775A", `−${fmtQty(item.ventes)} vendus`)}
+                                {item.receptions <= 0 && item.ventes <= 0 && <span style={{ color: "#a39d92" }}>—</span>}
+                              </td>
+                              <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                                <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 700, color: item.alerte ? "#B91C1C" : "#1a1a1a" }}>{fmtQty(item.stock)}</span>
+                                <span style={{ fontSize: 12, color: "#6f6656" }}> {item.unit ?? ""}</span>
+                              </td>
+                              <td style={TD}>{item.alerte ? chip("#FEF2F2", "#B91C1C", "⚠ sous le minimum") : null}</td>
+                              <td style={{ ...TD, textAlign: "right", width: 40, color: "#a39d92", fontWeight: 700 }}>→</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Téléphone : tuiles */}
+                {isOpen && !bureau && (
                   <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 4 }}>
                     {catItems.map((item) => (
-                      <TuileProduit key={item.ingredient_id} couleur={CAT_COLORS[cat as Category] ?? "#999"} nom={item.name} onClick={() => loadMovements(item)}
+                      <TuileProduit key={item.ingredient_id} couleur={couleur} nom={item.name} onClick={() => loadMovements(item)}
                         style={{ marginBottom: 0, background: item.alerte ? "#FFFBF5" : "#fff" }}
                         infos={item.stock_min != null ? (
                           <span>min {fmtQty(item.stock_min)} {item.unit ?? ""}{item.stock_objectif != null ? ` · objectif ${fmtQty(item.stock_objectif)} ${item.unit ?? ""}` : ""}</span>
