@@ -9,13 +9,11 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
-import { IngredientAvatar } from "@/components/IngredientAvatar";
-import type { Category } from "@/types/ingredients";
 import { BarreCommande, MenuCommande } from "@/components/commandes/BarreCommande";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
-import { useBureau } from "@/hooks/useBureau";
+import { useBureau, useLarge } from "@/hooks/useBureau";
 import { CommandesBureau, type CommandeLigne } from "@/components/commandes/CommandesBureau";
 import { inChunks } from "@/lib/supabaseChunks";
 import { ZONES_EMBED, appliquerZonesEtab, type ZoneEtabRow } from "@/lib/zonesEtablissement";
@@ -143,22 +141,6 @@ const tile: React.CSSProperties = {
   gap: 4,
   borderBottom: "1px solid #f0ebe2",
 };
-
-const menuItemStyle: React.CSSProperties = {
-  display: "block",
-  width: "100%",
-  padding: "11px 16px",
-  border: "none",
-  background: "transparent",
-  color: "#1a1a1a",
-  fontSize: 13,
-  fontWeight: 500,
-  fontFamily: "inherit",
-  textAlign: "left",
-  cursor: "pointer",
-  borderBottom: "1px solid rgba(0,0,0,0.04)",
-};
-
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -573,6 +555,7 @@ function CommandesPage() {
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   // Bureau : tableau des commandes + volet (src/components/commandes/CommandesBureau) ; téléphone : la page d'avant
   const bureau = useBureau();
+  const large = useLarge();
   const [draftSupplierIds, setDraftSupplierIds] = useState<Set<string>>(new Set());
 
   // Reception modal
@@ -613,7 +596,6 @@ function CommandesPage() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [supplierListOpen, setSupplierListOpen] = useState(false);
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   // Historique
   const [histOpen, setHistOpen] = useState(false);
@@ -628,25 +610,7 @@ function CommandesPage() {
   // Pending receptions (validated orders awaiting reception)
   // Dépliage des commandes (historique & réceptions en attente) : lignes chargées au clic
   type SessionLigne = { id: string; name: string; quantite: number; unite: string; prix_unitaire_ht: number | null; total_ligne_ht: number | null; qty_received: number | null; checked: boolean | null };
-  const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const [sessionLignes, setSessionLignes] = useState<Record<string, SessionLigne[] | "loading">>({});
-  const toggleSession = useCallback(async (id: string) => {
-    setOpenSessionId(prev => (prev === id ? null : id));
-    setSessionLignes(prev => {
-      if (prev[id]) return prev;
-      (async () => {
-        try {
-          const res = await fetchApi(`/api/commandes/session-lignes?session_id=${id}`);
-          const data = await res.json();
-          setSessionLignes(p2 => ({ ...p2, [id]: (data.lignes ?? []) as SessionLigne[] }));
-        } catch {
-          setSessionLignes(p2 => ({ ...p2, [id]: [] }));
-        }
-      })();
-      return { ...prev, [id]: "loading" };
-    });
-  }, []);
-
   /** Charge les articles d'une commande pour le volet bureau (sans dépliage dans la liste) */
   const chargerLignes = useCallback((id: string) => {
     setSessionLignes(prev => {
@@ -663,28 +627,6 @@ function CommandesPage() {
       return { ...prev, [id]: "loading" };
     });
   }, []);
-  const renderSessionLignes = (id: string) => {
-    const lignes = sessionLignes[id];
-    if (openSessionId !== id) return null;
-    if (!lignes || lignes === "loading") return <div style={{ fontSize: 12, color: "#999", padding: "8px 0 2px" }}>Chargement…</div>;
-    if (lignes.length === 0) return <div style={{ fontSize: 12, color: "#999", padding: "8px 0 2px" }}>Aucune ligne.</div>;
-    return (
-      <div style={{ marginTop: 8, borderTop: "1px dashed #ece4d4", paddingTop: 8 }}>
-        {lignes.map(l => (
-          <div key={l.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0", fontSize: 12.5 }}>
-            <span style={{ color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {l.name}
-              <span style={{ color: "#999", marginLeft: 6 }}>{l.quantite} {l.unite}</span>
-            </span>
-            <span style={{ color: "#6f6a61", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-              {l.total_ligne_ht != null ? `${l.total_ligne_ht.toFixed(2)} €` : "—"}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   const [pendingReceptions, setPendingReceptions] = useState<{
     id: string; supplier_id: string; supplier_name: string;
     created_at: string; nb_articles: number; total_ht: number; email_sent_at?: string | null;
@@ -1222,7 +1164,6 @@ function CommandesPage() {
     if (!res.ok) { alert("Impossible de rouvrir cette commande."); return; }
     setPendingReceptions((prev) => prev.filter((x) => x.id !== r.id));
     setDraftSupplierIds((prev) => new Set([...prev, r.supplier_id]));
-    setOpenSessionId(null);
     setSelectedSupplierId(r.supplier_id);
     setConfirmation(`Commande ${r.supplier_name} rouverte — modifie-la puis valide et renvoie`);
     setTimeout(() => setConfirmation(null), 5000);
@@ -1646,109 +1587,6 @@ function CommandesPage() {
     return condLabel;
   }
 
-  function renderProductCard(item: CatalogItem, isFav: boolean) {
-    const qty = Number(quantities[item.id] ?? 0);
-    const hasQty = qty > 0;
-    const packCount = item.pack_count ?? 0;
-    const indiv = individualUnitLabel(item);
-    const obj = item.stock_objectif;
-
-    const condLabel = libelleConditionnement(item);
-
-
-    return (
-      <div key={item.id} style={{
-        background: "#fff", borderRadius: 14, border: hasQty ? "2px solid #D4775A" : "1.5px solid #e5ddd0",
-        padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6,
-        boxShadow: hasQty ? "0 4px 16px rgba(212,119,90,0.2)" : "0 2px 10px rgba(0,0,0,0.07)",
-        transition: "all 0.15s",
-      }}>
-        {/* Ligne 1 : photo compacte + nom sur toute la largeur + favori */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-          <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={44} />
-          <div className="produit-main">
-            <div className="produit-name" style={{ fontSize: 13.5, fontWeight: 700, color: "#1a1a1a" }}>{item.name}</div>
-          </div>
-          <button type="button" onClick={() => toggleFavori(item.id, isFav)}
-            style={{ background: "none", border: "none", fontSize: 14, cursor: "pointer", opacity: isFav ? 1 : 0.3, flexShrink: 0, padding: 0 }}>
-            &#x2B50;
-          </button>
-        </div>
-
-        {/* Ligne 2 : pastilles — conditionnement · unité de commande · zone + raccourci produit */}
-        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-          {condLabel && <span className="pastille-cadre">{condLabel}</span>}
-          {item.order_unit && <span className="pastille-cadre">cmd : {item.order_unit}</span>}
-          {item.storage_zone && (
-            <span className="pastille" style={{ "--pastille-c": zoneColors[item.storage_zone] ?? "#b0a894" } as React.CSSProperties}>
-              {item.storage_zone}
-            </span>
-          )}
-          {/* Raccourci : modifier la fiche produit (conditionnement, commande & stock) et revenir ici */}
-          <a
-            href={`/ingredients?edit=${item.id}&back=${encodeURIComponent("/commandes")}`}
-            title="Modifier la fiche produit"
-            className="pastille-cadre"
-            style={{ textDecoration: "none", cursor: "pointer" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            ✎ produit
-          </a>
-        </div>
-
-        {/* Ligne 3 : jauge de stock + ligne stock compacte */}
-        {(() => {
-          const si = stockData[item.id];
-          const min = item.stock_min ?? 0;
-          const objG = item.stock_objectif ?? 0;
-          const objIndiv = packCount > 0 && obj != null ? obj * packCount : obj;
-          if (!si && !(objG > 0)) return null;
-          const stockVal = si ? Math.round(si.stock * 10) / 10 : null;
-          const color = si == null ? "#999" : si.stock <= min ? "#DC2626" : objG > 0 && si.stock < objG ? "#b45309" : "#2D6A4F";
-          const pct = si && objG > 0 ? Math.max(0, Math.min(100, (si.stock / objG) * 100)) : 0;
-          return (
-            <div>
-              {objG > 0 && (
-                <div style={{ height: 6, borderRadius: 3, background: "#f0ebe3", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3 }} />
-                </div>
-              )}
-              <div style={{ fontSize: 10.5, color: "#999", marginTop: 3, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "baseline" }}>
-                {stockVal != null && <span style={{ fontWeight: 700, color }}>Stock {stockVal}</span>}
-                {objG > 0 && <span>min {min} · objectif {objG}{objIndiv && packCount > 0 ? ` (${objIndiv} ${indiv}s)` : ""}</span>}
-                {si && si.avg_daily > 0 && <span>{Math.round(si.avg_daily * 10) / 10}/j</span>}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Ligne 4 : à commander (gauche) + prix en pastille ronde (bas droite) */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {(() => {
-            const si = stockData[item.id];
-            if (!si || !(si.qty_to_order > 0)) return <span />;
-            return (
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#2563EB" }}>
-                À commander : {si.qty_to_order} {si.unit ?? ""}
-              </span>
-            );
-          })()}
-          {item.prix_commande != null && (
-            <span className="pastille-ronde" style={{ marginLeft: "auto" }}>
-              {item.prix_commande.toFixed(2).replace(".", ",")} € HT{item.order_unit ? ` · ${item.order_unit}` : ""}
-            </span>
-          )}
-        </div>
-
-        {/* Ligne 5 : stepper + bascule d'unité */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
-          {packCount > 0 && unitToggle(item)}
-        </div>
-      </div>
-    );
-  }
-
   /** Bureau : une ligne de tableau par article, tout sur une ligne comme la Base produits ; stepper et bascule d'unité dans la colonne Quantité */
   function renderLigneProduit(item: CatalogItem, isFav: boolean, couleur: string) {
     const qty = Number(quantities[item.id] ?? 0);
@@ -1805,8 +1643,61 @@ function CommandesPage() {
     );
   }
 
+  /** Téléphone (10/10/2026) : même tableau en trois colonnes — nom + conditionnement · zone · prix + stock, quantité à droite, fiche */
+  function renderLigneProduitMobile(item: CatalogItem, isFav: boolean, couleur: string) {
+    const qty = Number(quantities[item.id] ?? 0);
+    const hasQty = qty > 0;
+    const packCount = item.pack_count ?? 0;
+    const condLabel = libelleConditionnement(item);
+    const si = stockData[item.id];
+    const min = item.stock_min ?? 0;
+    const objG = item.stock_objectif ?? 0;
+    const stockVal = si ? Math.round(si.stock * 10) / 10 : null;
+    const couleurStock = si == null ? "#999" : si.stock <= min ? "#DC2626" : objG > 0 && si.stock < objG ? "#b45309" : "#2D6A4F";
+    const total = hasQty && item.prix_commande != null ? qty * item.prix_commande : null;
+    const TDL: React.CSSProperties = { padding: "9px 6px 9px 10px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13, background: hasQty ? "rgba(212,119,90,0.08)" : undefined };
+    const sous = [condLabel ?? (item.order_unit ? `cmd : ${item.order_unit}` : null), item.storage_zone, item.prix_commande != null ? `${item.prix_commande.toFixed(2).replace(".", ",")} € HT${item.order_unit ? ` / ${item.prix_par_colis ? "colis" : item.order_unit}` : ""}` : null].filter(Boolean).join(" · ");
+    return (
+      <tr key={item.id}>
+        <td style={{ ...TDL, padding: 0, width: 4, background: couleur }} />
+        <td style={TDL}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+            <button type="button" onClick={() => toggleFavori(item.id, isFav)} title={isFav ? "Retirer des habituels" : "Ajouter aux habituels"}
+              style={{ background: "none", border: "none", fontSize: 12, cursor: "pointer", opacity: isFav ? 1 : 0.25, padding: 0, lineHeight: "17px", flexShrink: 0 }}>&#x2B50;</button>
+            <span style={{ fontWeight: 600, color: "#1a1a1a", lineHeight: 1.25 }}>{item.name}</span>
+          </div>
+          {sous && <div style={{ fontSize: 11.5, color: "#6f6a61", marginTop: 2 }}>{sous}</div>}
+          {(stockVal != null || (si && si.qty_to_order > 0)) && (
+            <div style={{ fontSize: 11.5, marginTop: 2 }}>
+              {stockVal != null && <span style={{ fontWeight: 700, color: couleurStock }}>stock {stockVal}</span>}
+              {objG > 0 && <span style={{ color: "#999" }}> / obj. {objG}</span>}
+              {si && si.qty_to_order > 0 && <span style={{ fontWeight: 700, color: "#2563EB" }}> · à commander {si.qty_to_order}</span>}
+            </div>
+          )}
+        </td>
+        <td style={{ ...TDL, padding: "9px 4px 9px 0", textAlign: "right", whiteSpace: "nowrap" }}>
+          <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+            {packCount > 0 && unitToggle(item)}
+            {total != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{total.toFixed(2).replace(".", ",")} €</span>}
+          </div>
+        </td>
+        <td style={{ ...TDL, padding: "9px 8px 9px 2px", width: 30 }}>
+          <a href={`/ingredients?edit=${item.id}&back=${encodeURIComponent("/commandes")}`} title="Modifier la fiche produit"
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: 8, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", textDecoration: "none", fontWeight: 700, fontSize: 12 }}>→</a>
+        </td>
+      </tr>
+    );
+  }
+
   function tableauProduits(items: CatalogItem[], fav: boolean, couleur: string) {
     const THL: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+    if (!large) return (
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+        <colgroup><col style={{ width: 4 }} /><col /><col style={{ width: 128 }} /><col style={{ width: 34 }} /></colgroup>
+        <tbody>{items.map((item) => renderLigneProduitMobile(item, fav, couleur))}</tbody>
+      </table>
+    );
     return (
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 980 }}>
@@ -2156,8 +2047,8 @@ function CommandesPage() {
             <div key={cat} style={{ marginTop: 10, marginBottom: 6 }}>
               {/* Barre de catégorie : même trame que le menu produits, l'inventaire et la commande simplifiée (src/lib/styleCategories.ts) */}
               <button type="button" onClick={() => setOpenCats((prev) => ({ ...prev, [cat]: !isOpen }))} aria-expanded={isOpen}
-                className={`barre-categorie${bureau && isOpen ? " ouverte" : ""}`}
-                style={{ ...styleBarreCategorie(couleur), ...(bureau ? { minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: isOpen ? "14px 14px 0 0" : 14 } : {}) }}>
+                className={`barre-categorie${isOpen ? " ouverte" : ""}`}
+                style={{ ...styleBarreCategorie(couleur), minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: isOpen ? "14px 14px 0 0" : 14 }}>
                 <span style={styleTitreCategorie(couleur)}>
                   {catLabel(cat)} <span style={{ opacity: 0.75, fontWeight: 400 }}>({allItems.length})</span>
                 </span>
@@ -2165,8 +2056,8 @@ function CommandesPage() {
                 <span style={styleChevronBarre(couleur, isOpen)}>▼</span>
               </button>
 
-              {/* Bureau : tableau par sous-catégorie dans un cadre collé à la barre (gabarit Base produits) */}
-              {bureau && isOpen && (
+              {/* Tableau par sous-catégorie dans un cadre collé à la barre (gabarit Base produits) ; lignes resserrées sur téléphone */}
+              {isOpen && (
                 <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>
                   {favoris.length > 0 && (
                     <>
@@ -2192,56 +2083,6 @@ function CommandesPage() {
                 </div>
               )}
 
-              {!bureau && <div style={{
-                // Plafond proportionnel au nombre de produits : à 5000 px fixes,
-                // les grosses catégories (cave à vin Vinoflo) étaient coupées.
-                maxHeight: isOpen ? Math.max(5000, allItems.length * 900 + 600) : 0, overflow: "hidden",
-                transition: "max-height 0.3s ease",
-              }}>
-                {favoris.length > 0 && (
-                  <>
-                    <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "#b8860b", padding: "8px 14px 4px" }}>
-                      Habituels
-                    </div>
-                    <div className="commandes-grid" style={{ display: "grid", gap: 10, padding: "6px 10px 10px" }}>
-                      {favoris.map((item) => renderProductCard(item, true))}
-                    </div>
-                  </>
-                )}
-
-                {others.length > 0 && (() => {
-                  const hasSubCats = others.some(i => i.sub_category);
-                  if (!hasSubCats) {
-                    return (
-                      <div className="commandes-grid" style={{ display: "grid", gap: 10, padding: "6px 10px 10px" }}>
-                        {others.map((item) => renderProductCard(item, false))}
-                      </div>
-                    );
-                  }
-                  // Group by sub_category, render each group with a header
-                  const subGroups: { sub: string; items: CatalogItem[] }[] = [];
-                  for (const item of others) {
-                    const sub = item.sub_category ?? "Autre";
-                    const last = subGroups[subGroups.length - 1];
-                    if (last && last.sub === sub) { last.items.push(item); }
-                    else { subGroups.push({ sub, items: [item] }); }
-                  }
-                  return (
-                    <div style={{ padding: "6px 10px 10px" }}>
-                      {subGroups.map((sg, gi) => (
-                        <div key={sg.sub}>
-                          <div style={{ ...styleSousCategorie(couleur, true), cursor: "default", marginTop: gi > 0 ? 10 : 2 }}>
-                            <span>{sg.sub} <span style={{ fontWeight: 500, opacity: 0.8 }}>({sg.items.length})</span></span>
-                          </div>
-                          <div className="commandes-grid" style={{ display: "grid", gap: 10 }}>
-                            {sg.items.map((item) => renderProductCard(item, false))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>}
             </div>
           );
         })}
@@ -2296,8 +2137,9 @@ function CommandesPage() {
         )}
 
         {/* Bureau : tableau des commandes, compteurs et volet */}
-        {bureau && !loading && !selectedSupplierId && (
+        {!loading && !selectedSupplierId && (
           <CommandesBureau
+            bureau={bureau}
             accent={accentColor}
             enCours={activeSessions}
             aRecevoir={pendingReceptions.map((r) => ({ ...r, status: "validee" }))}
@@ -2336,22 +2178,6 @@ function CommandesPage() {
             onRenvoyer={(c) => { void renvoyerMailCommande({ id: c.id, supplier_name: c.supplier_name, email_sent_at: c.email_sent_at }); }}
             onPointer={(c) => setReceptionSessionId(c.id)}
           />
-        )}
-
-        {/* Desktop: new order button */}
-        {!bureau && !loading && !selectedSupplierId && suppliers.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setSupplierListOpen(true)}
-            style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "10px 20px",
-              borderRadius: 10, border: "none", background: accentColor,
-              color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 16,
-            }}
-          >
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>
-            Nouvelle commande
-          </button>
         )}
 
         {/* Current supplier indicator (when selected) */}
@@ -2501,266 +2327,6 @@ function CommandesPage() {
           </div>
         </BottomSheet>
 
-        {/* ── DASHBOARD (no supplier selected) ── */}
-        {!bureau && !loading && !selectedSupplierId && (
-          <>
-            {/* KPI row */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginTop: 8 }}>
-              {[
-                { label: "Brouillons", count: activeSessions.filter(s => s.status === "brouillon").length, color: "#A0845C", icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" },
-                { label: "En attente", count: activeSessions.filter(s => s.status === "en_attente").length, color: "#2563EB", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
-                { label: "A recevoir", count: pendingReceptions.length, color: "#4a6741", icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" },
-                { label: "Recues ce mois", count: recentOrders.filter(r => {
-                  const d = new Date(r.created_at);
-                  const now = new Date();
-                  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                }).length, color: "#16a34a", icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" },
-              ].map((kpi) => (
-                <div key={kpi.label} style={{
-                  background: "#fff", borderRadius: 12,
-                  borderLeft: `4px solid ${kpi.count > 0 ? kpi.color : "#e0d8ce"}`,
-                  border: "1px solid #ece4d4",
-                  borderLeftWidth: 4, borderLeftColor: kpi.count > 0 ? kpi.color : "#e0d8ce",
-                  padding: "16px 18px",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={kpi.count > 0 ? kpi.color : "#ccc"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d={kpi.icon} />
-                    </svg>
-                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999" }}>
-                      {kpi.label}
-                    </span>
-                  </div>
-                  <div style={{
-                    fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                    fontWeight: 700, fontSize: 28, color: kpi.count > 0 ? kpi.color : "#ccc",
-                  }}>
-                    {kpi.count}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Commandes en cours */}
-        {!bureau && !loading && !selectedSupplierId && activeSessions.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{
-              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
-              color: "#A0845C", marginBottom: 8,
-              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-            }}>
-              Commandes en cours
-            </div>
-            {activeSessions.map((s) => {
-              const isBrouillon = s.status === "brouillon";
-              const badgeColor = isBrouillon ? "#A0845C" : "#2563EB";
-              const badgeBg = isBrouillon ? "#FFF8F0" : "#EFF6FF";
-              const isCurrentSupplier = s.supplier_id === selectedSupplierId;
-              const menuOpen = activeMenuId === s.id;
-              const reprendre = () => {
-                let canonicalId = s.supplier_id;
-                for (const [cid, aliasSet] of supplierAliases.entries()) {
-                  if (aliasSet.has(s.supplier_id)) { canonicalId = cid; break; }
-                }
-                setSelectedSupplierId(canonicalId);
-              };
-              return (
-                <div key={s.id} style={{ position: "relative", marginBottom: 8 }}>
-                  <div
-                    onClick={() => { if (!isCurrentSupplier) reprendre(); }}
-                    style={{
-                      background: isCurrentSupplier ? "#fdf5f2" : "#fff",
-                      borderRadius: 12, border: isCurrentSupplier ? "1.5px solid #D4775A" : "1px solid #e0d8ce",
-                      padding: "14px 16px",
-                      cursor: isCurrentSupplier ? "default" : "pointer",
-                      display: "flex", alignItems: "center", gap: 12,
-                      transition: "border-color 0.15s",
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{s.supplier_name}</span>
-                        <span style={{
-                          fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
-                          background: badgeBg, color: badgeColor, whiteSpace: "nowrap",
-                          textTransform: "uppercase", letterSpacing: ".05em",
-                        }}>
-                          {statusLabel[s.status] ?? s.status}
-                        </span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontSize: 11, color: "#999" }}>
-                          {s.nb_articles} article{s.nb_articles > 1 ? "s" : ""}
-                        </span>
-                        {s.total_ht > 0 && (
-                          <span style={{
-                            fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                            fontWeight: 700, fontSize: 13, color: "#1a1a1a",
-                          }}>
-                            {s.total_ht.toFixed(2)} €
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {/* 3-dot menu trigger */}
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); setActiveMenuId(menuOpen ? null : s.id); }}
-                      style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        border: "none", background: menuOpen ? "rgba(0,0,0,0.06)" : "transparent",
-                        cursor: "pointer", color: "#666", flexShrink: 0,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 18, fontWeight: 700, lineHeight: 1,
-                      }}
-                      aria-label="Actions"
-                    >
-                      ⋯
-                    </button>
-                  </div>
-
-                  {/* Action menu */}
-                  {menuOpen && (
-                    <>
-                      <div onClick={() => setActiveMenuId(null)}
-                        style={{ position: "fixed", inset: 0, zIndex: 90 }} />
-                      <div style={{
-                        position: "absolute", top: "calc(100% - 6px)", right: 8, zIndex: 91,
-                        minWidth: 180,
-                        background: "#fff",
-                        border: "1px solid rgba(0,0,0,0.08)",
-                        borderRadius: 12,
-                        boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
-                        overflow: "hidden",
-                      }}>
-                        {!isCurrentSupplier && (
-                          <button type="button" onClick={() => { setActiveMenuId(null); reprendre(); }}
-                            style={menuItemStyle}>
-                            Reprendre
-                          </button>
-                        )}
-                        <button type="button" onClick={() => { setActiveMenuId(null); downloadPdfById(s.id, s.supplier_name); }}
-                          style={menuItemStyle}>
-                          Telecharger PDF
-                        </button>
-                        {isBrouillon && (
-                          <button type="button" disabled={sendingEmail}
-                            onClick={() => { setActiveMenuId(null); sendEmailForSession(s.id); }}
-                            style={{ ...menuItemStyle, opacity: sendingEmail ? 0.5 : 1 }}>
-                            Envoyer par mail
-                          </button>
-                        )}
-                        {isBrouillon && (
-                          <button type="button" disabled={saving}
-                            onClick={() => { setActiveMenuId(null); validerActiveSession(s.id); }}
-                            style={{ ...menuItemStyle, color: "#4a6741", fontWeight: 700 }}>
-                            Valider
-                          </button>
-                        )}
-                        <button type="button"
-                          onClick={async () => {
-                            setActiveMenuId(null);
-                            if (!confirm(`Supprimer la commande ${s.supplier_name} ?`)) return;
-                            const erreur = await supprimerBrouillon(s.id);
-                            if (erreur) { alert(erreur); return; }
-                            setActiveSessions((prev) => prev.filter((x) => x.id !== s.id));
-                            if (session?.id === s.id) { setSession(null); setQuantities({}); }
-                            setConfirmation("Commande supprimée");
-                            setTimeout(() => setConfirmation(null), 3000);
-                          }}
-                          style={{ ...menuItemStyle, color: "#DC2626" }}>
-                          Supprimer
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Réceptions en attente */}
-        {!bureau && !loading && !selectedSupplierId && pendingReceptions.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{
-              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
-              color: "#4a6741", marginBottom: 8,
-              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-            }}>
-              Receptions en attente
-            </div>
-            {pendingReceptions.map((r) => (
-              <div key={r.id} onClick={() => toggleSession(r.id)} style={{
-                background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce",
-                borderLeft: "4px solid #4a6741", padding: "14px 16px", marginBottom: 8, cursor: "pointer",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{r.supplier_name}</span>
-                    <span style={{ fontSize: 11, color: "#999" }}>{fmtDate(r.created_at)}</span>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: r.email_sent_at ? "#2D6A4F" : "#b45309" }}>
-                      {r.email_sent_at ? "✓ envoyée par mail" : "à envoyer"}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-                    <span style={{ fontSize: 12, color: "#666" }}>{r.nb_articles} article{r.nb_articles > 1 ? "s" : ""}</span>
-                    {r.total_ht > 0 && (
-                      <span style={{
-                        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                        fontWeight: 700, fontSize: 16, color: "#1a1a1a",
-                      }}>
-                        {r.total_ht.toFixed(2)} €
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {renderSessionLignes(r.id)}
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-                  {peutEnvoyer(r.supplier_id) && (
-                    <button type="button" onClick={(e) => { e.stopPropagation(); void modifierCommandeValidee(r); }} disabled={saving}
-                      style={{
-                        fontSize: 11, fontWeight: 600, color: "#8a5a2b", background: "#fff",
-                        border: "1px solid #e6cfb0", borderRadius: 6, cursor: "pointer", padding: "5px 12px",
-                        fontFamily: "inherit",
-                      }}>
-                      Modifier
-                    </button>
-                  )}
-                  {peutEnvoyer(r.supplier_id) && (
-                    <button type="button" onClick={(e) => { e.stopPropagation(); void renvoyerMailCommande(r); }} disabled={sendingEmail || saving}
-                      style={{
-                        fontSize: 11, fontWeight: 600, color: "#2563EB", background: "#fff",
-                        border: "1px solid #bfd3f7", borderRadius: 6, cursor: "pointer", padding: "5px 12px",
-                        fontFamily: "inherit", opacity: sendingEmail ? 0.6 : 1,
-                      }}>
-                      {sendingEmail ? "Envoi…" : r.email_sent_at ? "Renvoyer" : "Envoyer"}
-                    </button>
-                  )}
-                  <button type="button" onClick={(e) => { e.stopPropagation(); downloadPdfById(r.id, r.supplier_name); }}
-                    style={{
-                      fontSize: 11, fontWeight: 600, color: "#4a6741", background: "#fff",
-                      border: "1px solid #ddd6c8", borderRadius: 6, cursor: "pointer", padding: "5px 12px",
-                      fontFamily: "inherit",
-                    }}>
-                    PDF
-                  </button>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); setReceptionSessionId(r.id); }} disabled={saving}
-                    style={{
-                      fontSize: 11, fontWeight: 700, color: "#fff", background: "#16a34a",
-                      border: "none", borderRadius: 6, cursor: "pointer", padding: "5px 14px",
-                      fontFamily: "inherit",
-                    }}>
-                    Pointer
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Fournisseurs BottomSheet (opened via FAB) */}
         {!loading && !selectedSupplierId && suppliers.length > 0 && (
           <BottomSheet open={supplierListOpen} onClose={() => setSupplierListOpen(false)} title="Commander par fournisseur">
@@ -2838,52 +2404,6 @@ function CommandesPage() {
               })}
             </div>
           </BottomSheet>
-        )}
-
-
-        {/* Historique recent */}
-        {!bureau && !loading && !selectedSupplierId && recentOrders.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{
-              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
-              color: "#999", marginBottom: 10,
-              fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-            }}>
-              Historique recent
-            </div>
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #ece4d4", overflow: "hidden" }}>
-              {recentOrders.map((r, idx) => (
-                <div key={r.id} onClick={() => toggleSession(r.id)} style={{
-                  padding: "11px 16px", cursor: "pointer",
-                  borderBottom: idx < recentOrders.length - 1 ? "1px solid #f0ebe2" : "none",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{
-                      width: 8, height: 8, borderRadius: "50%",
-                      background: supplierColor(r.supplier_name), flexShrink: 0,
-                    }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
-                        {r.supplier_name}
-                      </span>
-                      <span style={{ fontSize: 11, color: "#999", marginLeft: 8 }}>
-                        {new Date(r.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-                      </span>
-                    </div>
-                    <span style={{
-                      fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-                      fontWeight: 700, fontSize: 14, color: "#1a1a1a",
-                      fontVariantNumeric: "tabular-nums",
-                    }}>
-                      {r.total_ht > 0 ? `${r.total_ht.toFixed(2)} €` : "—"}
-                    </span>
-                    <span style={{ fontSize: 10, color: "#b0a894", transform: openSessionId === r.id ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▶</span>
-                  </div>
-                  {renderSessionLignes(r.id)}
-                </div>
-              ))}
-            </div>
-          </div>
         )}
 
         {/* KPI Cards */}

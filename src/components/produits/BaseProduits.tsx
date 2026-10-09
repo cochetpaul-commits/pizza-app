@@ -721,6 +721,9 @@ export function VoletDroit({ titre, sousTitre, onFermer, pied, largeur = 640, ch
           .volet-droit { z-index: 201 !important; top: 48px !important; right: 0 !important; bottom: 0 !important; left: 0; width: auto !important; border-radius: 20px 20px 0 0 !important; border: none !important; box-shadow: 0 -8px 40px rgba(0,0,0,0.25) !important; animation: voletMonte .3s cubic-bezier(.2,.8,.2,1); }
           .volet-droit > div { padding-left: 16px !important; padding-right: 16px !important; }
           .volet-droit > div:last-child { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; }
+          /* Les boutons du pied passent à la ligne au lieu de déborder */
+          .volet-pied { flex-wrap: wrap; justify-content: flex-end; }
+          .volet-pied > * { margin-left: 0 !important; }
         }
         @keyframes voletMonte { from { transform: translateY(100%); } to { transform: none; } }
       `}</style>
@@ -739,7 +742,7 @@ export function VoletDroit({ titre, sousTitre, onFermer, pied, largeur = 640, ch
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 24px" }}>{children}</div>
         {pied && (
-          <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "12px 20px", borderTop: `1px solid ${BORD}` }}>{pied}</div>
+          <div className="volet-pied" style={{ display: "flex", gap: 8, alignItems: "center", padding: "12px 20px", borderTop: `1px solid ${BORD}` }}>{pied}</div>
         )}
       </aside>
     </>

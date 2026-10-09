@@ -16,8 +16,8 @@ import { cleEtab } from "@/lib/zonesEtablissement";
 import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
 import { couleurRayon, rayonDuProduit, RAYON_AUTRES, RAYON_PREPARATIONS } from "@/lib/rayons";
 import { getSupplierColor } from "@/lib/supplierColors";
-import { BoutonCrayon, BoutonCroix, Compteur, Conditionnement as CondLibelle, TuileProduit } from "@/components/TuileProduit";
-import { useBureau } from "@/hooks/useBureau";
+import { BoutonCrayon, BoutonCroix, Compteur, Conditionnement as CondLibelle } from "@/components/TuileProduit";
+import { useBureau, useLarge } from "@/hooks/useBureau";
 import { couleurTexte, styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie } from "@/lib/styleCategories";
 import { correspondRecherche, filtrerRecherche, normaliserRecherche } from "@/lib/rechercheTolerante";
 void categorieDeFamille;
@@ -78,6 +78,7 @@ export default function InventaireFeuillePage() {
 
 function Feuille() {
   const bureau = useBureau();
+  const large = useLarge();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { isGroupAdmin } = useProfile();
@@ -441,8 +442,8 @@ function Feuille() {
     champs[champs.indexOf(e.currentTarget) + 1]?.focus();
   };
 
-  /** Carte d'une ligne : tuile produit commune (nom, conditionnement, compteurs, fournisseur et total) */
-  const carte = (l: Ligne, couleur: string) => {
+  /** Téléphone (10/10/2026) : même tableau que le bureau en trois colonnes — nom + conditionnement · fournisseur + total, compteurs à droite, actions */
+  const ligneMobile = (l: Ligne, couleur: string) => {
     const s = saisies[l.id] ?? { colis: "", unites: "" };
     const contenu = l.cond_contenu;
     const deuxChamps = contenu != null && contenu > 1;
@@ -454,7 +455,6 @@ function Feuille() {
     const f = fiches[l.ingredient_id];
     const fournisseur = fournisseurDe(l, c);
     const detailPiece = f?.piece_weight_g ? `${f.piece_weight_g >= 1000 ? `${txt(f.piece_weight_g / 1000)} kg` : `${txt(f.piece_weight_g)} g`} la pièce` : f?.piece_volume_ml ? `${f.piece_volume_ml >= 1000 ? `${txt(f.piece_volume_ml / 1000)} L` : `${txt(f.piece_volume_ml)} mL`} la pièce` : null;
-    // Couleur de la catégorie de la fiche (comme le menu produits), sinon celle du rayon
     const couleurCat = (f?.category && CAT_COLORS[f.category as Category]) || couleur;
     const nomColis = deuxChamps && l.cond_libelle ? pluriel(l.cond_libelle.split(" ")[0], 2) : null;
     const auPoids = l.unite === "kg" || l.unite === "litre";
@@ -467,50 +467,47 @@ function Feuille() {
       );
     };
     const remarque = l.rattachement === "approché" || l.rattachement === "rattaché par ressemblance" || l.aVerifier || l.inactive;
+    const TD: React.CSSProperties = { padding: "8px 6px 8px 10px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13, background: compte(l) ? "rgba(45,106,79,0.07)" : undefined };
     return (
-      <TuileProduit key={l.id} couleur={couleurCat} fait={compte(l)} inactive={l.inactive} nom={l.nom_feuille ?? l.nom}
-        actions={<>
-          {f && <BoutonCrayon href={`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(`/inventaire/${id}`)}`} title="Modifier la fiche produit (prix, conditionnement, zone)" />}
-          {!lectureSeule && <BoutonCroix onClick={() => void retirer(l)} title="Retirer de la liste (la fiche n'est pas touchée)" />}
-        </>}
-        infos={<>
-          <span><CondLibelle>{c?.libelle ?? l.cond_libelle ?? l.unite ?? "unité"}</CondLibelle>{!c && detailPiece ? ` · ${detailPiece}` : ""}</span>
-          {valo.cout == null && <span style={{ color: "#b45309" }}>sans prix{valo.raison ? ` (${valo.raison})` : ""}</span>}
+      <tr key={l.id}>
+        <td style={{ ...TD, padding: 0, width: 4, background: couleurCat }} />
+        <td style={TD}>
+          <div style={{ fontWeight: 600, color: l.inactive ? "#999" : "#1a1a1a", lineHeight: 1.25 }}>{l.nom_feuille ?? l.nom}</div>
           {remarque && (
-            <span style={{
-              fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8,
-              background: l.inactive ? "#fde7e7" : l.aVerifier ? "#fde7ef" : "#fdf3d4", color: l.inactive ? "#a12b2b" : l.aVerifier ? "#b0306a" : "#8a6a12",
-            }}>{l.inactive ? (f ? "fiche désactivée" : "fiche supprimée") : l.aVerifier ? "fiche à vérifier" : "rattaché par ressemblance"}</span>
+            <span style={{ display: "inline-block", marginTop: 3, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8, background: l.inactive ? "#fde7e7" : l.aVerifier ? "#fde7ef" : "#fdf3d4", color: l.inactive ? "#a12b2b" : l.aVerifier ? "#b0306a" : "#8a6a12" }}>
+              {l.inactive ? (f ? "fiche désactivée" : "fiche supprimée") : l.aVerifier ? "fiche à vérifier" : "rattaché par ressemblance"}
+            </span>
           )}
-          {!lectureSeule && peutColis && !deuxChamps && (
-            <button type="button" onClick={() => void basculerComptage(l)} style={lien}>compter par {c!.libelle.split(" ")[0]}</button>
-          )}
-        </>}
-        milieu={
-          /* Compteurs resserrés, centrés, côte à côte (colis puis unités) ; point d'état d'enregistrement en haut à droite */
-          <div style={{ position: "relative", display: "flex", justifyContent: "center", gap: 24, marginTop: 6 }}>
+          <div style={{ fontSize: 11.5, color: "#6f6656", marginTop: 2 }}>
+            <CondLibelle>{c?.libelle ?? l.cond_libelle ?? l.unite ?? "unité"}</CondLibelle>{!c && detailPiece ? ` · ${detailPiece}` : ""}
+            {fournisseur ? ` · ${fournisseur.name}` : recettes[l.ingredient_id] ? " · recette maison" : ""}
+            {valo.cout == null && <span style={{ color: "#b45309" }}> · sans prix{valo.raison ? ` (${valo.raison})` : ""}</span>}
+          </div>
+          <div style={{ fontSize: 11.5, marginTop: 2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            {total != null
+              ? <span><strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong>{valo.cout != null && <span style={{ color: "#6f6656" }}> · {eur(total * valo.cout)}</span>}</span>
+              : <span style={{ color: "#c4bcae" }}>non compté</span>}
+            {!lectureSeule && peutColis && !deuxChamps && (
+              <button type="button" onClick={() => void basculerComptage(l)} style={{ ...lien, fontSize: 11.5 }}>compter par {c!.libelle.split(" ")[0]}</button>
+            )}
+          </div>
+        </td>
+        <td style={{ ...TD, padding: "8px 2px 8px 0", textAlign: "right", whiteSpace: "nowrap" }}>
+          <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
             {contenu != null && compteur("colis", deuxChamps ? nomColis ?? "colis" : pluriel(l.unite ?? "colis", 2), !deuxChamps && auPoids ? 0.5 : 1)}
             {(deuxChamps || contenu == null) && compteur("unites", pluriel(l.unite ?? "unités", 2), contenu == null && auPoids ? 0.5 : 1)}
-            <span title={etat === "erreur" ? "Pas enregistré" : etat === "attente" ? "Enregistrement…" : "Enregistré"} style={{
-              position: "absolute", right: -4, top: -4, width: 8, height: 8, borderRadius: 4,
-              background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent",
-            }} />
           </div>
-        }
-        gauche={fournisseur
-          ? <span className="pastille" style={{ "--pastille-c": getSupplierColor(fournisseur.name, fournisseur.color) } as React.CSSProperties}>{fournisseur.name}</span>
-          : recettes[l.ingredient_id]
-            ? <span className="pastille" title={`Valorisée au coût de la recette « ${recettes[l.ingredient_id].name} »`} style={{ "--pastille-c": CAT_COLORS.preparation } as React.CSSProperties}>recette maison</span>
-            : null}
-        droite={<span style={{ fontSize: 12.5, color: "#8a8378" }}>
-          {total != null
-            ? <><strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong>{valo.cout != null && <span style={{ color: "#6f6656" }}> · {eur(total * valo.cout)}</span>}</>
-            : <span style={{ color: "#c4bcae" }}>non compté</span>}
-        </span>}
-      />
+        </td>
+        <td style={{ ...TD, padding: "8px 6px 8px 0", width: 30, textAlign: "center" }}>
+          <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+            <span title={etat === "erreur" ? "Pas enregistré" : etat === "attente" ? "Enregistrement…" : etat === "ok" ? "Enregistré" : ""} style={{ width: 8, height: 8, borderRadius: 4, background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent" }} />
+            {f && <BoutonCrayon href={`/ingredients?edit=${l.ingredient_id}&back=${encodeURIComponent(`/inventaire/${id}`)}`} title="Modifier la fiche produit (prix, conditionnement, zone)" />}
+            {!lectureSeule && <BoutonCroix onClick={() => void retirer(l)} title="Retirer de la liste (la fiche n'est pas touchée)" />}
+          </div>
+        </td>
+      </tr>
     );
   };
-
 
   /** Bureau : une ligne de tableau par produit, tout sur une ligne (gabarit Base produits) ; compteurs dans la colonne Comptage */
   const ligne = (l: Ligne, couleur: string) => {
@@ -589,6 +586,12 @@ function Feuille() {
 
   const tableau = (ls: Ligne[], couleur: string) => {
     const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+    if (!large) return (
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+        <colgroup><col style={{ width: 4 }} /><col /><col style={{ width: 150 }} /><col style={{ width: 34 }} /></colgroup>
+        <tbody>{ls.map((l) => ligneMobile(l, couleur))}</tbody>
+      </table>
+    );
     return (
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 900 }}>
@@ -803,8 +806,8 @@ function Feuille() {
                 <div key={r.code} style={{ margin: `${i === 0 ? 4 : 10}px 0 6px` }}>
                   {/* Titre de rayon : fond plein, texte blanc, exactement comme l'écran de commande */}
                   <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleFamille(zone, r.code)]: !ouverte }))} aria-expanded={ouverte}
-                    className={`barre-categorie${bureau && ouverte ? " ouverte" : ""}`}
-                    style={{ ...styleBarreCategorie(couleur), ...(bureau ? { minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: ouverte ? "14px 14px 0 0" : 14 } : {}) }}>
+                    className={`barre-categorie${ouverte ? " ouverte" : ""}`}
+                    style={{ ...styleBarreCategorie(couleur), minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: ouverte ? "14px 14px 0 0" : 14 }}>
                     <span style={styleTitreCategorie(couleur)}>
                       {r.libelle} <span style={{ opacity: 0.75, fontWeight: 400 }}>({r.lignes.length})</span>
                     </span>
@@ -820,64 +823,40 @@ function Feuille() {
                     )}
                     <span style={styleChevronBarre(couleur, ouverte)}>▼</span>
                   </button>
-                  {/* Bureau : cadre collé à la barre, sous-catégories en bandeau, produits en tableau */}
-                  {ouverte && bureau && (
+                  {/* Cadre collé à la barre, sous-catégories en bandeau (repliables sur téléphone), produits en tableau */}
+                  {ouverte && (
                     <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>
                       {r.sous.map((g) => {
                         const compteesSous = g.lignes.filter(compte).length;
+                        // Téléphone : sous-catégories repliées par défaut (on n'ouvre que ce que l'on compte) ; bureau : toujours visibles
+                        const cleSous = `${cleFamille(zone, r.code)}|${g.nom ?? ""}`;
+                        const sousOuverte = bureau || enRecherche || !plusieursSous || (bascules[cleSous] ?? false);
                         return (
                           <div key={g.nom ?? "∅"}>
                             {plusieursSous && (
-                              <div style={{ ...styleSousCategorie(couleur, true), cursor: "default", borderRadius: 0 }}>
+                              <div role={bureau ? undefined : "button"} tabIndex={bureau ? undefined : 0} aria-expanded={bureau ? undefined : sousOuverte}
+                                onClick={bureau ? undefined : () => setBascules((b) => ({ ...b, [cleSous]: !sousOuverte }))}
+                                onKeyDown={bureau ? undefined : (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setBascules((b) => ({ ...b, [cleSous]: !sousOuverte })); } }}
+                                style={{ ...styleSousCategorie(couleur, sousOuverte), cursor: bureau ? "default" : "pointer", borderRadius: 0, margin: 0 }}>
                                 <span>{g.nom ?? "Autre"} <span style={{ fontWeight: 500, opacity: 0.8 }}>({g.lignes.length})</span></span>
                                 <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                   {compteesSous > 0 && <span style={{ fontSize: 10.5, color: compteesSous === g.lignes.length ? "#2D6A4F" : "#8a7e6b" }}>{compteesSous}/{g.lignes.length}</span>}
                                   {!lectureSeule && (
                                     <span role="button" tabIndex={0} title={`Retirer « ${g.nom ?? "Autre"} » de cette zone`} aria-label={`Retirer la sous-catégorie ${g.nom ?? "Autre"}`}
-                                      onClick={() => void retirerLot(g.lignes, `${r.libelle} · ${g.nom ?? "Autre"}`)}
-                                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); void retirerLot(g.lignes, `${r.libelle} · ${g.nom ?? "Autre"}`); } }}
+                                      onClick={(e) => { e.stopPropagation(); void retirerLot(g.lignes, `${r.libelle} · ${g.nom ?? "Autre"}`); }}
+                                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); void retirerLot(g.lignes, `${r.libelle} · ${g.nom ?? "Autre"}`); } }}
                                       style={croixPetite}>×</span>
                                   )}
+                                  {!bureau && <span style={{ fontSize: 10, transition: "transform 0.2s", transform: sousOuverte ? "rotate(0)" : "rotate(-90deg)" }}>▼</span>}
                                 </span>
                               </div>
                             )}
-                            {tableau(g.lignes, couleur)}
+                            {sousOuverte && tableau(g.lignes, couleur)}
                           </div>
                         );
                       })}
                     </div>
                   )}
-                  {ouverte && !bureau && r.sous.map((g) => {
-                    const cleSous = `${cleFamille(zone, r.code)}|${g.nom ?? ""}`;
-                    // Sans en-tête de sous-catégorie (rayon sans sous-catégories), les cartes sont toujours visibles
-                    const sousOuverte = enRecherche || !plusieursSous || (bascules[cleSous] ?? false);
-                    const compteesSous = g.lignes.filter(compte).length;
-                    return (
-                      <div key={g.nom ?? "∅"} style={{ marginTop: 6 }}>
-                        {plusieursSous && (
-                          /* Sous-catégorie : même accordéon teinté que le menu produits */
-                          <button type="button" onClick={() => setBascules((b) => ({ ...b, [cleSous]: !sousOuverte }))} aria-expanded={sousOuverte} style={styleSousCategorie(couleur, sousOuverte)}>
-                            <span>{g.nom ?? "Autre"} <span style={{ fontWeight: 500, opacity: 0.8 }}>({g.lignes.length})</span></span>
-                            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              {compteesSous > 0 && <span style={{ fontSize: 10.5, color: compteesSous === g.lignes.length ? "#2D6A4F" : "#8a7e6b" }}>{compteesSous}/{g.lignes.length}</span>}
-                              {!lectureSeule && (
-                                <span role="button" tabIndex={0} title={`Retirer « ${g.nom ?? "Autre"} » de cette zone`} aria-label={`Retirer la sous-catégorie ${g.nom ?? "Autre"}`}
-                                  onClick={(e) => { e.stopPropagation(); void retirerLot(g.lignes, `${r.libelle} · ${g.nom ?? "Autre"}`); }}
-                                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); void retirerLot(g.lignes, `${r.libelle} · ${g.nom ?? "Autre"}`); } }}
-                                  style={croixPetite}>×</span>
-                              )}
-                              <span style={{ fontSize: 10, transition: "transform 0.2s", transform: sousOuverte ? "rotate(0)" : "rotate(-90deg)" }}>▼</span>
-                            </span>
-                          </button>
-                        )}
-                        {sousOuverte && (
-                          <div style={plusieursSous ? { padding: "0 0 2px 6px", marginBottom: 4 } : undefined}>
-                            {g.lignes.map((l) => carte(l, couleur))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
                 </div>
               );
             });

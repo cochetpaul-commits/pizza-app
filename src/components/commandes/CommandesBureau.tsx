@@ -11,7 +11,8 @@ import { EtatVide } from "@/components/ui/EtatVide";
  * des commandes (brouillons, à recevoir, historique récent) ou, au choix, trois accordéons colorés ;
  * un clic sur une ligne ouvre la commande dans le volet de droite avec ses articles et les actions de
  * son statut. L'éditeur de commande (choix des produits, quantités) reste la page actuelle, ouverte
- * par « Ouvrir la commande ». La version téléphone n'est pas touchée.
+ * par « Ouvrir la commande ». Depuis le 10/10/2026, le téléphone utilise le même écran : tuiles sur deux
+ * colonnes, lignes en trois colonnes (fournisseur + statut · date, total, chevron), volet en feuille du bas.
  */
 
 export type CommandeLigne = {
@@ -56,6 +57,8 @@ function Chip({ fond, couleur, children }: { fond: string; couleur: string; chil
 }
 
 export type CommandesBureauProps = {
+  /** Ordinateur ou iPad ; sinon téléphone (tuiles compactes, lignes resserrées, « Commander » dans la barre du bas) */
+  bureau?: boolean;
   accent: string;
   /** Brouillons et commandes en attente de validation */
   enCours: CommandeLigne[];
@@ -84,6 +87,7 @@ export type CommandesBureauProps = {
 };
 
 export function CommandesBureau(p: CommandesBureauProps) {
+  const bureau = p.bureau ?? true;
   const affichage = useSyncExternalStore(abonner, lire, () => "plat" as const);
   const [ouverteId, setOuverteId] = useState<string | null>(null);
   const [sectionsFermees, setSectionsFermees] = useState<Set<Section>>(() => new Set(["historique"]));
@@ -107,9 +111,9 @@ export function CommandesBureau(p: CommandesBureauProps) {
 
   const statut = (c: CommandeLigne) => {
     const s = section(c);
-    if (s === "a_recevoir") return <Chip fond="rgba(74,103,65,0.12)" couleur={VERT}>{c.email_sent_at ? "Envoyée" : "Validée · à envoyer"}</Chip>;
+    if (s === "a_recevoir") return <Chip fond="rgba(74,103,65,0.12)" couleur={VERT}>{c.email_sent_at ? "Envoyée" : bureau ? "Validée · à envoyer" : "À envoyer"}</Chip>;
     const couleur = p.couleurStatut[c.status] ?? GRIS;
-    return <Chip fond={`${couleur}1f`} couleur={couleur}>{p.libelleStatut[c.status] ?? c.status}</Chip>;
+    return <Chip fond={`${couleur}1f`} couleur={couleur}>{!bureau && c.status === "en_attente" ? "À valider" : p.libelleStatut[c.status] ?? c.status}</Chip>;
   };
   const actionLigne = (c: CommandeLigne) => {
     const s = section(c);
@@ -133,7 +137,36 @@ export function CommandesBureau(p: CommandesBureauProps) {
       <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{actionLigne(c)}</td>
     </tr>
   ); };
-  const tableau = (liste: CommandeLigne[], vide: string, enSection = false) => { const TH = enSection ? TH_SEC : TH_PLAT; const TD = enSection ? TD_SEC : TD_PLAT; return (
+  /** Téléphone : fournisseur + statut · date · articles, total à droite, chevron */
+  const ligneMobile = (c: CommandeLigne) => {
+    const TD: CSSProperties = { padding: "10px 8px 10px 12px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13 };
+    const s = section(c);
+    return (
+      <tr key={c.id} className={`cb-ligne${ouverte?.id === c.id ? " on" : ""}`} onClick={() => setOuverteId(c.id)} style={{ cursor: "pointer" }}>
+        <td style={{ ...TD, padding: 0, width: 4, background: p.couleurFournisseur(c.supplier_name) }} />
+        <td style={TD}>
+          <div style={{ fontWeight: 600, lineHeight: 1.25 }}>{c.supplier_name}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3, fontSize: 11.5, color: MUTED, minWidth: 0 }}>
+            {statut(c)}
+            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {p.fmtDate(c.created_at)}{c.nb_articles != null ? ` · ${c.nb_articles} art.` : ""}{s === "a_recevoir" ? (c.email_sent_at ? " · envoyée" : " · à envoyer") : ""}
+            </span>
+          </div>
+        </td>
+        <td style={{ ...TD, padding: "10px 4px 10px 0", textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: c.total_ht > 0 ? "#1a1a1a" : FAIBLE }}>{c.total_ht > 0 ? euros(c.total_ht) : "—"}</td>
+        <td style={{ ...TD, padding: "10px 10px 10px 2px", width: 18, color: FAIBLE, fontSize: 18, textAlign: "right" }} aria-hidden>›</td>
+      </tr>
+    );
+  };
+  const tableau = (liste: CommandeLigne[], vide: string, enSection = false) => { const TH = enSection ? TH_SEC : TH_PLAT; const TD = enSection ? TD_SEC : TD_PLAT; if (!bureau) return (
+    <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+      <colgroup><col style={{ width: 4 }} /><col /><col style={{ width: 92 }} /><col style={{ width: 22 }} /></colgroup>
+      <tbody>
+        {liste.map(ligneMobile)}
+        {liste.length === 0 && <tr><td style={{ padding: 0 }} colSpan={4}><EtatVide compact icone="commande" titre={vide.split(". ")[0].replace(/\.$/, "")} texte={vide.split(". ").slice(1).join(". ") || undefined} /></td></tr>}
+      </tbody>
+    </table>
+  ); return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 760 }}>
         <thead><tr>
@@ -196,25 +229,26 @@ export function CommandesBureau(p: CommandesBureauProps) {
   );
 
   return (
-    <div style={{ display: "grid", gap: 18 }}>
+    <div style={{ display: "grid", gap: bureau ? 18 : 12 }}>
       <style>{`.cb-ligne:hover td { background: #f7f3ec; } .cb-ligne.on td { background: rgba(212,119,90,0.08); }.cb-ligne:last-child td{border-bottom:0}`}</style>
 
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
         <div>
-          <h1 style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 28, textTransform: "uppercase", letterSpacing: ".02em", margin: 0, lineHeight: 1.05, color: "#1a1a1a" }}>Commandes</h1>
-          <div style={{ color: MUTED, fontSize: 13, marginTop: 4 }}>Brouillons, envois et réceptions, par fournisseur.</div>
+          <h1 style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: bureau ? 28 : 22, textTransform: "uppercase", letterSpacing: ".02em", margin: 0, lineHeight: 1.05, color: "#1a1a1a" }}>Commandes</h1>
+          {bureau && <div style={{ color: MUTED, fontSize: 13, marginTop: 4 }}>Brouillons, envois et réceptions, par fournisseur.</div>}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <a href="/commandes/theoriques" style={{ ...BTN, display: "inline-flex", alignItems: "center", textDecoration: "none" }} title="Ce qu'il faudrait commander d'après le stock théorique">Proposition de commande</a>
-          <button type="button" onClick={p.onCommander} style={{ ...BTN, background: p.accent, color: "#fff", border: "none", fontWeight: 700 }}>+ Commander</button>
+          <a href="/commandes/theoriques" style={{ ...BTN, display: "inline-flex", alignItems: "center", textDecoration: "none" }} title="Ce qu'il faudrait commander d'après le stock théorique">{bureau ? "Proposition de commande" : "Proposition"}</a>
+          {/* Téléphone : « Commander » est dans la barre du bas */}
+          {bureau && <button type="button" onClick={p.onCommander} style={{ ...BTN, background: p.accent, color: "#fff", border: "none", fontWeight: 700 }}>+ Commander</button>}
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-        <Tuile icone="brouillon" libelle="Brouillons" valeur={nombre(brouillons.length)} couleur={brouillons.length ? BRUN : FAIBLE} sous={brouillons.length ? noms(brouillons) : "aucun brouillon"} />
-        <Tuile icone="attente" libelle="En attente de validation" valeur={nombre(enAttente.length)} couleur={enAttente.length ? "#2563EB" : FAIBLE} sous={enAttente.length ? noms(enAttente) : "aucune commande d'équipier à valider"} />
-        <Tuile icone="camion" libelle="À recevoir" valeur={nombre(p.aRecevoir.length)} couleur={p.aRecevoir.length ? VERT : FAIBLE} sous={p.aRecevoir.length ? p.aRecevoir.map((c) => `${c.supplier_name} ${euros(c.total_ht)}`).join(" · ") : "rien en attente de livraison"} />
-        <Tuile icone="recu" libelle="Reçues ce mois" valeur={euros(recuesMois.reduce((t, c) => t + c.total_ht, 0))} couleur={recuesMois.length ? "#16a34a" : FAIBLE} sous={`${recuesMois.length} commande${recuesMois.length > 1 ? "s" : ""} depuis le 1er du mois`} />
+      <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, 1fr)" : "repeat(2, 1fr)", gap: bureau ? 10 : 8 }}>
+        <Tuile compacte={!bureau} icone="brouillon" libelle="Brouillons" valeur={nombre(brouillons.length)} couleur={brouillons.length ? BRUN : FAIBLE} sous={!bureau ? "" : brouillons.length ? noms(brouillons) : "aucun brouillon"} />
+        <Tuile compacte={!bureau} icone="attente" libelle={bureau ? "En attente de validation" : "À valider"} valeur={nombre(enAttente.length)} couleur={enAttente.length ? "#2563EB" : FAIBLE} sous={!bureau ? "" : enAttente.length ? noms(enAttente) : "aucune commande d'équipier à valider"} />
+        <Tuile compacte={!bureau} icone="camion" libelle="À recevoir" valeur={nombre(p.aRecevoir.length)} couleur={p.aRecevoir.length ? VERT : FAIBLE} sous={!bureau ? "" : p.aRecevoir.length ? p.aRecevoir.map((c) => `${c.supplier_name} ${euros(c.total_ht)}`).join(" · ") : "rien en attente de livraison"} />
+        <Tuile compacte={!bureau} icone="recu" libelle="Reçues ce mois" valeur={euros(recuesMois.reduce((t, c) => t + c.total_ht, 0))} couleur={recuesMois.length ? "#16a34a" : FAIBLE} sous={!bureau ? "" : `${recuesMois.length} commande${recuesMois.length > 1 ? "s" : ""} depuis le 1er du mois`} />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

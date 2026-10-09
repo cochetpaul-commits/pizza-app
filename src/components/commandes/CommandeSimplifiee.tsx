@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { fetchApi } from "@/lib/fetchApi";
-import { useBureau } from "@/hooks/useBureau";
+import { useBureau, useLarge } from "@/hooks/useBureau";
 import { SEUIL_HABITUEL } from "@/lib/commandeHabituels";
 import { libelleZone, nomUnite, quantiteAffichee, type UniteCommande, type UniteTaille } from "@/lib/commandeArticles";
 
@@ -71,7 +71,7 @@ const qteTexte = (n: number) => String(Math.round(n * 100) / 100).replace(".", "
 /** Couleur du titre de rayon : partagée avec l'inventaire (src/lib/rayons.ts) */
 import { couleurRayon } from "@/lib/rayons";
 import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
-import { BoutonCrayon, Compteur, Conditionnement, TuileProduit } from "@/components/TuileProduit";
+import { BoutonCrayon, Compteur } from "@/components/TuileProduit";
 
 /**
  * Aller-retour vers la fiche produit (admins, managers) : l'état de l'écran est gardé le temps de corriger
@@ -100,6 +100,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   onOngletChange?: (onglet: Onglet) => void;
 }) {
   const bureau = useBureau();
+  const large = useLarge();
   // Commande du jour / précommande du mercredi : deux brouillons séparés
   const router = useRouter();
   const { canWrite: peutCorrigerFiche } = useProfile();
@@ -315,77 +316,75 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   };
   const aEnvoyer = onglet === "precommande" && brouillon && !!data.session && data.lignes.some((l) => l.quantite > 0);
 
-  function carte(a: Article, couleur: string = ACCENT) {
+  /** Téléphone (10/10/2026) : même tableau que le bureau en trois colonnes — nom + conditionnement · prix · repère, quantité à droite */
+  function ligneMobile(a: Article, couleur: string = ACCENT) {
     const m = modeDe(a);
-    const ligne = ligneDe(a, m);
-    const total = ligne?.quantite ?? 0;
-    const maPart = ligne?.apports.find((p) => p.user_id === data!.moi)?.quantite ?? 0;
+    const l = ligneDe(a, m);
+    const total = l?.quantite ?? 0;
+    const maPart = l?.apports.find((p) => p.user_id === data!.moi)?.quantite ?? 0;
     const pas = m === "uc" && a.au_poids ? 0.5 : 1;
     const prix = m === "element" ? a.prix_element : a.prix_uc;
     const unite = uniteDe(a, m);
     const autreMode: Mode = m === "uc" ? "element" : "uc";
     const autreLigne = a.unite_element ? ligneDe(a, autreMode) : undefined;
-    const detail = ligne && ligne.apports.length > 0 && (ligne.apports.length > 1 || ligne.apports[0].user_id !== data!.moi)
-      ? ligne.apports.map((p) => `${p.user_id === data!.moi ? "moi" : p.nom} ${qteTexte(p.quantite)}`).join(" · ")
+    const detail = l && l.apports.length > 0 && (l.apports.length > 1 || l.apports[0].user_id !== data!.moi)
+      ? l.apports.map((p) => `${p.user_id === data!.moi ? "moi" : p.nom} ${qteTexte(p.quantite)}`).join(" · ")
       : null;
-    const texteIndication: React.CSSProperties = { fontSize: 12.5, color: ACCENT, marginTop: 4, whiteSpace: "normal", overflowWrap: "anywhere" };
-    // Tuile produit commune : nom, conditionnement et prix, indications, puis zones à gauche et compteur à droite
+    const indication = data!.indication === "derniere_commande"
+      ? (a.derniere ? `Dernière commande : ${quantiteAffichee(a, a.derniere.quantite, a.derniere.mode)}` : null)
+      : (estHabituel(a) && a.habituel ? `D'habitude : ${quantiteAffichee(a, a.habituel.quantite, a.habituel.mode)} par livraison` : null);
+    const TD: React.CSSProperties = { padding: "9px 6px 9px 10px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13, background: total > 0 ? "rgba(212,119,90,0.08)" : undefined };
+    const pilule = (actif: boolean): React.CSSProperties => ({
+      padding: "3px 8px", borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: "pointer", lineHeight: 1.2, fontFamily: "inherit",
+      border: actif ? `1.5px solid ${ACCENT}` : "1px solid #ddd6c8", background: actif ? "#FFF0EB" : "#f7f3ec", color: actif ? ACCENT : "#8a8378",
+    });
     return (
-      <TuileProduit key={a.ingredient_id} couleur={couleur} fait={total > 0} nom={a.nom}
-        actions={peutCorrigerFiche ? <BoutonCrayon onClick={() => void ouvrirFiche(a)} title="Ouvrir la fiche produit" /> : undefined}
-        infos={<>
-          <Conditionnement>{unite}</Conditionnement>
-          {(prix != null || a.ref) && <span>{prix != null ? euros(prix) : ""}{prix != null && a.ref ? " · " : ""}{a.ref ? `réf. ${a.ref}` : ""}</span>}
-        </>}
-        milieu={<>
-          {data!.indication === "derniere_commande" ? (a.derniere && (
-            <div style={texteIndication}>Dernière commande : {quantiteAffichee(a, a.derniere.quantite, a.derniere.mode)}</div>
-          )) : (estHabituel(a) && a.habituel && (
-            // Médiane par livraison
-            <div style={texteIndication}>D&apos;habitude : {quantiteAffichee(a, a.habituel.quantite, a.habituel.mode)} par livraison</div>
-          ))}
-          {a.stock_objectif != null && (
-            <div style={{ ...texteIndication, color: "#6f6656", marginTop: 2 }}>Stock idéal : {quantiteAffichee(a, a.stock_objectif, a.contenu_nb > 1 ? "element" : "uc")}</div>
+      <tr key={a.ingredient_id}>
+        <td style={{ ...TD, padding: 0, width: 4, background: couleur }} />
+        <td style={TD}>
+          <div style={{ fontWeight: 600, color: "#1a1a1a", lineHeight: 1.25 }}>{a.nom}</div>
+          <div style={{ fontSize: 11.5, color: "#6f6656", marginTop: 2 }}>
+            {unite}{prix != null ? ` · ${euros(prix)} HT` : ""}{a.ref ? ` · réf. ${a.ref}` : ""}
+            {a.zones.length > 0 && <span style={{ display: "inline-flex", gap: 4, marginLeft: 6, verticalAlign: "middle" }}>{a.zones.map((z) => <span key={z.nom} className="pastille" style={{ "--pastille-c": z.couleur ?? "#8a8378" } as React.CSSProperties}>{libelleZone(z.nom)}</span>)}</span>}
+          </div>
+          {(indication || a.stock_objectif != null) && (
+            <div style={{ fontSize: 11.5, color: ACCENT, marginTop: 2 }}>
+              {indication}{indication && a.stock_objectif != null ? " · " : ""}{a.stock_objectif != null && <span style={{ color: "#6f6656" }}>stock idéal {quantiteAffichee(a, a.stock_objectif, a.contenu_nb > 1 ? "element" : "uc")}</span>}
+            </div>
           )}
-          {total > 0 && !a.au_poids && a.contenu_nb > 1 && (
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginTop: 2, whiteSpace: "normal", overflowWrap: "anywhere" }}>En cours : {quantiteAffichee(a, total, m)}</div>
+          {total > 0 && !a.au_poids && a.contenu_nb > 1 && <div style={{ fontSize: 11.5, color: "#1a1a1a", fontWeight: 700, marginTop: 2 }}>En cours : {quantiteAffichee(a, total, m)}</div>}
+          {(detail || (autreLigne && autreLigne.quantite > 0)) && (
+            <div style={{ fontSize: 11.5, color: "#6f6656", marginTop: 2 }}>{detail}{autreLigne && autreLigne.quantite > 0 && <>{detail ? " — " : ""}aussi {quantiteAffichee(a, autreLigne.quantite, autreMode)}</>}</div>
           )}
           {a.unite_element && brouillon && (
-            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <span style={{ display: "inline-flex", gap: 4, marginTop: 5 }}>
               {(["uc", "element"] as Mode[]).map((x) => (
-                <button key={x} type="button" onClick={() => setModes((s) => ({ ...s, [a.ingredient_id]: x }))}
-                  style={{
-                    flex: 1, minHeight: 34, padding: "4px 8px", borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: "pointer", lineHeight: 1.2,
-                    border: m === x ? `1.5px solid ${ACCENT}` : "1px solid #ddd6c8",
-                    background: m === x ? "#FFF0EB" : "#f7f3ec", color: m === x ? ACCENT : "#8a8378",
-                  }}>
-                  {/* « Par carton de 6 » / « Par bouteille » : l'autre bouton dit déjà ce qu'il y a dans le carton */}
+                <button key={x} type="button" onClick={() => setModes((st) => ({ ...st, [a.ingredient_id]: x }))} style={pilule(m === x)}>
                   Par {x === "element" ? a.unite_element : a.contenu_nb > 1 && a.element ? `${nomUnite(a.unite_commande)} de ${qteTexte(a.contenu_nb)}` : a.unite_uc}
                 </button>
               ))}
-            </div>
+            </span>
           )}
-          {(detail || (autreLigne && autreLigne.quantite > 0)) && (
-            <div style={{ fontSize: 12, color: "#6f6656", marginTop: 6 }}>
-              {detail}
-              {autreLigne && autreLigne.quantite > 0 && <>{detail ? " — " : ""}aussi {quantiteAffichee(a, autreLigne.quantite, autreMode)}</>}
-            </div>
-          )}
-        </>}
-        gauche={a.zones.map((z) => (
-          <span key={z.nom} className="pastille" style={{ "--pastille-c": z.couleur ?? "#8a8378" } as React.CSSProperties}>{libelleZone(z.nom)}</span>
-        ))}
-        droite={brouillon ? (total === 0 ? (
-          <button type="button" aria-label={`Ajouter ${a.nom}`} onClick={() => fixerMaPart(a, m, 1)} style={{
-            height: 40, minWidth: 64, padding: "0 16px", borderRadius: 20, border: "none", background: ACCENT, color: "#fff", fontSize: 16, fontWeight: 700,
-            cursor: "pointer", touchAction: "manipulation", fontFamily: "inherit",
-          }}>+ 1</button>
-        ) : (
-          <Compteur valeur={qteTexte(total)} moinsActif={maPart > 0}
-            onMoins={() => fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2))}
-            onPlus={() => fixerMaPart(a, m, Math.round((maPart + pas) * 2) / 2)} />
-        )) : undefined}
-      />
+        </td>
+        <td style={{ ...TD, padding: "9px 4px 9px 0", textAlign: "right", whiteSpace: "nowrap" }}>
+          <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+            {brouillon ? (total === 0 ? (
+              <button type="button" aria-label={`Ajouter ${a.nom}`} onClick={() => fixerMaPart(a, m, 1)} style={{
+                height: 36, minWidth: 60, padding: "0 14px", borderRadius: 18, border: "none", background: ACCENT, color: "#fff", fontSize: 15, fontWeight: 700,
+                cursor: "pointer", touchAction: "manipulation", fontFamily: "inherit",
+              }}>+ 1</button>
+            ) : (
+              <Compteur valeur={qteTexte(total)} moinsActif={maPart > 0}
+                onMoins={() => fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2))}
+                onPlus={() => fixerMaPart(a, m, Math.round((maPart + pas) * 2) / 2)} />
+            )) : <span style={{ fontWeight: 700 }}>{total > 0 ? qteTexte(total) : "—"}</span>}
+            {total > 0 && prix != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{euros(total * prix)}</span>}
+          </div>
+        </td>
+        <td style={{ ...TD, padding: "9px 8px 9px 2px", width: 30, textAlign: "right" }}>
+          {peutCorrigerFiche && <BoutonCrayon onClick={() => void ouvrirFiche(a)} title="Ouvrir la fiche produit" />}
+        </td>
+      </tr>
     );
   }
 
@@ -469,6 +468,12 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
 
   function tableau(articles: Article[], couleur: string = ACCENT) {
     const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+    if (!large) return (
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+        <colgroup><col style={{ width: 4 }} /><col /><col style={{ width: 132 }} /><col style={{ width: 30 }} /></colgroup>
+        <tbody>{articles.map((a) => ligneMobile(a, couleur))}</tbody>
+      </table>
+    );
     return (
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 960 }}>
@@ -539,9 +544,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
       {onglet === "jour" && recherche.trim().length >= 2 ? (
         <div>
           {resultats.length === 0 && <div style={{ color: "#999", fontSize: 14, padding: 12 }}>Aucun produit trouvé.</div>}
-          {bureau && resultats.length > 0
-            ? <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden" }}>{tableau(resultats)}</div>
-            : resultats.map((a) => carte(a))}
+          {resultats.length > 0 && <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden" }}>{tableau(resultats)}</div>}
         </div>
       ) : sections.length === 0 ? (
         <div style={{ color: "#999", fontSize: 14, padding: 12 }}>
@@ -555,8 +558,8 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
               {/* Titre de rayon : fond plein, texte blanc ; collé en haut de l'écran tant que le rayon ouvert défile */}
               <div className={ouvert && !bureau ? "rayon-collant" : undefined} style={{ background: "#f2ede4", paddingBottom: ouvert && !bureau ? 8 : 0 }}>
               <button type="button" onClick={() => setBascules((s) => ({ ...s, [r.code]: !ouvert }))} aria-expanded={ouvert}
-                className={`barre-categorie${bureau && ouvert ? " ouverte" : ""}`}
-                style={{ ...styleBarreCategorie(couleurRayon(r.code)), ...(bureau ? { minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: ouvert ? "14px 14px 0 0" : 14 } : {}) }}>
+                className={`barre-categorie${ouvert ? " ouverte" : ""}`}
+                style={{ ...styleBarreCategorie(couleurRayon(r.code)), minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: ouvert ? "14px 14px 0 0" : 14 }}>
                 <span style={styleTitreCategorie(couleurRayon(r.code))}>
                   {r.libelle} <span style={{ opacity: 0.75, fontWeight: 400 }}>({r.articles.length})</span>
                 </span>
@@ -566,9 +569,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
                 <span style={styleChevronBarre(couleurRayon(r.code), ouvert)}>▼</span>
               </button>
               </div>
-              {ouvert && (bureau
-                ? <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>{tableau(r.articles, couleurRayon(r.code))}</div>
-                : r.articles.map((a) => carte(a, couleurRayon(r.code))))}
+              {ouvert && <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderTop: "none", borderRadius: "0 0 14px 14px", overflow: "hidden" }}>{tableau(r.articles, couleurRayon(r.code))}</div>}
             </div>
           );
         })
