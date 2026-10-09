@@ -547,8 +547,8 @@ export default function FournisseursPage() {
 
   function renderFormBody() {
     const bodyColor = form.color || (modalSupplier ? getSupplierColor(modalSupplier.name, modalSupplier.color) : "#D4775A");
-    return (
-      <>
+    const gauche = (
+          <>
         {/* Name (only in create mode) */}
         {modalMode === "create" && (
           <div style={{ marginBottom: 10 }}>
@@ -564,6 +564,7 @@ export default function FournisseursPage() {
         )}
 
         {/* Etablissement selector */}
+        <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-start" }}>
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#6f6a61", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 }}>
             Établissement
@@ -597,11 +598,12 @@ export default function FournisseursPage() {
         </div>
 
         {/* Section: Couleur */}
-        <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#6f6a61", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 }}>
-          Couleur
-        </div>
         <div style={{ marginBottom: 8 }}>
+          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#6f6a61", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 }}>
+            Couleur
+          </div>
           <ColorPicker value={form.color || bodyColor} onChange={(hex) => setForm((f) => ({ ...f, color: hex }))} size={18} />
+        </div>
         </div>
 
         {/* ── Accordion: Coordonnees ── */}
@@ -682,6 +684,37 @@ export default function FournisseursPage() {
           </div>
         )}
 
+        {/* ── Accordion: Administratif ── */}
+        <div style={titreSection}>Administratif</div>
+        {(
+          <div style={{ padding: "0 0 6px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, marginBottom: 8 }}>
+              <div>
+                <div style={labelStyle}>SIRET</div>
+                <input style={inputStyle} value={form.siret} onChange={(e) => setForm((f) => ({ ...f, siret: e.target.value }))} placeholder="123 456 789 00012" />
+              </div>
+              <div>
+                <div style={labelStyle}>N TVA intra.</div>
+                <input style={inputStyle} value={form.tva_intra} onChange={(e) => setForm((f) => ({ ...f, tva_intra: e.target.value }))} placeholder="FR12345678901" />
+              </div>
+            </div>
+            <div>
+              <div style={labelStyle}>Notes</div>
+              <textarea
+                style={{ ...inputStyle, resize: "vertical" }}
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                placeholder="Informations complementaires..."
+                rows={2}
+              />
+            </div>
+          </div>
+        )}
+
+          </>
+        );
+    const droite = (
+          <>
         {/* ── Accordion: Franco & Livraison ── */}
         <div style={titreSection}>Franco & Livraison</div>
         {(
@@ -710,7 +743,7 @@ export default function FournisseursPage() {
             <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
               Planning commande → livraison
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "110px 130px 1fr", gap: 6, marginBottom: 2, maxWidth: 520 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "110px 130px 1fr", gap: 6, marginBottom: 2 }}>
               <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Jour cde</div>
               <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Heure lim.</div>
               <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Jour livr.</div>
@@ -718,7 +751,7 @@ export default function FournisseursPage() {
             {JOURS_FULL.map((jour) => {
               const rule = schedule.find(r => r.day === jour);
               return (
-                <div key={jour} style={{ display: "grid", gridTemplateColumns: "110px 130px 1fr", gap: 6, marginBottom: 2, maxWidth: 520 }}>
+                <div key={jour} style={{ display: "grid", gridTemplateColumns: "110px 130px 1fr", gap: 6, marginBottom: 2 }}>
                   <div style={{ padding: "6px 4px", fontSize: 12.5, color: rule ? "#1a1a1a" : "#a39d92", fontWeight: rule ? 600 : 400 }}>
                     {jour.charAt(0).toUpperCase() + jour.slice(1)}
                   </div>
@@ -757,33 +790,6 @@ export default function FournisseursPage() {
                 </div>
               );
             })}
-          </div>
-        )}
-
-        {/* ── Accordion: Administratif ── */}
-        <div style={titreSection}>Administratif</div>
-        {(
-          <div style={{ padding: "0 0 6px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, marginBottom: 8 }}>
-              <div>
-                <div style={labelStyle}>SIRET</div>
-                <input style={inputStyle} value={form.siret} onChange={(e) => setForm((f) => ({ ...f, siret: e.target.value }))} placeholder="123 456 789 00012" />
-              </div>
-              <div>
-                <div style={labelStyle}>N TVA intra.</div>
-                <input style={inputStyle} value={form.tva_intra} onChange={(e) => setForm((f) => ({ ...f, tva_intra: e.target.value }))} placeholder="FR12345678901" />
-              </div>
-            </div>
-            <div>
-              <div style={labelStyle}>Notes</div>
-              <textarea
-                style={{ ...inputStyle, resize: "vertical" }}
-                value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="Informations complementaires..."
-                rows={2}
-              />
-            </div>
           </div>
         )}
 
@@ -896,6 +902,21 @@ export default function FournisseursPage() {
           </div>
         )}
 
+          </>
+        );
+    return (
+      <>
+        {bureau ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 36, alignItems: "start" }}>
+            <div>{gauche}</div>
+            <div>{droite}</div>
+          </div>
+        ) : (
+          <>
+            {gauche}
+            {droite}
+          </>
+        )}
         {/* Actions */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <button
@@ -986,7 +1007,7 @@ export default function FournisseursPage() {
           <tr>
             <td style={{ padding: 0, width: 4, background: sColor }} />
             <td colSpan={8} style={{ padding: "12px 16px 16px", background: "#faf8f4", borderBottom: "1px solid #ddd6c8" }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ maxWidth: 820 }}>{renderFormBody()}</div>
+              {renderFormBody()}
             </td>
           </tr>
         )}
