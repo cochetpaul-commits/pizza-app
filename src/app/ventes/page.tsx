@@ -983,7 +983,7 @@ function PerformancesPage() {
               <div style={S.card}>
                 <div style={S.sec}>Par service · {mode.toUpperCase()} · couverts</div>
                 {/* Desktop: table classique */}
-                <div className="desktop-only" style={{ overflow: "hidden", borderRadius: 8, border: "1px solid #e0d8ce" }}>
+                <div className="desktop-only" style={{ overflow: "hidden", borderRadius: 14, border: "1px solid #ddd6c8" }}>
                   <RecapTable services={W.services} mode={mode} meteo={meteo} dates={W.dates} days={W.days} useWeeks={W.dates.length > 14} />
                 </div>
                 {/* Mobile: transposed table (rows=zones, cols=midi/soir) per day */}
@@ -2493,8 +2493,8 @@ function zCell(val: number | undefined, color: string) {
 }
 
 const thSt = (align: "left" | "right" | "center" = "right"): CSSProperties => ({
-  fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600,
-  padding: "11px 14px", textAlign: align, whiteSpace: "nowrap", borderBottom: "1px solid #e0d8ce",
+  fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600,
+  padding: "8px 14px", textAlign: align, whiteSpace: "nowrap", borderBottom: "1px solid #ddd6c8",
   color: "#777",
 });
 

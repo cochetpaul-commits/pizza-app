@@ -17,7 +17,6 @@ type Etab = {
 type Poste = { etablissement_id: string; equipe: string };
 
 const CARD: React.CSSProperties = { background: "#fff", borderRadius: 14, border: "1px solid #ddd6c8" };
-const LABEL: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 };
 const INPUT: React.CSSProperties = { padding: "8px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, width: 260, boxSizing: "border-box" };
 
 export default function EtablissementsListPage() {
@@ -119,10 +118,11 @@ export default function EtablissementsListPage() {
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid #ddd6c8" }}>
-                  <th style={{ ...LABEL, textAlign: "left", padding: "12px 16px" }}>Etablissement</th>
-                  <th style={{ ...LABEL, textAlign: "left", padding: "12px 16px" }}>Adresse</th>
-                  <th style={{ ...LABEL, textAlign: "left", padding: "12px 16px" }}>Equipes</th>
+                <tr>
+                  <th style={{ textAlign: "left", padding: "8px 16px" }}>Etablissement</th>
+                  <th style={{ textAlign: "left", padding: "8px 16px" }}>Adresse</th>
+                  <th style={{ textAlign: "left", padding: "8px 16px" }}>Equipes</th>
+                  <th style={{ width: 50 }} />
                 </tr>
               </thead>
               <tbody>
@@ -130,7 +130,7 @@ export default function EtablissementsListPage() {
                   <tr
                     key={etab.id}
                     onClick={() => router.push(`/settings/etablissements/${etab.id}`)}
-                    style={{ borderBottom: "1px solid #f0ebe3", cursor: "pointer" }}
+                    style={{ cursor: "pointer" }}
                     onMouseOver={e => (e.currentTarget.style.background = "#f5f0e8")}
                     onMouseOut={e => (e.currentTarget.style.background = "transparent")}
                   >
@@ -162,6 +162,9 @@ export default function EtablissementsListPage() {
                           </span>
                         ))}
                       </div>
+                    </td>
+                    <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                      <span style={{ display: "inline-flex", width: 26, height: 26, borderRadius: 8, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>→</span>
                     </td>
                   </tr>
                 ))}

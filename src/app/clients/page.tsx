@@ -169,6 +169,7 @@ export default function CarnetClientsPage() {
         )}
 
         {!loading && filtered.length > 0 && (
+          <div style={cadre}>
           <table style={tableStyle}>
             <thead>
               <tr>
@@ -176,7 +177,7 @@ export default function CarnetClientsPage() {
                 <th style={th}>Telephone</th>
                 <th style={th}>Email</th>
                 <th style={{ ...th, textAlign: "center" }}>Events</th>
-                <th style={{ ...th, width: 40 }} />
+                <th style={{ ...th, width: 70 }} />
               </tr>
             </thead>
             <tbody>
@@ -201,7 +202,7 @@ export default function CarnetClientsPage() {
                       <span style={{ color: "#ccc" }}>0</span>
                     )}
                   </td>
-                  <td style={td}>
+                  <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); remove(c.id); }}
@@ -210,11 +211,13 @@ export default function CarnetClientsPage() {
                     >
                       &times;
                     </button>
+                    <span style={{ ...fleche, marginLeft: 6 }}>→</span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -302,23 +305,27 @@ const tableStyle: React.CSSProperties = {
   fontSize: 13,
 };
 
+const cadre: React.CSSProperties = { background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden" };
+
 const th: React.CSSProperties = {
   textAlign: "left",
-  padding: "8px 10px",
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: 1,
+  padding: "8px 14px",
+  fontSize: 10.5,
+  fontWeight: 600,
+  letterSpacing: ".08em",
   textTransform: "uppercase",
-  color: "#b0a894",
+  color: "#a39d92",
   borderBottom: "1px solid #ddd6c8",
+  whiteSpace: "nowrap",
 };
 
 const td: React.CSSProperties = {
-  padding: "10px 10px",
-  borderBottom: "1px solid rgba(221,214,200,0.4)",
+  padding: "11px 14px",
   fontSize: 13,
   color: "#1a1a1a",
 };
+
+const fleche: React.CSSProperties = { display: "inline-flex", width: 26, height: 26, borderRadius: 8, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 };
 
 const badgeStyle: React.CSSProperties = {
   display: "inline-block",

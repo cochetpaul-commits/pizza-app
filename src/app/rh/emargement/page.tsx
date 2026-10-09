@@ -247,17 +247,14 @@ export default function EmargementPage() {
           <p style={{ color: "#999", fontSize: 13, textAlign: "center", marginTop: 40 }}>Aucun employe actif</p>
         ) : (
           <>
-            <div style={{ overflowX: "auto" }}>
+            <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14 }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 600 }}>
                 <thead>
-                  <tr style={{ borderBottom: "2px solid #ddd6c8" }}>
+                  <tr>
                     <th
                       style={{
                         textAlign: "left",
-                        padding: "10px 8px",
-                        fontSize: 12,
-                        color: "#999",
-                        fontWeight: 600,
+                        padding: "8px 14px",
                         minWidth: 140,
                         position: "sticky",
                         left: 0,
@@ -273,10 +270,8 @@ export default function EmargementPage() {
                           key={i}
                           style={{
                             textAlign: "center",
-                            padding: "10px 4px",
-                            fontSize: 12,
-                            color: isToday ? "#e27f57" : "#999",
-                            fontWeight: 600,
+                            padding: "8px 4px",
+                            color: isToday ? "#e27f57" : undefined,
                             minWidth: 60,
                           }}
                         >
@@ -290,10 +285,8 @@ export default function EmargementPage() {
                     <th
                       style={{
                         textAlign: "center",
-                        padding: "10px 8px",
-                        fontSize: 12,
+                        padding: "8px 8px",
                         color: "#1a1a1a",
-                        fontWeight: 700,
                         minWidth: 60,
                       }}
                     >
@@ -309,7 +302,6 @@ export default function EmargementPage() {
                       <tr
                         key={emp.id}
                         style={{
-                          borderBottom: "1px solid #ddd6c8",
                           transition: "background 0.15s",
                           background: isOverWeek ? "rgba(198,40,40,0.06)" : undefined,
                         }}

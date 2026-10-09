@@ -181,10 +181,10 @@ function Contenu() {
     } finally { setEnCours((s) => { const n = { ...s }; delete n[k]; return n; }); }
   };
 
-  const card: React.CSSProperties = { background: "#fff", borderRadius: 14, boxShadow: "0 1px 3px rgba(0,0,0,.06)", marginBottom: 12, overflow: "hidden" };
+  const card: React.CSSProperties = { background: "#fff", borderRadius: 14, border: "1px solid #ddd6c8", marginBottom: 12, overflow: "hidden" };
   const btn: React.CSSProperties = { padding: "6px 12px", borderRadius: 16, border: "1px solid #ddd", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" };
-  const th: React.CSSProperties = { textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: .4, color: "#888", padding: "8px 10px", borderBottom: "1px solid #eee", whiteSpace: "nowrap" };
-  const td: React.CSSProperties = { padding: "8px 10px", borderBottom: "1px solid #f3f3f3", fontSize: 13, verticalAlign: "top" };
+  const th: React.CSSProperties = { textAlign: "left", fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".08em", color: "#a39d92", fontWeight: 600, padding: "8px 14px", borderBottom: "1px solid #ddd6c8", whiteSpace: "nowrap" };
+  const td: React.CSSProperties = { padding: "10px 14px", fontSize: 13, verticalAlign: "top" };
   const num: React.CSSProperties = { ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
 
   return (

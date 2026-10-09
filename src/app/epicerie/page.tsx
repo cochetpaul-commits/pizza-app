@@ -306,15 +306,15 @@ export default function EpiceriePage() {
                 <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                     <thead>
-                      <tr style={{ background: "#FAF7F2", borderBottom: "2px solid #E8E0D0" }}>
+                      <tr>
                         {["Produit", "Qté/pièce", "Mode", "Coût achat", "Coeff", "TVA", "Prix HT", "Prix TTC", "Arrondi", "Marge", ""].map((h, i) => (
-                          <th key={i} style={{ padding: "10px 10px", textAlign: i === 0 ? "left" : "right", fontWeight: 800, color: "#6B6257", fontSize: 10, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
+                          <th key={i} style={{ padding: "8px 10px", textAlign: i === 0 ? "left" : "right", whiteSpace: "nowrap" }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {lines.map((l, i) => (
-                        <tr key={l.id} style={{ borderBottom: "1px solid #F0EBE0", background: i % 2 === 0 ? "#fff" : "#FDFCFA" }}>
+                      {lines.map((l) => (
+                        <tr key={l.id}>
                           <td style={{ padding: "8px 10px", maxWidth: 200 }}>
                             <div style={{ fontWeight: 800, color: couleurTexte(CAT_COLORS[l.category]), fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</div>
                           </td>
