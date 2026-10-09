@@ -182,15 +182,18 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
   const ticket = total.couverts > 0 ? total.ca / total.couverts : 0;
   const ticketA1 = totalA1.couverts > 0 ? totalA1.ca / totalA1.couverts : 0;
   const hierTotal = useMemo(() => totaliser(ventes, hier, hier), [ventes, hier]);
+  // Jours de fermeture de l'établissement (réglages) retirés du graphique : Bello Mio ne travaille pas le week-end
+  const fermes = useMemo(() => new Set(etab?.jours_fermeture ?? []), [etab?.jours_fermeture]);
   const semaine = useMemo(() => {
-    const jours = Array.from({ length: 7 }, (_, i) => shift(semaineDebut, i));
+    const jours = Array.from({ length: 7 }, (_, i) => shift(semaineDebut, i))
+      .filter((j) => !fermes.has(new Date(`${j}T12:00:00`).getDay()));
     return jours.map((j) => ({
       date: j,
       ca: totaliser(ventes, j, j).ca,
       caPrec: totaliser(ventes, shift(j, -7), shift(j, -7)).ca,
       futur: j > today,
     }));
-  }, [ventes, semaineDebut, today]);
+  }, [ventes, semaineDebut, today, fermes]);
   const brouillons = commandes.filter((c) => c.status === "brouillon" || c.status === "en_attente");
   const aReceptionner = commandes.filter((c) => c.status === "validee" || c.status === "envoyee");
   const meteoJour = (date: string, service: string) => meteo.find((m) => m.date === date && m.service === service);
@@ -463,7 +466,7 @@ function GraphSemaine({ jours, couleur }: { jours: { date: string; ca: number; c
   const haut = Math.ceil(max / pas) * pas;
   const H = 150, base = 170, gauche = 52, largeur = 580;
   const y = (v: number) => base - (v / haut) * H;
-  const col = largeur / 7;
+  const col = largeur / Math.max(1, jours.length);
   const totalCur = jours.reduce((s, j) => s + j.ca, 0);
   const totalPrec = jours.filter((j) => !j.futur).reduce((s, j) => s + j.caPrec, 0);
   const graduations = Array.from({ length: haut / pas + 1 }, (_, i) => i * pas);
