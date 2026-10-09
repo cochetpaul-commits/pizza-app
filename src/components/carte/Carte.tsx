@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
-import { useEtablissement } from "@/lib/EtablissementContext";
 import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { useBureau } from "@/hooks/useBureau";
 import { VoletDroit } from "@/components/produits/BaseProduits";
@@ -11,7 +10,8 @@ import { OSWALD } from "@/components/TuileProduit";
 import { Tuile } from "@/components/ui/Tuile";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { couleurTexteSur, styleBarreCategorie } from "@/lib/styleCategories";
-import { CatalogueContent } from "@/components/production/CatalogueTab";
+import { VueFiches } from "./VueFiches";
+import { useDonneesCarte } from "./useDonneesCarte";
 import { CatalogueSalleContent } from "@/components/production/CatalogueSalleTab";
 import FicheWizard from "@/components/fiche/FicheWizard";
 import type { ArticleCarte, ReponseCarte } from "@/app/api/carte/route";
@@ -341,12 +341,11 @@ function VoletArticle({ article, peutEcrire, periode, onFermer, onRecharger, rel
 type FiltreLien = "tous" | "fiche" | "produit" | "aucun";
 type FiltreFc = "tous" | "bon" | "attention" | "mauvais" | "sans";
 
-export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuverte, rechargeTick }: { bureau: boolean; peutEcrire: boolean; estAdmin: boolean; onEditer: (e: EditionFiche) => void; editionOuverte: boolean; rechargeTick: number }) {
-  const { current: etab } = useEtablissement();
+export type DonneesCarte = { donnees: ReponseCarte | null; erreur: string | null; recharger: () => void };
+
+export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuverte, source }: { bureau: boolean; peutEcrire: boolean; estAdmin: boolean; onEditer: (e: EditionFiche) => void; editionOuverte: boolean; source: DonneesCarte }) {
+  const { donnees, erreur, recharger } = source;
   const affichage = useSyncExternalStore(abonner, lire, () => "az" as const);
-  const [donnees, setDonnees] = useState<ReponseCarte | null>(null);
-  const [erreur, setErreur] = useState<string | null>(null);
-  const [tick, setTick] = useState(0);
   const [q, setQ] = useState("");
   const [categorie, setCategorie] = useState<string>("toutes");
   const [lien, setLien] = useState<FiltreLien>("tous");
@@ -356,34 +355,6 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
   const [sectionsOuvertes, setSectionsOuvertes] = useState<Set<string>>(() => new Set(["PIZZE", "ANTIPASTI", "CUCINA", "DOLCI"]));
   const [synchro, setSynchro] = useState(false);
 
-  const recharger = useCallback(() => setTick((t) => t + 1), []);
-  // La Carte s'affiche tout de suite avec le dernier chargement mémorisé sur l'appareil, puis se rafraîchit.
-  // Après une modification (tick / rechargeTick), on demande un recalcul au serveur (?fresh=1).
-  const cleCache = `carte:${etab?.id ?? ""}`;
-  useEffect(() => {
-    let annule = false;
-    const fresh = tick > 0 || rechargeTick > 0;
-    (async () => {
-      await Promise.resolve();
-      if (annule) return;
-      if (!fresh) {
-        try {
-          const brut = sessionStorage.getItem(cleCache);
-          if (brut) setDonnees(JSON.parse(brut) as ReponseCarte);
-        } catch { /* stockage indisponible */ }
-      }
-      try {
-        const res = await fetchApi(`/api/carte${fresh ? "?fresh=1" : ""}`);
-        const json = await res.json();
-        if (annule) return;
-        if (!res.ok) { setErreur(json?.error ?? "Chargement impossible"); return; }
-        setDonnees(json as ReponseCarte);
-        setErreur(null);
-        try { sessionStorage.setItem(cleCache, JSON.stringify(json)); } catch { /* quota */ }
-      } catch (e) { if (!annule) setErreur(e instanceof Error ? e.message : "Chargement impossible"); }
-    })();
-    return () => { annule = true; };
-  }, [tick, rechargeTick, etab?.id, cleCache]);
 
   const articles = useMemo(() => donnees?.articles ?? [], [donnees]);
   const ouvert = ouvertId ? articles.find((a) => a.id === ouvertId) ?? null : null;
@@ -622,20 +593,35 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 
+const svg = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+const ICONES: Record<VueCarte, ReactNode> = {
+  articles: <svg {...svg}><path d="M7 3v7M4 3v4a3 3 0 0 0 6 0V3M7 10v11" /><path d="M17 3c-2 2-2.5 6-2.5 8a2.5 2.5 0 0 0 2.5 2.5V21M17 3v10.5" /></svg>,
+  fiches: <svg {...svg}><path d="M5 4h14v16H5z" /><path d="M9 8h6M9 12h6M9 16h3" /></svg>,
+  preparations: <svg {...svg}><path d="M4 10h16l-1.5 9a2 2 0 0 1-2 1.7h-9a2 2 0 0 1-2-1.7z" /><path d="M2 10h20M8 10V7a4 4 0 0 1 8 0v3" /></svg>,
+  equipe: <svg {...svg}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><circle cx="17" cy="9" r="2.5" /><path d="M16 15a5 5 0 0 1 5.5 5" /></svg>,
+};
+
 export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
   const bureau = useBureau();
   const { can, isGroupAdmin, loading } = useProfile();
   const voitArticles = can("performances.show_money");
   const peutEcrire = can("operations.edit_recettes");
-  const vues: { cle: VueCarte; libelle: string }[] = [
-    ...(voitArticles ? [{ cle: "articles" as const, libelle: "Articles" }] : []),
-    { cle: "fiches", libelle: "Fiches techniques" },
-    { cle: "preparations", libelle: "Préparations" },
-    { cle: "equipe", libelle: "Vue équipe" },
+  const vues: { cle: VueCarte; libelle: string; icone: ReactNode }[] = [
+    ...(voitArticles ? [{ cle: "articles" as const, libelle: "Articles", icone: ICONES.articles }] : []),
+    { cle: "fiches", libelle: "Fiches techniques", icone: ICONES.fiches },
+    { cle: "preparations", libelle: "Préparations", icone: ICONES.preparations },
+    { cle: "equipe", libelle: "Vue équipe", icone: ICONES.equipe },
   ];
   const [vueChoisie, setVueChoisie] = useState<VueCarte | null>(vueInitiale ?? null);
   const [edition, setEdition] = useState<EditionFiche | null>(null);
   const [rechargeTick, setRechargeTick] = useState(0);
+  const source = useDonneesCarte(rechargeTick);
+  const compteurs = useMemo(() => {
+    const d = source.donnees;
+    if (!d) return null;
+    const preps = d.fiches.filter((f) => f.categorie === "preparation" || f.categorie === "sauce").length;
+    return { articles: d.articles.filter((a) => a.categorie !== "MESSAGES").length, fiches: d.fiches.length - preps + d.vins.length, preparations: preps + d.empatements.length + d.preparations_anciennes.length };
+  }, [source.donnees]);
   const vue: VueCarte = vueChoisie && vues.some((v) => v.cle === vueChoisie) ? vueChoisie : voitArticles ? "articles" : "equipe";
 
   if (loading) return <div style={{ padding: 40, textAlign: "center", color: MUTED }}>Chargement…</div>;
@@ -648,16 +634,19 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
             <h1 style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: bureau ? 28 : 22, textTransform: "uppercase", letterSpacing: ".02em", margin: 0, lineHeight: 1.05, color: "#1a1a1a" }}>Carte</h1>
             <div style={{ color: MUTED, fontSize: 13 }}>
               {vue === "articles" ? "Ce qui se vend en caisse, relié à sa fiche technique : prix, coût matière, food cost, marge."
-                : vue === "fiches" ? "Les fiches techniques de la maison : pizze, cuisine, cocktails, empâtements, vins."
-                : vue === "preparations" ? "Sauces, pâtes, fonds et bases : les préparations utilisées dans les fiches."
+                : vue === "fiches" ? "Les fiches techniques de ce qui se vend : pizze, cuisine, cocktails, vins."
+                : vue === "preparations" ? "Sauces, bases, fonds et empâtements : ce qui entre dans les fiches."
                 : "Ce que la salle doit savoir : photo, description, allergènes, accords."}
             </div>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3, overflowX: "auto", maxWidth: "100%" }}>
               {vues.map((v) => (
-                <button key={v.cle} type="button" onClick={() => setVueChoisie(v.cle)}
-                  style={{ padding: "6px 12px", borderRadius: 8, border: "none", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", background: vue === v.cle ? "#fff" : "transparent", color: vue === v.cle ? "#1a1a1a" : MUTED, boxShadow: vue === v.cle ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}>{v.libelle}</button>
+                <button key={v.cle} type="button" onClick={() => setVueChoisie(v.cle)} title={v.libelle}
+                  style={{ padding: "6px 12px", borderRadius: 8, border: "none", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", background: vue === v.cle ? "#fff" : "transparent", color: vue === v.cle ? "#1a1a1a" : MUTED, boxShadow: vue === v.cle ? "0 1px 4px rgba(0,0,0,0.08)" : "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  {v.icone}{v.libelle}
+                  {compteurs && v.cle !== "equipe" && <span style={{ fontWeight: 500, color: vue === v.cle ? MUTED : FAIBLE }}>({v.cle === "articles" ? compteurs.articles : v.cle === "fiches" ? compteurs.fiches : compteurs.preparations})</span>}
+                </button>
               ))}
             </span>
             {bureau && peutEcrire && vue !== "equipe" && (
@@ -666,9 +655,9 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
           </div>
         </div>
 
-        {vue === "articles" && voitArticles && <VueArticles bureau={bureau} peutEcrire={peutEcrire} estAdmin={isGroupAdmin} onEditer={setEdition} editionOuverte={edition != null} rechargeTick={rechargeTick} />}
-        {vue === "fiches" && <CatalogueContent />}
-        {vue === "preparations" && <CatalogueContent preparations />}
+        {vue === "articles" && voitArticles && <VueArticles bureau={bureau} peutEcrire={peutEcrire} estAdmin={isGroupAdmin} onEditer={setEdition} editionOuverte={edition != null} source={source} />}
+        {vue === "fiches" && <VueFiches mode="fiches" bureau={bureau} peutEcrire={peutEcrire} onEditer={setEdition} editionOuverte={edition != null} source={source} />}
+        {vue === "preparations" && <VueFiches mode="preparations" bureau={bureau} peutEcrire={peutEcrire} onEditer={setEdition} editionOuverte={edition != null} source={source} />}
         {vue === "equipe" && <CatalogueSalleContent sansTitre />}
       </div>
       {edition && <VoletFiche edition={edition} onFermer={() => setEdition(null)} onEnregistre={() => { setEdition(null); setRechargeTick((t) => t + 1); }} />}

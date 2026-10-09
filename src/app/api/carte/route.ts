@@ -53,8 +53,45 @@ export type ArticleCarte = {
   ventes_30j: { qty: number; ca_ttc: number } | null;
 };
 
+/** Une fiche technique de la maison (vue Fiches / Préparations de la Carte), avec ou sans touche Popina */
+export type FicheCarte = {
+  id: string;
+  nom: string;
+  categorie: string;
+  sous_categorie: string | null;
+  fiche_type: string | null;
+  statut: string | null;
+  nb_parts: number;
+  description: string | null;
+  resume_salle: string | null;
+  photo_url: string | null;
+  allergenes: string[];
+  lignes: LigneRecette[];
+  total_cost: number | null;
+  /** Coût d'une vente (une pizza, une part, une portion) */
+  cout: number | null;
+  /** Prix de vente TTC : touche Popina reliée, sinon prix de la fiche */
+  prix_ttc: number | null;
+  prix_source: "popina" | "fiche" | null;
+  prix_ht: number | null;
+  food_cost: number | null;
+  popina_nom: string | null;
+  in_catalogue: boolean;
+  /** Préparation : poids produit (g) si connu */
+  poids_g: number | null;
+};
+export type CategorieFiche = { slug: string; nom: string; couleur: string; ordre: number; famille: string };
+export type VinCarte = { id: string; nom: string; domaine: string | null; couleur: string | null; prix: number | null };
+export type EmpatementCarte = { id: string; nom: string; patons: number | null; poids: number | null };
+export type PrepCarte = { id: string; nom: string; poids_g: number | null };
+
 export type ReponseCarte = {
   articles: ArticleCarte[];
+  fiches: FicheCarte[];
+  categories: CategorieFiche[];
+  vins: VinCarte[];
+  empatements: EmpatementCarte[];
+  preparations_anciennes: PrepCarte[];
   periode_ventes: { from: string; to: string };
 };
 
@@ -102,7 +139,7 @@ export async function GET(req: NextRequest) {
 
   // Un seul aller-retour pour tout ce qui est petit : touches, ventes, fiches (toutes), lignes (toutes), doses.
   // Les deux serveurs sont dans la même région, mais chaque étape enchaînée coûte un aller-retour.
-  const [{ data: touches, error: errTouches }, ventesRes, { data: toutesFiches }, { data: toutesLignes }, { data: doses }] = await Promise.all([
+  const [{ data: touches, error: errTouches }, ventesRes, { data: toutesFiches }, { data: toutesLignes }, { data: doses }, { data: etabRow }, { data: categoriesRows }, { data: vinsRows }, { data: empRows }, { data: prepRows }] = await Promise.all([
     supabaseAdmin
       .from("popina_products")
       .select("id, popina_id, name, category, sub_category, price_ttc, tva_rate, kitchen_recipe_id, ingredient_id, linked_type")
@@ -112,10 +149,17 @@ export async function GET(req: NextRequest) {
     supabaseAdmin.rpc("ventes_par_produit", { p_etab: etabId, p_from: periode.from, p_to: periode.to }),
     supabaseAdmin
       .from("kitchen_recipes")
-      .select("id, name, category, fiche_type, statut, nb_parts, portions_count, total_cost, cost_per_portion, cost_per_kg, description_courte, resume_salle, photo_url, output_ingredient_id"),
+      .select("id, name, category, sous_categorie, fiche_type, statut, nb_parts, portions_count, total_cost, cost_per_portion, cost_per_kg, description_courte, resume_salle, photo_url, output_ingredient_id, sell_price, vat_rate, in_catalogue, establishments, is_active, yield_grams"),
     supabaseAdmin.from("kitchen_recipe_lines").select("recipe_id, ingredient_id, qty, unit, sort_order").order("sort_order"),
     supabaseAdmin.from("popina_dose_map").select("popina_product_id, ingredient_id, dose, dose_unit"),
+    supabaseAdmin.from("etablissements").select("slug").eq("id", etabId).maybeSingle(),
+    supabaseAdmin.from("categories").select("slug, nom, couleur, famille_id, sort_order").order("sort_order").order("nom"),
+    supabaseAdmin.from("wines").select("id, name, domaine, color, sell_price, establishments").order("name"),
+    supabaseAdmin.from("recipes").select("id, name, balls_count, ball_weight").order("name"),
+    supabaseAdmin.from("prep_recipes").select("id, name, yield_grams, establishments").order("name"),
   ]);
+  const slugEtab = (etabRow?.slug as string | undefined) ?? "";
+  const pourCetEtab = (liste: unknown) => !Array.isArray(liste) || liste.length === 0 || liste.includes(slugEtab);
   if (errTouches) return NextResponse.json({ error: errTouches.message }, { status: 500 });
   top("etape1");
 
@@ -134,7 +178,6 @@ export async function GET(req: NextRequest) {
   type Ligne = NonNullable<typeof toutesLignes>[number];
   const ficheIdsSet = new Set(ficheIds);
   const fiches = (toutesFiches ?? []).filter((f) => ficheIdsSet.has(f.id));
-  const lignes = (toutesLignes ?? []).filter((l) => ficheIdsSet.has(l.recipe_id));
   const ficheParId = new Map<string, Fiche>(fiches.map((f) => [f.id, f]));
   // Toutes les lignes, par fiche : les préparations utilisées comme ingrédient y sont déjà (allergènes)
   const lignesParFiche = new Map<string, Ligne[]>();
@@ -146,7 +189,9 @@ export async function GET(req: NextRequest) {
   const doseParTouche = new Map((doses ?? []).map((d) => [d.popina_product_id, d]));
 
   // Ingrédients : ceux des lignes (nom, allergènes) et ceux reliés directement (prix)
-  const ingredientIds = [...new Set([...produitIds, ...(lignes ?? []).map((l) => l.ingredient_id).filter((x): x is string => !!x)])];
+  const fichesEtab = (toutesFiches ?? []).filter((f) => f.is_active !== false && pourCetEtab(f.establishments));
+  const idsFichesEtab = new Set(fichesEtab.map((f) => f.id));
+  const ingredientIds = [...new Set([...produitIds, ...(toutesLignes ?? []).filter((l) => idsFichesEtab.has(l.recipe_id) || ficheIdsSet.has(l.recipe_id)).map((l) => l.ingredient_id).filter((x): x is string => !!x)])];
   // Préparations maison utilisées comme ingrédient : leurs lignes sont déjà chargées, on ajoute leurs ingrédients
   const ficheParSortie = new Map<string, string>((toutesFiches ?? []).filter((s) => s.output_ingredient_id).map((s) => [s.output_ingredient_id as string, s.id]));
   const idsAvecSous = new Set(ingredientIds);
@@ -192,6 +237,29 @@ export async function GET(req: NextRequest) {
     return [...out].sort();
   }
 
+  type FicheBrute = Fiche;
+  const coutFiche = (f: FicheBrute): { cout: number | null; detail: string; parts: number } => {
+    const estPizza = f.category === "pizza";
+    const parts = Number(f.nb_parts) || Number(f.portions_count) || 1;
+    const brut = estPizza
+      ? (f.total_cost != null ? Number(f.total_cost) : null)
+      : (f.cost_per_portion != null ? Number(f.cost_per_portion) : f.total_cost != null ? Number(f.total_cost) : f.cost_per_kg != null ? Number(f.cost_per_kg) : null);
+    if (brut != null && brut > 0) {
+      return { cout: arrondi(brut), parts, detail: estPizza ? "la pizza" : parts > 1 ? `la part (${parts} parts, ${arrondi(Number(f.total_cost) || 0).toFixed(2).replace(".", ",")} € la recette)` : "la portion" };
+    }
+    return { cout: null, parts, detail: "fiche sans coût (ingrédients sans prix ?)" };
+  };
+  const contenuFiche = (f: FicheBrute, parts: number): NonNullable<ArticleCarte["fiche"]> => ({
+    id: f.id, nom: f.name, categorie: f.category, fiche_type: f.fiche_type ?? null, statut: f.statut ?? null, nb_parts: parts,
+    description: f.description_courte ?? null, resume_salle: f.resume_salle ?? null, photo_url: f.photo_url ?? null,
+    allergenes: allergenesFiche(f.id),
+    lignes: (lignesParFiche.get(f.id) ?? []).map((l) => {
+      const ing = l.ingredient_id ? ingParId.get(l.ingredient_id) : undefined;
+      return { nom: ing?.name ?? "?", qty: l.qty != null ? Number(l.qty) : null, unit: l.unit ?? null, preparation: !!(l.ingredient_id && ficheParSortie.has(l.ingredient_id)) };
+    }),
+    total_cost: f.total_cost != null ? arrondi(Number(f.total_cost)) : null,
+  });
+
   const articles: ArticleCarte[] = (touches ?? []).map((t) => {
     const prixTtc = Number(t.price_ttc) || 0;
     const tva = Number(t.tva_rate) || 0;
@@ -212,28 +280,11 @@ export async function GET(req: NextRequest) {
       if (!f) orphelin = true;
       else {
         lien = "fiche";
-        const estPizza = f.category === "pizza";
-        const parts = Number(f.nb_parts) || Number(f.portions_count) || 1;
-        const brut = estPizza
-          ? (f.total_cost != null ? Number(f.total_cost) : null)
-          : (f.cost_per_portion != null ? Number(f.cost_per_portion) : f.total_cost != null ? Number(f.total_cost) : f.cost_per_kg != null ? Number(f.cost_per_kg) : null);
-        if (brut != null && brut > 0) {
-          cout = arrondi(brut);
-          coutSource = "fiche";
-          coutDetail = estPizza ? "la pizza" : parts > 1 ? `la part (${parts} parts, ${arrondi(Number(f.total_cost) || 0).toFixed(2).replace(".", ",")} € la recette)` : "la portion";
-        } else {
-          coutDetail = "fiche sans coût (ingrédients sans prix ?)";
-        }
-        fiche = {
-          id: f.id, nom: f.name, categorie: f.category, fiche_type: f.fiche_type ?? null, statut: f.statut ?? null, nb_parts: parts,
-          description: f.description_courte ?? null, resume_salle: f.resume_salle ?? null, photo_url: f.photo_url ?? null,
-          allergenes: allergenesFiche(f.id),
-          lignes: (lignesParFiche.get(f.id) ?? []).map((l) => {
-            const ing = l.ingredient_id ? ingParId.get(l.ingredient_id) : undefined;
-            return { nom: ing?.name ?? "?", qty: l.qty != null ? Number(l.qty) : null, unit: l.unit ?? null, preparation: !!(l.ingredient_id && ficheParSortie.has(l.ingredient_id)) };
-          }),
-          total_cost: f.total_cost != null ? arrondi(Number(f.total_cost)) : null,
-        };
+        const c = coutFiche(f);
+        cout = c.cout;
+        if (c.cout != null) coutSource = "fiche";
+        coutDetail = c.detail;
+        fiche = contenuFiche(f, c.parts);
       }
     } else if (t.ingredient_id) {
       const ing = ingParId.get(t.ingredient_id);
@@ -277,7 +328,40 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  const reponse: ReponseCarte = { articles, periode_ventes: periode };
+  // Fiches de la maison : prix de la touche Popina reliée, sinon prix de la fiche (HT + TVA)
+  const toucheParFiche = new Map<string, { nom: string; prix_ttc: number; taux: number }>();
+  for (const t of touches ?? []) {
+    if (!t.kitchen_recipe_id || toucheParFiche.has(t.kitchen_recipe_id)) continue;
+    const tva = Number(t.tva_rate) || 0;
+    toucheParFiche.set(t.kitchen_recipe_id, { nom: t.name, prix_ttc: Number(t.price_ttc) || 0, taux: tva > 1 ? tva / 100 : tva });
+  }
+  const fichesCarte: FicheCarte[] = fichesEtab.map((f) => {
+    const c = coutFiche(f);
+    const touche = toucheParFiche.get(f.id);
+    let prixTtc: number | null = null, prixHt: number | null = null, source: FicheCarte["prix_source"] = null;
+    if (touche && touche.prix_ttc > 0) { prixTtc = touche.prix_ttc; prixHt = arrondi(touche.prix_ttc / (1 + touche.taux)); source = "popina"; }
+    else if (f.sell_price != null && Number(f.sell_price) > 0) {
+      const taux = Number(f.vat_rate) || 0.1;
+      prixHt = arrondi(Number(f.sell_price)); prixTtc = arrondi(prixHt * (1 + (taux > 1 ? taux / 100 : taux))); source = "fiche";
+    }
+    const contenu = contenuFiche(f, c.parts);
+    return {
+      ...contenu,
+      sous_categorie: f.sous_categorie ?? null,
+      cout: c.cout,
+      prix_ttc: prixTtc, prix_ht: prixHt, prix_source: source,
+      food_cost: c.cout != null && prixHt != null && prixHt > 0 ? arrondi((c.cout / prixHt) * 100) : null,
+      popina_nom: touche?.nom ?? null,
+      in_catalogue: f.in_catalogue !== false,
+      poids_g: f.yield_grams != null ? Number(f.yield_grams) : null,
+    };
+  });
+  const categories: CategorieFiche[] = (categoriesRows ?? []).map((c) => ({ slug: c.slug, nom: c.nom, couleur: c.couleur ?? "#939597", ordre: Number(c.sort_order) || 0, famille: c.famille_id ?? "autre" }));
+  const vins: VinCarte[] = (vinsRows ?? []).filter((w) => pourCetEtab(w.establishments)).map((w) => ({ id: w.id, nom: w.name, domaine: w.domaine ?? null, couleur: w.color ?? null, prix: w.sell_price != null ? Number(w.sell_price) : null }));
+  const empatements: EmpatementCarte[] = (empRows ?? []).map((e) => ({ id: e.id, nom: e.name, patons: e.balls_count != null ? Number(e.balls_count) : null, poids: e.ball_weight != null ? Number(e.ball_weight) : null }));
+  const preparationsAnciennes: PrepCarte[] = (prepRows ?? []).filter((p) => pourCetEtab(p.establishments)).map((p) => ({ id: p.id, nom: p.name, poids_g: p.yield_grams != null ? Number(p.yield_grams) : null }));
+
+  const reponse: ReponseCarte = { articles, fiches: fichesCarte, categories, vins, empatements, preparations_anciennes: preparationsAnciennes, periode_ventes: periode };
   top("calcul");
   memoire.set(etabId, { quand: Date.now(), reponse });
   console.log("[carte] durées ms", chrono, "articles", articles.length);
