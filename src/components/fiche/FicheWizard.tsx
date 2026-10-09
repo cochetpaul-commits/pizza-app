@@ -19,6 +19,7 @@ import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/o
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { openApiFile } from "@/lib/fetchApi";
 import { couleurTexte } from "@/lib/styleCategories";
+import { useBureau } from "@/hooks/useBureau";
 import { fermerOffresActives } from "@/lib/offerClosing";
 
 // ── Brouillons non enregistrés ──────────────────────────────────────
@@ -88,6 +89,9 @@ type Props = {
 };
 
 export default function FicheWizard({ recipeId, recipeType, initialCategorie, initialSousCategorie, initialNom, initialPrixTtc, initialPopinaId, enVolet = false, onFermer, onEnregistre }: Props) {
+  const bureau = useBureau();
+  // Bureau : une ligne par ingrédient (comme le tableau des produits) ; téléphone : cartes compactes
+  const modeIngredients = bureau ? "tableau" : "cartes";
   const router = useRouter();
   const { current: etab, etablissements } = useEtablissement();
   const { can } = useProfile();
@@ -674,8 +678,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   return (
     <div style={enVolet ? undefined : { maxWidth: 760, margin: "0 auto", padding: "16px 16px 40px" }}>
 
-      {/* BROUILLONS NON ENREGISTRÉS (cet appareil) */}
-      {otherDrafts.length > 0 && (
+      {/* BROUILLONS NON ENREGISTRÉS (cet appareil) : pas dans le volet de modification d'une fiche existante (10/10/2026) */}
+      {otherDrafts.length > 0 && !(enVolet && recipeId) && (
         <div style={{ background: "#fff8ec", border: "1px solid #ecd9b8", borderRadius: 14, padding: "10px 14px", marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.amber, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>Brouillons non enregistrés sur cet appareil</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -740,6 +744,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
                   const f = familles.find(ff => ff.id === (c?.famille_id ?? "autre"));
                   update({ categorie_slug: slug, sous_categorie: "", tva: f?.tva_defaut ?? 10 });
                 }}>
+                  {fiche.categorie_slug && !categories.some(c => c.slug === fiche.categorie_slug) && <option value={fiche.categorie_slug}>{fiche.categorie_slug}</option>}
                   {categories.map(c => <option key={c.slug} value={c.slug}>{c.nom}</option>)}
                   <option value="__new__">+ Créer une catégorie</option>
                 </select>
@@ -932,11 +937,11 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           {isPizza && (
             <>
               <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: couleurCat }}>Avant four</div>
-              <IngredientListDnD droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "avant_four")} returnUrl={currentUrl} />
+              <IngredientListDnD mode={modeIngredients} droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "avant_four")} returnUrl={currentUrl} />
             </>
           )}
           <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: couleurCat }}>{isPizza ? "Après four" : isBar ? "Composition" : "Ingrédients"}</div>
-          <IngredientListDnD droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "apres_four")} returnUrl={currentUrl} />
+          <IngredientListDnD mode={modeIngredients} droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "apres_four")} returnUrl={currentUrl} />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, paddingTop: 4, fontSize: 15 }}>
             <span>Coût matière{isPizza && patonCost > 0 ? <span style={NOTE}> · dont pâton {eur(patonCost)}</span> : null}</span>
             <span><b style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20 }}>{eur(totalCost)}</b>{canSeeMoney && ht > 0 && <span style={{ color: fcCouleur, fontWeight: 700 }}> &nbsp;{fc.toFixed(1).replace(".", ",")} %</span>}</span>

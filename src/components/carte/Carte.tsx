@@ -32,7 +32,7 @@ export type EditionFiche = { recipeId?: string; nom?: string; popina?: string; p
 
 export function VoletFiche({ edition, onFermer, onEnregistre }: { edition: EditionFiche; onFermer: () => void; onEnregistre: (id: string) => void }) {
   return (
-    <VoletDroit titre={edition.recipeId ? "Modifier la fiche" : "Nouvelle fiche"} sousTitre={edition.recipeId ? "La fiche complète, enregistrée en bas." : edition.nom ? `Depuis la touche « ${edition.nom} »` : "Pizza, plat, cocktail ou préparation"} largeur={820} onFermer={onFermer}>
+    <VoletDroit titre={edition.recipeId ? "Modifier la fiche" : "Nouvelle fiche"} sousTitre={edition.recipeId ? "La fiche complète, enregistrée en bas." : edition.nom ? `Depuis la touche « ${edition.nom} »` : "Pizza, plat, cocktail ou préparation"} largeur={900} onFermer={onFermer}>
       <FicheWizard key={edition.recipeId ?? `new-${edition.popina ?? edition.cat ?? ""}`} enVolet recipeId={edition.recipeId} initialNom={edition.nom} initialPrixTtc={edition.prix ?? null} initialPopinaId={edition.popina ?? null} initialCategorie={edition.cat} onFermer={onFermer} onEnregistre={onEnregistre} />
     </VoletDroit>
   );

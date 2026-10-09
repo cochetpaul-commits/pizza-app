@@ -34,7 +34,13 @@ interface Props {
   externalDragContext?: boolean;
   /** Base path for the current recipe page, used for "back" link from ingredient edit */
   returnUrl?: string;
+  /** « tableau » (bureau, 10/10/2026) : une ligne par ingrédient, comme le tableau des produits ; « cartes » : fiches empilées (téléphone) */
+  mode?: "cartes" | "tableau";
 }
+
+const TH_ING: CSSProperties = { fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", fontWeight: 600, whiteSpace: "nowrap" };
+const COLONNES_ING = "18px minmax(180px, 1.5fr) minmax(120px, 1fr) 118px 64px 64px 26px";
+const CHAMP_ING: CSSProperties = { height: 32, borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 13, background: "#fff" };
 
 function tmpId() {
   return `tmp-${Math.random().toString(36).slice(2)}`;
@@ -101,8 +107,9 @@ function computeCost(line: IngredientLine, cpu: CpuByUnit | undefined, ing?: Ing
 export function IngredientListDnD({
   droppableId = "ingredients",
   items, ingredients, priceByIngredient, units, onChange, priceLabelByIngredient,
-  metaByIngredient, pivotId, onPivotChange, externalDragContext, returnUrl,
+  metaByIngredient, pivotId, onPivotChange, externalDragContext, returnUrl, mode = "cartes",
 }: Props) {
+  const tableau = mode === "tableau";
   const ingredientOptions: SmartSelectOption[] = ingredients.map(i => {
     const isMaison = i.source === "recette_maison";
     let rightBottom = priceLabelByIngredient?.[i.id] ?? undefined;
@@ -144,23 +151,76 @@ export function IngredientListDnD({
   const droppableContent = (
         <Droppable droppableId={droppableId}>
           {(provided) => (
-            <div ref={provided.innerRef} {...provided.droppableProps} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div ref={provided.innerRef} {...provided.droppableProps} style={tableau ? { display: "flex", flexDirection: "column" } : { display: "flex", flexDirection: "column", gap: 6 }}>
+              {tableau && items.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: COLONNES_ING, gap: 8, alignItems: "center", padding: "6px 4px", borderBottom: "1px solid #ddd6c8" }}>
+                  <span /><span style={TH_ING}>Ingrédient</span><span style={TH_ING}>Prix · fournisseur</span>
+                  <span style={{ ...TH_ING, textAlign: "center" }}>Qté</span><span style={TH_ING}>Unité</span><span style={{ ...TH_ING, textAlign: "right" }}>Coût</span><span />
+                </div>
+              )}
               {items.map((line, i) => {
                 const cpu = priceByIngredient[line.ingredient_id];
                 const ing = ingredients.find(ig => ig.id === line.ingredient_id);
                 const cost = computeCost(line, cpu, ing);
                 const densityMissing = isMissingDensity(ing, line);
+                const meta = line.ingredient_id ? metaByIngredient?.[line.ingredient_id] : undefined;
+                const changerIngredient = (id: string) => {
+                  const ingFound = ingredients.find(ii => ii.id === id);
+                  updateLine(line.id, { ingredient_id: id, unit: normalizeUnit(ingFound?.default_unit) });
+                };
 
                 return (
                   <Draggable key={line.id} draggableId={line.id} index={i}>
-                    {(drag, snapshot) => (
+                    {(drag, snapshot) => tableau ? (
+                      <div ref={drag.innerRef} {...drag.draggableProps} className="ing-ligne"
+                        style={{ display: "grid", gridTemplateColumns: COLONNES_ING, gap: 8, alignItems: "center", padding: "5px 4px", borderBottom: "1px solid #f0ebe2", background: snapshot.isDragging ? "#fff" : "transparent", ...drag.draggableProps.style }}>
+                        <span {...drag.dragHandleProps} style={{ fontSize: 15, color: "#b0a89a", cursor: "grab", userSelect: "none", textAlign: "center" }}>⠿</span>
+                        <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 4 }}>
+                          {onPivotChange && (
+                            <button type="button" onClick={() => { if (line.ingredient_id) onPivotChange(pivotId === line.ingredient_id ? null : line.ingredient_id); }} title="Définir comme ingrédient pivot"
+                              style={{ background: "none", border: "none", flexShrink: 0, fontSize: 15, padding: 0, lineHeight: 1, cursor: line.ingredient_id ? "pointer" : "default", color: line.ingredient_id && pivotId === line.ingredient_id ? "#D97706" : "#ccc" }}>
+                              {line.ingredient_id && pivotId === line.ingredient_id ? "★" : "☆"}
+                            </button>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <SmartSelect options={ingredientOptions} value={line.ingredient_id} onChange={changerIngredient} placeholder="Ingrédient…" inputStyle={{ height: 32, fontSize: 13, fontWeight: 600 }} />
+                          </div>
+                          {line.ingredient_id && (
+                            <a href={`/ingredients?edit=${line.ingredient_id}${returnUrl ? `&back=${encodeURIComponent(returnUrl)}` : ""}`} title="Modifier le produit" style={{ flexShrink: 0, color: "#9a8f84", display: "flex" }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7" /><path d="M7 7h10v10" /></svg>
+                            </a>
+                          )}
+                        </div>
+                        <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, color: "#9a8f84", fontWeight: 600, overflow: "hidden", whiteSpace: "nowrap" }} title={meta ? [meta.prix, meta.perKg, meta.cond, meta.fournisseur].filter(Boolean).join(" · ") : undefined}>
+                          {meta ? (
+                            <>
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{meta.perKg || meta.prix || "—"}</span>
+                              {meta.fournisseur && <span className="pastille" style={{ "--pastille-c": meta.fournisseurColor ?? "#b0a894", flexShrink: 0 } as CSSProperties}>{meta.fournisseur}</span>}
+                              {densityMissing && <span title="Densité manquante : prix estimé avec 1 g/ml" style={{ color: "#d97706", flexShrink: 0 }}>⚠</span>}
+                            </>
+                          ) : line.ingredient_id && priceLabelByIngredient?.[line.ingredient_id] ? (
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{priceLabelByIngredient[line.ingredient_id]}</span>
+                          ) : <span>—</span>}
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "center" }}>
+                          <StepperInput value={line.qty} onChange={v => updateLine(line.id, { qty: v })} step={1} min={0} placeholder="Qté" />
+                        </div>
+                        <select value={line.unit} onChange={e => updateLine(line.id, { unit: e.target.value })} style={{ ...CHAMP_ING, padding: "0 4px", width: "100%" }}>
+                          {units.map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                        <span style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: cost != null ? "#1a1a1a" : "#9a8f84", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                          {cost != null ? `${fmtMoney(cost)} €` : "—"}
+                        </span>
+                        <button type="button" onClick={() => removeLine(line.id)} aria-label="Retirer" style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: "transparent", color: "#b0a89a", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>✕</button>
+                      </div>
+                    ) : (
                       <div
                         ref={drag.innerRef}
                         {...drag.draggableProps}
                         style={{
-                          display: "flex", flexDirection: "column", gap: 3,
+                          display: "flex", flexDirection: "column", gap: 2,
                           background: snapshot.isDragging ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.55)",
-                          borderRadius: 10, padding: "6px 10px",
+                          borderRadius: 10, padding: "5px 8px",
                           border: "1px solid rgba(217,199,182,0.7)",
                           ...drag.draggableProps.style,
                         }}
@@ -195,11 +255,7 @@ export function IngredientListDnD({
                             <SmartSelect
                               options={ingredientOptions}
                               value={line.ingredient_id}
-                              onChange={id => {
-                                const ingFound = ingredients.find(ii => ii.id === id);
-                                const du = normalizeUnit(ingFound?.default_unit);
-                                updateLine(line.id, { ingredient_id: id, unit: du });
-                              }}
+                              onChange={changerIngredient}
                               placeholder="Ingrédient…"
                               inputStyle={{ height: 34, fontSize: 13 }}
                             />
@@ -258,7 +314,7 @@ export function IngredientListDnD({
                         ) : null}
 
                         {/* Row 2 : − qté + centrés, coût en pastille, croix à droite */}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
                           <StepperInput
                             value={line.qty}
                             onChange={v => updateLine(line.id, { qty: v })}
@@ -325,11 +381,12 @@ export function IngredientListDnD({
         <DragDropContext onDragEnd={onDragEnd}>{droppableContent}</DragDropContext>
       )}
 
+      <style>{`.ing-ligne:hover{background:#faf8f4}`}</style>
       <button
         type="button"
         onClick={addLine}
         style={{
-          marginTop: 10, padding: "6px 14px", borderRadius: 8,
+          marginTop: tableau ? 8 : 10, padding: "6px 14px", borderRadius: 8,
           border: "1.5px dashed rgba(217,199,182,0.9)", background: "transparent",
           color: "#6f6a61", fontSize: 13, fontWeight: 600, cursor: "pointer",
         }}
