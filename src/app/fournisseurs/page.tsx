@@ -908,7 +908,7 @@ export default function FournisseursPage() {
     return (
       <>
         {bureau ? (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 36, alignItems: "start" }}>
+          <div className="fo-fiche" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", columnGap: 36, alignItems: "start", minWidth: 0 }}>
             <div>{gauche}</div>
             <div>{droite}</div>
           </div>
@@ -1019,8 +1019,8 @@ export default function FournisseursPage() {
   function tableauFournisseurs(liste: SupplierRow[]) {
     const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
     return (
-      <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden" }}>
-        <style>{`.fo-ligne:hover td{background:#f7f3ec}`}</style>
+      <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden", overflowX: "auto", minWidth: 0 }}>
+        <style>{`.fo-ligne:hover td{background:#f7f3ec} @media (max-width: 1150px){ .fo-fiche{ grid-template-columns: minmax(0, 1fr) !important; } }`}</style>
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 980 }}>
             <thead><tr>
@@ -1197,7 +1197,7 @@ export default function FournisseursPage() {
 
   return (
     <RequireRole allowedRoles={["group_admin", "equipier"]}>
-      <main style={{ maxWidth: bureau ? 1400 : 900, width: "100%", boxSizing: "border-box", margin: "0 auto", padding: bureau ? "18px 28px 60px" : "24px 16px 40px" }}>
+      <main style={{ maxWidth: bureau ? 1400 : 900, width: "100%", minWidth: 0, boxSizing: "border-box", margin: "0 auto", padding: bureau ? "18px 28px 60px" : "24px 16px 40px" }}>
 
         {/* Desktop action buttons */}
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
