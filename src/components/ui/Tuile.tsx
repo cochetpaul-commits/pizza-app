@@ -73,15 +73,15 @@ export function Tuile({ libelle, valeur, sous, couleur = "#6f6a61", icone, droit
   const contenu = (
     <>
       <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: compacte ? 0 : 28 }}>
-        <span style={{ fontSize: 12.5, color: MUTED, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{libelle}</span>
-        {droite ?? (icone && !compacte ? (
+        <span style={{ fontSize: 12.5, color: MUTED, fontWeight: 600, minWidth: 0, lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{libelle}</span>
+        {droite ? <span style={{ flexShrink: 0, whiteSpace: "nowrap" }}>{droite}</span> : (icone && !compacte ? (
           <span style={{ width: 30, height: 30, borderRadius: "50%", background: sombre ? "rgba(26,26,26,0.07)" : alpha(couleur, 0.14), display: "grid", placeItems: "center", flexShrink: 0 }}>
             <Icone nom={icone} couleur={sombre ? "#1a1a1a" : couleur} />
           </span>
         ) : null)}
       </span>
       <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: compacte ? 22 : 28, lineHeight: 1.05, color: sombre ? "#1a1a1a" : couleur, fontVariantNumeric: "tabular-nums" }}>{valeur}</span>
-      {!compacte && sous != null && sous !== "" && <span style={{ fontSize: 12, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sous}</span>}
+      {!compacte && sous != null && sous !== "" && <span style={{ fontSize: 12, color: MUTED, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{sous}</span>}
     </>
   );
   if (href) return <a href={href} style={style}>{contenu}</a>;

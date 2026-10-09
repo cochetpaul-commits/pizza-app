@@ -276,7 +276,7 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
           <Kpi couleur={couleur} icone="euro" label={`CA TTC ${titrePeriode}`} value={fmtEur(total.ca)} delta={delta(total.ca, totalA1.ca)} sub={totalA1.ca > 0 ? `${fmtEur(totalA1.ca)} l'an dernier (${jourCourt(periodeA1.from)}${periodeA1.from !== periodeA1.to ? ` → ${jourCourt(periodeA1.to)}` : ""})` : "pas de comparaison l'an dernier"} loading={loading} href={`/ventes?from=${periode.from}&to=${periode.to}`} />
           <Kpi couleur="#b7791f" icone="couverts" label="Couverts" value={String(total.couverts)} delta={delta(total.couverts, totalA1.couverts)} sub={`${total.midi.couverts} midi · ${total.soir.couverts} soir`} loading={loading} />
           <Kpi couleur="#5F4B8B" icone="ticket" label="Ticket moyen" value={fmtDec(ticket)} delta={delta(ticket, ticketA1)} sub={ticketA1 > 0 ? `par couvert · ${fmtDec(ticketA1)} l'an dernier` : "par couvert"} loading={loading} />
-          <Kpi couleur="#4a6741" icone="facture" label="Achats HT du mois" value={fmtEur(num(compteurs?.factures_mois_ht))} badge={compteurs ? `${compteurs.factures_mois} facture${compteurs.factures_mois > 1 ? "s" : ""}` : undefined} sub="factures importées depuis le 1er" loading={!compteurs} href="/achats" />
+          <Kpi couleur="#4a6741" icone="facture" label="Achats HT du mois" value={fmtEur(num(compteurs?.factures_mois_ht))} badge={compteurs ? `${compteurs.factures_mois} facture${compteurs.factures_mois > 1 ? "s" : ""}` : undefined} sub="importées depuis le 1er" loading={!compteurs} href="/achats" />
         </div>
       )}
 
@@ -414,12 +414,14 @@ function Titre({ children, droite }: { children: React.ReactNode; droite?: React
 
 function Kpi({ label, value, delta: d, sub, badge: b, loading, href, couleur, icone }: { label: string; value: string; delta?: number | null; sub?: string; badge?: string; loading: boolean; href?: string; couleur: string; icone: TuileIcone }) {
   const ton = d == null ? null : Math.abs(d) < 1 ? "flat" : d > 0 ? "up" : "down";
-  const droite = ton ? (
-    <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 7px", borderRadius: 8, color: ton === "up" ? "#4a6741" : ton === "down" ? "#b4443a" : T.muted, background: ton === "up" ? "rgba(74,103,65,0.12)" : ton === "down" ? "rgba(180,68,58,0.12)" : "rgba(0,0,0,0.05)" }}>
+  // Variation et badge au début de la ligne de détail : l'icône reste en haut à droite, le libellé n'est jamais écrasé sur téléphone
+  const variation = ton ? (
+    <b style={{ color: ton === "up" ? "#4a6741" : ton === "down" ? "#b4443a" : T.muted, whiteSpace: "nowrap" }}>
       {d! > 0 ? "▲" : d! < 0 ? "▼" : ""} {Math.abs(d!).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %
-    </span>
-  ) : b ? <span style={badge("neutre")}>{b}</span> : undefined;
-  const tuile = <Tuile libelle={label} icone={icone} couleur={couleur} droite={droite} sous={sub} valeur={<span style={{ opacity: loading ? 0.4 : 1, transition: "opacity .2s" }}>{value}</span>} />;
+    </b>
+  ) : b ? <b style={{ color: T.dark, whiteSpace: "nowrap" }}>{b}</b> : null;
+  const detail = variation ? <>{variation}{sub ? ` · ${sub}` : ""}</> : sub;
+  const tuile = <Tuile libelle={label} icone={icone} couleur={couleur} sous={detail} valeur={<span style={{ opacity: loading ? 0.4 : 1, transition: "opacity .2s" }}>{value}</span>} />;
   return href ? <Link href={href} style={{ textDecoration: "none", display: "block" }}>{tuile}</Link> : tuile;
 }
 
