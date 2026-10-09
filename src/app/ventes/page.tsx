@@ -169,7 +169,7 @@ function destroyChart(id: string) { if (charts[id]) { charts[id].destroy(); dele
 
 /* ── Styles ── */
 const S = {
-  card: { background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 } as CSSProperties,
+  card: { background: "#fff", borderRadius: 14, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 } as CSSProperties,
   sec: { fontSize: 11, textTransform: "uppercase" as const, letterSpacing: ".08em", color: "#666", fontWeight: 700, marginBottom: 12 } as CSSProperties,
   bigNum: { fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 46, fontWeight: 700, color: "#fff", lineHeight: 1, letterSpacing: "-.02em" } as CSSProperties,
 };

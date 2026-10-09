@@ -125,7 +125,7 @@ function getSupplierCategory(supplierName: string): string {
 /* ── Styles ── */
 
 const S = {
-  card: { background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce" } as CSSProperties,
+  card: { background: "#fff", borderRadius: 14, padding: "18px 20px", border: "1px solid #e0d8ce" } as CSSProperties,
   sec: { fontSize: 9, textTransform: "uppercase" as const, letterSpacing: ".12em", color: "#777", fontWeight: 500, marginBottom: 12 } as CSSProperties,
   kpiValue: { fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 26, color: "#1a1a1a" } as CSSProperties,
   kpiLabel: { fontFamily: "DM Sans, sans-serif", fontSize: 10, textTransform: "uppercase" as const, letterSpacing: ".08em", color: "#999", marginBottom: 8 } as CSSProperties,
@@ -577,7 +577,7 @@ function AchatsContent() {
   const renderMonthAccordion = (mg: MonthGroup) => {
     const isOpen = openDashMonth === mg.key;
     return (
-      <div key={mg.key} style={{ border: "1px solid #ddd6c8", borderRadius: 10, overflow: "hidden" }}>
+      <div key={mg.key} style={{ border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden" }}>
         <div
           onClick={() => { setOpenDashMonth(isOpen ? null : mg.key); setDashOpenSupplier(null); setDashSelectedInvoice(null); setDashLines([]); }}
           style={{
@@ -950,7 +950,7 @@ function AchatsContent() {
             {/*  C2) TOP ACHATS — products table                   */}
             {/* ══════════════════════════════════════════════════ */}
             <div style={{ ...S.sec, marginBottom: 12 }}>Top achats — {periodLabel}</div>
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "18px 20px", marginBottom: 28 }}>
+            <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e0d8ce", padding: "18px 20px", marginBottom: 28 }}>
               {topProductsLoading ? (
                 <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Chargement...</p>
               ) : topProducts.length === 0 ? (
@@ -1019,7 +1019,7 @@ function AchatsContent() {
             {/* ══════════════════════════════════════════════════ */}
             {/*  D) FACTURES — filtered by range, by supplier     */}
             {/* ══════════════════════════════════════════════════ */}
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "18px 20px", marginBottom: 20 }}>
+            <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e0d8ce", padding: "18px 20px", marginBottom: 20 }}>
               <div style={{ marginBottom: 14 }}>
                 <div style={{ ...S.sec, marginBottom: 0 }}>Factures — {periodLabel}</div>
               </div>

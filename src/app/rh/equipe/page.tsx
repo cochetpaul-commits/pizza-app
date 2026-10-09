@@ -303,7 +303,7 @@ const tableStyle: React.CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
   background: "#fff",
-  borderRadius: 12,
+  borderRadius: 14,
   overflow: "hidden",
   border: "1px solid #ddd6c8",
 };

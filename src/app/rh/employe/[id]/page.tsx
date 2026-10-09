@@ -2085,7 +2085,7 @@ const tabBtn = (active: boolean, ec?: string): React.CSSProperties => ({
 const section: React.CSSProperties = {
   background: "#fff",
   border: "1px solid #ddd6c8",
-  borderRadius: 10,
+  borderRadius: 14,
   padding: "16px 18px 20px",
   marginBottom: 14,
 };

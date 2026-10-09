@@ -194,7 +194,7 @@ export default function EpiceriePage() {
     navigator.clipboard.writeText(text);
   }
 
-  const card = { background: "#fff", border: "1px solid #E8E0D0", borderRadius: 12, padding: 16 };
+  const card = { background: "#fff", border: "1px solid #E8E0D0", borderRadius: 14, padding: 16 };
   const btnPrimary = { padding: "7px 16px", borderRadius: 8, background: "#D4775A", color: "#fff", fontWeight: 800, fontSize: 13, border: "none", cursor: "pointer" as const };
   const btnSecondary = { padding: "7px 16px", borderRadius: 8, background: "transparent", color: "#D4775A", fontWeight: 800, fontSize: 13, border: "1px solid #D4775A", cursor: "pointer" as const };
   const btnGhost = (active?: boolean) => ({ padding: "5px 12px", borderRadius: 8, background: active ? "#D4775A" : "transparent", color: active ? "#fff" : "#6B6257", fontWeight: 700, fontSize: 12, border: "1px solid #ddd6c8", cursor: "pointer" as const });
@@ -302,7 +302,7 @@ export default function EpiceriePage() {
                 <div style={{ fontWeight: 700 }}>Ajoutez des produits depuis le catalogue</div>
               </div>
             ) : (
-              <div style={{ ...card, padding: 0, borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ ...card, padding: 0, borderRadius: 14, overflow: "hidden" }}>
                 <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                     <thead>

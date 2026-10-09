@@ -72,7 +72,7 @@ function delta(cur: number, prev: number): { txt: string; color: string } | null
 
 function KpiCard({ label, value, sub, subColor }: { label: string; value: string; sub?: string; subColor?: string }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: "14px 16px" }}>
+    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: "14px 16px" }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif", marginTop: 2 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, fontWeight: 600, color: subColor ?? "#999", marginTop: 2 }}>{sub}</div>}
@@ -114,7 +114,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function CatSplit({ lines, total }: { lines: CatLine[]; total: number }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: "14px 16px" }}>
+    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: "14px 16px" }}>
       {lines.map(l => {
         const pct = total > 0 ? (l.ca / total) * 100 : 0;
         const d = delta(l.ca, l.prevCa);
@@ -138,7 +138,7 @@ function CatSplit({ lines, total }: { lines: CatLine[]; total: number }) {
 
 function TopProduits({ prods, unit }: { prods: ProdLine[]; unit: "ca" | "qty" }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: "6px 16px" }}>
+    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: "6px 16px" }}>
       {prods.map((p, i) => (
         <div key={p.name} style={{
           display: "flex", alignItems: "center", gap: 10, padding: "9px 0",
@@ -182,7 +182,7 @@ function DetailProduits({ prods }: { prods: ProdLine[] }) {
         const color = couleurTexte(CAT_COLORS[cat] ?? ACCENT);
         const ouvert = ouverts.has(cat);
         return (
-          <div key={cat} style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, overflow: "hidden" }}>
+          <div key={cat} style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden" }}>
             <button type="button" onClick={() => toggle(cat)} style={{
               width: "100%", display: "flex", alignItems: "center", gap: 10,
               padding: "12px 16px", border: "none", background: "none", cursor: "pointer",
@@ -356,14 +356,14 @@ export default function MonTableauPage() {
 
       {loading && <p style={{ color: "#999", fontSize: 13, textAlign: "center", padding: 40 }}>Chargement…</p>}
       {!loading && err && (
-        <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: 24, textAlign: "center", fontSize: 13, color: "#999" }}>
+        <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: 24, textAlign: "center", fontSize: 13, color: "#999" }}>
           {err === "Aucune fiche employé liée à ce compte"
             ? "Ton compte n'est pas encore relié à une fiche employé. Demande à un responsable de t'inviter depuis Paramètres → Employés."
             : err}
         </div>
       )}
       {!loading && !err && data?.empty && (
-        <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: 24, textAlign: "center", fontSize: 13, color: "#999" }}>
+        <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: 24, textAlign: "center", fontSize: 13, color: "#999" }}>
           Aucune vente sur cette période. {""}
           (Piccola Mia n&apos;est pas encore connectée à la caisse Kezia — les chiffres arrivent avec Bello Mio.)
         </div>
@@ -382,7 +382,7 @@ export default function MonTableauPage() {
             </div>
 
             <SectionTitle>Par serveur</SectionTitle>
-            <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: "6px 16px", overflowX: "auto" }}>
+            <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: "6px 16px", overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 420 }}>
                 <thead>
                   <tr style={{ borderBottom: "2px solid #ddd6c8" }}>
@@ -415,7 +415,7 @@ export default function MonTableauPage() {
             </div>
 
             <SectionTitle>Attaches de l&apos;équipe (moyenne)</SectionTitle>
-            <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: "14px 16px" }}>
               {m.attacheGroups.map(g => (
                 <VsBar key={g.key} label={g.label} mine={m.teamAvgAttaches[g.key] ?? 0} team={null} fmt={fmtPct} />
               ))}
@@ -464,7 +464,7 @@ export default function MonTableauPage() {
             {pizze && cucina && (pizze.ca + cucina.ca) > 0 && (
               <>
                 <SectionTitle>Pizza vs Cucina</SectionTitle>
-                <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: "14px 16px" }}>
+                <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: "14px 16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
                     <span style={{ color: CAT_COLORS.PIZZE }}>🍕 Pizze · {fmtEur(pizze.ca)}</span>
                     <span style={{ color: CAT_COLORS.CUCINA }}>Cucina · {fmtEur(cucina.ca)} 🍝</span>
@@ -499,7 +499,7 @@ export default function MonTableauPage() {
         const s = data.salle!;
         if (!s.hasOperateur || !s.me) {
           return (
-            <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: 24, textAlign: "center", fontSize: 13, color: "#999" }}>
+            <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: 24, textAlign: "center", fontSize: 13, color: "#999" }}>
               Ton nom d&apos;opérateur Popina n&apos;est pas renseigné sur ta fiche.
               Demande à un responsable de l&apos;ajouter (Paramètres → Employés → ta fiche → « Caisse Popina »).
             </div>
@@ -522,7 +522,7 @@ export default function MonTableauPage() {
             </div>
 
             <SectionTitle>Mes attaches (% de mes tables) — trait noir = moyenne équipe</SectionTitle>
-            <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: "14px 16px" }}>
               {s.attacheGroups.map(g => (
                 <VsBar
                   key={g.key}

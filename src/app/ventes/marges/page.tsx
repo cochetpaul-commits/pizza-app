@@ -114,7 +114,7 @@ function foodCostColor(fc: number | null): string {
 const S = {
   card: {
     background: COLORS.card,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: "18px 20px",
     border: `1px solid ${COLORS.border}`,
     marginBottom: 14,
@@ -129,7 +129,7 @@ const S = {
   } as CSSProperties,
   kpiCard: {
     background: COLORS.card,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: "16px 18px",
     border: `1px solid ${COLORS.border}`,
     flex: "1 1 140px",

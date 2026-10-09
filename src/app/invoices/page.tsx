@@ -925,7 +925,7 @@ const dropZoneStyle: React.CSSProperties = {
 
 const cardStyle: React.CSSProperties = {
   background: "#fff",
-  borderRadius: 12,
+  borderRadius: 14,
   border: "1px solid #ddd6c8",
   padding: "20px 22px",
 };
@@ -1030,7 +1030,7 @@ const tableStyle: React.CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
   background: "#fff",
-  borderRadius: 10,
+  borderRadius: 14,
   overflow: "hidden",
   border: "1px solid #ddd6c8",
   fontSize: 13,
