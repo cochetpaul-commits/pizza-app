@@ -39,6 +39,7 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   // Achats
   "/ingredients":     "achats.inventaire",
   "/stock":           "achats.inventaire",
+  "/commandes/theoriques": "achats.edit",
   "/inventaire":      "achats.inventaire",
   "/commandes":       "achats.edit",
   "/fournisseurs":    "achats.edit",
@@ -68,6 +69,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/inventaire":   ALL,
   "/session":      ALL,
   "/settings/account": ALL,
+  "/settings/stock": MANAGERS,
   "/bello-mio":    ALL,
   "/piccola-mia":  ALL,
   "/dashboard":    ALL,

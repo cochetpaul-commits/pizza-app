@@ -287,7 +287,7 @@ const SECTION_ACHATS: TabSection = {
   tabs: [
     { label: "Produits", href: "/ingredients", match: ["/ingredients"], icon: () => <ShoppingBasket size={24} strokeWidth={1.5} /> },
     { label: "Commandes", href: "/commandes", match: ["/commandes"], icon: () => <IconTruck /> },
-    { label: "Stock", href: "/stock", match: ["/stock"], icon: () => <IconBox /> },
+    { label: "Inventaire", href: "/inventaire", match: ["/inventaire"], icon: () => <IconBox /> },
     { label: "Factures", href: "/achats", match: ["/achats", "/invoices", "/variations-prix"], icon: () => <IconFileText /> },
   ],
 };

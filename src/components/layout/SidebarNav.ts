@@ -69,6 +69,7 @@ export const PARAMETRES_ITEMS: NavItemV2[] = [
   { label: "Catégories", href: "/settings/categories", icon: "tag", roles: ["group_admin"] },
   { label: "Accès de l'équipe", href: "/settings/acces", icon: "users", roles: ["group_admin"] },
   { label: "Prix de vente", href: "/epicerie", icon: "tag", roles: MANAGERS },
+  { label: "Stock et doses", href: "/settings/stock", icon: "box", roles: MANAGERS },
   { label: "Mes congés", href: "/mes-conges", icon: "beach" },
   { label: "Mon compte", href: "/settings/account", icon: "settings" },
 ];
@@ -84,9 +85,9 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     { kind: "divider", label: "Exploitation" },
     { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
     { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
-    { kind: "page", label: "Stock", href: "/stock", icon: "box", permission: "achats.inventaire" },
-    { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },
+    // Le stock vit dans la Base produits depuis le 10/10/2026 ; l'inventaire le remet à niveau
     { kind: "page", label: "Base produits", href: "/ingredients", icon: "tag", permission: "achats.inventaire" },
+    { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },
     { kind: "page", label: "Fournisseurs", href: "/fournisseurs", icon: "truck", permission: "achats.edit" },
     { kind: "group", label: "HACCP", icon: "clipboard", roles: MANAGERS, items: HACCP_ITEMS },
     ...(piccola ? [{ kind: "group", label: "Événementiel", icon: "calendarEvent", roles: MANAGERS, items: EVENEMENTIEL_ITEMS } as NavEntry] : []),

@@ -204,7 +204,10 @@ export function CommandesBureau(p: CommandesBureauProps) {
           <h1 style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 28, textTransform: "uppercase", letterSpacing: ".02em", margin: 0, lineHeight: 1.05, color: "#1a1a1a" }}>Commandes</h1>
           <div style={{ color: MUTED, fontSize: 13, marginTop: 4 }}>Brouillons, envois et réceptions, par fournisseur.</div>
         </div>
-        <button type="button" onClick={p.onCommander} style={{ ...BTN, background: p.accent, color: "#fff", border: "none", fontWeight: 700 }}>+ Commander</button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <a href="/commandes/theoriques" style={{ ...BTN, display: "inline-flex", alignItems: "center", textDecoration: "none" }} title="Ce qu'il faudrait commander d'après le stock théorique">Proposition de commande</a>
+          <button type="button" onClick={p.onCommander} style={{ ...BTN, background: p.accent, color: "#fff", border: "none", fontWeight: 700 }}>+ Commander</button>
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
