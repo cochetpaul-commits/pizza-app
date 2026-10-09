@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -11,14 +11,14 @@ import { buildRecipeMeta, type RecipeIngredientMeta } from "@/lib/recipeMeta";
 import type { LatestOffer } from "@/types/ingredients";
 import {
   type FicheState, type Categorie, type Famille, type IngredientRef, type LigneIngredient, type Zone, type PrixLigne,
-  ALLERGENES_14, PATON_BASE,
-  coutLigne, coutRecetteTotal, coutPaton, coutPortion, prixTTC, prixHT,
+  ALLERGENES_14, PATON_BASE, coutRecetteTotal, coutPaton, coutPortion, prixTTC, prixHT,
   foodCostPct, margeBrute, prixConseille, fcColor, allergenesActifs, resumeAuto,
   eur, tmpKey, defaultFiche, ligneWeightG,
 } from "./ficheTypes";
 import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { openApiFile } from "@/lib/fetchApi";
+import { couleurTexte } from "@/lib/styleCategories";
 import { fermerOffresActives } from "@/lib/offerClosing";
 
 // ── Brouillons non enregistrés ──────────────────────────────────────
@@ -95,7 +95,6 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const resolvedEtab = etab ?? etablissements?.[0];
   const etabSlug = resolvedEtab?.slug?.includes("piccola") ? "piccola" : "bello_mio";
 
-  const [step, setStep] = useState(0);
   const [fiche, setFiche] = useState<FicheState>(() => ({
     ...defaultFiche(etabSlug),
     ...(initialCategorie ? { categorie_slug: initialCategorie } : {}),
@@ -115,7 +114,6 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const [newCatName, setNewCatName] = useState("");
   const [showNewSubCat, setShowNewSubCat] = useState(false);
   const [newSubCatName, setNewSubCatName] = useState("");
-  const [salleView, setSalleView] = useState<"salle" | "cuisine">("salle");
   const [existingSubCats, setExistingSubCats] = useState<Record<string, string[]>>({});
   const [popinaProducts, setPopinaProducts] = useState<{ id: string; name: string; category: string; price_ttc: number; kitchen_recipe_id: string | null }[]>([]);
   const [linkedPopina, setLinkedPopina] = useState<string | null>(initialPopinaId ?? null);
@@ -123,8 +121,6 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const [showPopinaList, setShowPopinaList] = useState(false);
   const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});
   const [metaByIngredient, setMetaByIngredient] = useState<Record<string, RecipeIngredientMeta>>({});
-  // Saisie en cours du coefficient kilo (null = affichage dérivé du prix)
-  const [coeffKgDraft, setCoeffKgDraft] = useState<string | null>(null);
 
   // ── Load data ──
   useEffect(() => {
@@ -337,6 +333,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
             coeff: rec.sell_price && rec.cost_per_portion ? Number(rec.sell_price) / Number(rec.cost_per_portion) : 3,
             tva: rec.vat_rate ? Number(rec.vat_rate) * 100 : 10,
             prix_ttc_manuel: rec.sell_price ? Number(rec.sell_price) * (1 + (rec.vat_rate ? Number(rec.vat_rate) : 0.1)) : null,
+            prix_ttc_emporter: rec.sell_price_emporter ? Number(rec.sell_price_emporter) : null,
+            tva_emporter: rec.vat_rate_emporter != null ? Number(rec.vat_rate_emporter) * 100 : 5.5,
             sell_price_per_kg: rec.sell_price_per_kg ? Number(rec.sell_price_per_kg) : null,
             sell_price_per_portion: rec.sell_price_per_portion ? Number(rec.sell_price_per_portion) : null,
             cooked_weight_g: rec.cooked_weight_g ? Number(rec.cooked_weight_g) : null,
@@ -413,7 +411,6 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       if (entry?.fiche) {
         draftIdRef.current = entry.id;
         setFiche(entry.fiche);
-        if (typeof entry.step === "number") setStep(entry.step);
         setLinkedPopina(entry.linkedPopina ?? null);
         showToast("Fiche en cours restaurée");
         draftReady.current = true;
@@ -424,7 +421,6 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
         const d = JSON.parse(raw) as { ts?: number; step?: number; fiche?: FicheState; linkedPopina?: string | null };
         if (d?.fiche && Date.now() - (d.ts ?? 0) < DRAFT_TTL_MS) {
           setFiche(d.fiche);
-          if (typeof d.step === "number") setStep(d.step);
           if (d.linkedPopina !== undefined) setLinkedPopina(d.linkedPopina);
           showToast("Brouillon restauré");
         } else {
@@ -439,20 +435,20 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   useEffect(() => {
     if (!draftReady.current) return;
     try {
-      localStorage.setItem(draftKey, JSON.stringify({ ts: Date.now(), step, fiche, linkedPopina }));
+      localStorage.setItem(draftKey, JSON.stringify({ ts: Date.now(), step: 0, fiche, linkedPopina }));
     } catch { /* quota plein ou stockage bloqué : non bloquant */ }
     if (!fiche.nom.trim() && fiche.lignes.length === 0) return;
     const t = setTimeout(() => {
       const others = readArchive(etabSlug).filter(d => d.id !== draftIdRef.current);
       const next: DraftEntry[] = [{
         id: draftIdRef.current, ts: Date.now(), nom: fiche.nom, categorie_slug: fiche.categorie_slug,
-        sous_categorie: fiche.sous_categorie, step, fiche, linkedPopina,
+        sous_categorie: fiche.sous_categorie, step: 0, fiche, linkedPopina,
       }, ...others];
       writeArchive(etabSlug, next);
       setDrafts(next);
     }, 800);
     return () => clearTimeout(t);
-  }, [fiche, step, linkedPopina, draftKey, etabSlug]);
+  }, [fiche, linkedPopina, draftKey, etabSlug]);
 
   const clearDraft = useCallback(() => {
     try { localStorage.removeItem(draftKey); } catch { /* */ }
@@ -467,7 +463,6 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
     if (enCours && !confirm(`Remplacer la fiche en cours par le brouillon « ${d.nom?.trim() || "sans nom"} » ?`)) return;
     draftIdRef.current = d.id;
     setFiche(d.fiche);
-    setStep(typeof d.step === "number" ? d.step : 0);
     setLinkedPopina(d.linkedPopina ?? null);
     showToast("Brouillon restauré — pense à enregistrer");
   };
@@ -506,6 +501,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       total_cost: saveTotalCost > 0 ? saveTotalCost : null,
       sell_price: saveHt > 0 ? saveHt : null,
       vat_rate: fiche.tva / 100,
+      sell_price_emporter: fiche.prix_ttc_emporter != null && fiche.prix_ttc_emporter > 0 ? fiche.prix_ttc_emporter : null,
+      vat_rate_emporter: fiche.tva_emporter / 100,
       margin_rate: saveHt > 0 ? (1 - saveCostPerPortion / saveHt) : 0.65,
       sell_price_per_kg: fiche.sell_price_per_kg,
       sell_price_per_portion: fiche.sell_price_per_portion,
@@ -623,940 +620,430 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   }
 
   // ── Steps ──
-  const STEPS = ["Infos", "Ingredients", "Preparation", "Prix et marge", "Fiche salle"];
-
   if (loading) return <div style={{ textAlign: "center", padding: 60, color: COLORS.muted }}>Chargement...</div>;
 
-  return (
-    <div style={{ maxWidth: 860, margin: "0 auto", padding: "28px 16px 80px" }}>
+  // ── Gabarit de la fiche (maquette validée le 09/10/2026) : une seule colonne, sections empilées ──
+  const BORD = "#ddd6c8";
+  const SEC: CSSProperties = { padding: "18px 18px", borderBottom: `1px solid ${BORD}`, display: "grid", gap: 12 };
+  const H2: CSSProperties = { margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "#6f6a61", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap" };
+  const LBL: CSSProperties = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#6f6a61", marginBottom: 5 };
+  const INPUT: CSSProperties = { height: 44, width: "100%", border: `1px solid ${BORD}`, borderRadius: 12, background: "#fff", padding: "0 14px", fontSize: 15, color: "#1a1a1a", fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+  const SELECT: CSSProperties = { ...INPUT, appearance: "auto" as const };
+  const ZONE: CSSProperties = { ...INPUT, height: "auto", minHeight: 80, padding: "10px 14px", resize: "vertical" as const };
+  const NOTE: CSSProperties = { fontSize: 12.5, color: "#6f6a61" };
+  const BTN: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, height: 42, padding: "0 16px", borderRadius: 12, border: `1px solid ${BORD}`, background: "#fff", fontWeight: 600, color: "#1a1a1a", whiteSpace: "nowrap", fontSize: 14, cursor: "pointer", fontFamily: "inherit" };
+  const PETIT: CSSProperties = { ...BTN, height: 34, fontSize: 13, padding: "0 12px" };
+  const AIDE: CSSProperties = { fontWeight: 500, letterSpacing: 0, textTransform: "none", fontSize: 12, color: "#a39d92" };
+  const pilule = (actif: boolean): CSSProperties => ({ padding: "8px 14px", borderRadius: 9, fontSize: 13.5, fontWeight: 700, cursor: "pointer", border: "none", fontFamily: "inherit", background: actif ? "#fff" : "transparent", color: actif ? "#1a1a1a" : "#6f6a61", boxShadow: actif ? "0 1px 4px rgba(0,0,0,0.08)" : "none" });
+  const Bascule = ({ titre, aide, actif, onChange }: { titre: string; aide: string; actif: boolean; onChange: (v: boolean) => void }) => (
+    <button type="button" onClick={() => onChange(!actif)} aria-pressed={actif} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", textAlign: "left", border: "none", background: "transparent", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+      <span><b style={{ display: "block", fontSize: 15, color: "#1a1a1a" }}>{titre}</b><small style={{ color: "#6f6a61", fontSize: 12.5 }}>{aide}</small></span>
+      <span style={{ display: "inline-block", width: 40, height: 24, borderRadius: 12, background: actif ? "#1a1a1a" : BORD, position: "relative", flexShrink: 0 }}>
+        <span style={{ position: "absolute", top: 3, left: actif ? 19 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+      </span>
+    </button>
+  );
+  const couleurCat = cat?.couleur ?? "#939597";
+  const fcCouleur = fcCol === "ok" ? "#4a6741" : fcCol === "warn" ? "#b7791f" : "#b4443a";
+  const htEmporter = fiche.prix_ttc_emporter != null && fiche.prix_ttc_emporter > 0 ? prixHT(fiche.prix_ttc_emporter, fiche.tva_emporter) : null;
+  const popinaLie = linkedPopina ? popinaProducts.find(p => p.id === linkedPopina) : null;
+  const retourCarte = () => router.push("/carte?vue=fiches");
 
-      {/* HERO */}
-      <div style={{
-        background: `linear-gradient(135deg, #82302c, #6e2523)`,
-        color: "#fff", borderRadius: 22, padding: "22px 26px", marginBottom: 14,
-        boxShadow: "0 10px 24px #7d2a2a22",
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-          <div>
-            <div style={{ fontSize: 11, letterSpacing: ".2em", opacity: 0.75, textTransform: "uppercase", fontWeight: 600 }}>
-              Fiche technique
-            </div>
-            <h1 style={{ fontSize: 26, letterSpacing: ".08em", marginTop: 4, textTransform: "uppercase", fontWeight: 800 }}>
-              {fiche.nom || "Nouvelle recette"}
-            </h1>
-          </div>
-          <span style={{
-            borderRadius: 999, padding: "5px 14px", fontSize: 12, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase",
-            background: fiche.statut === "publiee" ? "#f6e2df" : fiche.statut === "validee" ? "#e2efe4" : "#f2ede2",
-            color: fiche.statut === "publiee" ? COLORS.bordeaux : fiche.statut === "validee" ? COLORS.ok : COLORS.muted,
-          }}>
-            {fiche.statut === "publiee" ? "Au catalogue" : fiche.statut === "validee" ? "Validee" : "Brouillon"}
-          </span>
-        </div>
-        <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-          <span style={{ background: "#ffffff22", borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600 }}>
-            {resolvedEtab?.nom ?? "Bello Mio"}
-          </span>
-          {cat && <span style={{ background: "#ffffff22", borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600 }}>{cat.nom}</span>}
-          {fiche.sous_categorie && <span style={{ background: "#ffffff22", borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600 }}>{fiche.sous_categorie}</span>}
-        </div>
-      </div>
+  // Lignes d'ingrédients : conversion vers l'éditeur commun (IngredientListDnD), par zone
+  const toLines = (zone: string): IngredientLine[] =>
+    fiche.lignes.filter(l => l.zone === zone).map((l, i) => ({ id: l.key, ingredient_id: l.ingredient_id ?? "", qty: l.quantite || "", unit: l.unite, sort_order: i }));
+  const fromLines = (lines: IngredientLine[], zone: string): LigneIngredient[] =>
+    lines.map(l => ({ key: l.id, ingredient_id: l.ingredient_id || null, ingredient: mercuriale.find((m: IngredientRef) => m.id === l.ingredient_id) ?? null, quantite: typeof l.qty === "number" ? l.qty : 0, unite: l.unit, zone: zone as Zone }));
+  const updateZone = (lines: IngredientLine[], zone: string) => update({ lignes: [...fiche.lignes.filter(l => l.zone !== zone), ...fromLines(lines, zone)] });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ingList = mercuriale.map(m => ({ id: m.id, name: m.nom_produit || m.nom_court, category: "" as any, allergens: m.allergenes, source: m.source ?? null })) as any[];
+  const priceMap: Record<string, CpuByUnit> = {};
+  for (const m of mercuriale) {
+    if (m.cpu && (m.cpu.g || m.cpu.ml || m.cpu.pcs)) priceMap[m.id] = m.cpu;
+    else if (m.prix_base > 0) priceMap[m.id] = m.unite_base === "cl" ? { ml: m.prix_base / 10 } : m.unite_base === "pc" ? { pcs: m.prix_base } : { g: m.prix_base };
+  }
+  const units = ["g", "kg", "cl", "ml", "L", "pcs"];
+  const currentUrl = (() => { if (typeof window === "undefined") return ""; const u = new URL(window.location.href); u.searchParams.set("draft", draftIdRef.current); return u.pathname + u.search; })();
+  const poidsCru = fiche.lignes.reduce((acc: number, l: LigneIngredient) => acc + ligneWeightG(l), 0) + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
+
+  return (
+    <div style={{ maxWidth: 760, margin: "0 auto", padding: "16px 16px 40px" }}>
 
       {/* BROUILLONS NON ENREGISTRÉS (cet appareil) */}
       {otherDrafts.length > 0 && (
-        <div style={{ background: "#fff8ec", border: "1px solid #ecd9b8", borderRadius: 14, padding: "10px 14px", marginBottom: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.amber, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>
-            Brouillons non enregistrés sur cet appareil
-          </div>
+        <div style={{ background: "#fff8ec", border: "1px solid #ecd9b8", borderRadius: 14, padding: "10px 14px", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: COLORS.amber, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>Brouillons non enregistrés sur cet appareil</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {otherDrafts.map(d => (
               <span key={d.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#fff", border: `1px solid ${COLORS.line}`, borderRadius: 999, padding: "4px 6px 4px 12px", fontSize: 13 }}>
                 <button type="button" onClick={() => restoreDraft(d)} style={{ border: "none", background: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 13, color: COLORS.ink, padding: 0 }}>
-                  <strong>{d.nom?.trim() || "Sans nom"}</strong>
-                  <span style={{ color: COLORS.muted }}> · {d.sous_categorie || d.categorie_slug || "—"} · {ageLabel(d.ts)}</span>
+                  <strong>{d.nom?.trim() || "Sans nom"}</strong><span style={{ color: COLORS.muted }}> · {d.sous_categorie || d.categorie_slug || "—"} · {ageLabel(d.ts)}</span>
                 </button>
-                <button type="button" aria-label="Oublier ce brouillon" onClick={() => forgetDraft(d)} style={{ border: "none", background: "none", cursor: "pointer", color: COLORS.muted, fontSize: 15, lineHeight: 1, padding: "0 4px" }}>×</button>
+                <button type="button" aria-label="Oublier ce brouillon" onClick={() => forgetDraft(d)} style={{ border: "none", background: "none", cursor: "pointer", color: COLORS.muted, fontSize: 15, padding: "0 4px" }}>×</button>
               </span>
             ))}
           </div>
         </div>
       )}
 
-      {/* PIPELINE */}
-      <div style={{
-        display: "flex", alignItems: "center", background: COLORS.card,
-        borderRadius: 18, padding: "14px 18px", marginBottom: 14, boxShadow: "0 4px 14px #0000000a",
-      }}>
-        {["Brouillon cuisine", "Fiche validee", "Au catalogue salle"].map((label, i) => (
-          <React.Fragment key={i}>
-            {i > 0 && <div style={{ flex: 1, height: 2, background: COLORS.line, margin: "0 12px", minWidth: 20 }} />}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em",
-              color: i < (fiche.statut === "publiee" ? 3 : fiche.statut === "validee" ? 2 : 1) ? COLORS.ok : (i === (fiche.statut === "publiee" ? 2 : fiche.statut === "validee" ? 1 : 0) ? COLORS.bordeaux : COLORS.muted),
-            }}>
-              <span style={{
-                width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12,
-                background: i < (fiche.statut === "publiee" ? 3 : fiche.statut === "validee" ? 2 : 1) ? COLORS.ok : (i === (fiche.statut === "publiee" ? 2 : fiche.statut === "validee" ? 1 : 0) ? COLORS.bordeaux : COLORS.pill),
-                color: i < (fiche.statut === "publiee" ? 3 : fiche.statut === "validee" ? 2 : 1) || i === (fiche.statut === "publiee" ? 2 : fiche.statut === "validee" ? 1 : 0) ? "#fff" : COLORS.muted,
-              }}>
-                {i + 1}
+      <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 16, overflow: "hidden" }}>
+        {/* EN-TÊTE */}
+        <div style={{ padding: "18px 18px 14px", borderBottom: `1px solid ${BORD}`, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".02em", lineHeight: 1.1, color: "#1a1a1a" }}>{fiche.nom || "Nouvelle fiche"}</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+              {cat && <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 999, background: `${couleurCat}1f`, color: couleurTexte(couleurCat) }}>{cat.nom}</span>}
+              <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 999, background: fiche.statut === "publiee" ? "rgba(74,103,65,0.12)" : fiche.statut === "validee" ? "rgba(37,99,235,0.10)" : "#f2ede4", color: fiche.statut === "publiee" ? "#4a6741" : fiche.statut === "validee" ? "#2563EB" : "#6f6a61" }}>
+                {fiche.statut === "publiee" ? "Publiée" : fiche.statut === "validee" ? "Validée" : "Brouillon"}
               </span>
-              <span className="hidden-mobile" style={{ whiteSpace: "nowrap" }}>{label}</span>
+              {popinaLie && <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 999, background: "rgba(212,119,90,0.12)", color: "#D4775A" }}>Popina {popinaLie.price_ttc?.toFixed(2).replace(".", ",")} €</span>}
             </div>
-          </React.Fragment>
-        ))}
-      </div>
+          </div>
+          <button type="button" onClick={retourCarte} aria-label="Fermer" style={{ border: "none", background: "transparent", fontSize: 24, color: "#6f6a61", lineHeight: 1, cursor: "pointer", padding: 0 }}>×</button>
+        </div>
 
-      {/* STEPPER */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {STEPS.map((s, i) => (
-          <button key={i} onClick={() => setStep(i)} style={{
-            flex: 1, minWidth: 120, border: "none", cursor: "pointer",
-            background: step === i ? COLORS.terra : COLORS.card,
-            borderRadius: 14, padding: "10px 8px", fontSize: 12, fontWeight: 700,
-            color: step === i ? "#fff" : COLORS.muted, letterSpacing: ".04em",
-            boxShadow: "0 3px 10px #0000000a", transition: ".15s",
-            fontFamily: "inherit",
-          }}>
-            <span style={{
-              display: "inline-flex", width: 20, height: 20, borderRadius: "50%",
-              background: step === i ? "#ffffff33" : COLORS.pill,
-              alignItems: "center", justifyContent: "center", marginRight: 6, fontSize: 11,
-              color: step === i ? "#fff" : COLORS.muted,
-            }}>{i + 1}</span>
-            {s}
-          </button>
-        ))}
-      </div>
-
-      {/* ÉTAPE 1 : INFOS */}
-      {step === 0 && (
-        <div style={{ background: COLORS.card, borderRadius: 18, padding: "22px 24px", marginBottom: 14, boxShadow: "0 4px 14px #0000000a" }}>
-          <h2 style={{ fontSize: 13, letterSpacing: ".15em", textTransform: "uppercase", color: COLORS.bordeaux, marginBottom: 16, fontWeight: 800 }}>
-            1. Informations de base
-          </h2>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "14px 0 6px" }}>Nom de la recette</label>
-          <input type="text" value={fiche.nom} onChange={e => update({ nom: e.target.value })} placeholder="Ex : BURRATA"
-            style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", color: COLORS.ink, outline: "none", boxSizing: "border-box" }} />
-
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 14 }}>
-            <div style={{ flex: 1, minWidth: 150 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Categorie</label>
+        {/* IDENTITÉ */}
+        <div style={SEC}>
+          <h2 style={H2}>Identité</h2>
+          <div>
+            <label style={LBL}>Nom</label>
+            <input type="text" value={fiche.nom} onChange={e => update({ nom: e.target.value })} placeholder="Ex : BURRATA" style={{ ...INPUT, fontWeight: 700, fontSize: 17 }} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <label style={LBL}>Catégorie</label>
               {showNewCat ? (
                 <div style={{ display: "flex", gap: 6 }}>
-                  <input type="text" autoFocus value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nom de la categorie"
-                    style={{ flex: 1, border: `1.5px solid ${COLORS.terra}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", outline: "none", fontFamily: "inherit" }}
+                  <input type="text" autoFocus value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nom de la catégorie" style={{ ...INPUT, borderColor: COLORS.terra }}
                     onKeyDown={async e => {
                       if (e.key === "Enter" && newCatName.trim()) {
                         const slug = newCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
                         const { data, error } = await supabase.from("categories").insert({ nom: newCatName.trim(), slug, couleur: "#999999", famille_id: "autre", sous_categories: [], sort_order: 99 }).select().single();
                         if (error) { alert(`Catégorie non créée : ${error.message}`); return; }
-                        if (data) {
-                          setCategories(prev => [...prev, data as Categorie]);
-                          update({ categorie_slug: slug, sous_categorie: "" });
-                        }
+                        if (data) { setCategories(prev => [...prev, data as Categorie]); update({ categorie_slug: slug, sous_categorie: "" }); }
                         setNewCatName(""); setShowNewCat(false);
                       }
                       if (e.key === "Escape") { setNewCatName(""); setShowNewCat(false); }
                     }} />
-                  <button onClick={() => { setNewCatName(""); setShowNewCat(false); }}
-                    style={{ border: "none", background: "#f2ede2", borderRadius: 10, padding: "0 12px", cursor: "pointer", color: COLORS.muted, fontWeight: 700, fontFamily: "inherit" }}>x</button>
+                  <button type="button" onClick={() => { setNewCatName(""); setShowNewCat(false); }} style={{ ...PETIT, height: 44 }}>×</button>
                 </div>
               ) : (
-                <select value={fiche.categorie_slug} onChange={e => {
+                <select value={fiche.categorie_slug} style={SELECT} onChange={e => {
                   const slug = e.target.value;
                   if (slug === "__new__") { setShowNewCat(true); return; }
                   const c = categories.find(cc => cc.slug === slug);
                   const f = familles.find(ff => ff.id === (c?.famille_id ?? "autre"));
                   update({ categorie_slug: slug, sous_categorie: "", tva: f?.tva_defaut ?? 10 });
-                }} style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit" }}>
-                  {categories.map(c => {
-                    const f = familles.find(ff => ff.id === c.famille_id);
-                    return <option key={c.slug} value={c.slug}>{c.nom} ({f?.label ?? "Autre"}, FC {f?.objectif_fc ?? 30} %)</option>;
-                  })}
-                  <option value="__new__">+ Creer une categorie</option>
+                }}>
+                  {categories.map(c => <option key={c.slug} value={c.slug}>{c.nom}</option>)}
+                  <option value="__new__">+ Créer une catégorie</option>
                 </select>
               )}
             </div>
-            <div style={{ flex: 1, minWidth: 150 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>
-                Sous-categorie <span style={{ textTransform: "none", letterSpacing: 0 }}>(facultatif)</span>
-              </label>
+            <div>
+              <label style={LBL}>Sous-catégorie</label>
               {showNewSubCat ? (
                 <div style={{ display: "flex", gap: 6 }}>
-                  <input type="text" autoFocus value={newSubCatName} onChange={e => setNewSubCatName(e.target.value)} placeholder="Nom de la sous-categorie"
-                    style={{ flex: 1, border: `1.5px solid ${COLORS.terra}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", outline: "none", fontFamily: "inherit" }}
+                  <input type="text" autoFocus value={newSubCatName} onChange={e => setNewSubCatName(e.target.value)} placeholder="Nom de la sous-catégorie" style={{ ...INPUT, borderColor: COLORS.terra }}
                     onKeyDown={async e => {
                       if (e.key === "Enter" && newSubCatName.trim()) {
                         const scName = newSubCatName.trim();
-                        // Save to categories table if cat exists
                         if (cat) {
                           const newSubs = [...(cat.sous_categories ?? []), scName];
                           await supabase.from("categories").update({ sous_categories: newSubs }).eq("id", cat.id);
                           setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, sous_categories: newSubs } : c));
                         }
-                        // Update local existing sub-cats
-                        setExistingSubCats(prev => ({
-                          ...prev,
-                          [fiche.categorie_slug]: [...new Set([...(prev[fiche.categorie_slug] ?? []), scName])].sort(),
-                        }));
+                        setExistingSubCats(prev => ({ ...prev, [fiche.categorie_slug]: [...new Set([...(prev[fiche.categorie_slug] ?? []), scName])].sort() }));
                         update({ sous_categorie: scName });
                         setNewSubCatName(""); setShowNewSubCat(false);
                       }
                       if (e.key === "Escape") { setNewSubCatName(""); setShowNewSubCat(false); }
                     }} />
-                  <button onClick={() => { setNewSubCatName(""); setShowNewSubCat(false); }}
-                    style={{ border: "none", background: "#f2ede2", borderRadius: 10, padding: "0 12px", cursor: "pointer", color: COLORS.muted, fontWeight: 700, fontFamily: "inherit" }}>x</button>
+                  <button type="button" onClick={() => { setNewSubCatName(""); setShowNewSubCat(false); }} style={{ ...PETIT, height: 44 }}>×</button>
                 </div>
               ) : (
-                <select value={fiche.sous_categorie} onChange={e => {
-                  const v = e.target.value;
-                  if (v === "__new__") { setShowNewSubCat(true); return; }
-                  update({ sous_categorie: v });
-                }} style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit" }}>
+                <select value={fiche.sous_categorie} style={SELECT} onChange={e => { const v = e.target.value; if (v === "__new__") { setShowNewSubCat(true); return; } update({ sous_categorie: v }); }}>
                   <option value="">Aucune</option>
                   {(existingSubCats[fiche.categorie_slug] ?? []).map(s => <option key={s} value={s}>{s}</option>)}
-                  <option value="__new__">+ Creer une sous-categorie</option>
+                  <option value="__new__">+ Créer une sous-catégorie</option>
                 </select>
               )}
             </div>
           </div>
-
-          {/* Variante pizza */}
-          {isPizza && (
-            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 14 }}>
-              <div style={{ flex: 1, minWidth: 150 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Empatement lie</label>
-                <select value={fiche.empatement} onChange={e => update({ empatement: e.target.value })}
-                  style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit" }}>
-                  {empatements.length > 0
-                    ? empatements.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>)
-                    : <option>FOCACCIA</option>
-                  }
-                </select>
-              </div>
-              <div style={{ flex: 1, minWidth: 150 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Poids paton (g)</label>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <button onClick={() => update({ paton_poids: Math.max(0, fiche.paton_poids - 2) })} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#fff", color: COLORS.bordeaux, fontSize: 17, fontWeight: 800, cursor: "pointer", boxShadow: "0 2px 6px #00000012" }}>&minus;</button>
-                  <b style={{ minWidth: 44, textAlign: "center", fontSize: 17 }}>{fiche.paton_poids}</b>
-                  <button onClick={() => update({ paton_poids: fiche.paton_poids + 2 })} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#fff", color: COLORS.bordeaux, fontSize: 17, fontWeight: 800, cursor: "pointer", boxShadow: "0 2px 6px #00000012" }}>+</button>
-                  <span style={{ fontSize: 12.5, color: COLORS.muted, marginLeft: 8 }}>cout paton : {eur(patonCost)}</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ÉTAPE 2 : INGRÉDIENTS */}
-      {step === 1 && (
-        <div style={{ background: COLORS.card, borderRadius: 18, padding: "22px 24px", marginBottom: 14, boxShadow: "0 4px 14px #0000000a" }}>
-          <h2 style={{ fontSize: 13, letterSpacing: ".15em", textTransform: "uppercase", color: COLORS.bordeaux, marginBottom: 16, fontWeight: 800 }}>
-            2. Ingredients
-          </h2>
-
-          {/* Ingredient list with drag & drop */}
-          {(() => {
-            // Convert LigneIngredient → IngredientLine for IngredientListDnD
-            const toLines = (zone: string): IngredientLine[] =>
-              fiche.lignes.filter(l => l.zone === zone).map((l, i) => ({
-                id: l.key, ingredient_id: l.ingredient_id ?? "", qty: l.quantite || "", unit: l.unite, sort_order: i,
-              }));
-            const fromLines = (lines: IngredientLine[], zone: string): LigneIngredient[] =>
-              lines.map(l => ({
-                key: l.id, ingredient_id: l.ingredient_id || null,
-                ingredient: mercuriale.find((m: IngredientRef) => m.id === l.ingredient_id) ?? null,
-                quantite: typeof l.qty === "number" ? l.qty : 0, unite: l.unit, zone: zone as Zone,
-              }));
-            const updateZone = (lines: IngredientLine[], zone: string) => {
-              const otherLines = fiche.lignes.filter(l => l.zone !== zone);
-              update({ lignes: [...otherLines, ...fromLines(lines, zone)] });
-            };
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const ingList = mercuriale.map(m => ({ id: m.id, name: m.nom_produit || m.nom_court, category: "" as any, allergens: m.allergenes, source: m.source ?? null })) as any[];
-            const priceMap: Record<string, CpuByUnit> = {};
-            for (const m of mercuriale) {
-              // Prix complets (€/g, €/ml, €/pièce) quand on les a — l'ancien
-              // raccourci { g: prix_base } perdait le €/L : plus d'estimation
-              // possible sur une ligne en cl, et le poids total comptait
-              // les centilitres comme des grammes.
-              if (m.cpu && (m.cpu.g || m.cpu.ml || m.cpu.pcs)) priceMap[m.id] = m.cpu;
-              else if (m.prix_base > 0) {
-                priceMap[m.id] = m.unite_base === "cl" ? { ml: m.prix_base / 10 } : m.unite_base === "pc" ? { pcs: m.prix_base } : { g: m.prix_base };
-              }
-            }
-            const units = ["g", "kg", "cl", "ml", "L", "pcs"];
-            // URL de retour depuis /ingredients : on y glisse l'identifiant du
-            // brouillon pour retrouver exactement cette fiche, quel que soit le
-            // chemin d'entrée (nouvelle fiche, catégorie, sous-catégorie).
-            const currentUrl = (() => {
-              if (typeof window === "undefined") return "";
-              const u = new URL(window.location.href);
-              u.searchParams.set("draft", draftIdRef.current);
-              return u.pathname + u.search;
-            })();
-
-            return (
-              <>
-                {isPizza && (
-                  <>
-                    <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "18px 0 8px" }}>Avant four</div>
-                    <IngredientListDnD droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "avant_four")} returnUrl={currentUrl} />
-                  </>
-                )}
-                <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "18px 0 8px" }}>
-                  {isPizza ? "Apres four" : isBar ? "Composition" : "Ingredients"}
-                </div>
-                <IngredientListDnD droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "apres_four")} returnUrl={currentUrl} />
-              </>
-            );
-          })()}
-
-          {/* Recette maison réutilisable */}
-          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 14, padding: "10px 12px", borderRadius: 12, border: `1.5px solid ${fiche.comme_ingredient ? COLORS.ok : COLORS.line}`, background: fiche.comme_ingredient ? "#eef6ef" : "#fff", cursor: "pointer" }}>
-            <input type="checkbox" checked={!!fiche.comme_ingredient} onChange={e => update({ comme_ingredient: e.target.checked })} style={{ marginTop: 3, width: 18, height: 18, accentColor: COLORS.ok }} />
-            <span style={{ fontSize: 13.5 }}>
-              <strong>Utilisable comme ingrédient dans d&apos;autres fiches</strong>
-              <span style={{ display: "block", fontSize: 12, color: COLORS.muted, marginTop: 2 }}>
-                Sirop, sauce, base, préparation : à l&apos;enregistrement, elle apparaît dans la recherche d&apos;ingrédients avec l&apos;étiquette MAISON et son prix au kilo (coût matière ÷ poids de la recette, ou poids cuit s&apos;il est renseigné à l&apos;étape 4).
-              </span>
-            </span>
-          </label>
-
-          {/* Total + poids + allergènes */}
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1.5px solid ${COLORS.line}` }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, marginBottom: 6 }}>
-              <span>Cout matiere, recette complete</span>
-              <span style={{ color: COLORS.bordeaux, fontSize: 18 }}>{eur(totalCost)}</span>
-            </div>
-            {(() => {
-              const wG = fiche.lignes.reduce((acc: number, l: LigneIngredient) => acc + ligneWeightG(l), 0)
-                + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
-              if (wG <= 0) return null;
-              return (
-                <div style={{ display: "flex", gap: 16, fontSize: 12, color: "#888" }}>
-                  <span>Poids total : <strong style={{ color: "#1a1a1a" }}>{wG >= 1000 ? `${(wG / 1000).toFixed(2)} kg` : `${Math.round(wG)} g`}</strong></span>
-                  {fiche.portions > 1 && <span>Poids/portion : <strong style={{ color: "#1a1a1a" }}>{Math.round(wG / fiche.portions)} g</strong></span>}
-                  {totalCost > 0 && wG > 0 && <span>Prix/kg : <strong style={{ color: COLORS.bordeaux }}>{(totalCost / wG * 1000).toFixed(2)}€</strong></span>}
-                </div>
-              );
-            })()}
-          </div>
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, marginBottom: 8 }}>Allergenes, detectes automatiquement</div>
-            <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-              {ALLERGENES_14.map(a => (
-                <span key={a} style={{
-                  borderRadius: 999, padding: "5px 13px", fontSize: 12, fontWeight: 700,
-                  background: actifs.has(a) ? "#fbe3e0" : "#f2ede2",
-                  color: actifs.has(a) ? COLORS.warn : "#b9b2a2",
-                }}>{a}</span>
+          <div>
+            <label style={LBL}>Statut</label>
+            <div style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 12, padding: 3, gap: 3 }}>
+              {(["brouillon", "validee", "publiee"] as const).map(s => (
+                <button key={s} type="button" onClick={() => update({ statut: s })} style={pilule(fiche.statut === s)}>{s === "brouillon" ? "Brouillon" : s === "validee" ? "Validée" : "Publiée"}</button>
               ))}
             </div>
+            <div style={{ ...NOTE, marginTop: 4 }}>Publiée : visible par l&apos;équipe dans la Carte (photo, description, allergènes).</div>
           </div>
-        </div>
-      )}
-
-      {/* ÉTAPE 3 : PRÉPARATION */}
-      {step === 2 && (
-        <div style={{ background: COLORS.card, borderRadius: 18, padding: "22px 24px", marginBottom: 14, boxShadow: "0 4px 14px #0000000a" }}>
-          <h2 style={{ fontSize: 13, letterSpacing: ".15em", textTransform: "uppercase", color: COLORS.bordeaux, marginBottom: 16, fontWeight: 800 }}>
-            3. Preparation <span style={{ color: COLORS.muted, fontWeight: 600, letterSpacing: ".02em", textTransform: "none", fontSize: 12 }}>(facultatif)</span>
-          </h2>
-          <StepsList
-            steps={fiche.etapes}
-            onChange={(etapes) => {
-              const resume_salle = fiche.resume_manuel ? fiche.resume_salle : resumeAuto(etapes);
-              update({ etapes, resume_salle });
-            }}
-            recipeId={fiche.id}
-          />
-          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "14px 0 6px" }}>Notes libres</label>
-          <textarea value={fiche.notes} onChange={e => update({ notes: e.target.value })} placeholder="Cuisson, dressage, point d'attention..."
-            style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", outline: "none", resize: "vertical", minHeight: 70, fontFamily: "inherit", boxSizing: "border-box" }} />
-        </div>
-      )}
-
-      {/* ÉTAPE 4 : PRIX & MARGE (permission valeurs monétaires) */}
-      {step === 3 && canSeeMoney && (
-        <div style={{ background: COLORS.card, borderRadius: 18, padding: "22px 24px", marginBottom: 14, boxShadow: "0 4px 14px #0000000a" }}>
-          <h2 style={{ fontSize: 13, letterSpacing: ".15em", textTransform: "uppercase", color: COLORS.bordeaux, marginBottom: 16, fontWeight: 800 }}>
-            4. Prix et marge
-          </h2>
-
-          {/* Portions */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "#faf5ea", borderRadius: 14, padding: "12px 16px", marginBottom: 16, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: COLORS.muted }}>Recette pour</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <button onClick={() => update({ portions: Math.max(1, fiche.portions - 1) })} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#fff", color: COLORS.bordeaux, fontSize: 17, fontWeight: 800, cursor: "pointer", boxShadow: "0 2px 6px #00000012" }}>&minus;</button>
-              <b style={{ minWidth: 44, textAlign: "center", fontSize: 17 }}>{fiche.portions}</b>
-              <button onClick={() => update({ portions: fiche.portions + 1 })} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#fff", color: COLORS.bordeaux, fontSize: 17, fontWeight: 800, cursor: "pointer", boxShadow: "0 2px 6px #00000012" }}>+</button>
-              <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.muted }}>{fiche.portions > 1 ? fam.portions_label_pluriel : fam.portions_label}</span>
-            </div>
-            <span style={{ fontSize: 12.5, color: COLORS.muted, fontWeight: 600 }}>
-              {fiche.portions > 1 ? `cout recette ${eur(totalCost)} / ${fiche.portions} = ${eur(costPerPortion)} / ${fam.portions_label}` : `tout est calcule pour 1 ${fam.portions_label}`}
-            </span>
-          </div>
-
-          {/* KPIs */}
-          <div style={{ display: "flex", background: "#fffdf9", border: `1.5px solid ${COLORS.line}`, borderRadius: 16, overflow: "hidden", marginBottom: 14, flexWrap: "wrap" }}>
-            <KPI label="Cout / portion" value={eur(costPerPortion)} color={COLORS.bordeaux} sub={isPizza ? `dont paton ${eur(patonCost)}` : fiche.portions > 1 ? `recette : ${eur(totalCost)}` : ""} />
-            <KPI label="Coeff" value={`x${(costPerPortion > 0 ? ttc / costPerPortion : fiche.coeff).toFixed(2)}`} color="#6b4fd8" />
-            <KPI label="Prix vente TTC" value={eur(ttc)} sub={`${eur(ht)} HT, TVA ${fiche.tva} %`} />
-            <KPI label="Marge brute" value={eur(marge)} color={COLORS.ok} sub={fiche.portions > 1 ? `/ ${fam.portions_label}, recette : ${eur(marge * fiche.portions)}` : `/ ${fam.portions_label}`} />
-          </div>
-
-          {/* Poids total + Prix/kg + Cuisson */}
-          {(() => {
-            // Liquides inclus : 3 L comptent 3 kg
-            const weightG = fiche.lignes.reduce((acc: number, l: LigneIngredient) => acc + ligneWeightG(l), 0)
-              + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
-            if (weightG <= 0) return null;
-            const pricePerKg = totalCost > 0 ? totalCost / weightG * 1000 : 0;
-            return (
-              <div style={{ display: "flex", justifyContent: "center", gap: 16, fontSize: 12, color: "#888", marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
-                <span>Poids cru : <strong style={{ color: "#1a1a1a" }}>{weightG >= 1000 ? `${(weightG / 1000).toFixed(2)} kg` : `${Math.round(weightG)} g`}</strong></span>
-                {pricePerKg > 0 && <span>Prix/kg : <strong style={{ color: COLORS.bordeaux }}>{pricePerKg.toFixed(2)}{"\u20AC"}</strong></span>}
-                {fiche.portions > 0 && weightG > 0 && <span>Poids/portion : <strong style={{ color: "#1a1a1a" }}>{Math.round(weightG / fiche.portions)} g</strong></span>}
-              </div>
-            );
-          })()}
-
-          {/* Bandeau prix conseillé */}
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
-            border: `1.5px solid ${fcCol === "ok" ? "#dfe8dc" : "#f0d9d6"}`,
-            background: fcCol === "ok" ? "#f2f7f0" : "#fbf1ef",
-            borderRadius: 14, padding: "12px 16px", marginBottom: 16, flexWrap: "wrap",
-          }}>
-            <span style={{ fontSize: 13.5, color: fcCol === "ok" ? COLORS.green : COLORS.warn, fontWeight: 700 }}>
-              {fcCol === "ok"
-                ? `Food cost tenu : ${fc.toFixed(0)} % pour un objectif ${fam.label.toLowerCase()} de ${fam.objectif_fc} %. Prix plancher : ${eur(conseille)} TTC.`
-                : `Food cost depasse : ${fc.toFixed(0)} % pour un objectif ${fam.label.toLowerCase()} de ${fam.objectif_fc} %. Prix conseille : ${eur(conseille)} TTC.`
-              }
-            </span>
-            {fcCol !== "ok" && (
-              <button onClick={() => { update({ prix_ttc_manuel: conseille }); showToast("Prix conseille applique"); }}
-                style={{ border: "none", background: COLORS.warn, color: "#fff", borderRadius: 999, padding: "8px 18px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-                Appliquer
-              </button>
-            )}
-          </div>
-
-          {/* Contrôles coeff / prix / TVA */}
-          <div style={{ background: "rgba(255,255,255,0.8)", borderRadius: 14, border: "1px solid rgba(0,0,0,0.06)", padding: 16, marginBottom: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: ".08em" }}>Prix de vente · a la portion</div>
-            <span style={{ fontSize: 11, color: "#aaa" }}>Prix TTC = cout portion ({eur(costPerPortion)}) × coefficient</span>
-          </div>
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 150 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Coefficient</label>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <input type="number" value={(costPerPortion > 0 ? ttc / costPerPortion : fiche.coeff).toFixed(2)} step="0.01" onChange={e => update({ coeff: Number(e.target.value) || 1, prix_ttc_manuel: null })}
-                  style={{ width: 86, textAlign: "center", fontWeight: 800, color: "#6b4fd8", fontSize: 17, border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "9px", background: "#fffdf9", fontFamily: "inherit" }} />
-                {[2.5, 3, 3.5, 4].map(c => (
-                  <button key={c} onClick={() => update({ coeff: c, prix_ttc_manuel: null })}
-                    style={{ border: `1.5px solid ${COLORS.line}`, background: "#fffdf9", borderRadius: 999, padding: "6px 13px", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, cursor: "pointer", fontFamily: "inherit" }}>
-                    x{c}
+          <div>
+            <label style={LBL}>Établissements</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              {([["bello_mio", "Bello Mio", "#e27f57"], ["piccola", "Piccola Mia", "#e6c428"]] as const).map(([slug, nom, couleur]) => {
+                const actif = (fiche.establishments ?? []).some(e => e === slug || (slug === "bello_mio" && e === "bellomio"));
+                return (
+                  <button key={slug} type="button" onClick={() => {
+                    const sans = (fiche.establishments ?? []).filter(e => !(e === slug || (slug === "bello_mio" && e === "bellomio")));
+                    update({ establishments: actif ? sans : [...sans, slug] });
+                  }} style={{ display: "inline-flex", alignItems: "center", gap: 6, border: `1px solid ${actif ? "#1a1a1a" : BORD}`, borderRadius: 12, padding: "9px 14px", fontWeight: 600, fontSize: 14, color: actif ? "#1a1a1a" : "#6f6a61", background: "#fff", cursor: "pointer", fontFamily: "inherit" }}>
+                    <span style={{ width: 9, height: 9, borderRadius: "50%", background: couleur }} />{nom}
                   </button>
-                ))}
+                );
+              })}
+            </div>
+          </div>
+          {isPizza && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div>
+                <label style={LBL}>Empâtement</label>
+                <select value={fiche.empatement} onChange={e => update({ empatement: e.target.value })} style={SELECT}>
+                  {empatements.length > 0 ? empatements.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>) : <option>FOCACCIA</option>}
+                </select>
+              </div>
+              <div>
+                <label style={LBL}>Pâton <span style={AIDE}>· {eur(patonCost)}</span></label>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button type="button" onClick={() => update({ paton_poids: Math.max(0, fiche.paton_poids - 2) })} style={{ width: 36, height: 36, borderRadius: "50%", border: "none", background: "#D4775A", color: "#fff", fontSize: 18, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>−</button>
+                  <b style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, minWidth: 54, textAlign: "center" }}>{fiche.paton_poids} g</b>
+                  <button type="button" onClick={() => update({ paton_poids: fiche.paton_poids + 2 })} style={{ width: 36, height: 36, borderRadius: "50%", border: "none", background: "#D4775A", color: "#fff", fontSize: 18, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>+</button>
+                </div>
               </div>
             </div>
-            <div style={{ flex: 1, minWidth: 150 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Prix TTC : ajuste le coeff</label>
-              <input type="number" step="0.5" value={ttc.toFixed(2)} onChange={e => update({ prix_ttc_manuel: Number(e.target.value) || 0 })}
-                style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit", boxSizing: "border-box" }} />
-            </div>
-            <div style={{ minWidth: 120 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>TVA</label>
-              <select value={fiche.tva} onChange={e => update({ tva: Number(e.target.value) })}
-                style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit" }}>
-                <option value={10}>10 %</option><option value={20}>20 % (alcool)</option><option value={5.5}>5,5 %</option>
-              </select>
-            </div>
-          </div>
+          )}
+        </div>
 
-          {/* Food cost bar */}
-          <div style={{ marginTop: 18 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: COLORS.muted, fontWeight: 700, alignItems: "center" }}>
-              <span>FOOD COST <b style={{ color: fcCol === "ok" ? COLORS.ok : fcCol === "warn" ? COLORS.amber : COLORS.warn, fontSize: 15 }}>{fc.toFixed(0)} %</b></span>
-              <span>objectif {fam.label} : {fam.objectif_fc} %</span>
-            </div>
-            <div style={{ height: 8, borderRadius: 99, background: "#eee6d7", overflow: "hidden", marginTop: 8 }}>
-              <div style={{
-                height: "100%", borderRadius: 99, transition: ".3s",
-                width: `${Math.min(100, (fam.objectif_fc > 0 ? fc / fam.objectif_fc : 0) * 50)}%`,
-                background: fcCol === "ok" ? COLORS.ok : fcCol === "warn" ? COLORS.amber : COLORS.warn,
-              }} />
-            </div>
-          </div>
-          </div>
-
-          {/* Poids apres cuisson */}
-          <div style={{ marginTop: 14, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 12, color: "#888" }}>Poids apres cuisson</span>
-              <input type="number" step={10} min={0} value={fiche.cooked_weight_g ?? ""}
-                onChange={e => update({ cooked_weight_g: e.target.value ? Number(e.target.value) : null })}
-                placeholder="g" style={{ width: 80, padding: "6px 10px", borderRadius: 8, border: `1.5px solid ${COLORS.line}`, fontSize: 14, fontWeight: 700, textAlign: "center" }} />
-              <span style={{ fontSize: 12, color: "#999" }}>g</span>
-            </div>
-            {fiche.cooked_weight_g != null && fiche.cooked_weight_g > 0 && (() => {
-              const wCru = fiche.lignes.reduce((a: number, l: LigneIngredient) => a + ligneWeightG(l), 0);
-              const reduction = wCru > 0 ? ((1 - fiche.cooked_weight_g / wCru) * 100).toFixed(0) : 0;
-              return <span style={{ fontSize: 12, color: COLORS.terra, fontWeight: 700 }}>Reduction : {reduction}%</span>;
-            })()}
-          </div>
-
-          {/* Traiteur · prix au kilo : coût matière/kg, coeff et prix TTC/kg */}
-          {(() => {
-            const wCru = fiche.lignes.reduce((a: number, l: LigneIngredient) => a + ligneWeightG(l), 0)
-              + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
-            const wRef = fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? fiche.cooked_weight_g : wCru;
-            if (wRef <= 0 || totalCost <= 0) {
-              return (
-                <div style={{ marginTop: 18, background: "rgba(255,255,255,0.8)", borderRadius: 14, border: "1px dashed rgba(0,0,0,0.12)", padding: 16 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>
-                    Prix de vente · au kilo (traiteur)
-                  </div>
-                  <div style={{ fontSize: 12, color: "#aaa" }}>
-                    Renseignez des quantites en g ou kg dans les ingredients pour calculer le cout matiere au kilo.
-                  </div>
-                </div>
-              );
-            }
-            const coutKg = (totalCost / wRef) * 1000;
-            const ttcKg = fiche.sell_price_per_kg;
-            const coeffKg = ttcKg != null && ttcKg > 0 ? ttcKg / coutKg : null;
-            const htKg = ttcKg != null ? ttcKg / (1 + fiche.tva / 100) : null;
-            const margeKg = htKg != null ? htKg - coutKg : null;
-            const conseilleKg = prixConseille(coutKg, fam.objectif_fc, fiche.tva);
-            return (
-              <div style={{ marginTop: 18, background: "rgba(255,255,255,0.8)", borderRadius: 14, border: "1px solid rgba(0,0,0,0.06)", padding: 16 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: ".08em" }}>
-                    Prix de vente · au kilo (traiteur)
-                  </div>
-                  <span style={{ fontSize: 11, color: "#aaa" }}>
-                    Prix TTC/kg = cout/kg ({eur(coutKg)}) × coeff kilo · base {fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? "poids cuit" : "poids cru"} : {wRef >= 1000 ? `${(wRef / 1000).toFixed(2)} kg` : `${Math.round(wRef)} g`}
-                  </span>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
-                  <KPI label="Cout / kg" value={eur(coutKg)} color={COLORS.bordeaux} sub="matiere" />
-                  <KPI label="Coeff kilo" value={coeffKg != null ? `x${coeffKg.toFixed(2)}` : "—"} color="#6b4fd8" sub="TTC / cout" />
-                  <KPI label="Prix vente TTC / kg" value={ttcKg != null ? eur(ttcKg) : "—"} sub={htKg != null ? `${eur(htKg)} HT, TVA ${fiche.tva} %` : `TVA ${fiche.tva} %`} />
-                  <KPI label="Marge brute / kg" value={margeKg != null ? eur(margeKg) : "—"} color={COLORS.ok} />
-                </div>
-                <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
-                  <div style={{ minWidth: 150 }}>
-                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Coefficient kilo</label>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <input type="number" step="0.01"
-                        value={coeffKgDraft ?? (coeffKg != null ? coeffKg.toFixed(2) : "")}
-                        placeholder="x"
-                        onFocus={() => setCoeffKgDraft(coeffKg != null ? String(Math.round(coeffKg * 100) / 100) : "")}
-                        onChange={e => {
-                          // Garder la frappe telle quelle et appliquer le prix en direct
-                          setCoeffKgDraft(e.target.value);
-                          const c = Number(e.target.value.replace(",", "."));
-                          if (Number.isFinite(c) && c > 0) {
-                            update({ sell_price_per_kg: Math.round(coutKg * c * 100) / 100 });
-                          }
-                        }}
-                        onBlur={() => setCoeffKgDraft(null)}
-                        style={{ width: 86, textAlign: "center", fontWeight: 800, color: "#6b4fd8", fontSize: 17, border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "9px", background: "#fffdf9", fontFamily: "inherit" }} />
-                      {[2.5, 3, 3.5].map(c => (
-                        <button key={c} onClick={() => update({ sell_price_per_kg: Math.round(coutKg * c * 100) / 100 })}
-                          style={{ border: `1.5px solid ${COLORS.line}`, background: "#fffdf9", borderRadius: 999, padding: "6px 13px", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, cursor: "pointer", fontFamily: "inherit" }}>
-                          x{c}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 150 }}>
-                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Prix TTC / kg : ajuste le coeff</label>
-                    <input type="number" step="0.5" value={ttcKg ?? ""}
-                      placeholder={conseilleKg > 0 ? conseilleKg.toFixed(2) : ""}
-                      onChange={e => update({ sell_price_per_kg: e.target.value ? Number(e.target.value) : null })}
-                      style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", fontFamily: "inherit", boxSizing: "border-box" }} />
-                  </div>
-                </div>
-                {/* Food cost au kilo */}
-                {htKg != null && htKg > 0 && (() => {
-                  const fcKg = (coutKg / htKg) * 100;
-                  const fcKgCol = fcColor(fcKg, fam.objectif_fc);
-                  return (
-                    <div style={{ marginTop: 16 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: COLORS.muted, fontWeight: 700, alignItems: "center" }}>
-                        <span>FOOD COST KILO <b style={{ color: fcKgCol === "ok" ? COLORS.ok : fcKgCol === "warn" ? COLORS.amber : COLORS.warn, fontSize: 15 }}>{fcKg.toFixed(0)} %</b></span>
-                        <span>objectif {fam.label} : {fam.objectif_fc} %</span>
-                      </div>
-                      <div style={{ height: 8, borderRadius: 99, background: "#eee6d7", overflow: "hidden", marginTop: 8 }}>
-                        <div style={{
-                          height: "100%", borderRadius: 99, transition: ".3s",
-                          width: `${Math.min(100, (fam.objectif_fc > 0 ? fcKg / fam.objectif_fc : 0) * 50)}%`,
-                          background: fcKgCol === "ok" ? COLORS.ok : fcKgCol === "warn" ? COLORS.amber : COLORS.warn,
-                        }} />
-                      </div>
-                    </div>
-                  );
-                })()}
-                {conseilleKg > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12.5, color: COLORS.green, fontWeight: 700 }}>
-                      Prix conseille (objectif {fam.objectif_fc} % de food cost) : {eur(conseilleKg)} TTC / kg
-                    </span>
-                    <button onClick={() => { update({ sell_price_per_kg: Math.round(conseilleKg * 100) / 100 }); showToast("Prix au kilo conseille applique"); }}
-                      style={{ border: `1.5px solid ${COLORS.green}`, background: "transparent", color: COLORS.green, borderRadius: 999, padding: "6px 14px", fontSize: 11.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-                      Appliquer
-                    </button>
-                  </div>
-                )}
+        {/* PRIX DE VENTE (valeurs monétaires) */}
+        {canSeeMoney && (
+          <div style={SEC}>
+            <h2 style={H2}>Prix de vente <span style={AIDE}>{popinaLie ? `Popina : ${popinaLie.price_ttc?.toFixed(2).replace(".", ",")} € TTC` : "TTC saisi, HT calculé"}</span></h2>
+            <div style={{ display: "grid", gap: 8 }}>
+              {/* Sur place */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 96px", gap: 10, alignItems: "center", border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
+                <div><b style={{ fontSize: 14 }}>Sur place</b><small style={{ display: "block", color: "#6f6a61", fontSize: 12 }}>{eur(ht)} HT · coeff. ×{(costPerPortion > 0 ? ttc / costPerPortion : fiche.coeff).toFixed(1)}</small></div>
+                <input type="number" step="0.5" min={0} value={ttc > 0 ? Number(ttc.toFixed(2)) : ""} placeholder="0,00" onChange={e => update({ prix_ttc_manuel: Number(e.target.value) || 0 })} aria-label="Prix TTC sur place"
+                  style={{ ...INPUT, height: 40, padding: "0 10px", textAlign: "right", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 19, fontWeight: 700 }} />
+                <select value={fiche.tva} onChange={e => update({ tva: Number(e.target.value) })} aria-label="TVA sur place" style={{ ...SELECT, height: 40, padding: "0 8px", fontSize: 13 }}>
+                  <option value={10}>TVA 10 %</option><option value={5.5}>TVA 5,5 %</option><option value={20}>TVA 20 %</option>
+                </select>
               </div>
-            );
-          })()}
-
-          {/* Lignes de prix multi-mode */}
-          <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1.5px solid ${COLORS.line}` }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "#8a6b3e", textTransform: "uppercase", letterSpacing: ".08em" }}>
-                Tarifs de vente
-              </label>
-              <button onClick={() => update({ prix_lignes: [...fiche.prix_lignes, { mode: "portion", label: "", prix_ht: 0, tva: 10, coeff: fiche.coeff }] })}
-                style={{ border: `1.5px dashed ${COLORS.terra}`, background: "transparent", color: COLORS.terraDark, borderRadius: 999, padding: "4px 14px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                + Ajouter un tarif
-              </button>
-            </div>
-            {fiche.prix_lignes.length === 0 && (
-              <div style={{ fontSize: 12, color: "#bbb", fontStyle: "italic", marginBottom: 8 }}>Aucun tarif supplementaire. Utilisez le prix principal ci-dessus ou ajoutez des lignes.</div>
-            )}
-            {fiche.prix_lignes.map((pl, i) => {
-              const ttc = pl.prix_ht * (1 + pl.tva / 100);
-              return (
-                <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap", padding: "8px 10px", background: "rgba(255,255,255,0.6)", borderRadius: 10, border: `1px solid ${COLORS.line}` }}>
-                  <select value={pl.mode} onChange={e => {
-                    const next = [...fiche.prix_lignes]; next[i] = { ...pl, mode: e.target.value as PrixLigne["mode"] }; update({ prix_lignes: next });
-                  }} style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${COLORS.line}`, fontSize: 12, fontWeight: 600 }}>
-                    <option value="portion">Portion</option>
-                    <option value="kg">Kilo</option>
-                    <option value="piece">Piece</option>
-                    <option value="litre">Litre</option>
-                    <option value="custom">Autre</option>
-                  </select>
-                  {pl.mode === "custom" && (
-                    <input value={pl.label} onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, label: e.target.value }; update({ prix_lignes: next }); }}
-                      placeholder="Label" style={{ width: 80, padding: "4px 8px", borderRadius: 6, border: `1px solid ${COLORS.line}`, fontSize: 12 }} />
-                  )}
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ fontSize: 11, color: "#888" }}>HT</span>
-                    <input type="number" step={0.5} min={0} value={pl.prix_ht || ""}
-                      onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, prix_ht: Number(e.target.value) || 0 }; update({ prix_lignes: next }); }}
-                      style={{ width: 65, padding: "4px 8px", borderRadius: 6, border: `1px solid ${COLORS.line}`, fontSize: 13, fontWeight: 700, textAlign: "center" }} />
-                    <span style={{ fontSize: 11, color: "#888" }}>€</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ fontSize: 11, color: "#888" }}>TVA</span>
-                    <select value={pl.tva} onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, tva: Number(e.target.value) }; update({ prix_lignes: next }); }}
-                      style={{ padding: "4px 6px", borderRadius: 6, border: `1px solid ${COLORS.line}`, fontSize: 11, fontWeight: 600 }}>
-                      {[0, 5.5, 10, 20].map(v => <option key={v} value={v}>{v}%</option>)}
+              {/* À emporter */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 96px", gap: 10, alignItems: "center", border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
+                <div><b style={{ fontSize: 14 }}>À emporter</b><small style={{ display: "block", color: "#6f6a61", fontSize: 12 }}>{htEmporter != null ? `${eur(htEmporter)} HT` : "même prix que sur place si vide"}</small></div>
+                <input type="number" step="0.5" min={0} value={fiche.prix_ttc_emporter ?? ""} placeholder={ttc > 0 ? ttc.toFixed(2) : "0,00"} onChange={e => update({ prix_ttc_emporter: e.target.value ? Number(e.target.value) : null })} aria-label="Prix TTC à emporter"
+                  style={{ ...INPUT, height: 40, padding: "0 10px", textAlign: "right", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 19, fontWeight: 700 }} />
+                <select value={fiche.tva_emporter} onChange={e => update({ tva_emporter: Number(e.target.value) })} aria-label="TVA à emporter" style={{ ...SELECT, height: 40, padding: "0 8px", fontSize: 13 }}>
+                  <option value={5.5}>TVA 5,5 %</option><option value={10}>TVA 10 %</option><option value={20}>TVA 20 %</option>
+                </select>
+              </div>
+              {/* Autres prix */}
+              {fiche.prix_lignes.map((pl, i) => {
+                const ttcL = pl.prix_ht * (1 + pl.tva / 100);
+                const libelle = pl.mode === "custom" ? pl.label : pl.mode === "kg" ? "Au kilo" : pl.mode === "piece" ? "À la pièce" : pl.mode === "litre" ? "Au litre" : "À la portion";
+                return (
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 110px 96px 32px", gap: 10, alignItems: "center", border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
+                    <div style={{ minWidth: 0 }}>
+                      <select value={pl.mode} onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, mode: e.target.value as PrixLigne["mode"] }; update({ prix_lignes: next }); }} style={{ border: "none", background: "transparent", fontWeight: 700, fontSize: 14, fontFamily: "inherit", padding: 0, color: "#1a1a1a" }}>
+                        <option value="portion">À la portion</option><option value="kg">Au kilo</option><option value="piece">À la pièce</option><option value="litre">Au litre</option><option value="custom">Autre</option>
+                      </select>
+                      {pl.mode === "custom" && <input value={pl.label} placeholder="Libellé (livraison, traiteur…)" onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, label: e.target.value }; update({ prix_lignes: next }); }} style={{ ...INPUT, height: 32, fontSize: 13, marginTop: 4 }} />}
+                      <small style={{ display: "block", color: "#6f6a61", fontSize: 12 }}>{pl.mode === "custom" ? "" : `${libelle} · `}{eur(pl.prix_ht)} HT</small>
+                    </div>
+                    <input type="number" step="0.5" min={0} value={ttcL > 0 ? Number(ttcL.toFixed(2)) : ""} placeholder="0,00" onChange={e => { const t = Number(e.target.value) || 0; const next = [...fiche.prix_lignes]; next[i] = { ...pl, prix_ht: t / (1 + pl.tva / 100) }; update({ prix_lignes: next }); }} aria-label="Prix TTC"
+                      style={{ ...INPUT, height: 40, padding: "0 10px", textAlign: "right", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 19, fontWeight: 700 }} />
+                    <select value={pl.tva} onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, tva: Number(e.target.value) }; update({ prix_lignes: next }); }} aria-label="TVA" style={{ ...SELECT, height: 40, padding: "0 8px", fontSize: 13 }}>
+                      {[5.5, 10, 20, 0].map(v => <option key={v} value={v}>TVA {String(v).replace(".", ",")} %</option>)}
                     </select>
+                    <button type="button" onClick={() => update({ prix_lignes: fiche.prix_lignes.filter((_, j) => j !== i) })} aria-label="Retirer ce prix" style={{ border: "none", background: "transparent", color: "#b4443a", fontSize: 18, cursor: "pointer", fontFamily: "inherit" }}>×</button>
                   </div>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{ttc.toFixed(2)}€ TTC</span>
-                  <button onClick={() => { const next = fiche.prix_lignes.filter((_, j) => j !== i); update({ prix_lignes: next }); }}
-                    style={{ border: "none", background: "rgba(220,38,38,0.08)", color: "#DC2626", width: 24, height: 24, borderRadius: 6, cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>x</button>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+              <button type="button" onClick={() => update({ prix_lignes: [...fiche.prix_lignes, { mode: "custom", label: "", prix_ht: 0, tva: 10, coeff: fiche.coeff }] })}
+                style={{ border: `1px dashed ${BORD}`, borderRadius: 12, padding: "10px 14px", color: "#D4775A", fontWeight: 700, fontSize: 14, background: "transparent", textAlign: "left", cursor: "pointer", fontFamily: "inherit" }}>
+                + Ajouter un prix (livraison, traiteur au kilo, à la part…)
+              </button>
+            </div>
+            {/* Repères */}
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", background: "#f7f3ec", borderRadius: 12, padding: "12px 14px" }}>
+              <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Coût matière</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{eur(costPerPortion)}</div></div>
+              <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Food cost</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1.1, color: fcCouleur }}>{ht > 0 ? `${fc.toFixed(1).replace(".", ",")} %` : "—"}</div></div>
+              <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Marge HT</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{ht > 0 ? eur(marge) : "—"}</div></div>
+            </div>
+            <div style={{ ...NOTE, display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+              <span>Food cost sur le prix HT sur place, par {fam.portions_label}. Objectif {fam.label.toLowerCase()} : {fam.objectif_fc} %{conseille > 0 ? ` · prix conseillé ${eur(conseille)} TTC` : ""}.</span>
+              {conseille > 0 && fcCol !== "ok" && <button type="button" onClick={() => { update({ prix_ttc_manuel: conseille }); showToast("Prix conseillé appliqué"); }} style={PETIT}>Appliquer {eur(conseille)}</button>}
+            </div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={NOTE}>Coefficient :</span>
+              {[2.5, 3, 3.5, 4].map(c => <button key={c} type="button" onClick={() => update({ coeff: c, prix_ttc_manuel: null })} style={{ ...PETIT, height: 30, fontSize: 12.5, padding: "0 10px" }}>×{String(c).replace(".", ",")}</button>)}
+            </div>
 
-          {/* Liaison Popina — Bello Mio uniquement */}
-          {etabSlug !== "piccola" && <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1.5px solid ${COLORS.line}` }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 6 }}>
-              Touche vente Popina
-            </label>
-            {linkedPopina ? (() => {
-              const pp = popinaProducts.find(p => p.id === linkedPopina);
-              return (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#f2f7f0", border: `1.5px solid #dfe8dc`, borderRadius: 12, padding: "10px 14px" }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.green, flex: 1 }}>{pp?.name ?? "Produit lie"}</span>
-                  <span style={{ fontSize: 12, color: COLORS.muted }}>{pp?.category} : {pp?.price_ttc?.toFixed(2)} {"\u20AC"}</span>
-                  <button onClick={async () => {
-                    if (linkedPopina) {
-                      await supabase.from("popina_products").update({ kitchen_recipe_id: null, linked_type: null }).eq("id", linkedPopina);
-                    }
-                    setLinkedPopina(null);
-                    showToast("Lien Popina retire");
-                  }} style={{ border: "none", background: "#f7e3df", color: COLORS.warn, width: 26, height: 26, borderRadius: "50%", cursor: "pointer", fontWeight: 800, flexShrink: 0, fontFamily: "inherit" }}>x</button>
-                </div>
-              );
-            })() : (
-              <div style={{ position: "relative" }}>
-                <input type="text" value={popinaSearch} placeholder="Chercher un produit Popina..."
-                  onChange={e => { setPopinaSearch(e.target.value); setShowPopinaList(true); }}
-                  onFocus={() => setShowPopinaList(true)}
-                  onBlur={() => setTimeout(() => setShowPopinaList(false), 150)}
-                  style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 14, background: "#fffdf9", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
-                {showPopinaList && popinaSearch.trim().length >= 2 && (() => {
-                  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-                  const q = norm(popinaSearch);
-                  const results = popinaProducts
-                    .filter(p => norm(p.name).includes(q))
-                    .sort((a, b) => (a.kitchen_recipe_id ? 1 : 0) - (b.kitchen_recipe_id ? 1 : 0))
-                    .slice(0, 15);
-                  return results.length > 0 ? (
-                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, maxHeight: 220, overflowY: "auto", zIndex: 30, boxShadow: "0 12px 28px #00000020" }}>
-                      {results.map(p => (
-                        <div key={p.id} onMouseDown={async e => {
-                          e.preventDefault();
-                          if (fiche.id) {
-                            // Detach from previous recipe if already linked
-                            await supabase.from("popina_products").update({ kitchen_recipe_id: fiche.id, ingredient_id: null, linked_type: popinaLinkedType }).eq("id", p.id);
-                          }
-                          setLinkedPopina(p.id);
-                          setPopinaSearch("");
-                          setShowPopinaList(false);
-                          showToast(`Lie a ${p.name}`);
-                        }} style={{ padding: "9px 13px", cursor: "pointer" }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#faf5ea"; }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#fff"; }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ fontSize: 13.5, fontWeight: 700 }}>{p.name}</span>
-                            {p.kitchen_recipe_id && <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "#f0ebe2", color: "#999" }}>deja lie</span>}
-                          </div>
-                          <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 1 }}>
-                            {p.category} : {p.price_ttc?.toFixed(2)} {"\u20AC"} TTC
-                          </div>
-                        </div>
-                      ))}
+            {/* Traiteur : prix au kilo, poids après cuisson */}
+            <details style={{ border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
+              <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Traiteur : prix au kilo et poids après cuisson</summary>
+              {(() => {
+                const wRef = fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? fiche.cooked_weight_g : poidsCru;
+                const coutKg = wRef > 0 && totalCost > 0 ? (totalCost / wRef) * 1000 : null;
+                const ttcKg = fiche.sell_price_per_kg;
+                const coeffKg = coutKg != null && ttcKg != null && ttcKg > 0 ? ttcKg / coutKg : null;
+                const htKg = ttcKg != null ? ttcKg / (1 + fiche.tva / 100) : null;
+                const conseilleKg = coutKg != null ? prixConseille(coutKg, fam.objectif_fc, fiche.tva) : 0;
+                return (
+                  <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      <div>
+                        <label style={LBL}>Poids après cuisson <span style={AIDE}>· cru {poidsCru >= 1000 ? `${(poidsCru / 1000).toFixed(2)} kg` : `${Math.round(poidsCru)} g`}</span></label>
+                        <input type="number" step={10} min={0} value={fiche.cooked_weight_g ?? ""} placeholder="g" onChange={e => update({ cooked_weight_g: e.target.value ? Number(e.target.value) : null })} style={INPUT} />
+                      </div>
+                      <div>
+                        <label style={LBL}>Prix TTC au kilo <span style={AIDE}>{coeffKg != null ? `· coeff. ×${coeffKg.toFixed(2)}` : ""}</span></label>
+                        <input type="number" step="0.5" min={0} value={ttcKg ?? ""} placeholder={conseilleKg > 0 ? conseilleKg.toFixed(2) : ""} onChange={e => update({ sell_price_per_kg: e.target.value ? Number(e.target.value) : null })} style={INPUT} />
+                      </div>
                     </div>
-                  ) : (
-                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: 12, zIndex: 30, boxShadow: "0 12px 28px #00000020" }}>
-                      <span style={{ fontSize: 12.5, color: COLORS.muted, fontStyle: "italic" }}>Aucun produit Popina non lie trouve.</span>
+                    <div style={NOTE}>
+                      {coutKg != null ? <>Coût matière {eur(coutKg)} / kg{htKg != null ? ` · ${eur(htKg)} HT / kg` : ""}{conseilleKg > 0 ? ` · conseillé ${eur(conseilleKg)} TTC / kg` : ""}.</> : "Renseigne des quantités en g ou kg pour calculer le coût au kilo."}
+                      {coutKg != null && <> <button type="button" onClick={() => update({ sell_price_per_kg: Math.round(coutKg * 3 * 100) / 100 })} style={{ ...PETIT, height: 28, fontSize: 12, padding: "0 8px", marginLeft: 6 }}>×3</button></>}
                     </div>
-                  );
-                })()}
-              </div>
-            )}
-            {!linkedPopina && <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>Associer cette fiche a un produit de la caisse Popina pour le suivi des ventes.</div>}
-          </div>}
-
-          {/* Bouton valider */}
-          <div style={{ marginTop: 20, textAlign: "right" }}>
-            <button onClick={() => { update({ statut: "validee" }); showToast("Fiche validee"); }}
-              style={{ border: "none", borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: "pointer", background: COLORS.green, color: "#fff", fontFamily: "inherit" }}>
-              Valider la fiche
-            </button>
+                  </div>
+                );
+              })()}
+            </details>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ÉTAPE 5 : FICHE SALLE */}
-      {step === 4 && (
-        <div style={{ background: COLORS.card, borderRadius: 18, padding: "22px 24px", marginBottom: 14, boxShadow: "0 4px 14px #0000000a" }}>
-          <h2 style={{ fontSize: 13, letterSpacing: ".15em", textTransform: "uppercase", color: COLORS.bordeaux, marginBottom: 16, fontWeight: 800 }}>
-            5. Fiche de vente : salle
-          </h2>
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 150 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Description carte</label>
-              <textarea value={fiche.description} onChange={e => update({ description: e.target.value })} placeholder="Ex : Focaccia croustillante, burrata cremeuse des Pouilles..."
-                style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", outline: "none", resize: "vertical", minHeight: 70, fontFamily: "inherit", boxSizing: "border-box" }} />
-            </div>
-            <div style={{ flex: 1, minWidth: 150 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 6px" }}>Accord conseille</label>
-              <input type="text" value={fiche.accord} onChange={e => update({ accord: e.target.value })} placeholder="Ex : Verre de Vermentino, Spritz Bello"
-                style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-            </div>
+        {/* RECETTE */}
+        <div style={SEC}>
+          <h2 style={H2}>Recette {fiche.id && <button type="button" onClick={() => openApiFile(`/api/recettes/pdf?id=${fiche.id}`)} style={{ border: "none", background: "transparent", fontWeight: 600, fontSize: 13, color: "#1a1a1a", textDecoration: "underline", textDecorationColor: BORD, textUnderlineOffset: 3, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Imprimer</button>}</h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "#6f6a61", flexWrap: "wrap" }}>
+            Quantités pour
+            <button type="button" onClick={() => update({ portions: Math.max(1, fiche.portions - 1) })} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#D4775A", color: "#fff", fontSize: 17, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>−</button>
+            <b style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, minWidth: 24, textAlign: "center", color: "#1a1a1a" }}>{fiche.portions}</b>
+            <button type="button" onClick={() => update({ portions: fiche.portions + 1 })} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#D4775A", color: "#fff", fontSize: 17, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>+</button>
+            {fiche.portions > 1 ? fam.portions_label_pluriel : fam.portions_label}
+            {fiche.portions > 1 && <span style={NOTE}>· {eur(totalCost)} la recette, {eur(costPerPortion)} la {fam.portions_label}</span>}
           </div>
-
-          {/* Résumé */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "20px 0 6px", flexWrap: "wrap", gap: 8 }}>
-            <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: 0 }}>Resume cuisine pour la salle</label>
-            <button onClick={() => { update({ resume_salle: resumeAuto(fiche.etapes), resume_manuel: false }); showToast("Resume regenere depuis les etapes"); }}
-              style={{ border: `1.5px solid ${COLORS.line}`, background: "#fffdf9", borderRadius: 999, padding: "6px 13px", fontSize: 12.5, fontWeight: 700, color: COLORS.muted, cursor: "pointer", fontFamily: "inherit" }}>
-              Regenerer depuis les etapes
-            </button>
-          </div>
-          <textarea value={fiche.resume_salle} onChange={e => update({ resume_salle: e.target.value, resume_manuel: true })} placeholder="Genere automatiquement depuis les etapes de preparation"
-            style={{ width: "100%", border: `1.5px solid ${COLORS.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: "#fffdf9", outline: "none", resize: "vertical", minHeight: 56, fontFamily: "inherit", boxSizing: "border-box" }} />
-
-          {/* Aperçu toggle */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "20px 0 6px", flexWrap: "wrap", gap: 8 }}>
-            <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.muted, textTransform: "uppercase", letterSpacing: ".08em", margin: 0 }}>Apercu</label>
-            <div style={{ display: "flex", gap: 4, background: COLORS.pill, borderRadius: 999, padding: 3 }}>
-              <button onClick={() => setSalleView("salle")} style={{ border: "none", borderRadius: 999, padding: "6px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: salleView === "salle" ? COLORS.card : "transparent", color: salleView === "salle" ? COLORS.bordeaux : COLORS.muted, boxShadow: salleView === "salle" ? "0 2px 6px #00000012" : "none" }}>Vue salle</button>
-              <button onClick={() => setSalleView("cuisine")} style={{ border: "none", borderRadius: 999, padding: "6px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: salleView === "cuisine" ? COLORS.card : "transparent", color: salleView === "cuisine" ? COLORS.bordeaux : COLORS.muted, boxShadow: salleView === "cuisine" ? "0 2px 6px #00000012" : "none" }}>Vue cuisine</button>
-            </div>
-          </div>
-
-          {salleView === "salle" ? (
-            <div style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 16, padding: "18px 20px", background: "#fffdf9" }}>
-              <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 4 }}>{fiche.nom || "Nouvelle recette"}</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-                {[...actifs].map(a => <span key={a} style={{ border: "1px solid #f2c9c4", color: COLORS.warn, background: "#fdf0ee", borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 600 }}>{a}</span>)}
-              </div>
-              <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, marginBottom: 4 }}>Composition</div>
-              {fiche.lignes.filter(l => l.ingredient).map(l => (
-                <div key={l.key} style={{ fontSize: 13, padding: "3px 0", display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontWeight: 600 }}>{l.ingredient?.nom_court}</span>
-                  <span style={{ color: COLORS.muted }}>{l.quantite} {l.unite}</span>
-                </div>
-              ))}
-              {fiche.description && <div style={{ fontSize: 13.5, color: "#5b5346", marginTop: 10, lineHeight: 1.55 }}>{fiche.description}</div>}
-              {fiche.resume_salle && <div style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 10, lineHeight: 1.5, fontStyle: "italic", borderLeft: `3px solid ${COLORS.pill}`, paddingLeft: 10 }}>En cuisine : {fiche.resume_salle}</div>}
-              {fiche.accord && <div style={{ fontSize: 12.5, marginTop: 8, color: COLORS.green, fontWeight: 700 }}>Accord : {fiche.accord}</div>}
-            </div>
-          ) : (
-            <div style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 16, padding: "18px 20px", background: "#fffdf9" }}>
-              <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 12 }}>{fiche.nom || "Nouvelle recette"}</div>
-              {isPizza && (
-                <div style={{ fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>
-                  Paton : {fiche.paton_poids} g ({fiche.empatement}) : {eur(patonCost)}
-                </div>
-              )}
-              {isPizza && fiche.lignes.some(l => l.zone === "avant_four" && l.ingredient) && (
-                <>
-                  <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "8px 0 4px" }}>Avant four</div>
-                  {fiche.lignes.filter(l => l.zone === "avant_four" && l.ingredient).map(l => (
-                    <div key={l.key} style={{ fontSize: 13, padding: "3px 0", display: "flex", justifyContent: "space-between" }}>
-                      <span>{l.ingredient?.nom_court}</span>
-                      <span style={{ color: COLORS.muted }}>{l.quantite} {l.unite} : {eur(coutLigne(l))}</span>
-                    </div>
-                  ))}
-                </>
-              )}
-              <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "8px 0 4px" }}>
-                {isPizza ? "Apres four" : isBar ? "Composition" : "Ingredients"}
-              </div>
-              {fiche.lignes.filter(l => l.zone === "apres_four" && l.ingredient).map(l => (
-                <div key={l.key} style={{ fontSize: 13, padding: "3px 0", display: "flex", justifyContent: "space-between" }}>
-                  <span>{l.ingredient?.nom_court}</span>
-                  <span style={{ color: COLORS.muted }}>{l.quantite} {l.unite} : {eur(coutLigne(l))}</span>
-                </div>
-              ))}
-              <div style={{ borderTop: `1.5px solid ${COLORS.line}`, marginTop: 10, paddingTop: 8, display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 14 }}>
-                <span>Cout total</span>
-                <span style={{ color: COLORS.bordeaux }}>{eur(totalCost)}</span>
-              </div>
-              {fiche.etapes.filter(Boolean).length > 0 && (
-                <>
-                  <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800, margin: "14px 0 6px" }}>Preparation</div>
-                  {fiche.etapes.filter(Boolean).map((e, i) => (
-                    <div key={i} style={{ fontSize: 13, padding: "2px 0", display: "flex", gap: 8 }}>
-                      <span style={{ color: COLORS.bordeaux, fontWeight: 800, flexShrink: 0 }}>{i + 1}.</span>
-                      <span>{e}</span>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Publier */}
-          <div style={{ marginTop: 20, textAlign: "right" }}>
-            <button disabled={fiche.statut === "brouillon"} onClick={() => {
-              if (fiche.statut === "brouillon") { showToast("Validez d'abord la fiche a l'etape 4"); return; }
-              update({ statut: "publiee" }); showToast("Publiee au catalogue, visible par la salle");
-            }}
-              style={{ border: "none", borderRadius: 999, padding: "13px 28px", fontSize: 14.5, fontWeight: 800, cursor: fiche.statut === "brouillon" ? "default" : "pointer", background: COLORS.bordeaux, color: "#fff", opacity: fiche.statut === "brouillon" ? 0.45 : 1, fontFamily: "inherit" }}>
-              Publier au catalogue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* NAV */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-        {/* Row 1: main actions */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
-          <button disabled={step === 0} onClick={() => setStep(s => {
-              let prev = s - 1;
-              if (prev === 3 && !canSeeMoney) prev = 2;
-              return Math.max(0, prev);
-            })}
-            style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: step === 0 ? "default" : "pointer", background: "transparent", color: COLORS.muted, opacity: step === 0 ? 0.45 : 1, fontFamily: "inherit" }}>
-            Retour
-          </button>
-          {canWrite && (
-            <button disabled={saving} onClick={handleSave}
-              style={{ border: `1.5px solid ${COLORS.green}`, borderRadius: 999, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: "#fff", color: COLORS.green, fontFamily: "inherit", opacity: saving ? 0.5 : 1 }}>
-              {saving ? "..." : "Sauvegarder"}
-            </button>
-          )}
-          <button onClick={() => {
-              if (step < 4) {
-                let next = step + 1;
-                if (next === 3 && !canSeeMoney) next = 4;
-                setStep(next);
-              } else { handleSave(); router.push("/recettes"); }
-            }}
-            style={{ flex: 1, border: "none", borderRadius: 999, padding: "10px 16px", fontSize: 13, fontWeight: 800, cursor: "pointer", background: COLORS.terra, color: "#fff", boxShadow: "0 6px 16px #c97b5b44", fontFamily: "inherit" }}>
-            {step === 4 ? "Terminer" : "Continuer"}
-          </button>
-        </div>
-        {/* Row 2: secondary actions */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
-          <button onClick={() => {
-              if (confirm("Quitter sans sauvegarder ?")) { clearDraft(); router.push("/recettes"); }
-            }}
-            style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", background: "transparent", color: COLORS.muted, fontFamily: "inherit" }}>
-            Annuler
-          </button>
-          {fiche.id && canWrite && (
-            <button onClick={async () => {
-                if (!confirm(`Supprimer la recette "${fiche.nom}" ?`)) return;
-                await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", fiche.id!);
-                await supabase.from("kitchen_recipes").delete().eq("id", fiche.id!);
-                clearDraft();
-                router.push("/recettes");
-              }}
-              style={{ border: `1.5px solid ${COLORS.warn}`, borderRadius: 999, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", background: "transparent", color: COLORS.warn, fontFamily: "inherit" }}>
-              Supprimer
-            </button>
-          )}
-          {fiche.id && (
+          {isPizza && (
             <>
-              <button onClick={() => openApiFile(`/api/recettes/pdf?id=${fiche.id}`)}
-                style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", background: "#fff", color: COLORS.muted, fontFamily: "inherit" }}>
-                PDF
-              </button>
-              <button onClick={() => {
-                const n = prompt("Nombre de portions / personnes ?", String(fiche.portions > 1 ? fiche.portions : 10));
-                if (!n) return;
-                const p = parseInt(n);
-                if (p > 0) openApiFile(`/api/recettes/pdf?id=${fiche.id}&portions=${p}`);
-              }}
-                style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 999, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", background: "#fff", color: COLORS.muted, fontFamily: "inherit" }}>
-                PDF Prod.
-              </button>
+              <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: couleurCat }}>Avant four</div>
+              <IngredientListDnD droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "avant_four")} returnUrl={currentUrl} />
             </>
+          )}
+          <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: couleurCat }}>{isPizza ? "Après four" : isBar ? "Composition" : "Ingrédients"}</div>
+          <IngredientListDnD droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "apres_four")} returnUrl={currentUrl} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, paddingTop: 4, fontSize: 15 }}>
+            <span>Coût matière{isPizza && patonCost > 0 ? <span style={NOTE}> · dont pâton {eur(patonCost)}</span> : null}</span>
+            <span><b style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20 }}>{eur(totalCost)}</b>{canSeeMoney && ht > 0 && <span style={{ color: fcCouleur, fontWeight: 700 }}> &nbsp;{fc.toFixed(1).replace(".", ",")} %</span>}</span>
+          </div>
+          {poidsCru > 0 && <div style={NOTE}>Poids cru {poidsCru >= 1000 ? `${(poidsCru / 1000).toFixed(2)} kg` : `${Math.round(poidsCru)} g`}{fiche.portions > 1 ? ` · ${Math.round(poidsCru / fiche.portions)} g la ${fam.portions_label}` : ""}{totalCost > 0 ? ` · ${(totalCost / poidsCru * 1000).toFixed(2).replace(".", ",")} € le kilo` : ""}. Prix d&apos;achat du jour.</div>}
+        </div>
+
+        {/* PRÉPARATION */}
+        <div style={SEC}>
+          <h2 style={H2}>Préparation <span style={AIDE}>Les étapes alimentent le résumé pour la salle.</span></h2>
+          <StepsList steps={fiche.etapes} onChange={(etapes) => { const resume_salle = fiche.resume_manuel ? fiche.resume_salle : resumeAuto(etapes); update({ etapes, resume_salle }); }} recipeId={fiche.id} />
+          <div>
+            <label style={LBL}>Notes libres</label>
+            <textarea value={fiche.notes} onChange={e => update({ notes: e.target.value })} placeholder="Cuisson, dressage, point d'attention…" style={{ ...ZONE, minHeight: 60 }} />
+          </div>
+        </div>
+
+        {/* POUR LA SALLE */}
+        <div style={SEC}>
+          <h2 style={H2}>Pour la salle</h2>
+          <div>
+            <label style={LBL}>Description sur la carte</label>
+            <textarea value={fiche.description} onChange={e => update({ description: e.target.value })} placeholder="Ex : Focaccia croustillante, burrata crémeuse des Pouilles…" style={ZONE} />
+          </div>
+          <div>
+            <label style={LBL}>Accord <span style={AIDE}>· vin, cocktail</span></label>
+            <input type="text" value={fiche.accord} onChange={e => update({ accord: e.target.value })} placeholder="Ex : Verre de Vermentino, Spritz Bello" style={INPUT} />
+          </div>
+          <div>
+            <label style={{ ...LBL, display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <span>En un mot pour le service <span style={AIDE}>· généré depuis les étapes</span></span>
+              <button type="button" onClick={() => { update({ resume_salle: resumeAuto(fiche.etapes), resume_manuel: false }); showToast("Résumé régénéré depuis les étapes"); }} style={{ border: "none", background: "transparent", color: "#D4775A", fontWeight: 700, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Régénérer</button>
+            </label>
+            <textarea value={fiche.resume_salle} onChange={e => update({ resume_salle: e.target.value, resume_manuel: true })} placeholder="Généré automatiquement depuis les étapes de préparation" style={{ ...ZONE, minHeight: 56 }} />
+          </div>
+        </div>
+
+        {/* ALLERGÈNES */}
+        <div style={SEC}>
+          <h2 style={H2}>Allergènes</h2>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {ALLERGENES_14.map(a => (
+              <span key={a} style={{ fontSize: 13, fontWeight: 600, padding: "6px 12px", borderRadius: 10, border: `1px solid ${actifs.has(a) ? "transparent" : BORD}`, background: actifs.has(a) ? "rgba(180,68,58,0.12)" : "transparent", color: actifs.has(a) ? "#b4443a" : "#6f6a61" }}>{a}</span>
+            ))}
+          </div>
+          <div style={NOTE}>{actifs.size > 0 ? `${[...actifs].join(", ")} : depuis les ingrédients de la recette.` : "Aucun allergène détecté dans les ingrédients. Ils se règlent sur la fiche de chaque produit."}</div>
+        </div>
+
+        {/* CAISSE */}
+        <div style={SEC}>
+          <h2 style={H2}>Caisse</h2>
+          {etabSlug !== "piccola" && (
+            <div>
+              <label style={LBL}>Touche Popina</label>
+              {popinaLie ? (
+                <div style={{ ...INPUT, justifyContent: "space-between", display: "flex", alignItems: "center" }}>
+                  <span style={{ fontWeight: 700 }}>{popinaLie.name}<span style={{ fontWeight: 500, color: "#6f6a61" }}> · {popinaLie.category} · {popinaLie.price_ttc?.toFixed(2).replace(".", ",")} €</span></span>
+                  <button type="button" onClick={async () => { if (linkedPopina) await supabase.from("popina_products").update({ kitchen_recipe_id: null, linked_type: null }).eq("id", linkedPopina); setLinkedPopina(null); showToast("Lien Popina retiré"); }}
+                    style={{ border: "none", background: "transparent", color: "#b4443a", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Retirer</button>
+                </div>
+              ) : (
+                <div style={{ position: "relative" }}>
+                  <input type="text" value={popinaSearch} placeholder="Chercher une touche de caisse…" onChange={e => { setPopinaSearch(e.target.value); setShowPopinaList(true); }} onFocus={() => setShowPopinaList(true)} onBlur={() => setTimeout(() => setShowPopinaList(false), 150)} style={INPUT} />
+                  {showPopinaList && popinaSearch.trim().length >= 2 && (() => {
+                    const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+                    const q = norm(popinaSearch);
+                    const results = popinaProducts.filter(p => norm(p.name).includes(q)).sort((a, b) => (a.kitchen_recipe_id ? 1 : 0) - (b.kitchen_recipe_id ? 1 : 0)).slice(0, 15);
+                    return (
+                      <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: `1px solid ${BORD}`, borderRadius: 12, maxHeight: 240, overflowY: "auto", zIndex: 30, boxShadow: "0 12px 28px rgba(0,0,0,0.12)" }}>
+                        {results.length === 0 && <div style={{ padding: 12, fontSize: 13, color: "#6f6a61" }}>Aucune touche trouvée.</div>}
+                        {results.map(p => (
+                          <div key={p.id} onMouseDown={async e => {
+                            e.preventDefault();
+                            if (fiche.id) await supabase.from("popina_products").update({ kitchen_recipe_id: fiche.id, ingredient_id: null, linked_type: popinaLinkedType }).eq("id", p.id);
+                            setLinkedPopina(p.id); setPopinaSearch(""); setShowPopinaList(false); showToast(`Liée à ${p.name}`);
+                          }} style={{ padding: "9px 13px", cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 8, borderBottom: "1px solid #f0ebe2" }}>
+                            <span style={{ fontWeight: 600 }}>{p.name}{p.kitchen_recipe_id && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "#f0ebe2", color: "#999", marginLeft: 6 }}>déjà liée</span>}</span>
+                            <span style={{ fontSize: 12.5, color: "#6f6a61", whiteSpace: "nowrap" }}>{p.category} · {p.price_ttc?.toFixed(2).replace(".", ",")} €</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          )}
+          <Bascule titre="Utilisable comme ingrédient" aide="Pour une sauce, une base, une pâte reprise dans d'autres fiches : elle apparaît dans la recherche d'ingrédients avec son prix au kilo." actif={!!fiche.comme_ingredient} onChange={v => update({ comme_ingredient: v })} />
+        </div>
+
+        {/* PIED */}
+        <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: `1px solid ${BORD}`, padding: "12px 18px calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {fiche.id && canWrite && (
+            <button type="button" onClick={async () => {
+              if (!confirm(`Supprimer la fiche « ${fiche.nom} » ?`)) return;
+              await supabase.from("kitchen_recipe_lines").delete().eq("recipe_id", fiche.id!);
+              await supabase.from("kitchen_recipes").delete().eq("id", fiche.id!);
+              clearDraft(); retourCarte();
+            }} style={{ border: "none", background: "transparent", color: "#b4443a", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit", padding: 0, marginRight: "auto" }}>Supprimer</button>
+          )}
+          {!(fiche.id && canWrite) && <span style={{ marginRight: "auto" }} />}
+          <button type="button" onClick={() => { if (confirm("Quitter sans enregistrer ?")) { clearDraft(); retourCarte(); } }} style={BTN}>Annuler</button>
+          {canWrite && (
+            <button type="button" disabled={saving} onClick={handleSave} style={{ ...BTN, background: "#1a1a1a", color: "#f2ede4", borderColor: "#1a1a1a", fontWeight: 700, flex: 1, maxWidth: 220, opacity: saving ? 0.6 : 1 }}>{saving ? "Enregistrement…" : "Enregistrer"}</button>
           )}
         </div>
       </div>
 
       {/* TOAST */}
       {toast && (
-        <div style={{
-          position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)",
-          background: COLORS.ink, color: "#fff", borderRadius: 999, padding: "11px 24px",
-          fontSize: 13.5, fontWeight: 700, zIndex: 50,
-        }}>
-          {toast}
-        </div>
+        <div style={{ position: "fixed", bottom: 90, left: "50%", transform: "translateX(-50%)", background: COLORS.ink, color: "#fff", borderRadius: 999, padding: "11px 24px", fontSize: 13.5, fontWeight: 700, zIndex: 50 }}>{toast}</div>
       )}
-    </div>
-  );
-}
-
-// ── KPI tile ──
-function KPI({ label, value, color, sub }: { label: string; value: string; color?: string; sub?: string }) {
-  return (
-    <div style={{ flex: 1, minWidth: 118, padding: "16px 10px", textAlign: "center", borderRight: `1.5px solid ${COLORS.line}` }}>
-      <div style={{ fontSize: 10.5, letterSpacing: ".12em", textTransform: "uppercase", color: COLORS.muted, fontWeight: 800 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, marginTop: 4, color: color ?? COLORS.ink }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }

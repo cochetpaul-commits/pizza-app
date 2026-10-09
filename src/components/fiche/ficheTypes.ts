@@ -71,6 +71,9 @@ export type FicheState = {
   coeff: number;
   tva: number;
   prix_ttc_manuel: number | null;
+  /** Prix à emporter (TTC) et sa TVA en pourcent ; null = même prix que sur place */
+  prix_ttc_emporter: number | null;
+  tva_emporter: number;
   // Traiteur
   sell_price_per_kg: number | null;
   sell_price_per_portion: number | null;
@@ -217,6 +220,8 @@ export function defaultFiche(etabSlug: string): FicheState {
     coeff: 3,
     tva: 10,
     prix_ttc_manuel: null,
+    prix_ttc_emporter: null,
+    tva_emporter: 5.5,
     sell_price_per_kg: null,
     sell_price_per_portion: null,
     cooked_weight_g: null,
