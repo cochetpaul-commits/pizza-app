@@ -87,7 +87,18 @@ type LigneProps = {
   /** Vue par catégorie : la colonne Catégorie est portée par la barre au-dessus */
   sansCategorie?: boolean;
   stock?: StockItem | null;
+  /** Interrupteur actif / inactif (bureau) : un produit inactif sort des listes, des commandes et du prochain inventaire */
+  onToggleActif?: (x: Ingredient) => void;
 };
+
+function Interrupteur({ actif, onChange, titre }: { actif: boolean; onChange: () => void; titre: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={actif} title={titre} onClick={(e) => { e.stopPropagation(); onChange(); }}
+      style={{ width: 34, height: 20, borderRadius: 10, border: "none", padding: 2, background: actif ? "#4a6741" : "#d6d0c4", cursor: "pointer", position: "relative", transition: "background .15s", flexShrink: 0 }}>
+      <span style={{ display: "block", width: 16, height: 16, borderRadius: "50%", background: "#fff", transform: actif ? "translateX(14px)" : "none", transition: "transform .15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
+    </button>
+  );
+}
 
 /** Cellule / pastille de stock : quantité et unité, rouge sous le minimum */
 function Stock({ s, compact }: { s: StockItem | null | undefined; compact?: boolean }) {
@@ -164,7 +175,7 @@ function BarreCategorie({ cat, couleur, n, ouverte, onToggle }: { cat: Category;
   );
 }
 
-const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, onOpenSupplier, sansCategorie, stock }: LigneProps) {
+const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, onOpenSupplier, sansCategorie, stock, onToggleActif }: LigneProps) {
   const { couleurCat, texteCat, inactive, aUnPrix, prix, colisage, maj, etat } = affichageProduit(x, offer);
   const sousProduit = [x.sub_category, maj ? `mis à jour le ${maj}` : null].filter(Boolean).join(" · ");
 
@@ -213,6 +224,11 @@ const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, a
       <td style={{ ...TD, textAlign: "right" }}><Stock s={stock} /></td>
       <td style={{ ...TD, color: x.storage_zone ? "#1a1a1a" : FAIBLE }}>{x.storage_zone ?? "—"}</td>
       <td style={TD}>{etat && <Chip fond={etat.fond} couleur={etat.couleur}>{etat.libelle}</Chip>}</td>
+      {onToggleActif && (
+        <td style={{ ...TD, width: 44 }} onClick={(e) => e.stopPropagation()}>
+          <Interrupteur actif={!inactive} onChange={() => onToggleActif(x)} titre={inactive ? "Inactif : cliquer pour réactiver (listes, commandes, inventaire)" : "Actif : cliquer pour désactiver (sort des listes, des commandes et du prochain inventaire)"} />
+        </td>
+      )}
       <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
         <a href={`/ingredients/${x.id}`} title="Fiche détaillée (historique des prix, recettes)"
           style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 8, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", textDecoration: "none", fontWeight: 700, fontSize: 13 }}>→</a>
@@ -250,6 +266,7 @@ export type BaseProduitsProps = {
   stockMap: Map<string, StockItem>;
   inventaireDate: string | null;
   aCommander: number;
+  onToggleActif?: (x: Ingredient) => void;
   q: string;
   setQ: (v: string) => void;
   categorie: "all" | Category;
@@ -383,11 +400,11 @@ export function BaseProduits(p: BaseProduitsProps) {
       onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} />
   );
   const ligne = (l: Ligne, sansCategorie = false) => (
-    <LigneProduit key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)} stock={p.stockMap.get(l.x.id) ?? null}
+    <LigneProduit key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)} stock={p.stockMap.get(l.x.id) ?? null} onToggleActif={p.peutEcrire ? p.onToggleActif : undefined}
       selectionnee={p.selectedIds.has(l.x.id)} enEdition={p.editingId === l.x.id} peutEcrire={p.peutEcrire} sansCategorie={sansCategorie}
       onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} />
   );
-  const nbColonnes = (sansCategorie: boolean) => 9 + (p.peutEcrire ? 1 : 0) - (sansCategorie ? 1 : 0);
+  const nbColonnes = (sansCategorie: boolean) => 9 + (p.peutEcrire ? 1 : 0) + (p.peutEcrire && p.onToggleActif ? 1 : 0) - (sansCategorie ? 1 : 0);
   const enTete = (sansCategorie: boolean) => (
     <thead>
       <tr>
@@ -400,6 +417,7 @@ export function BaseProduits(p: BaseProduitsProps) {
         <th style={{ ...TH, textAlign: "right" }}>Stock</th>
         <th style={TH}>Zone</th>
         <th style={TH}>État</th>
+        {p.peutEcrire && p.onToggleActif && <th style={{ ...TH, width: 44 }}>Actif</th>}
         <th style={TH} />
       </tr>
     </thead>

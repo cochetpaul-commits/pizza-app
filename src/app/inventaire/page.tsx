@@ -7,6 +7,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { CATEGORIES, CAT_LABELS, CAT_COLORS, type Category, type Ingredient } from "@/types/ingredients";
 import { fetchApi, openApiFile } from "@/lib/fetchApi";
+import { ModalNonComptes } from "@/components/inventaire/ModalNonComptes";
 import { useRouter } from "next/navigation";
 import { fermerOffresActives } from "@/lib/offerClosing";
 import { ZONES_EMBED, appliquerZonesEtab, type ZoneEtabRow } from "@/lib/zonesEtablissement";
@@ -151,6 +152,8 @@ export default function InventairePage() {
 
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number | "">>({});
+  // Après la clôture : produits actifs sans aucune quantité saisie, proposés à la désactivation
+  const [nonComptes, setNonComptes] = useState<{ id: string; nom: string }[] | null>(null);
 
   // Totaux consolidés par produit (somme de toutes les zones)
   const ingTotals = useMemo(() => {
@@ -543,8 +546,14 @@ export default function InventairePage() {
       if (mvErr) alert(`Inventaire clôturé, mais mouvements de stock non enregistrés : ${mvErr.message}`);
     }
 
+    // Produits actifs jamais comptés (aucune zone renseignée) : on propose de les mettre inactifs
+    const comptes = new Set<string>();
+    for (const [key, v] of Object.entries(quantities)) { if (v !== "") comptes.add(key.split("|")[0]); }
+    const oublies = ingredients.filter((ing) => ing.is_active !== false && !comptes.has(ing.id)).map((ing) => ({ id: ing.id, nom: ing.name }));
+
     await reload();
     setSaving(false);
+    if (oublies.length > 0) setNonComptes(oublies);
   }
 
   // ── View closed inventory ─────────────────────────────────
@@ -1762,6 +1771,10 @@ export default function InventairePage() {
           </div>
         )}
       </div>
+      {nonComptes && (
+        <ModalNonComptes produits={nonComptes} onFermer={() => setNonComptes(null)}
+          onFait={(nb) => { setNonComptes(null); alert(`${nb} produit${nb > 1 ? "s" : ""} mis inactif${nb > 1 ? "s" : ""}. Ils se réactivent dans la Base produits.`); void reload(); }} />
+      )}
     </RequireRole>
   );
 }

@@ -55,6 +55,7 @@ import { normaliserSousCategorie } from "@/lib/styleCategories";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { useBottomBarActions } from "@/lib/BottomBarContext";
 import { dateFermeture, fermerOffresActives } from "@/lib/offerClosing";
+import { desactiverProduits, reactiverProduits } from "@/lib/produitsActifs";
 
 type OfferPayload = Record<string, unknown>;
 
@@ -332,6 +333,23 @@ function IngredientsPageInner() {
     clearSelection();
     setBulkActing(false);
   };
+
+  const bulkReactivate = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkActing(true);
+    const err = await reactiverProduits([...selectedIds]);
+    if (err) alert(err);
+    mutate();
+    clearSelection();
+    setBulkActing(false);
+  };
+  /** Interrupteur de la ligne : actif ↔ inactif, sans confirmation (réversible en un clic) */
+  const toggleActif = async (x: Ingredient) => {
+    const err = x.is_active === false ? await reactiverProduits([x.id]) : await desactiverProduits([x.id]);
+    if (err) { alert(err); return; }
+    mutate();
+  };
+  const selectionInactifs = [...selectedIds].some((id) => items.find((x) => x.id === id)?.is_active === false);
 
   const selectAllFiltered = () => setSelectedIds(new Set(filtered.map((x) => x.id)));
 
@@ -1377,6 +1395,7 @@ function IngredientsPageInner() {
                 stockMap={stockMap}
                 inventaireDate={stock?.inventoryDate ?? null}
                 aCommander={aCommander}
+                onToggleActif={toggleActif}
                 q={q}
                 setQ={setQ}
                 categorie={filterCategory}
@@ -1693,6 +1712,15 @@ function IngredientsPageInner() {
           )}
 
           <div style={{ flex: 1 }} />
+
+          {/* Réactiver (quand la sélection contient des fiches désactivées) */}
+          {selectionInactifs && <button onClick={bulkReactivate} disabled={bulkActing} title="Remet les fiches dans les listes, les commandes et l'inventaire" style={{
+            padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.25)",
+            background: "rgba(255,255,255,0.12)", color: "#fff", fontSize: 12, fontWeight: 700,
+            cursor: "pointer", opacity: bulkActing ? 0.5 : 1,
+          }}>
+            Réactiver
+          </button>}
 
           {/* Désactiver (réversible, historique conservé) */}
           <button onClick={bulkDeactivate} disabled={bulkActing} title="Fiche inactive, offres fermées, historique conservé" style={{

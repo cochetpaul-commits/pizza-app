@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi, openApiFile } from "@/lib/fetchApi";
+import { ModalNonComptes } from "@/components/inventaire/ModalNonComptes";
 import { inChunks } from "@/lib/supabaseChunks";
 import { useProfile } from "@/lib/ProfileContext";
 import { libelleZone } from "@/lib/commandeArticles";
@@ -85,6 +86,7 @@ function Feuille() {
   const [etabSlug, setEtabSlug] = useState("");
   const [zones, setZones] = useState<string[]>([]);
   const [lignes, setLignes] = useState<Ligne[]>([]);
+  const [nonComptes, setNonComptes] = useState<{ id: string; nom: string }[] | null>(null);
   const [fiches, setFiches] = useState<Record<string, Fiche>>({});
   /** Rayons de l'écran de commande (rayons_commande), dans l'ordre : les catégories de l'inventaire */
   const [rayons, setRayons] = useState<{ code: string; libelle: string; ordre: number }[]>([]);
@@ -359,8 +361,12 @@ function Feuille() {
     const restant = lignes.filter((l) => !l.retiree && !compte(l)).length;
     for (const [lid, t] of minuteries.current) { clearTimeout(t); await enregistrer(lid); }
     if (!confirm(`Clôturer l'inventaire ?${restant ? `\n${restant} ligne(s) non comptée(s) : elles resteront vides.` : ""}\nIl ne sera plus modifiable (sauf réouverture par un admin).`)) return;
-    await action("cloture", { action: "cloturer" }, (j) => j.avertissement ? String(j.avertissement)
+    // Produits actifs non comptés (ou retirés de la feuille) : proposés à la désactivation après la clôture
+    const vus = new Set<string>();
+    const oublies = lignes.filter((l) => !l.inactive && (l.retiree || !compte(l)) && l.ingredient_id && !vus.has(l.ingredient_id) && vus.add(l.ingredient_id)).map((l) => ({ id: l.ingredient_id as string, nom: l.nom }));
+    const resultat = await action("cloture", { action: "cloturer" }, (j) => j.avertissement ? String(j.avertissement)
       : `Inventaire clôturé : ${Number(j.total ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € HT${Number(j.sans_prix) ? `, ${j.sans_prix} ligne(s) sans prix` : ""} (${j.mouvements} produits dans les mouvements de stock).`);
+    if (resultat && !("error" in resultat) && oublies.length > 0) setNonComptes(oublies);
   }
 
   /** Compter par colis (conditionnement de la fiche) ou à l'unité ; les quantités déjà saisies sont converties */
@@ -907,6 +913,10 @@ function Feuille() {
             return !!(j as { ok?: boolean }).ok;
           }}
         />
+      )}
+      {nonComptes && (
+        <ModalNonComptes produits={nonComptes} onFermer={() => setNonComptes(null)}
+          onFait={(nb) => { setNonComptes(null); setMessage(`${nb} produit${nb > 1 ? "s" : ""} mis inactif${nb > 1 ? "s" : ""} : ils se réactivent dans la Base produits.`); void charger(); }} />
       )}
     </div>
   );
