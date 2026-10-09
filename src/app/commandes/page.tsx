@@ -1749,7 +1749,7 @@ function CommandesPage() {
     );
   }
 
-  /** Bureau : une ligne de tableau par article (même gabarit que la Base produits), stepper et bascule d'unité dans la colonne Quantité */
+  /** Bureau : une ligne de tableau par article, tout sur une ligne comme la Base produits ; stepper et bascule d'unité dans la colonne Quantité */
   function renderLigneProduit(item: CatalogItem, isFav: boolean, couleur: string) {
     const qty = Number(quantities[item.id] ?? 0);
     const hasQty = qty > 0;
@@ -1761,7 +1761,7 @@ function CommandesPage() {
     const stockVal = si ? Math.round(si.stock * 10) / 10 : null;
     const couleurStock = si == null ? "#999" : si.stock <= min ? "#DC2626" : objG > 0 && si.stock < objG ? "#b45309" : "#2D6A4F";
     const total = hasQty && item.prix_commande != null ? qty * item.prix_commande : null;
-    const TDL: React.CSSProperties = { padding: "10px 14px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13, background: hasQty ? "rgba(212,119,90,0.08)" : undefined };
+    const TDL: React.CSSProperties = { padding: "9px 14px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13, whiteSpace: "nowrap", background: hasQty ? "rgba(212,119,90,0.08)" : undefined };
     return (
       <tr key={item.id}>
         <td style={{ ...TDL, padding: 0, width: 4, background: couleur }} />
@@ -1769,43 +1769,37 @@ function CommandesPage() {
           <button type="button" onClick={() => toggleFavori(item.id, isFav)} title={isFav ? "Retirer des habituels" : "Ajouter aux habituels"}
             style={{ background: "none", border: "none", fontSize: 14, cursor: "pointer", opacity: isFav ? 1 : 0.3, padding: 0 }}>&#x2B50;</button>
         </td>
-        <td style={{ ...TDL, minWidth: 260 }}>
+        <td style={{ ...TDL, fontWeight: 600, color: "#1a1a1a", whiteSpace: "normal", minWidth: 220 }}>{item.name}</td>
+        <td style={{ ...TDL, color: "#6f6a61", fontSize: 12.5 }}>
+          {condLabel ?? (item.order_unit ? `cmd : ${item.order_unit}` : "—")}{condLabel && item.order_unit ? ` · ${item.order_unit}` : ""}
+        </td>
+        <td style={TDL}>
+          {item.storage_zone
+            ? <span className="pastille" style={{ "--pastille-c": zoneColors[item.storage_zone] ?? "#b0a894" } as React.CSSProperties}>{item.storage_zone}</span>
+            : <span style={{ color: "#a39d92" }}>—</span>}
+        </td>
+        <td style={TDL}>
+          {stockVal != null ? <span style={{ fontWeight: 700, color: couleurStock }}>{stockVal}</span> : <span style={{ color: "#a39d92" }}>—</span>}
+          {objG > 0 && <span style={{ fontSize: 11, color: "#999", marginLeft: 6 }}>/ obj. {objG}</span>}
+          {si && si.qty_to_order > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#2563EB", marginLeft: 8 }}>à commander {si.qty_to_order}</span>}
+        </td>
+        <td style={{ ...TDL, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+          {item.prix_commande != null
+            ? <><span style={{ fontWeight: 700 }}>{item.prix_commande.toFixed(2).replace(".", ",")} € HT</span>{item.order_unit && <span style={{ fontSize: 11, color: "#999" }}> · {item.prix_par_colis ? "colis" : item.order_unit}</span>}</>
+            : <span style={{ color: "#a39d92" }}>—</span>}
+        </td>
+        <td style={TDL}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <IngredientAvatar ingredientId={item.id} name={item.name} category={(item.category ?? "autre") as Category} size={32} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600, color: "#1a1a1a" }}>{item.name}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginTop: 3 }}>
-                {condLabel && <span className="pastille-cadre">{condLabel}</span>}
-                {item.order_unit && <span className="pastille-cadre">cmd : {item.order_unit}</span>}
-                {item.storage_zone && (
-                  <span className="pastille" style={{ "--pastille-c": zoneColors[item.storage_zone] ?? "#b0a894" } as React.CSSProperties}>{item.storage_zone}</span>
-                )}
-                <a href={`/ingredients?edit=${item.id}&back=${encodeURIComponent("/commandes")}`} title="Modifier la fiche produit" className="pastille-cadre" style={{ textDecoration: "none", cursor: "pointer" }}>✎ produit</a>
-              </div>
-            </div>
-          </div>
-        </td>
-        <td style={{ ...TDL, whiteSpace: "nowrap" }}>
-          {stockVal != null ? <div style={{ fontWeight: 700, color: couleurStock }}>Stock {stockVal}</div> : <span style={{ color: "#a39d92" }}>—</span>}
-          {objG > 0 && <div style={{ fontSize: 11, color: "#999" }}>min {min} · objectif {objG}</div>}
-          {si && si.qty_to_order > 0 && <div style={{ fontSize: 11, fontWeight: 700, color: "#2563EB" }}>À commander : {si.qty_to_order} {si.unit ?? ""}</div>}
-        </td>
-        <td style={{ ...TDL, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-          {item.prix_commande != null ? (
-            <>
-              <div style={{ fontWeight: 700 }}>{item.prix_commande.toFixed(2).replace(".", ",")} € HT</div>
-              {item.order_unit && <div style={{ fontSize: 11, color: "#999" }}>{item.prix_par_colis ? "le colis" : `l'unité · ${item.order_unit}`}</div>}
-            </>
-          ) : <span style={{ color: "#a39d92" }}>—</span>}
-        </td>
-        <td style={{ ...TDL, whiteSpace: "nowrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
             {packCount > 0 && unitToggle(item)}
           </div>
         </td>
-        <td style={{ ...TDL, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: total != null ? "#1a1a1a" : "#a39d92" }}>
+        <td style={{ ...TDL, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: total != null ? "#1a1a1a" : "#a39d92" }}>
           {total != null ? `${total.toFixed(2).replace(".", ",")} €` : "—"}
+        </td>
+        <td style={{ ...TDL, textAlign: "right", width: 40 }}>
+          <a href={`/ingredients?edit=${item.id}&back=${encodeURIComponent("/commandes")}`} title="Modifier la fiche produit"
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 8, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", textDecoration: "none", fontWeight: 700, fontSize: 13 }}>→</a>
         </td>
       </tr>
     );
@@ -1815,10 +1809,11 @@ function CommandesPage() {
     const THL: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
     return (
       <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 820 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 980 }}>
           <thead><tr>
             <th style={{ ...THL, padding: 0, width: 4 }} /><th style={{ ...THL, width: 32, paddingRight: 0 }} />
-            <th style={THL}>Produit</th><th style={THL}>Stock</th><th style={{ ...THL, textAlign: "right" }}>Prix</th><th style={THL}>Quantité</th><th style={{ ...THL, textAlign: "right" }}>Total HT</th>
+            <th style={THL}>Produit</th><th style={THL}>Conditionnement</th><th style={THL}>Zone</th><th style={THL}>Stock</th>
+            <th style={{ ...THL, textAlign: "right" }}>Prix</th><th style={THL}>Quantité</th><th style={{ ...THL, textAlign: "right" }}>Total HT</th><th style={THL} />
           </tr></thead>
           <tbody>{items.map((item) => renderLigneProduit(item, fav, couleur))}</tbody>
         </table>
