@@ -73,22 +73,31 @@ export function StepperInput({
   const atMin = min != null && (value === "" ? 0 : value) <= min;
   const atMax = max != null && (value === "" ? 0 : value) >= max;
 
+  // Sobre (10/10/2026) : un petit groupe bordé « − 80 + », signes gris, valeur en sombre
   const btnBase: React.CSSProperties = {
-    width: 32, height: 32,
-    borderRadius: "50%",
+    width: 26, height: 28,
+    borderRadius: 6,
     border: "none",
-    fontSize: 16,
-    fontWeight: 700,
+    background: "transparent",
+    fontSize: 15,
+    fontWeight: 500,
+    lineHeight: 1,
     display: "flex", alignItems: "center", justifyContent: "center",
-    transition: "background 0.12s, transform 0.1s",
+    transition: "background 0.12s",
     flexShrink: 0,
+    fontFamily: "inherit",
+    padding: 0,
   };
 
   return (
     <div style={{
       display: "inline-flex",
       alignItems: "center",
-      gap: 4,
+      height: 30,
+      border: "1px solid #ddd6c8",
+      borderRadius: 8,
+      background: "#fff",
+      padding: "0 1px",
       opacity: disabled ? 0.5 : 1,
     }}>
       <button
@@ -97,8 +106,7 @@ export function StepperInput({
         disabled={disabled || atMin}
         style={{
           ...btnBase,
-          background: hasValue ? "rgba(139,26,26,0.08)" : "rgba(0,0,0,0.04)",
-          color: hasValue ? "#8B1A1A" : "#ccc",
+          color: disabled || atMin ? "#d6d0c4" : "#6f6a61",
           cursor: disabled || atMin ? "not-allowed" : "pointer",
         }}
       >−</button>
@@ -114,14 +122,14 @@ export function StepperInput({
         placeholder={placeholder}
         disabled={disabled}
         style={{
-          width: 38, height: 32,
+          width: 36, height: 28,
           background: "transparent",
           border: "none",
           textAlign: "center",
-          fontWeight: hasValue ? 800 : 500,
-          fontSize: hasValue ? 16 : 13,
+          fontWeight: 700,
+          fontSize: hasValue ? 14 : 12,
           fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-          color: hasValue ? "#D4775A" : "#bbb",
+          color: hasValue ? "#1a1a1a" : "#b0a89a",
           outline: "none",
           MozAppearance: "textfield",
           WebkitAppearance: "none",
@@ -133,8 +141,7 @@ export function StepperInput({
         disabled={disabled || atMax}
         style={{
           ...btnBase,
-          background: "rgba(74,103,65,0.10)",
-          color: "#4a6741",
+          color: disabled || atMax ? "#d6d0c4" : "#6f6a61",
           cursor: disabled || atMax ? "not-allowed" : "pointer",
         }}
       >+</button>

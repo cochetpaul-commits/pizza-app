@@ -39,7 +39,7 @@ interface Props {
 }
 
 const TH_ING: CSSProperties = { fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", fontWeight: 600, whiteSpace: "nowrap" };
-const COLONNES_ING = "18px minmax(180px, 1.5fr) minmax(120px, 1fr) 118px 64px 64px 26px";
+const COLONNES_ING = "18px minmax(180px, 1.5fr) minmax(120px, 1fr) 96px 64px 64px 26px";
 const CHAMP_ING: CSSProperties = { height: 32, borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 13, background: "#fff" };
 
 function tmpId() {
