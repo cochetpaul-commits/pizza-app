@@ -54,3 +54,10 @@ export const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi
 export const jourCourt = (dateIso: string) => new Date(dateIso + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" }).replace(".", "");
 export const dateCourte = (dateIso: string) => new Date(dateIso + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 export const libellePeriode = (r: DateRange) => `${dateCourte(r.from)} – ${dateCourte(r.to)}`;
+/** Les N derniers mois entiers plus le mois en cours */
+export function derniersMois(n: number): DateRange {
+  const d = new Date();
+  return { from: iso(new Date(d.getFullYear(), d.getMonth() - n + 1, 1, 12)), to: iso(d) };
+}
+export const libelleMois = (m: string) => new Date(m + "-01T12:00:00").toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
+export const libelleMoisLong = (m: string) => new Date(m + "-01T12:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" });

@@ -8,11 +8,17 @@ import { useBureau } from "@/hooks/useBureau";
 import { BORD, FAIBLE, MUTED, OSWALD, VERT, ROUGE, derniersJours, moisEnCours, nbJours, libellePeriode, texteVariation, variation } from "./gabarit";
 
 /** En-tête d'une page Analyse : titre, la question à laquelle elle répond, période (raccourcis + sélecteur) */
-export function EnteteAnalyse({ titre, question, range, onRange, droite }: { titre: string; question: string; range: DateRange; onRange: (r: DateRange) => void; droite?: ReactNode }) {
+export function EnteteAnalyse({ titre, question, range, onRange, droite, raccourcis: raccourcisProp, comparaison }: {
+  titre: string; question: string; range: DateRange; onRange: (r: DateRange) => void; droite?: ReactNode;
+  /** Raccourcis de période ; par défaut 7 j / 30 j / 90 j / ce mois */
+  raccourcis?: { libelle: string; r: DateRange }[];
+  /** Texte à la place de « comparé aux N jours d'avant » */
+  comparaison?: string;
+}) {
   const bureau = useBureau();
   const n = nbJours(range);
   const hier = derniersJours(1).to;
-  const raccourcis: { libelle: string; r: DateRange }[] = [
+  const raccourcis: { libelle: string; r: DateRange }[] = raccourcisProp ?? [
     { libelle: "7 j", r: derniersJours(7) }, { libelle: "30 j", r: derniersJours(30) }, { libelle: "90 j", r: derniersJours(90) }, { libelle: "Ce mois", r: moisEnCours() },
   ];
   const actif = (r: DateRange) => r.from === range.from && r.to === range.to;
@@ -33,7 +39,7 @@ export function EnteteAnalyse({ titre, question, range, onRange, droite }: { tit
           ))}
         </span>
         <PilotageRangeBar value={range} onChange={onRange} center={false} />
-        <span style={{ fontSize: 12, color: FAIBLE, whiteSpace: "nowrap" }} title={libellePeriode(range)}>{n} jour{n > 1 ? "s" : ""} · comparé aux {n} jours d&apos;avant{range.to > hier ? " · journée en cours incluse" : ""}</span>
+        <span style={{ fontSize: 12, color: FAIBLE, whiteSpace: "nowrap" }} title={libellePeriode(range)}>{comparaison ?? <>{n} jour{n > 1 ? "s" : ""} · comparé aux {n} jours d&apos;avant{range.to > hier ? " · journée en cours incluse" : ""}</>}</span>
       </div>
     </div>
   );

@@ -40,10 +40,11 @@ const MANAGERS: Role[] = ["group_admin", "manager"];
 export const ANALYSE_ITEMS: NavItemV2[] = [
   { label: "Chiffre d'affaires", href: "/analyse/chiffre-affaires", icon: "barChart", permission: "performances.view" },
   { label: "Couverts", href: "/analyse/couverts", icon: "users", permission: "performances.view" },
-  { label: "Marge", href: "/rentabilite", icon: "calculator", permission: "performances.pilotage" },
-  { label: "Masse salariale", href: "/rh/masse-salariale", icon: "trendingUp", permission: "performances.pilotage" },
-  { label: "CA / personne", href: "/rh/masse-salariale#productivite", icon: "users", permission: "performances.pilotage" },
-  { label: "Rentabilité plats", href: "/ventes/marges", icon: "wallet", permission: "performances.pilotage" },
+  { label: "Marge", href: "/analyse/marge", icon: "calculator", permission: "performances.pilotage" },
+  { label: "Masse salariale", href: "/analyse/masse-salariale", icon: "trendingUp", permission: "performances.pilotage" },
+  { label: "CA / personne", href: "/analyse/ca-personne", icon: "clock", permission: "performances.pilotage" },
+  { label: "Rentabilité plats", href: "/analyse/plats", icon: "wallet", permission: "performances.pilotage" },
+  { label: "Simulations", href: "/analyse/simulations", icon: "calculator", permission: "performances.pilotage" },
 ];
 
 // HACCP (autocontrôles & conformité)
