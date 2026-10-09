@@ -133,11 +133,11 @@ const EMPTY_FORM: ModalForm = {
 };
 
 const labelStyle: React.CSSProperties = {
-  fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginBottom: 4,
+  fontFamily: "DM Sans, sans-serif", fontSize: 11.5, color: "#6f6a61", marginBottom: 3,
 };
 const inputStyle: React.CSSProperties = {
-  fontFamily: "DM Sans, sans-serif", fontSize: 14, padding: "10px 12px",
-  border: "1.5px solid #e5ddd0", borderRadius: 10, width: "100%",
+  fontFamily: "DM Sans, sans-serif", fontSize: 13, padding: "7px 10px", height: 34, boxSizing: "border-box",
+  border: "1px solid #ddd6c8", borderRadius: 8, width: "100%",
   background: "#fff", color: "#1a1a1a", outline: "none",
 };
 const readonlyBadge: React.CSSProperties = {
@@ -148,7 +148,7 @@ const readonlyBadge: React.CSSProperties = {
 const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_bouteilles,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code,color";
 
 // Titres de section de la fiche fournisseur : tout est affiché, plus d'accordéons (09/10/2026)
-const titreSection: React.CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "#6f6a61", padding: "14px 0 8px", marginBottom: 4, borderTop: "1px solid #ece6db" };
+const titreSection: React.CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "#6f6a61", padding: "12px 0 6px", marginBottom: 2, borderTop: "1px solid #ece6db" };
 
 export default function FournisseursPage() {
   const bureau = useBureau();
@@ -551,7 +551,7 @@ export default function FournisseursPage() {
       <>
         {/* Name (only in create mode) */}
         {modalMode === "create" && (
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 10 }}>
             <div style={labelStyle}>Nom du fournisseur *</div>
             <input
               style={{ ...inputStyle, borderColor: "#D4775A" }}
@@ -564,9 +564,9 @@ export default function FournisseursPage() {
         )}
 
         {/* Etablissement selector */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-            Etablissement
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#6f6a61", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 }}>
+            Établissement
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {bmEtab && (
@@ -597,18 +597,18 @@ export default function FournisseursPage() {
         </div>
 
         {/* Section: Couleur */}
-        <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+        <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 700, color: "#6f6a61", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 }}>
           Couleur
         </div>
-        <div style={{ marginBottom: 16 }}>
-          <ColorPicker value={form.color || bodyColor} onChange={(hex) => setForm((f) => ({ ...f, color: hex }))} size={24} />
+        <div style={{ marginBottom: 8 }}>
+          <ColorPicker value={form.color || bodyColor} onChange={(hex) => setForm((f) => ({ ...f, color: hex }))} size={18} />
         </div>
 
         {/* ── Accordion: Coordonnees ── */}
         <div style={titreSection}>Coordonnees</div>
         {(
-          <div style={{ padding: "0 2px 16px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div style={{ padding: "0 0 6px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, marginBottom: 8 }}>
               <div>
                 <div style={labelStyle}>Contact</div>
                 <input style={inputStyle} value={form.contact_name} onChange={(e) => setForm((f) => ({ ...f, contact_name: e.target.value }))} placeholder="Prenom Nom" />
@@ -618,7 +618,7 @@ export default function FournisseursPage() {
                 <input style={inputStyle} value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="06 xx xx xx xx" type="tel" />
               </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 0 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, marginBottom: 0 }}>
               <div>
                 <div style={labelStyle}>Email</div>
                 <input style={inputStyle} value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="contact@fournisseur.fr" type="email" />
@@ -634,12 +634,12 @@ export default function FournisseursPage() {
         {/* ── Accordion: Adresse ── */}
         <div style={titreSection}>Adresse</div>
         {(
-          <div style={{ padding: "0 2px 16px" }}>
+          <div style={{ padding: "0 0 6px" }}>
             <div style={{ marginBottom: 12 }}>
               <div style={labelStyle}>Adresse</div>
               <input style={inputStyle} value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} placeholder="Rue, numero" />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
               <div>
                 <div style={labelStyle}>Code postal</div>
                 <input style={inputStyle} value={form.postal_code} onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))} placeholder="35400" />
@@ -655,8 +655,8 @@ export default function FournisseursPage() {
         {/* ── Accordion: Infos commerciales ── */}
         <div style={titreSection}>Infos commerciales</div>
         {(
-          <div style={{ padding: "0 2px 16px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div style={{ padding: "0 0 6px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, marginBottom: 8 }}>
               <div>
                 <div style={labelStyle}>Categorie</div>
                 <select
@@ -685,7 +685,7 @@ export default function FournisseursPage() {
         {/* ── Accordion: Franco & Livraison ── */}
         <div style={titreSection}>Franco & Livraison</div>
         {(
-          <div style={{ background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12, padding: 14, marginBottom: 16 }}>
+          <div style={{ marginBottom: 6 }}>
             {/* Franco row */}
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
               <div>
@@ -710,7 +710,7 @@ export default function FournisseursPage() {
             <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
               Planning commande → livraison
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3, marginBottom: 3 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "110px 130px 1fr", gap: 6, marginBottom: 2, maxWidth: 520 }}>
               <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Jour cde</div>
               <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Heure lim.</div>
               <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textTransform: "uppercase", padding: "3px 6px" }}>Jour livr.</div>
@@ -718,12 +718,12 @@ export default function FournisseursPage() {
             {JOURS_FULL.map((jour) => {
               const rule = schedule.find(r => r.day === jour);
               return (
-                <div key={jour} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3, marginBottom: 1 }}>
-                  <div style={{ padding: "6px", fontSize: 12, color: rule ? "#1a1a1a" : "#ccc", fontWeight: rule ? 600 : 400, background: rule ? "#faf8f4" : "transparent", borderRadius: 5 }}>
+                <div key={jour} style={{ display: "grid", gridTemplateColumns: "110px 130px 1fr", gap: 6, marginBottom: 2, maxWidth: 520 }}>
+                  <div style={{ padding: "6px 4px", fontSize: 12.5, color: rule ? "#1a1a1a" : "#a39d92", fontWeight: rule ? 600 : 400 }}>
                     {jour.charAt(0).toUpperCase() + jour.slice(1)}
                   </div>
                   <input
-                    style={{ ...inputStyle, padding: "5px 6px", fontSize: 12, background: rule ? "#faf8f4" : "#fff" }}
+                    style={{ ...inputStyle, height: 30, padding: "4px 8px", fontSize: 12, background: rule ? "#faf8f4" : "#fff" }}
                     value={rule?.cutoff ?? ""}
                     placeholder="hh:mm"
                     onChange={(e) => {
@@ -737,7 +737,7 @@ export default function FournisseursPage() {
                     }}
                   />
                   <select
-                    style={{ ...inputStyle, padding: "5px 6px", fontSize: 12, cursor: "pointer", background: rule ? "#faf8f4" : "#fff" }}
+                    style={{ ...inputStyle, height: 30, padding: "4px 8px", fontSize: 12, cursor: "pointer", background: rule ? "#faf8f4" : "#fff" }}
                     value={rule?.delivery_day ?? ""}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -763,8 +763,8 @@ export default function FournisseursPage() {
         {/* ── Accordion: Administratif ── */}
         <div style={titreSection}>Administratif</div>
         {(
-          <div style={{ padding: "0 2px 16px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div style={{ padding: "0 0 6px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, marginBottom: 8 }}>
               <div>
                 <div style={labelStyle}>SIRET</div>
                 <input style={inputStyle} value={form.siret} onChange={(e) => setForm((f) => ({ ...f, siret: e.target.value }))} placeholder="123 456 789 00012" />
@@ -790,12 +790,12 @@ export default function FournisseursPage() {
         {/* ── Accordion: Portail fournisseur ── */}
         <div style={titreSection}>Portail fournisseur</div>
         {(
-          <div style={{ padding: "0 2px 16px" }}>
+          <div style={{ padding: "0 0 6px" }}>
             <div style={{ marginBottom: 12 }}>
               <div style={labelStyle}>URL du portail de commande</div>
               <input style={inputStyle} value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} placeholder="https://portail.fournisseur.com" type="url" />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
               <div>
                 <div style={labelStyle}>Identifiant</div>
                 <input style={inputStyle} value={form.portal_login} onChange={(e) => setForm((f) => ({ ...f, portal_login: e.target.value }))} placeholder="login / email" />
@@ -823,7 +823,7 @@ export default function FournisseursPage() {
         {/* ── Accordion: Contacts / Destinataires ── */}
         <div style={titreSection}>Contacts / Destinataires</div>
         {(
-          <div style={{ padding: "0 2px 16px" }}>
+          <div style={{ padding: "0 0 6px" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
               {contacts.map((c, idx) => (
                 <div
@@ -985,8 +985,8 @@ export default function FournisseursPage() {
         {isExpanded && (
           <tr>
             <td style={{ padding: 0, width: 4, background: sColor }} />
-            <td colSpan={8} style={{ padding: "16px 16px 20px", background: "#faf8f4", borderBottom: "1px solid #ddd6c8" }} onClick={(e) => e.stopPropagation()}>
-              {renderFormBody()}
+            <td colSpan={8} style={{ padding: "12px 16px 16px", background: "#faf8f4", borderBottom: "1px solid #ddd6c8" }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ maxWidth: 820 }}>{renderFormBody()}</div>
             </td>
           </tr>
         )}
