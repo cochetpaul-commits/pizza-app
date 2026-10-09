@@ -967,10 +967,13 @@ export default function FournisseursPage() {
               <EtabBadge etablissementId={s.etablissement_id} />
               {!s.is_active && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 6, background: "rgba(0,0,0,0.08)", color: "#999" }}>inactif</span>}
             </span>
+            <div className="fo-inline" style={{ fontSize: 11.5, color: "#6f6656", marginTop: 2 }}>
+              {[s.city, s.contact_name, s.phone, st?.lastImport ? `import ${fmtDate(st.lastImport)}` : null].filter(Boolean).join(" · ")}
+            </div>
           </td>
           <td style={TD}>{s.category ? <span style={{ ...readonlyBadge, background: `${sColor}18`, color: sColor }}>{CATEGORY_LABELS[s.category] ?? s.category}</span> : <span style={{ color: "#a39d92" }}>—</span>}</td>
-          <td style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>{s.city ? `${s.city}${s.postal_code ? ` (${s.postal_code})` : ""}` : "—"}</td>
-          <td style={{ ...TD, color: "#6f6656", fontSize: 12.5, whiteSpace: "normal", minWidth: 220 }}>
+          <td className="fo-col-large" style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>{s.city ? `${s.city}${s.postal_code ? ` (${s.postal_code})` : ""}` : "—"}</td>
+          <td className="fo-col-large" style={{ ...TD, color: "#6f6656", fontSize: 12.5, whiteSpace: "normal", minWidth: 220 }}>
             {[s.contact_name, s.email, s.phone].filter(Boolean).join(" · ") || <span style={{ color: "#a39d92" }}>Coordonnées non renseignées</span>}
             {s.client_code && <div style={{ fontSize: 11.5, color: "#a39d92" }}>Code client {s.client_code}</div>}
           </td>
@@ -978,7 +981,7 @@ export default function FournisseursPage() {
           <td style={{ ...TD, fontSize: 12, color: s.delivery_days && s.delivery_days.length > 0 ? "#16A34A" : "#a39d92", fontWeight: 600 }}>
             {s.delivery_days && s.delivery_days.length > 0 ? s.delivery_days.map(d => d.slice(0, 3)).join(", ") : "—"}
           </td>
-          <td style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>
+          <td className="fo-col-large" style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>
             {st?.lastImport ? <>{fmtDate(st.lastImport)}{st.lastImportNumber ? <span style={{ color: "#a39d92" }}> · {st.lastImportNumber}</span> : null}</> : <span style={{ color: "#a39d92" }}>Aucun import</span>}
           </td>
           <td style={{ ...TD, textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
@@ -1020,12 +1023,15 @@ export default function FournisseursPage() {
     const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
     return (
       <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden", overflowX: "auto", minWidth: 0 }}>
-        <style>{`.fo-ligne:hover td{background:#f7f3ec} @media (max-width: 1150px){ .fo-fiche{ grid-template-columns: minmax(0, 1fr) !important; } }`}</style>
+        <style>{`.fo-ligne:hover td{background:#f7f3ec} .fo-inline{display:none}
+          /* iPad : la fiche sur une colonne, le tableau tient dans la largeur (ville, contact et import passent sous le nom) */
+          @media (max-width: 1150px){ .fo-fiche{ grid-template-columns: minmax(0, 1fr) !important; } }
+          @media (max-width: 1100px){ .fo-table{ min-width: 0 !important; } .fo-col-large{ display: none; } .fo-inline{ display: block; } }`}</style>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 980 }}>
+          <table className="fo-table" style={{ borderCollapse: "collapse", width: "100%", minWidth: 980 }}>
             <thead><tr>
-              <th style={{ ...TH, padding: 0, width: 4 }} /><th style={TH}>Fournisseur</th><th style={TH}>Catégorie</th><th style={TH}>Ville</th><th style={TH}>Contact</th>
-              <th style={{ ...TH, textAlign: "right" }}>Réf.</th><th style={TH}>Livraison</th><th style={TH}>Dernier import</th><th style={TH} />
+              <th style={{ ...TH, padding: 0, width: 4 }} /><th style={TH}>Fournisseur</th><th style={TH}>Catégorie</th><th className="fo-col-large" style={TH}>Ville</th><th className="fo-col-large" style={TH}>Contact</th>
+              <th style={{ ...TH, textAlign: "right" }}>Réf.</th><th style={TH}>Livraison</th><th className="fo-col-large" style={TH}>Dernier import</th><th style={TH} />
             </tr></thead>
             <tbody>{liste.map(renderLigne)}</tbody>
           </table>
@@ -1034,149 +1040,74 @@ export default function FournisseursPage() {
     );
   }
 
-  function renderCard(s: SupplierRow) {
+  /** Téléphone (10/10/2026) : même tableau que le bureau, en trois colonnes ; la fiche s'ouvre dessous sur une colonne */
+  function renderLigneMobile(s: SupplierRow) {
     const st = stats.get(s.id);
     const sColor = getSupplierColor(s.name, s.color);
     const isExpanded = modalMode === "edit" && modalSupplier?.id === s.id;
+    const otherEtab = etablissements.find(e => e.id !== s.etablissement_id);
+    const alreadyExists = otherEtab && suppliers.some(x => x.name.toLowerCase() === s.name.toLowerCase() && x.etablissement_id === otherEtab.id);
+    const TD: React.CSSProperties = { padding: "10px 8px 10px 10px", borderBottom: isExpanded ? "none" : "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13, background: isExpanded ? "rgba(212,119,90,0.08)" : undefined };
+    const sous = [s.category ? (CATEGORY_LABELS[s.category] ?? s.category) : null, s.city, s.delivery_days && s.delivery_days.length > 0 ? `livr. ${s.delivery_days.map(d => d.slice(0, 3)).join(", ")}` : null].filter(Boolean).join(" · ");
     return (
-      <div key={s.id} style={{ display: "flex", flexDirection: "column" }}>
-        <div
-          onClick={() => isExpanded ? closeModal() : openModal(s)}
-          style={{
-            border: "1px solid #ddd6c8",
-            borderRadius: isExpanded ? "12px 12px 0 0" : 12,
-            padding: "14px 16px",
-            background: "#fff", boxShadow: isExpanded ? "none" : "0 1px 3px rgba(0,0,0,0.04)",
-            borderLeft: `4px solid ${sColor}`,
-            borderBottom: isExpanded ? "none" : "1px solid #ddd6c8",
-            cursor: "pointer", transition: "all 0.15s",
-          }}
-          onMouseEnter={(e) => { if (!isExpanded) { e.currentTarget.style.boxShadow = `0 2px 8px ${sColor}22`; e.currentTarget.style.borderColor = `${sColor}60`; } }}
-          onMouseLeave={(e) => { if (!isExpanded) { e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; } }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 15, color: sColor }}>
-                  {s.name}
-                </span>
-                <EtabBadge etablissementId={s.etablissement_id} />
-                {!s.is_active && (
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 6,
-                    background: "rgba(0,0,0,0.08)", color: "#999",
-                  }}>inactif</span>
-                )}
-              </div>
-
-              {/* Category + delivery badges */}
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
-                {s.category && (
-                  <span style={{ ...readonlyBadge, background: `${sColor}18`, color: sColor }}>
-                    {CATEGORY_LABELS[s.category] ?? s.category}
-                  </span>
-                )}
-                {s.city && (
-                  <span style={{ ...readonlyBadge, background: "#f0ede6", color: "#999" }}>
-                    {s.city}{s.postal_code ? ` (${s.postal_code})` : ""}
-                  </span>
-                )}
-              </div>
-
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#999", marginTop: 4 }}>
-                {[s.contact_name, s.email, s.phone, s.client_code ? `Code: ${s.client_code}` : null].filter(Boolean).join(" · ") || "Coordonnees non renseignees"}
-              </div>
-
-              <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, marginTop: 6, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-                <span><strong>{st?.refCount ?? 0}</strong> <span style={{ color: "#999" }}>ref.</span></span>
-                {s.delivery_days && s.delivery_days.length > 0 && (
-                  <span style={{ fontSize: 11, color: "#16A34A", fontWeight: 600 }}>
-                    Livr. {s.delivery_days.map(d => d.slice(0, 3)).join(", ")}
-                  </span>
-                )}
-                <span style={{ color: "#999", fontSize: 12 }}>
-                  {st?.lastImport
-                    ? `Import : ${fmtDate(st.lastImport)}${st.lastImportNumber ? ` · ${st.lastImportNumber}` : ""}`
-                    : "Aucun import"}
-                </span>
-              </div>
+      <React.Fragment key={s.id}>
+        <tr className="fo-ligne" onClick={() => isExpanded ? closeModal() : openModal(s)} style={{ cursor: "pointer" }}>
+          <td style={{ ...TD, padding: 0, width: 4, background: sColor }} />
+          <td style={TD}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontWeight: 700, color: s.is_active ? "#1a1a1a" : "#999", lineHeight: 1.25 }}>
+              <span>{s.name}</span>
+              <EtabBadge etablissementId={s.etablissement_id} />
+              {!s.is_active && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 6, background: "rgba(0,0,0,0.08)", color: "#999" }}>inactif</span>}
             </div>
-
-            <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
-              {/* Dupliquer pour l'autre etab */}
-              {(() => {
-                const otherEtab = etablissements.find(e => e.id !== s.etablissement_id);
-                const alreadyExists = otherEtab && suppliers.some(x => x.name.toLowerCase() === s.name.toLowerCase() && x.etablissement_id === otherEtab.id);
-                if (!otherEtab || alreadyExists) return null;
-                return (
-                  <button
-                    type="button"
-                    onClick={async (e) => {
-                      e.stopPropagation();
+            <div style={{ fontSize: 11.5, color: "#6f6656", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sous || "—"}</div>
+          </td>
+          <td style={{ ...TD, padding: "10px 4px 10px 0", textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ fontWeight: 700 }}>{st?.refCount ?? 0} <span style={{ fontWeight: 500, color: "#6f6656", fontSize: 12 }}>réf.</span></div>
+            <div style={{ fontSize: 11.5, color: st?.lastImport ? "#6f6656" : "#a39d92", marginTop: 2 }}>{st?.lastImport ? fmtDate(st.lastImport) : "aucun import"}</div>
+          </td>
+          <td style={{ ...TD, padding: "10px 10px 10px 2px", width: 18, color: "#a39d92", fontSize: 18, textAlign: "right" }} aria-hidden>
+            <span style={{ display: "inline-block", transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform .15s" }}>›</span>
+          </td>
+        </tr>
+        {isExpanded && (
+          <tr>
+            <td style={{ padding: 0, width: 4, background: sColor }} />
+            <td colSpan={3} style={{ padding: "12px 12px 16px", background: "#faf8f4", borderBottom: "1px solid #ddd6c8" }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginBottom: 10 }}>
+                {otherEtab && !alreadyExists && (
+                  <button type="button" title={`Dupliquer pour ${otherEtab.nom}`}
+                    onClick={async () => {
                       if (!confirm(`Dupliquer "${s.name}" pour ${otherEtab.nom} ?`)) return;
                       const { id: _id, etablissement_id: _eid, ...rest } = s;
                       const { error } = await supabase.from("suppliers").insert({ ...rest, etablissement_id: otherEtab.id, client_code: null });
                       if (error) { alert(error.message); return; }
                       window.location.reload();
                     }}
-                    title={`Dupliquer pour ${otherEtab.nom}`}
-                    style={{
-                      height: 28, padding: "0 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,0.2)",
-                      background: "rgba(37,99,235,0.06)", color: "#2563EB", cursor: "pointer",
-                      fontSize: 10, fontWeight: 700, whiteSpace: "nowrap",
-                    }}
-                  >
-                    + {otherEtab.nom.slice(0, 10)}
+                    style={{ height: 30, padding: "0 10px", borderRadius: 8, border: "1px solid rgba(37,99,235,0.2)", background: "rgba(37,99,235,0.06)", color: "#2563EB", cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", fontFamily: "inherit" }}>
+                    Dupliquer pour {otherEtab.nom}
                   </button>
-                );
-              })()}
-              <button
-                type="button"
-                onClick={(e) => handleDeleteSupplier(s, e)}
-                title="Supprimer le fournisseur"
-                aria-label="Supprimer"
-                style={{
-                  width: 34, height: 34, borderRadius: 10, border: "1px solid rgba(220,38,38,0.2)",
-                  background: "rgba(220,38,38,0.06)", color: "#DC2626", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "#DC2626"; e.currentTarget.style.color = "#fff"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(220,38,38,0.06)"; e.currentTarget.style.color = "#DC2626"; }}
-              >
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                  <path d="M10 11v6M14 11v6" />
-                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                </svg>
-              </button>
-              <span style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 22, height: 22, color: "#999",
-                transition: "transform 0.2s",
-                transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-              }}>
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </span>
-            </div>
-          </div>
-        </div>
-        {isExpanded && (
-          <div style={{
-            border: "1px solid #ddd6c8",
-            borderTop: "none",
-            borderLeft: `4px solid ${sColor}`,
-            borderRadius: "0 0 12px 12px",
-            background: "#faf8f4",
-            padding: "16px 16px 20px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-          }}>
-            {renderFormBody()}
-          </div>
+                )}
+                <button type="button" onClick={(e) => handleDeleteSupplier(s, e)}
+                  style={{ height: 30, padding: "0 10px", borderRadius: 8, border: "1px solid rgba(220,38,38,0.2)", background: "rgba(220,38,38,0.06)", color: "#DC2626", cursor: "pointer", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", fontFamily: "inherit" }}>
+                  Supprimer
+                </button>
+              </div>
+              {renderFormBody()}
+            </td>
+          </tr>
         )}
+      </React.Fragment>
+    );
+  }
+
+  function tableauMobile(liste: SupplierRow[]) {
+    return (
+      <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden" }}>
+        <style>{`.fo-ligne:hover td{background:#f7f3ec} .fo-ligne:last-child td{border-bottom:0}`}</style>
+        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+          <colgroup><col style={{ width: 4 }} /><col /><col style={{ width: 96 }} /><col style={{ width: 22 }} /></colgroup>
+          <tbody>{liste.map(renderLigneMobile)}</tbody>
+        </table>
       </div>
     );
   }
@@ -1229,7 +1160,7 @@ export default function FournisseursPage() {
 
         {!loading && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {bureau ? (active.length > 0 && tableauFournisseurs(active)) : active.map(renderCard)}
+            {active.length > 0 && (bureau ? tableauFournisseurs(active) : tableauMobile(active))}
 
             {inactive.length > 0 && (
               <>
@@ -1240,7 +1171,7 @@ export default function FournisseursPage() {
                 }}>
                   Inactifs
                 </div>
-                {bureau ? tableauFournisseurs(inactive) : inactive.map(renderCard)}
+                {bureau ? tableauFournisseurs(inactive) : tableauMobile(inactive)}
               </>
             )}
 
