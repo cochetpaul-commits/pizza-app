@@ -459,19 +459,27 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
     </tr>
   ); };
 
-  const carte = (a: ArticleCarte) => (
-    <button key={a.id} type="button" onClick={() => { setOuvertId(a.id); setRelierOuvert(false); }}
-      style={{ display: "grid", gridTemplateColumns: "4px 1fr auto", gap: 12, alignItems: "center", textAlign: "left", width: "100%", background: "#fff", border: `1px solid ${BORD}`, borderRadius: 12, padding: "0 12px 0 0", overflow: "hidden", cursor: "pointer", fontFamily: "inherit" }}>
-      <span style={{ alignSelf: "stretch", background: infoCategorie(a.categorie).couleur }} />
-      <span style={{ padding: "10px 0", minWidth: 0 }}>
-        <span style={{ display: "block", fontWeight: 600, fontSize: 14 }}>{a.nom}</span>
-        <span style={{ display: "block", fontSize: 12, color: MUTED, marginTop: 2 }}>{infoCategorie(a.categorie).libelle} · {a.lien ? libelleLien(a) : "non relié"}</span>
-      </span>
-      <span style={{ textAlign: "right", display: "grid", gap: 4, justifyItems: "end" }}>
-        <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{euros(a.prix_ttc)}</span>
-        <ChipFoodCost a={a} />
-      </span>
-    </button>
+  // Téléphone : même tableau que sur bureau, réduit à l'essentiel
+  const ligneMobile = (a: ArticleCarte, enSection: boolean) => (
+    <tr key={a.id} className={`ca-ligne${ouvert?.id === a.id ? " on" : ""}`} onClick={() => { setOuvertId(a.id); setRelierOuvert(false); }} style={{ cursor: "pointer" }}>
+      <td style={{ ...TD_SEC, padding: 0, width: 4, background: infoCategorie(a.categorie).couleur }} />
+      <td style={{ ...TD_SEC, padding: "10px 12px", minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>{a.nom}</div>
+        <div style={{ fontSize: 12, color: MUTED, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "52vw" }}>{[enSection ? null : infoCategorie(a.categorie).libelle, a.lien ? libelleLien(a) : "non relié"].filter(Boolean).join(" · ")}</div>
+      </td>
+      <td style={{ ...TD_SEC, padding: "10px 6px 10px 8px", textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+        <div style={{ fontWeight: 700 }}>{euros(a.prix_ttc)}</div>
+        <div style={{ fontSize: 12, marginTop: 2 }}><FoodCostTexte a={a} /></div>
+      </td>
+      <td style={{ ...TD_SEC, padding: "10px 12px 10px 0", textAlign: "right", width: 24, color: FAIBLE, fontWeight: 700 }}>→</td>
+    </tr>
+  );
+  const tableauMobile = (liste: ArticleCarte[], enSection: boolean) => (
+    <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderTop: enSection ? 0 : undefined, borderRadius: enSection ? "0 0 14px 14px" : 14, overflow: "hidden" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+        <tbody>{liste.map((a) => ligneMobile(a, enSection))}</tbody>
+      </table>
+    </div>
   );
 
   return (
@@ -512,20 +520,20 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
       {donnees && tries.length === 0 && <EtatVide icone="recherche" titre="Aucun article ne correspond" texte="Modifiez la recherche ou les filtres de la carte." />}
 
       {donnees && tries.length > 0 && !bureau && (
-        <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "grid", gap: 10 }}>
           {affichage === "az"
-            ? tries.map(carte)
+            ? tableauMobile(tries, false)
             : parCategorie.map(([cle, liste]) => {
               const c = infoCategorie(cle); const ouverte = enRecherche || sectionsOuvertes.has(cle);
               return (
-                <div key={cle} style={{ display: "grid", gap: 8 }}>
-                  <button type="button" onClick={() => setSectionsOuvertes((s) => { const n = new Set(s); if (n.has(cle)) n.delete(cle); else n.add(cle); return n; })}
-                    className="barre-categorie" style={{ ...styleBarreCategorie(c.couleur), minHeight: 44, gap: 10, padding: "0 14px", boxShadow: "none", borderRadius: 14 }}>
+                <div key={cle}>
+                  <button type="button" aria-expanded={ouverte} onClick={() => setSectionsOuvertes((s) => { const n = new Set(s); if (n.has(cle)) n.delete(cle); else n.add(cle); return n; })}
+                    className={`barre-categorie${ouverte ? " ouverte" : ""}`} style={{ ...styleBarreCategorie(c.couleur), minHeight: 44, gap: 10, padding: "0 14px", boxShadow: "none", borderRadius: ouverte ? "14px 14px 0 0" : 14 }}>
                     <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", color: couleurTexteSur(c.couleur) }}>{c.libelle}</span>
                     <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, color: couleurTexteSur(c.couleur), opacity: 0.7, marginLeft: -4, flex: 1, textAlign: "left" }}>{liste.length}</span>
                     <span style={{ color: couleurTexteSur(c.couleur), fontSize: 12, opacity: 0.85, transform: ouverte ? "rotate(180deg)" : "none" }}>▼</span>
                   </button>
-                  {ouverte && liste.map(carte)}
+                  {ouverte && tableauMobile(liste, true)}
                 </div>
               );
             })}

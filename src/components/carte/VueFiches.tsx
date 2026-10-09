@@ -280,24 +280,34 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
       </tr>
     );
   };
-  const carte = (l: Ligne) => {
+  // Téléphone : même tableau que sur bureau, réduit à l'essentiel (nom et détail, valeur à droite)
+  const ligneMobile = (l: Ligne, enSection: boolean) => {
     const g = groupeParCle.get(l.groupe);
     const v = verdict(l.foodCost);
+    const valeur = mode === "fiches" ? (l.prix != null ? euros(l.prix) : l.cout != null ? euros(l.cout) : "—") : (l.cout != null ? euros(l.cout) : "—");
+    const detail = v && l.foodCost != null ? <span style={{ color: v.couleur, fontWeight: 600 }}>{pct(l.foodCost)}</span> : l.cout != null && mode === "fiches" && l.prix != null ? <span style={{ color: FAIBLE }}>coût {euros(l.cout)}</span> : l.coutLibelle ? <span style={{ color: FAIBLE }}>{l.coutLibelle}</span> : null;
     return (
-      <button key={l.id} type="button" onClick={() => ouvrir(l)}
-        style={{ display: "grid", gridTemplateColumns: "4px 1fr auto", gap: 12, alignItems: "center", textAlign: "left", width: "100%", background: "#fff", border: `1px solid ${BORD}`, borderRadius: 12, padding: "0 12px 0 0", overflow: "hidden", cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a" }}>
-        <span style={{ alignSelf: "stretch", background: g?.couleur }} />
-        <span style={{ padding: "10px 0", minWidth: 0 }}>
-          <span style={{ display: "block", fontWeight: 600, fontSize: 14 }}>{l.nom}</span>
-          <span style={{ display: "block", fontSize: 12, color: MUTED, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[g?.libelle, l.sous, l.statut ? STATUTS[l.statut]?.libelle : null].filter(Boolean).join(" · ")}</span>
-        </span>
-        <span style={{ textAlign: "right", display: "grid", gap: 2, justifyItems: "end" }}>
-          <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{mode === "fiches" ? (l.prix != null ? euros(l.prix) : l.cout != null ? euros(l.cout) : "—") : (l.cout != null ? euros(l.cout) : "—")}</span>
-          {v && l.foodCost != null ? <span style={{ fontSize: 12, fontWeight: 600, color: v.couleur }}>{pct(l.foodCost)}</span> : l.cout != null && mode === "fiches" ? <span style={{ fontSize: 11, color: FAIBLE }}>coût {euros(l.cout)}</span> : null}
-        </span>
-      </button>
+      <tr key={l.id} className="cf-ligne" onClick={() => ouvrir(l)} style={{ cursor: "pointer" }}>
+        <td style={{ ...TD, padding: 0, width: 4, background: g?.couleur }} />
+        <td style={{ ...TD, padding: "10px 12px", minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{l.nom}</div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "52vw" }}>{[enSection ? null : g?.libelle, l.sous, l.statut ? STATUTS[l.statut]?.libelle : null].filter(Boolean).join(" · ")}</div>
+        </td>
+        <td style={{ ...TD, padding: "10px 6px 10px 8px", textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+          <div style={{ fontWeight: 700 }}>{valeur}</div>
+          {detail && <div style={{ fontSize: 12, marginTop: 2 }}>{detail}</div>}
+        </td>
+        <td style={{ ...TD, padding: "10px 12px 10px 0", textAlign: "right", width: 24, color: FAIBLE, fontWeight: 700 }}>→</td>
+      </tr>
     );
   };
+  const tableauMobile = (liste: Ligne[], enSection: boolean) => (
+    <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderTop: enSection ? 0 : undefined, borderRadius: enSection ? "0 0 14px 14px" : 14, overflow: "hidden" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+        <tbody>{liste.map((l) => ligneMobile(l, enSection))}</tbody>
+      </table>
+    </div>
+  );
 
   const creation: EditionFiche = mode === "preparations" ? { cat: "preparation" } : {};
 
@@ -341,19 +351,19 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
       )}
 
       {donnees && filtrees.length > 0 && !bureau && (
-        <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "grid", gap: 10 }}>
           {affichage === "az"
-            ? filtrees.map(carte)
+            ? tableauMobile(filtrees, false)
             : parGroupe.map(([g, liste]) => {
               const ouv = enRecherche || sectionsOuvertes.has(g.cle);
               return (
-                <div key={g.cle} style={{ display: "grid", gap: 8 }}>
-                  <button type="button" onClick={() => basculer(g.cle)} className="barre-categorie" style={{ ...styleBarreCategorie(g.couleur), minHeight: 44, gap: 10, padding: "0 14px", boxShadow: "none", borderRadius: 14 }}>
+                <div key={g.cle}>
+                  <button type="button" aria-expanded={ouv} onClick={() => basculer(g.cle)} className={`barre-categorie${ouv ? " ouverte" : ""}`} style={{ ...styleBarreCategorie(g.couleur), minHeight: 44, gap: 10, padding: "0 14px", boxShadow: "none", borderRadius: ouv ? "14px 14px 0 0" : 14 }}>
                     <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", color: couleurTexteSur(g.couleur) }}>{g.libelle}</span>
                     <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, color: couleurTexteSur(g.couleur), opacity: 0.7, marginLeft: -4, flex: 1, textAlign: "left" }}>{liste.length}</span>
                     <span style={{ color: couleurTexteSur(g.couleur), fontSize: 12, opacity: 0.85, transform: ouv ? "rotate(180deg)" : "none" }}>▼</span>
                   </button>
-                  {ouv && liste.map(carte)}
+                  {ouv && tableauMobile(liste, true)}
                 </div>
               );
             })}
