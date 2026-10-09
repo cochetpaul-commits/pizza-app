@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
+import React, { useState, useRef, useEffect, useMemo, useSyncExternalStore, type CSSProperties } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -39,6 +39,13 @@ const ROLE_LABELS: Record<string, string> = {
   group_admin: "DIRECTION", admin: "ADMIN", manager: "MANAGER",
   cuisine: "CUISINE", salle: "SALLE", plonge: "PLONGE",
 };
+
+const abonnerHash = (rappel: () => void) => {
+  window.addEventListener("hashchange", rappel);
+  window.addEventListener("popstate", rappel);
+  return () => { window.removeEventListener("hashchange", rappel); window.removeEventListener("popstate", rappel); };
+};
+const lireHash = () => window.location.hash;
 
 const C = {
   bgItem: "rgba(0,0,0,0.035)",
@@ -104,8 +111,12 @@ function SidebarContent() {
     [entries],
   );
 
-  const isActive = (href: string) => {
-    if (pathname === href) return true;
+  // Ancre de l'URL (#couverts…) : les entrées « Chiffre d'affaires » et « Couverts » pointent la même page
+  const hash = useSyncExternalStore(abonnerHash, lireHash, () => "");
+  const isActive = (hrefComplet: string) => {
+    const [href, ancre] = hrefComplet.split("#");
+    if (ancre !== undefined) return pathname === href && hash === `#${ancre}`;
+    if (pathname === href) return !allHrefs.some((h) => h.startsWith(href + "#") && hash === h.slice(href.length));
     if (!pathname.startsWith(href + "/")) return false;
     // /ventes ne doit pas s'allumer quand une page plus précise (/ventes/marges) est dans la liste
     return !allHrefs.some((h) => h !== href && h.startsWith(href + "/") && (pathname === h || pathname.startsWith(h + "/")));

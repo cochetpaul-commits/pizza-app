@@ -33,12 +33,15 @@ export type NavEntry =
 
 const MANAGERS: Role[] = ["group_admin", "manager"];
 
-// ANALYSE (ex-Pilotage) : les pages chiffrées au-delà des ventes
+// ANALYSE : un indicateur par entrée, dans la logique ComandR (10/10/2026).
+// Les ancres (#couverts, #productivite) ouvrent la page sur la section voulue.
 export const ANALYSE_ITEMS: NavItemV2[] = [
-  { label: "Produits", href: "/ventes/marges", icon: "wallet", permission: "performances.pilotage" },
-  { label: "Rentabilité", href: "/rentabilite", icon: "calculator", permission: "performances.pilotage" },
+  { label: "Chiffre d'affaires", href: "/ventes", icon: "barChart", permission: "performances.view" },
+  { label: "Couverts", href: "/ventes#couverts", icon: "users", permission: "performances.view" },
+  { label: "Marge", href: "/rentabilite", icon: "calculator", permission: "performances.pilotage" },
   { label: "Masse salariale", href: "/rh/masse-salariale", icon: "trendingUp", permission: "performances.pilotage" },
-  { label: "Factures & Stats", href: "/achats", icon: "fileText", permission: "achats.view" },
+  { label: "CA / personne", href: "/rh/masse-salariale#productivite", icon: "users", permission: "performances.pilotage" },
+  { label: "Rentabilité plats", href: "/ventes/marges", icon: "wallet", permission: "performances.pilotage" },
 ];
 
 // HACCP (autocontrôles & conformité)
@@ -74,20 +77,26 @@ export const PARAMETRES_ITEMS: NavItemV2[] = [
 
 /** Managers et admins, dans un établissement. `accueil` = page d'accueil de l'établissement. */
 export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] {
+  // Ordre validé le 10/10/2026 : le quotidien d'abord (du plus fréquent au plus rare), les référentiels ensuite,
+  // puis l'équipe, puis le bloc direction (ventes, achats, analyse), la configuration en bas.
   return [
     { kind: "page", label: "Accueil", href: accueil, icon: "dashboard" },
-    { kind: "page", label: "Équipe", href: "/rh/equipe", icon: "users", roles: MANAGERS },
-    { kind: "page", label: "Congés", href: "/rh/conges", icon: "beach", roles: MANAGERS },
-    { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
-    { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },
+    { kind: "divider", label: "Exploitation" },
     { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
-    { kind: "page", label: "Base produits", href: "/ingredients", icon: "tag", permission: "achats.inventaire" },
+    { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
     { kind: "page", label: "Stock", href: "/stock", icon: "box", permission: "achats.inventaire" },
+    { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },
+    { kind: "page", label: "Base produits", href: "/ingredients", icon: "tag", permission: "achats.inventaire" },
     { kind: "page", label: "Fournisseurs", href: "/fournisseurs", icon: "truck", permission: "achats.edit" },
-    { kind: "page", label: "Ventes", href: "/ventes", icon: "barChart", permission: "performances.view" },
-    { kind: "group", label: "Analyse", icon: "trendingUp", items: ANALYSE_ITEMS },
     { kind: "group", label: "HACCP", icon: "clipboard", roles: MANAGERS, items: HACCP_ITEMS },
     ...(piccola ? [{ kind: "group", label: "Événementiel", icon: "calendarEvent", roles: MANAGERS, items: EVENEMENTIEL_ITEMS } as NavEntry] : []),
+    { kind: "divider", label: "Équipe" },
+    { kind: "page", label: "Équipe", href: "/rh/equipe", icon: "users", roles: MANAGERS },
+    { kind: "page", label: "Congés", href: "/rh/conges", icon: "beach", roles: MANAGERS },
+    { kind: "divider", label: "Pilotage" },
+    { kind: "page", label: "Ventes", href: "/ventes", icon: "barChart", permission: "performances.view" },
+    { kind: "page", label: "Achats", href: "/achats", icon: "fileText", permission: "achats.view" },
+    { kind: "group", label: "Analyse", icon: "trendingUp", items: ANALYSE_ITEMS },
     { kind: "divider", label: "Configuration" },
     { kind: "group", label: "Paramètres", icon: "settings", items: PARAMETRES_ITEMS },
   ];
@@ -96,10 +105,12 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
 /** Équipiers : leur tableau, la production, les achats, et leurs pages perso */
 export const NAV_EQUIPIER: NavEntry[] = [
   { kind: "page", label: "Mon tableau", href: "/mon-tableau", icon: "dashboard" },
+  { kind: "divider", label: "Exploitation" },
+  { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
   { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
   { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },
-  { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
   { kind: "page", label: "Fournisseurs", href: "/fournisseurs", icon: "truck", permission: "achats.edit" },
+  { kind: "divider", label: "Pilotage" },
   { kind: "page", label: "Ventes", href: "/ventes", icon: "barChart", permission: "performances.view" },
   { kind: "group", label: "Analyse", icon: "trendingUp", items: ANALYSE_ITEMS },
   { kind: "divider", label: "Configuration" },

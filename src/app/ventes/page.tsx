@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback, Suspense, type CSSProperties 
 import dynamic from "next/dynamic";
 import { useEtabAuto } from "@/lib/useEtabAuto";
 import { useSearchParams } from "next/navigation";
+import { useAncre } from "@/hooks/useAncre";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import type { Chart } from "chart.js";
@@ -630,6 +631,7 @@ function PerformancesPage() {
   };
 
   const W = data;
+  useAncre(!!data && !loading);
   const activePrev = prev;
   const activePrevWeek = prevWeek;
   const ca = W ? (mode === "ttc" ? W.ca_ttc : W.ca_ht) : 0;
@@ -980,7 +982,7 @@ function PerformancesPage() {
 
             {/* Recap table */}
             {W.services.length > 0 && (
-              <div style={S.card}>
+              <div id="couverts" style={{ ...S.card, scrollMarginTop: 90 }}>
                 <div style={S.sec}>Par service · {mode.toUpperCase()} · couverts</div>
                 {/* Desktop: table classique */}
                 <div className="desktop-only" style={{ overflow: "hidden", borderRadius: 14, border: "1px solid #ddd6c8" }}>

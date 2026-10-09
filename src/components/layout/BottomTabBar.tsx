@@ -272,8 +272,8 @@ const SECTION_PILOTAGE: TabSection = {
     // Admins : vision globale via "Tableau", pas de tableau personnalise
     { label: "Mon tableau", href: "/mon-tableau", match: ["/mon-tableau"], icon: () => <IconBarChart />, roles: ["manager", "equipier"] },
     { label: "Ventes", href: "/ventes", match: ["/ventes"], icon: () => <IconWallet />, permission: "performances.view" },
-    { label: "Rentabilite", href: "/rentabilite", match: ["/rentabilite"], icon: () => <IconTrendingUp />, permission: "performances.pilotage" },
-    { label: "Produits", href: "/ventes/marges", match: ["/ventes/marges"], icon: () => <IconTag />, permission: "performances.pilotage" },
+    { label: "Marge", href: "/rentabilite", match: ["/rentabilite"], icon: () => <IconTrendingUp />, permission: "performances.pilotage" },
+    { label: "Rentab. plats", href: "/ventes/marges", match: ["/ventes/marges"], icon: () => <IconTag />, permission: "performances.pilotage" },
     { label: "Masse sal.", href: "/rh/masse-salariale", match: ["/rh/masse-salariale"], icon: () => <IconTrendingUp />, permission: "performances.pilotage" },
   ],
 };

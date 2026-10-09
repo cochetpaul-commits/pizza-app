@@ -5,6 +5,7 @@ import { useEtabAuto } from "@/lib/useEtabAuto";
 import { PilotageRangeBar, usePilotageTopBar } from "@/components/ui/PilotageRangeBar";
 import { usePilotageRange } from "@/lib/pilotageRange";
 import { RequireRole } from "@/components/RequireRole";
+import { useAncre } from "@/hooks/useAncre";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { PilotageSwipeWrapper } from "@/components/layout/PilotageSwipeWrapper";
@@ -278,6 +279,7 @@ export default function MasseSalarialePage() {
 
   const ratioCA = caHt && caHt > 0 ? ((totals.msChargee + totals.coutHS) / caHt) * 100 : null;
   const productivite = totals.hTrav > 0 && caHt ? caHt / totals.hTrav : null;
+  useAncre(productivite != null);
   const coutCouvert = couverts && couverts > 0 ? totals.msChargee / couverts : null;
   const objRatioMS = 35; // target
 
@@ -468,8 +470,8 @@ export default function MasseSalarialePage() {
             <div style={{ ...KPI, color: totals.hs > 0 ? "#DC2626" : "#1a1a1a" }}>+{fmtDec(totals.hs)}h</div>
             <div data-money style={{ fontSize: 10, color: "#DC2626", marginTop: 2, fontWeight: 600 }}>~{fmt(Math.round(totals.coutHS))}{"\u20AC"}</div>
           </div>
-          <div style={CARD}>
-            <div style={LABEL}>Productivite</div>
+          <div id="productivite" style={{ ...CARD, scrollMarginTop: 90 }}>
+            <div style={LABEL}>Productivite · CA / personne</div>
             <div data-money style={KPI}>{productivite ? `${fmt(productivite)}\u20AC` : "\u2014"}</div>
             <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>CA HT / heure</div>
           </div>
