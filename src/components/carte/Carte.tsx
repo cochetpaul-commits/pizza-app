@@ -11,6 +11,7 @@ import { OSWALD } from "@/components/TuileProduit";
 import { couleurTexteSur, styleBarreCategorie } from "@/lib/styleCategories";
 import { CatalogueContent } from "@/components/production/CatalogueTab";
 import { CatalogueSalleContent } from "@/components/production/CatalogueSalleTab";
+import FicheWizard from "@/components/fiche/FicheWizard";
 import type { ArticleCarte, ReponseCarte } from "@/app/api/carte/route";
 
 /**
@@ -23,6 +24,17 @@ import type { ArticleCarte, ReponseCarte } from "@/app/api/carte/route";
  */
 
 export type VueCarte = "articles" | "fiches" | "preparations" | "equipe";
+
+/** Fiche ouverte dans le volet de droite : existante (recipeId) ou à créer depuis une touche de caisse */
+export type EditionFiche = { recipeId?: string; nom?: string; popina?: string; prix?: number; cat?: string };
+
+export function VoletFiche({ edition, onFermer, onEnregistre }: { edition: EditionFiche; onFermer: () => void; onEnregistre: (id: string) => void }) {
+  return (
+    <VoletDroit titre={edition.recipeId ? "Modifier la fiche" : "Nouvelle fiche"} sousTitre={edition.recipeId ? "La fiche complète, enregistrée en bas." : edition.nom ? `Depuis la touche « ${edition.nom} »` : "Pizza, plat, cocktail ou préparation"} largeur={820} onFermer={onFermer}>
+      <FicheWizard key={edition.recipeId ?? `new-${edition.popina ?? edition.cat ?? ""}`} enVolet recipeId={edition.recipeId} initialNom={edition.nom} initialPrixTtc={edition.prix ?? null} initialPopinaId={edition.popina ?? null} initialCategorie={edition.cat} onFermer={onFermer} onEnregistre={onEnregistre} />
+    </VoletDroit>
+  );
+}
 
 const BORD = "#ddd6c8";
 const MUTED = "#6f6a61";
@@ -238,15 +250,15 @@ const Kpi = ({ l, val, s, couleur }: { l: string; val: string; s: string; couleu
   </div>
 );
 
-function VoletArticle({ article, peutEcrire, periode, onFermer, onRecharger, relierOuvert, setRelierOuvert, bureau }: {
+function VoletArticle({ article, peutEcrire, periode, onFermer, onRecharger, relierOuvert, setRelierOuvert, bureau, onEditer }: {
   article: ArticleCarte; peutEcrire: boolean; periode: { from: string; to: string } | null; onFermer: () => void; onRecharger: () => void;
-  relierOuvert: boolean; setRelierOuvert: (v: boolean) => void; bureau: boolean;
+  relierOuvert: boolean; setRelierOuvert: (v: boolean) => void; bureau: boolean; onEditer: (e: EditionFiche) => void;
 }) {
   const router = useRouter();
   const c = infoCategorie(article.categorie);
   const v = verdictFoodCost(article.food_cost);
   const coeff = article.cout != null && article.cout > 0 ? article.prix_ht / article.cout : null;
-  const urlCreation = `/fiche/new?nom=${encodeURIComponent(article.nom)}&popina=${article.id}&prix=${article.prix_ttc}${CAT_FICHE[article.categorie] ? `&cat=${CAT_FICHE[article.categorie]}` : ""}`;
+  const creation: EditionFiche = { nom: article.nom, popina: article.id, prix: article.prix_ttc, cat: CAT_FICHE[article.categorie] };
   const sousTitre = [c.libelle, article.fiche ? `${libelleLien(article).toLowerCase()}${article.fiche.statut ? ` ${STATUTS[article.fiche.statut] ?? article.fiche.statut}` : ""}` : article.produit ? `produit « ${article.produit.nom} »` : "touche non reliée"].join(" · ");
   const allergenes = article.fiche?.allergenes ?? article.produit?.allergenes ?? [];
 
@@ -257,8 +269,8 @@ function VoletArticle({ article, peutEcrire, periode, onFermer, onRecharger, rel
       <span style={{ flex: 1 }} />
       {article.produit && <button type="button" onClick={() => router.push(`/ingredients/${article.produit!.id}`)} style={BTN}>Ouvrir le produit</button>}
       {article.fiche
-        ? <button type="button" onClick={() => router.push(`/fiche/${article.fiche!.id}`)} style={{ ...BTN, background: "#1a1a1a", color: "#f2ede4", border: "none", fontWeight: 700 }}>{peutEcrire ? "Modifier la fiche" : "Voir la fiche"}</button>
-        : peutEcrire && <button type="button" onClick={() => router.push(urlCreation)} style={{ ...BTN, background: ACCENT, color: "#fff", border: "none", fontWeight: 700 }}>Créer la fiche</button>}
+        ? <button type="button" onClick={() => onEditer({ recipeId: article.fiche!.id })} style={{ ...BTN, background: "#1a1a1a", color: "#f2ede4", border: "none", fontWeight: 700 }}>{peutEcrire ? "Modifier la fiche" : "Voir la fiche"}</button>
+        : peutEcrire && <button type="button" onClick={() => onEditer(creation)} style={{ ...BTN, background: ACCENT, color: "#fff", border: "none", fontWeight: 700 }}>Créer la fiche</button>}
     </div>
   );
 
@@ -338,8 +350,7 @@ function VoletArticle({ article, peutEcrire, periode, onFermer, onRecharger, rel
 type FiltreLien = "tous" | "fiche" | "produit" | "aucun";
 type FiltreFc = "tous" | "bon" | "attention" | "mauvais" | "sans";
 
-export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean; peutEcrire: boolean; estAdmin: boolean }) {
-  const router = useRouter();
+export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuverte, rechargeTick }: { bureau: boolean; peutEcrire: boolean; estAdmin: boolean; onEditer: (e: EditionFiche) => void; editionOuverte: boolean; rechargeTick: number }) {
   const { current: etab } = useEtablissement();
   const affichage = useSyncExternalStore(abonner, lire, () => "az" as const);
   const [donnees, setDonnees] = useState<ReponseCarte | null>(null);
@@ -368,7 +379,7 @@ export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean;
       } catch (e) { if (!annule) setErreur(e instanceof Error ? e.message : "Chargement impossible"); }
     })();
     return () => { annule = true; };
-  }, [tick, etab?.id]);
+  }, [tick, rechargeTick, etab?.id]);
 
   const articles = useMemo(() => donnees?.articles ?? [], [donnees]);
   const ouvert = ouvertId ? articles.find((a) => a.id === ouvertId) ?? null : null;
@@ -421,7 +432,6 @@ export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean;
   }
 
   const sousArticle = (a: ArticleCarte) => a.fiche?.description ?? (a.fiche && a.fiche.nom.toLowerCase() !== a.nom.toLowerCase() ? `Fiche « ${a.fiche.nom} »` : null) ?? (a.produit ? `Produit « ${a.produit.nom} »${a.produit.dose ? ` · dose ${a.produit.dose}` : ""}` : null) ?? (a.cout_detail && a.cout_detail !== "la pizza" && a.cout_detail !== "la portion" ? a.cout_detail : null);
-  const urlCreation = (a: ArticleCarte) => `/fiche/new?nom=${encodeURIComponent(a.nom)}&popina=${a.id}&prix=${a.prix_ttc}${CAT_FICHE[a.categorie] ? `&cat=${CAT_FICHE[a.categorie]}` : ""}`;
 
   const celluleLien = (a: ArticleCarte) => (
     a.lien
@@ -432,9 +442,9 @@ export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean;
   );
   const celluleFiche = (a: ArticleCarte) => (
     a.fiche
-      ? <a href={`/fiche/${a.fiche.id}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 12.5, fontWeight: 600, color: "#1a1a1a", textDecoration: "underline", textDecorationColor: BORD, textUnderlineOffset: 3, whiteSpace: "nowrap" }}>Voir la fiche</a>
+      ? <button type="button" onClick={(e) => { e.stopPropagation(); onEditer({ recipeId: a.fiche!.id }); }} style={{ border: "none", background: "transparent", padding: 0, fontFamily: "inherit", cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: "#1a1a1a", textDecoration: "underline", textDecorationColor: BORD, textUnderlineOffset: 3, whiteSpace: "nowrap" }}>Voir la fiche</button>
       : peutEcrire && a.categorie !== "MESSAGES"
-        ? <a href={urlCreation(a)} onClick={(e) => e.stopPropagation()} style={{ fontSize: 12.5, fontWeight: 600, color: ACCENT, textDecoration: "none", whiteSpace: "nowrap" }}>Créer la fiche</a>
+        ? <button type="button" onClick={(e) => { e.stopPropagation(); onEditer({ nom: a.nom, popina: a.id, prix: a.prix_ttc, cat: CAT_FICHE[a.categorie] }); }} style={{ border: "none", background: "transparent", padding: 0, fontFamily: "inherit", cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: ACCENT, whiteSpace: "nowrap" }}>Créer la fiche</button>
         : <span style={{ color: FAIBLE }}>—</span>
   );
 
@@ -594,13 +604,13 @@ export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean;
         </div>
       )}
 
-      {ouvert && (
+      {ouvert && !editionOuverte && (
         <VoletArticle article={ouvert} peutEcrire={peutEcrire} periode={donnees?.periode_ventes ?? null} bureau={bureau}
-          onFermer={() => { setOuvertId(null); setRelierOuvert(false); }} onRecharger={recharger}
+          onFermer={() => { setOuvertId(null); setRelierOuvert(false); }} onRecharger={recharger} onEditer={onEditer}
           relierOuvert={relierOuvert} setRelierOuvert={setRelierOuvert} />
       )}
       {!bureau && peutEcrire && (
-        <button type="button" onClick={() => router.push("/fiche/new")} style={{ position: "fixed", right: 16, bottom: 86, zIndex: 90, height: 44, padding: "0 18px", borderRadius: 22, border: "none", background: ACCENT, color: "#fff", fontWeight: 700, fontSize: 14, boxShadow: "0 6px 18px rgba(0,0,0,0.18)", fontFamily: "inherit" }}>+ Fiche</button>
+        <button type="button" onClick={() => onEditer({})} style={{ position: "fixed", right: 16, bottom: 86, zIndex: 90, height: 44, padding: "0 18px", borderRadius: 22, border: "none", background: ACCENT, color: "#fff", fontWeight: 700, fontSize: 14, boxShadow: "0 6px 18px rgba(0,0,0,0.18)", fontFamily: "inherit" }}>+ Fiche</button>
       )}
     </div>
   );
@@ -610,7 +620,6 @@ export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean;
 
 export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
   const bureau = useBureau();
-  const router = useRouter();
   const { can, isGroupAdmin, loading } = useProfile();
   const voitArticles = can("performances.show_money");
   const peutEcrire = can("operations.edit_recettes");
@@ -621,6 +630,8 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
     { cle: "equipe", libelle: "Vue équipe" },
   ];
   const [vueChoisie, setVueChoisie] = useState<VueCarte | null>(vueInitiale ?? null);
+  const [edition, setEdition] = useState<EditionFiche | null>(null);
+  const [rechargeTick, setRechargeTick] = useState(0);
   const vue: VueCarte = vueChoisie && vues.some((v) => v.cle === vueChoisie) ? vueChoisie : voitArticles ? "articles" : "equipe";
 
   if (loading) return <div style={{ padding: 40, textAlign: "center", color: MUTED }}>Chargement…</div>;
@@ -646,16 +657,17 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
               ))}
             </span>
             {bureau && peutEcrire && vue !== "equipe" && (
-              <button type="button" onClick={() => router.push("/fiche/new")} style={{ ...BTN, background: ACCENT, color: "#fff", border: "none", fontWeight: 700 }}>+ Nouvelle fiche</button>
+              <button type="button" onClick={() => setEdition(vue === "preparations" ? { cat: "preparation" } : {})} style={{ ...BTN, background: ACCENT, color: "#fff", border: "none", fontWeight: 700 }}>+ Nouvelle fiche</button>
             )}
           </div>
         </div>
 
-        {vue === "articles" && voitArticles && <VueArticles bureau={bureau} peutEcrire={peutEcrire} estAdmin={isGroupAdmin} />}
+        {vue === "articles" && voitArticles && <VueArticles bureau={bureau} peutEcrire={peutEcrire} estAdmin={isGroupAdmin} onEditer={setEdition} editionOuverte={edition != null} rechargeTick={rechargeTick} />}
         {vue === "fiches" && <CatalogueContent />}
         {vue === "preparations" && <CatalogueContent preparations />}
         {vue === "equipe" && <CatalogueSalleContent sansTitre />}
       </div>
+      {edition && <VoletFiche edition={edition} onFermer={() => setEdition(null)} onEnregistre={() => { setEdition(null); setRechargeTick((t) => t + 1); }} />}
     </div>
   );
 }

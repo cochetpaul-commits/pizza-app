@@ -81,9 +81,13 @@ type Props = {
   initialNom?: string;
   initialPrixTtc?: number | null;
   initialPopinaId?: string | null;
+  /** Dans le volet de la Carte : pas de cadre ni d'en-tête propres, fermeture et retour par rappels */
+  enVolet?: boolean;
+  onFermer?: () => void;
+  onEnregistre?: (id: string) => void;
 };
 
-export default function FicheWizard({ recipeId, recipeType, initialCategorie, initialSousCategorie, initialNom, initialPrixTtc, initialPopinaId }: Props) {
+export default function FicheWizard({ recipeId, recipeType, initialCategorie, initialSousCategorie, initialNom, initialPrixTtc, initialPopinaId, enVolet = false, onFermer, onEnregistre }: Props) {
   const router = useRouter();
   const { current: etab, etablissements } = useEtablissement();
   const { can } = useProfile();
@@ -617,6 +621,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
     setSaving(false);
     clearDraft();
     showToast("Fiche enregistrée");
+    if (onEnregistre && savedId) onEnregistre(savedId);
   }
 
   // ── Steps ──
@@ -624,7 +629,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
 
   // ── Gabarit de la fiche (maquette validée le 09/10/2026) : une seule colonne, sections empilées ──
   const BORD = "#ddd6c8";
-  const SEC: CSSProperties = { padding: "18px 18px", borderBottom: `1px solid ${BORD}`, display: "grid", gap: 12 };
+  const SEC: CSSProperties = { padding: enVolet ? "16px 0" : "18px 18px", borderBottom: `1px solid ${BORD}`, display: "grid", gap: 12 };
   const H2: CSSProperties = { margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "#6f6a61", display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap" };
   const LBL: CSSProperties = { display: "block", fontSize: 12.5, fontWeight: 600, color: "#6f6a61", marginBottom: 5 };
   const INPUT: CSSProperties = { height: 44, width: "100%", border: `1px solid ${BORD}`, borderRadius: 12, background: "#fff", padding: "0 14px", fontSize: 15, color: "#1a1a1a", fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
@@ -647,7 +652,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const fcCouleur = fcCol === "ok" ? "#4a6741" : fcCol === "warn" ? "#b7791f" : "#b4443a";
   const htEmporter = fiche.prix_ttc_emporter != null && fiche.prix_ttc_emporter > 0 ? prixHT(fiche.prix_ttc_emporter, fiche.tva_emporter) : null;
   const popinaLie = linkedPopina ? popinaProducts.find(p => p.id === linkedPopina) : null;
-  const retourCarte = () => router.push("/carte?vue=fiches");
+  const retourCarte = () => { if (onFermer) onFermer(); else router.push("/carte?vue=fiches"); };
 
   // Lignes d'ingrédients : conversion vers l'éditeur commun (IngredientListDnD), par zone
   const toLines = (zone: string): IngredientLine[] =>
@@ -667,7 +672,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const poidsCru = fiche.lignes.reduce((acc: number, l: LigneIngredient) => acc + ligneWeightG(l), 0) + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
 
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", padding: "16px 16px 40px" }}>
+    <div style={enVolet ? undefined : { maxWidth: 760, margin: "0 auto", padding: "16px 16px 40px" }}>
 
       {/* BROUILLONS NON ENREGISTRÉS (cet appareil) */}
       {otherDrafts.length > 0 && (
@@ -686,9 +691,9 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
         </div>
       )}
 
-      <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 16, overflow: "hidden" }}>
-        {/* EN-TÊTE */}
-        <div style={{ padding: "18px 18px 14px", borderBottom: `1px solid ${BORD}`, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+      <div style={enVolet ? { background: "#fff" } : { background: "#fff", border: `1px solid ${BORD}`, borderRadius: 16, overflow: "hidden" }}>
+        {/* EN-TÊTE (le volet de la Carte a le sien) */}
+        {!enVolet && <div style={{ padding: "18px 18px 14px", borderBottom: `1px solid ${BORD}`, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 24, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".02em", lineHeight: 1.1, color: "#1a1a1a" }}>{fiche.nom || "Nouvelle fiche"}</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
@@ -700,7 +705,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
             </div>
           </div>
           <button type="button" onClick={retourCarte} aria-label="Fermer" style={{ border: "none", background: "transparent", fontSize: 24, color: "#6f6a61", lineHeight: 1, cursor: "pointer", padding: 0 }}>×</button>
-        </div>
+        </div>}
 
         {/* IDENTITÉ */}
         <div style={SEC}>
@@ -1023,7 +1028,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
         </div>
 
         {/* PIED */}
-        <div style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: `1px solid ${BORD}`, padding: "12px 18px calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ position: "sticky", bottom: enVolet ? -12 : 0, background: "#fff", borderTop: `1px solid ${BORD}`, padding: enVolet ? "12px 0" : "12px 18px calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {fiche.id && canWrite && (
             <button type="button" onClick={async () => {
               if (!confirm(`Supprimer la fiche « ${fiche.nom} » ?`)) return;
