@@ -11,6 +11,9 @@ function Inner() {
     <FicheWizard
       initialCategorie={sp.get("cat") ?? undefined}
       initialSousCategorie={sp.get("sub") ?? undefined}
+      initialNom={sp.get("nom") ?? undefined}
+      initialPrixTtc={sp.get("prix") ? Number(sp.get("prix")) || null : null}
+      initialPopinaId={sp.get("popina") ?? null}
     />
   );
 }

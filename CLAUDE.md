@@ -45,6 +45,7 @@ OPENWEATHER_API_KEY
 
 | Route | Description |
 |---|---|
+| `/carte` | Carte : touches Popina (prix, cout, food cost, lien fiche/produit), fiches techniques, preparations, vue equipe. Remplace /recettes, /catalogue, /admin/popina-catalogue (redirections) |
 | `/recettes/*` | Recettes v2 (pizza, cuisine, cocktail, empatement) |
 | `/ingredients` | Catalogue ingredients |
 | `/fournisseurs` | Fiches fournisseurs |

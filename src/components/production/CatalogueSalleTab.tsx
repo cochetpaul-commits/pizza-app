@@ -283,7 +283,8 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
 
 /* ── Exported content (used in /recettes tab + /catalogue/fiches) ── */
 
-export function CatalogueSalleContent() {
+/** `sansTitre` : sans le titre « Catalogue » (vue Équipe de la page Carte, qui a le sien) */
+export function CatalogueSalleContent({ sansTitre = false }: { sansTitre?: boolean } = {}) {
   const { categories: dbCategories } = useCategories();
   // Dynamic labels from DB
   const catLabels = useMemo(() => {
@@ -371,11 +372,13 @@ export function CatalogueSalleContent() {
 
   return (
     <main className="container" style={{ paddingBottom: 80 }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 24, color: "#1a1a1a", margin: 0, fontFamily: "'Oswald', sans-serif" }}>
-          Catalogue <span style={{ fontSize: 14, fontWeight: 500, color: "#999", letterSpacing: 0, textTransform: "none" }}>({visibleFiches.length}) — carte & accords</span>
-        </h1>
-      </div>
+      {!sansTitre && (
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={{ fontSize: 24, color: "#1a1a1a", margin: 0, fontFamily: "'Oswald', sans-serif" }}>
+            Catalogue <span style={{ fontSize: 14, fontWeight: 500, color: "#999", letterSpacing: 0, textTransform: "none" }}>({visibleFiches.length}) — carte & accords</span>
+          </h1>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
         <input type="text" placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)}

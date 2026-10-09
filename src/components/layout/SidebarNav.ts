@@ -66,7 +66,6 @@ export const PARAMETRES_ITEMS: NavItemV2[] = [
   { label: "Catégories", href: "/settings/categories", icon: "tag", roles: ["group_admin"] },
   { label: "Accès de l'équipe", href: "/settings/acces", icon: "users", roles: ["group_admin"] },
   { label: "Prix de vente", href: "/epicerie", icon: "tag", roles: MANAGERS },
-  { label: "Catalogue Popina", href: "/admin/popina-catalogue", icon: "tag", roles: ["group_admin"] },
   { label: "Mes congés", href: "/mes-conges", icon: "beach" },
   { label: "Mon compte", href: "/settings/account", icon: "settings" },
 ];
@@ -79,8 +78,7 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     { kind: "page", label: "Accueil", href: accueil, icon: "dashboard" },
     { kind: "page", label: "Équipe", href: "/rh/equipe", icon: "users", roles: MANAGERS },
     { kind: "page", label: "Congés", href: "/rh/conges", icon: "beach", roles: MANAGERS },
-    { kind: "page", label: "Fiches techniques", href: "/recettes", icon: "fileText", permission: "operations.recettes" },
-    { kind: "page", label: "Catalogue", href: "/catalogue", icon: "book", permission: "operations.recettes" },
+    { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
     { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },
     { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
     { kind: "page", label: "Base produits", href: "/ingredients", icon: "tag", permission: "achats.inventaire" },
@@ -98,8 +96,7 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
 /** Équipiers : leur tableau, la production, les achats, et leurs pages perso */
 export const NAV_EQUIPIER: NavEntry[] = [
   { kind: "page", label: "Mon tableau", href: "/mon-tableau", icon: "dashboard" },
-  { kind: "page", label: "Fiches techniques", href: "/recettes", icon: "fileText", permission: "operations.recettes" },
-  { kind: "page", label: "Catalogue", href: "/catalogue", icon: "book", permission: "operations.recettes" },
+  { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
   { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },
   { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
   { kind: "page", label: "Fournisseurs", href: "/fournisseurs", icon: "truck", permission: "achats.edit" },

@@ -77,9 +77,13 @@ type Props = {
   /** Pré-sélection quand on crée depuis une catégorie / sous-catégorie */
   initialCategorie?: string;
   initialSousCategorie?: string;
+  /** Création depuis une touche de caisse (page Carte) : nom, prix TTC et lien Popina déjà remplis */
+  initialNom?: string;
+  initialPrixTtc?: number | null;
+  initialPopinaId?: string | null;
 };
 
-export default function FicheWizard({ recipeId, recipeType, initialCategorie, initialSousCategorie }: Props) {
+export default function FicheWizard({ recipeId, recipeType, initialCategorie, initialSousCategorie, initialNom, initialPrixTtc, initialPopinaId }: Props) {
   const router = useRouter();
   const { current: etab, etablissements } = useEtablissement();
   const { can } = useProfile();
@@ -97,6 +101,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
     ...(initialCategorie ? { categorie_slug: initialCategorie } : {}),
     comme_ingredient: autoCommeIngredient(initialCategorie, initialSousCategorie),
     ...(initialSousCategorie ? { sous_categorie: initialSousCategorie } : {}),
+    ...(initialNom ? { nom: initialNom } : {}),
+    ...(initialPrixTtc && initialPrixTtc > 0 ? { prix_ttc_manuel: initialPrixTtc } : {}),
   }));
   const [categories, setCategories] = useState<Categorie[]>([]);
   const [familles, setFamilles] = useState<Famille[]>([]);
@@ -112,7 +118,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const [salleView, setSalleView] = useState<"salle" | "cuisine">("salle");
   const [existingSubCats, setExistingSubCats] = useState<Record<string, string[]>>({});
   const [popinaProducts, setPopinaProducts] = useState<{ id: string; name: string; category: string; price_ttc: number; kitchen_recipe_id: string | null }[]>([]);
-  const [linkedPopina, setLinkedPopina] = useState<string | null>(null);
+  const [linkedPopina, setLinkedPopina] = useState<string | null>(initialPopinaId ?? null);
   const [popinaSearch, setPopinaSearch] = useState("");
   const [showPopinaList, setShowPopinaList] = useState(false);
   const [priceLabelByIngredient, setPriceLabelByIngredient] = useState<Record<string, string>>({});

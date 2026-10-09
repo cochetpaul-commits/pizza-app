@@ -483,7 +483,8 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function CatalogueContent() {
+/** `preparations` : n'affiche que les préparations (vue « Préparations » de la Carte) */
+export function CatalogueContent({ preparations = false }: { preparations?: boolean } = {}) {
   const { current: etab, etablissements, loading: etabLoading } = useEtablissement();
   const resolvedEtab = etab ?? etablissements?.[0] ?? null;
   const etabSlug = resolvedEtab?.slug ?? null;
@@ -512,7 +513,7 @@ export function CatalogueContent() {
   const [q, setQ] = useState("");
   const [mainFilter] = useState<MainFilter>("tous");
   const [cuisineCatFilter] = useState<CuisineCatFilter>("all");
-  const [prodFilter] = useState(false);
+  const [prodFilter] = useState(preparations);
   const [openId, setOpenId] = useState<string | null>(null);
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
   const [showNewCatModal, setShowNewCatModal] = useState(false);

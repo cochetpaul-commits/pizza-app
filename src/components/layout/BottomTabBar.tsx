@@ -197,17 +197,6 @@ function IconPrinter() {
   );
 }
 
-function IconGrid() {
-  return (
-    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" />
-      <rect x="14" y="3" width="7" height="7" />
-      <rect x="14" y="14" width="7" height="7" />
-      <rect x="3" y="14" width="7" height="7" />
-    </svg>
-  );
-}
-
 function IconHeart() {
   return (
     <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -292,7 +281,7 @@ const SECTION_PILOTAGE: TabSection = {
 const SECTION_ACHATS: TabSection = {
   label: "Achats",
   href: "/commandes",
-  match: ["/achats", "/commandes", "/ingredients", "/invoices", "/fournisseurs", "/variations-prix", "/admin/popina-catalogue", "/stock"],
+  match: ["/achats", "/commandes", "/ingredients", "/invoices", "/fournisseurs", "/variations-prix", "/stock"],
   icon: () => <IconShoppingBag />,
   roles: ["group_admin", "manager", "equipier"],
   tabs: [
@@ -300,31 +289,28 @@ const SECTION_ACHATS: TabSection = {
     { label: "Commandes", href: "/commandes", match: ["/commandes"], icon: () => <IconTruck /> },
     { label: "Stock", href: "/stock", match: ["/stock"], icon: () => <IconBox /> },
     { label: "Factures", href: "/achats", match: ["/achats", "/invoices", "/variations-prix"], icon: () => <IconFileText /> },
-    { label: "Catalogue Popina", href: "/admin/popina-catalogue", match: ["/admin/popina-catalogue"], icon: () => <IconTag /> },
   ],
 };
 
 const SECTION_PRODUCTION: TabSection = {
   label: "Production",
-  href: "/recettes",
-  match: ["/catalogue", "/recettes", "/inventaire", "/prep"],
+  href: "/carte",
+  match: ["/carte", "/catalogue", "/recettes", "/inventaire", "/prep", "/fiche"],
   roles: ["group_admin", "manager", "equipier"],
   icon: () => <IconPackage />,
   tabs: [
-    { label: "Fiches tech.", href: "/recettes", match: ["/recettes", "/prep"], icon: () => <IconBook /> },
-    { label: "Catalogue", href: "/catalogue", match: ["/catalogue"], icon: () => <IconGrid /> },
+    { label: "Carte", href: "/carte", match: ["/carte", "/catalogue", "/recettes", "/prep", "/fiche"], icon: () => <IconBook /> },
     { label: "Inventaire", href: "/inventaire", match: ["/inventaire"], icon: () => <IconBox /> },
   ],
 };
 
 const SECTION_PRODUCTION_PICCOLA: TabSection = {
   label: "Production",
-  href: "/recettes",
-  match: ["/catalogue", "/recettes", "/inventaire", "/epicerie", "/prep"],
+  href: "/carte",
+  match: ["/carte", "/catalogue", "/recettes", "/inventaire", "/epicerie", "/prep", "/fiche"],
   icon: () => <IconPackage />,
   tabs: [
-    { label: "Fiches tech.", href: "/recettes", match: ["/recettes", "/prep"], icon: () => <IconBook /> },
-    { label: "Catalogue", href: "/catalogue", match: ["/catalogue"], icon: () => <IconGrid /> },
+    { label: "Carte", href: "/carte", match: ["/carte", "/catalogue", "/recettes", "/prep", "/fiche"], icon: () => <IconBook /> },
     { label: "Prix vente", href: "/epicerie", match: ["/epicerie"], icon: () => <IconTag /> },
     { label: "Inventaire", href: "/inventaire", match: ["/inventaire"], icon: () => <IconBox /> },
   ],
@@ -362,8 +348,8 @@ const SECTION_HACCP: TabSection = {
 
 const SECTION_ACHATS_PICCOLA: TabSection = {
   ...SECTION_ACHATS,
-  tabs: SECTION_ACHATS.tabs.filter(t => t.href !== "/admin/popina-catalogue"),
-  match: SECTION_ACHATS.match.filter(m => m !== "/admin/popina-catalogue"),
+  tabs: SECTION_ACHATS.tabs,
+  match: SECTION_ACHATS.match,
 };
 
 function IconSettings() {

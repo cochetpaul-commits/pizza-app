@@ -1,12 +1,11 @@
 "use client";
 
-import { CatalogueContent } from "@/components/production/CatalogueTab";
-import { RequireRole } from "@/components/RequireRole";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default function RecettesPage() {
-  return (
-    <RequireRole permission="operations.recettes">
-      <CatalogueContent />
-    </RequireRole>
-  );
+/** Page remplacée par la Carte (09/10/2026) : on y envoie, vue « fiches ». */
+export default function Redirection() {
+  const router = useRouter();
+  useEffect(() => { router.replace("/carte?vue=fiches"); }, [router]);
+  return null;
 }

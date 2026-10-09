@@ -24,6 +24,7 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/recettes":      "operations.recettes",
   "/fiche":         "operations.recettes",
   "/catalogue":     "operations.recettes",
+  "/carte":         "operations.recettes",
   "/recipes":       "operations.recettes",
   "/kitchen":       "operations.recettes",
   "/pizzas":        "operations.recettes",
@@ -60,6 +61,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   // Tous: production, achats, stock
   "/recettes":     ALL,
   "/catalogue":    ALL,
+  "/carte":        ALL,
   "/ingredients":  MANAGERS,
   "/commandes":    ALL,
   "/stock":        ALL,
