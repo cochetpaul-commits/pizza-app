@@ -31,8 +31,8 @@ const FAIBLE = "#a39d92";
 const BRUN = "#A0845C";
 const VERT = "#4a6741";
 const GRIS = "#939597";
-const TH_PLAT: CSSProperties = { textAlign: "left", fontSize: 12.5, color: "#1a1a1a", padding: "12px 16px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
-const TD_PLAT: CSSProperties = { padding: "12px 16px", borderBottom: `1px solid ${BORD}`, verticalAlign: "middle", fontSize: 13 };
+const TH_PLAT: CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: FAIBLE, padding: "8px 16px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
+const TD_PLAT: CSSProperties = { padding: "11px 16px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13 };
 /** Tableaux dans les accordéons (maquette) : en-tête en petites capitales discrètes, lignes plus serrées */
 const TH_SEC: CSSProperties = { ...{ textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: FAIBLE, padding: "8px 14px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" } };
 const TD_SEC: CSSProperties = { padding: "10px 14px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13 };

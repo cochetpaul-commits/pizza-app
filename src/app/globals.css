@@ -172,6 +172,19 @@ select {
    ouvertes, leurs coins du bas sont droits pour se coller au tableau */
 button.barre-categorie { border-radius: 14px !important; }
 button.barre-categorie.ouverte { border-radius: 14px 14px 0 0 !important; }
+
+/* Tableaux (maquette Carte validée le 09/10/2026, appliquée partout) : en-tête en petites
+   capitales espacées et discrètes, filets légers entre les lignes, pas de filet sous la dernière */
+table thead th {
+  font-size: 10.5px !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+  color: #a39d92 !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid #ddd6c8 !important;
+}
+table tbody td { border-bottom: 1px solid #f0ebe2 !important; }
+table tbody tr:last-child td { border-bottom: 0 !important; }
 input[type="text"], input[type="search"], input[type="email"],
 input[type="password"], input[type="number"], input[type="tel"],
 textarea {

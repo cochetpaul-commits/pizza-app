@@ -65,8 +65,8 @@ const euros = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigit
 const pct = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: n >= 100 ? 0 : 1, maximumFractionDigits: n >= 100 ? 0 : 1 })} %`;
 const qte = (q: number | null, u: string | null) => (q == null ? "—" : `${q.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${u ?? ""}`.trim());
 
-const TH_PLAT: CSSProperties = { textAlign: "left", fontSize: 12.5, color: "#1a1a1a", padding: "12px 16px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
-const TD_PLAT: CSSProperties = { padding: "12px 16px", borderBottom: `1px solid ${BORD}`, verticalAlign: "middle", fontSize: 13 };
+const TH_PLAT: CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: FAIBLE, padding: "8px 16px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
+const TD_PLAT: CSSProperties = { padding: "11px 16px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13 };
 /** Tableaux dans les accordéons (maquette) : en-tête en petites capitales discrètes, lignes plus serrées, séparateurs plus légers */
 const TH_SEC: CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: FAIBLE, padding: "8px 14px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
 const TD_SEC: CSSProperties = { padding: "10px 14px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13 };
