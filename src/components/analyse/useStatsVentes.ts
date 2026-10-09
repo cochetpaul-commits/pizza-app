@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { fetchApi } from "@/lib/fetchApi";
-import { periodePrecedente } from "./gabarit";
 
 /** Ce que les pages Analyse lisent dans la réponse de /api/ventes/stats (agrégat Popina) */
 export type ServiceJour = { date: string; jour: string; svc: "midi" | "soir"; ttc: number; ht: number; cov: number; sp_ttc: number; sp_ht: number; emp_ttc: number; emp_ht: number; sp_cov: number; z_ttc: Record<string, number>; z_ht: Record<string, number> };
@@ -41,16 +40,16 @@ export function useStatsVentes(range: DateRange, avecMeteo = false): EtatStats {
     if (!etabId) return;
     let annule = false;
     (async () => {
-      const prec = periodePrecedente(range);
-      const charge = async (r: DateRange): Promise<StatsVentes | null> => {
-        const res = await fetchApi(`/api/ventes/stats?etablissement_id=${etabId}&from=${r.from}&to=${r.to}`);
+      // Un seul appel : la période et les N jours d'avant (calculés côté serveur, mis en cache)
+      const charge = async (r: DateRange): Promise<{ stats: StatsVentes | null; prec: StatsVentes | null }> => {
+        const res = await fetchApi(`/api/ventes/stats?etablissement_id=${etabId}&from=${r.from}&to=${r.to}&comparer=precedente`);
         if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Chargement impossible");
         const j = await res.json();
-        return (j?.stats ?? null) as StatsVentes | null;
+        return { stats: (j?.stats ?? null) as StatsVentes | null, prec: (j?.prec ?? null) as StatsVentes | null };
       };
       try {
-        const [stats, precStats, meteoRes] = await Promise.all([
-          charge(range), charge(prec).catch(() => null),
+        const [{ stats, prec: precStats }, meteoRes] = await Promise.all([
+          charge(range),
           avecMeteo ? fetchApi(`/api/meteo?from=${range.from}&to=${range.to}`).catch(() => null) : Promise.resolve(null),
         ]);
         const meteo: Record<string, MeteoJour> = {};

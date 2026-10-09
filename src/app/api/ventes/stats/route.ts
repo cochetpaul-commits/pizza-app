@@ -116,6 +116,16 @@ export async function GET(req: NextRequest) {
   for (const p of popinaProds ?? []) {
     if (p.name && p.sub_category) subCatByName.set(p.name.trim().toLowerCase(), p.sub_category);
   }
+  // Pages Analyse (`comparer=precedente`) : la période et les N jours d'avant, rien d'autre.
+  // Vécu 09/10 : deux appels (période puis précédente) × trois périodes = six agrégations en
+  // parallèle, le pool PostgREST saturait et les pages restaient 2 à 3 minutes sur « Chargement ».
+  if (searchParams.get("comparer") === "precedente") {
+    const nbJours = Math.round((Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10)) - Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10))) / 86_400_000) + 1;
+    const stats = await statsPeriode(etabId, from, to);
+    const prec = await statsPeriode(etabId, shiftDays(from, -nbJours), shiftDays(to, -nbJours));
+    return NextResponse.json({ empty: !stats, stats, prec, prev: null, prevWeek: null });
+  }
+
   const [stats, prev, prevWeek] = await Promise.all([
     statsPeriode(etabId, from, to),
     statsPeriode(etabId, fromA1, toA1),
