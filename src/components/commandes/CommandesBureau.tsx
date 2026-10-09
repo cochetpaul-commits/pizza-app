@@ -158,7 +158,7 @@ export function CommandesBureau(p: CommandesBureauProps) {
   const barre = (s: Section, titre: string, couleur: string, n: number) => {
     const fermee = sectionsFermees.has(s);
     return (
-      <button type="button" aria-expanded={!fermee}
+      <button className={`barre-categorie${fermee ? "" : " ouverte"}`} type="button" aria-expanded={!fermee}
         onClick={() => setSectionsFermees((prev) => { const next = new Set(prev); if (next.has(s)) next.delete(s); else next.add(s); return next; })}
         style={{ width: "100%", minHeight: 46, display: "flex", alignItems: "center", gap: 12, padding: "0 16px", border: "none", cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: "#fff", borderRadius: fermee ? 14 : "14px 14px 0 0", background: `linear-gradient(90deg, ${couleur} 0%, ${couleur}cc 100%)` }}>
         <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em" }}>{titre}</span>

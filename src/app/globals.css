@@ -168,6 +168,10 @@ button, input[type="button"], input[type="submit"] {
 select {
   border-radius: 10px !important;
 }
+/* Barres d'accordéon (Base produits, Commandes, Carte) : échappent au 10px ci-dessus ;
+   ouvertes, leurs coins du bas sont droits pour se coller au tableau */
+button.barre-categorie { border-radius: 14px !important; }
+button.barre-categorie.ouverte { border-radius: 14px 14px 0 0 !important; }
 input[type="text"], input[type="search"], input[type="email"],
 input[type="password"], input[type="number"], input[type="tel"],
 textarea {

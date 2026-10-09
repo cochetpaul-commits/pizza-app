@@ -153,7 +153,7 @@ const CarteProduit = React.memo(function CarteProduit({ x, offer, fournisseur, a
 function BarreCategorie({ cat, couleur, n, ouverte, onToggle }: { cat: Category; couleur: string; n: number; ouverte: boolean; onToggle: (c: Category) => void }) {
   const texte = couleurTexteSur(couleur);
   return (
-    <button type="button" onClick={() => onToggle(cat)} aria-expanded={ouverte}
+    <button type="button" onClick={() => onToggle(cat)} aria-expanded={ouverte} className={`barre-categorie${ouverte ? " ouverte" : ""}`}
       style={{ ...styleBarreCategorie(couleur), minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: ouverte ? "14px 14px 0 0" : 14 }}>
       <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", color: texte }}>{CAT_LABELS[cat] ?? cat}</span>
       <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, color: texte, opacity: 0.7, marginLeft: -4, flex: 1 }}>{n}</span>

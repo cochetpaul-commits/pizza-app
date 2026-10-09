@@ -535,7 +535,7 @@ export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean;
               return (
                 <div key={cle} style={{ display: "grid", gap: 8 }}>
                   <button type="button" onClick={() => setSectionsOuvertes((s) => { const n = new Set(s); if (n.has(cle)) n.delete(cle); else n.add(cle); return n; })}
-                    style={{ ...styleBarreCategorie(c.couleur), minHeight: 44, gap: 10, padding: "0 14px", boxShadow: "none", borderRadius: 12 }}>
+                    className="barre-categorie" style={{ ...styleBarreCategorie(c.couleur), minHeight: 44, gap: 10, padding: "0 14px", boxShadow: "none", borderRadius: 14 }}>
                     <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", color: couleurTexteSur(c.couleur) }}>{c.libelle}</span>
                     <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, color: couleurTexteSur(c.couleur), opacity: 0.7, marginLeft: -4, flex: 1, textAlign: "left" }}>{liste.length}</span>
                     <span style={{ color: couleurTexteSur(c.couleur), fontSize: 12, opacity: 0.85, transform: ouverte ? "rotate(180deg)" : "none" }}>▼</span>
@@ -573,7 +573,7 @@ export function VueArticles({ bureau, peutEcrire, estAdmin }: { bureau: boolean;
             const texte = couleurTexteSur(c.couleur);
             return (
               <div key={cle}>
-                <button type="button" aria-expanded={ouverte} onClick={() => setSectionsOuvertes((s) => { const n = new Set(s); if (n.has(cle)) n.delete(cle); else n.add(cle); return n; })}
+                <button type="button" aria-expanded={ouverte} className={`barre-categorie${ouverte ? " ouverte" : ""}`} onClick={() => setSectionsOuvertes((s) => { const n = new Set(s); if (n.has(cle)) n.delete(cle); else n.add(cle); return n; })}
                   style={{ ...styleBarreCategorie(c.couleur), minHeight: 46, gap: 12, padding: "0 16px", boxShadow: "none", borderRadius: ouverte ? "14px 14px 0 0" : 14 }}>
                   <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", color: texte }}>{c.libelle}</span>
                   <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, color: texte, opacity: 0.7, marginLeft: -4 }}>{liste.length}</span>
