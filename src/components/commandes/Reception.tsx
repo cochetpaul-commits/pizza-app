@@ -7,6 +7,7 @@ import { EtatVide } from "@/components/ui/EtatVide";
 import { fetchApi } from "@/lib/fetchApi";
 import { useBureau } from "@/hooks/useBureau";
 import { ETATS, erreurLigne, montantReclame, quantiteEnStock, resumeReception, type EtatReception, type LigneControle } from "@/lib/reception";
+import { rapprocher, totalLigneDoc, type DocumentLu } from "@/lib/rapprochementReception";
 
 /**
  * Contrôle de réception d'une commande (10/10/2026, sur le modèle du contrôle des livraisons
@@ -15,6 +16,8 @@ import { ETATS, erreurLigne, montantReclame, quantiteEnStock, resumeReception, t
  * est facturée, un commentaire ; l'app affiche ce qui entre en stock et le montant à réclamer.
  * Chaque geste est enregistré tout de suite ; « Valider la réception » clôt la commande et crée
  * les mouvements de stock avec ce qui est réellement entré.
+ * Le bon de livraison ou la facture peut être joint (photo ou PDF) : il est lu et chaque ligne
+ * commandée affiche ce qui est facturé, l'écart, et une suggestion à appliquer d'un geste.
  */
 type Ligne = {
   id: string; ingredient_id: string | null; ingredient_name: string; category: string | null;
@@ -23,7 +26,8 @@ type Ligne = {
   etat_reception: EtatReception | null; prix_recu: number | null; facture_sur_bon: boolean; montant_reclame: number;
 };
 type Session = { id: string; status: string; supplier_name: string; created_at: string; email_sent_at: string | null; received_at: string | null; total_ht: number | null };
-type Filtre = "tout" | "a_controler" | "problemes";
+type Filtre = "tout" | "a_controler" | "problemes" | "ecarts";
+type DocumentJoint = { nom: string | null; type: string | null; url: string | null; lu: DocumentLu | null };
 
 const BORD = "#ddd6c8";
 const MUTED = "#6f6a61";
@@ -58,6 +62,10 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
   const [menuId, setMenuId] = useState<string | null>(null);
   const [signalement, setSignalement] = useState<{ ligne: Ligne; etat: EtatReception } | null>(null);
   const [confirmation, setConfirmation] = useState(false);
+  const [document, setDocument] = useState<DocumentJoint | null>(null);
+  const [depot, setDepot] = useState(false);
+  const [avertissement, setAvertissement] = useState<string | null>(null);
+  const fichierRef = useRef<HTMLInputElement>(null);
   const lignesRef = useRef(lignes);
   lignesRef.current = lignes;
 
@@ -71,6 +79,7 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
         if (!r.ok) { setErreur(j?.error ?? "Chargement impossible"); setChargement(false); return; }
         setLignes((j.lines ?? []) as Ligne[]);
         setSession(j.session ?? null);
+        setDocument(j.document ?? null);
         setChargement(false);
       } catch (e) { if (!annule) { setErreur(e instanceof Error ? e.message : "Chargement impossible"); setChargement(false); } }
     })();
@@ -115,13 +124,34 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
   const retirer = (l: Ligne) => appliquer(l.id, { etat_reception: null, qty_received: null, prix_recu: null, facture_sur_bon: true, reception_note: null });
 
   const resume = useMemo(() => resumeReception(lignes.map(controle)), [lignes]);
+  const rappro = useMemo(() => rapprocher(lignes.map((l) => ({ id: l.id, ingredient_id: l.ingredient_id, nom: l.ingredient_name, quantite: l.quantite, prix_unitaire_ht: l.prix_unitaire_ht })), document?.lu ?? null), [lignes, document]);
+
+  async function joindre(f: File) {
+    setDepot(true); setErreur(null); setAvertissement(null);
+    try {
+      const fd = new FormData();
+      fd.append("session_id", sessionId);
+      fd.append("file", f);
+      const r = await fetchApi("/api/commandes/reception/document", { method: "POST", body: fd });
+      const j = await r.json().catch(() => null);
+      if (!r.ok) { setErreur(j?.error ?? "Dépôt impossible"); return; }
+      setDocument(j.document ?? null);
+      setAvertissement(j.avertissement ?? null);
+    } catch (e) { setErreur(e instanceof Error ? e.message : "Dépôt impossible"); }
+    finally { setDepot(false); if (fichierRef.current) fichierRef.current.value = ""; }
+  }
+  async function retirerDocument() {
+    if (!confirm("Retirer le document joint ?")) return;
+    const r = await fetchApi(`/api/commandes/reception/document?session_id=${sessionId}`, { method: "DELETE" });
+    if (r.ok) { setDocument(null); setAvertissement(null); if (filtre === "ecarts") setFiltre("tout"); }
+  }
   const nbAControler = lignes.filter((l) => !l.etat_reception).length;
   const visibles = useMemo(() => {
     const n = q.trim().toLowerCase();
     return lignes.filter((l) =>
-      (filtre === "tout" || (filtre === "a_controler" ? !l.etat_reception : l.etat_reception != null && ETATS[l.etat_reception].probleme))
+      (filtre === "tout" || (filtre === "a_controler" ? !l.etat_reception : filtre === "ecarts" ? ["ecart", "absent"].includes(rappro.parLigne[l.id]?.statut ?? "") : l.etat_reception != null && ETATS[l.etat_reception].probleme))
       && (!n || l.ingredient_name.toLowerCase().includes(n)));
-  }, [lignes, filtre, q]);
+  }, [lignes, filtre, q, rappro]);
 
   async function valider() {
     setConfirmation(false);
@@ -175,11 +205,51 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
             </div>
           </div>
 
+          {/* Document : bon de livraison ou facture */}
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em" }}>Bon de livraison ou facture</div>
+            <input ref={fichierRef} type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void joindre(f); }} />
+            {depot ? (
+              <div style={{ padding: "12px 14px", borderRadius: 12, border: `1px dashed ${BORD}`, background: "#faf8f4", fontSize: 13, color: MUTED }}>Lecture du document… (jusqu&apos;à une minute pour une photo)</div>
+            ) : !document ? (
+              <button type="button" onClick={() => fichierRef.current?.click()} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 12, border: `1px dashed ${BORD}`, background: "#faf8f4", cursor: "pointer", fontFamily: "inherit", textAlign: "left", color: "#1a1a1a" }}>
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
+                <span><span style={{ display: "block", fontWeight: 700, fontSize: 13.5 }}>Joindre le bon ou la facture</span><span style={{ display: "block", fontSize: 12, color: MUTED }}>Photo ou PDF : les lignes sont lues et comparées à la commande.</span></span>
+              </button>
+            ) : (
+              <div style={{ padding: "10px 12px", borderRadius: 12, border: `1px solid ${BORD}`, background: "#fff", display: "grid", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h9l4 4v14H6z" /><path d="M14 3v5h5M9 13h7M9 17h5" /></svg>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{document.nom ?? "Document"}</span>
+                  {document.url && <a href={document.url} target="_blank" rel="noreferrer" style={{ ...GESTE, height: 30, textDecoration: "none" }}>Voir</a>}
+                  {!lue && <button type="button" onClick={() => fichierRef.current?.click()} style={{ ...GESTE, height: 30 }}>Changer</button>}
+                  {!lue && <button type="button" onClick={() => void retirerDocument()} style={{ ...GESTE, height: 30, color: "#b4443a" }}>Retirer</button>}
+                </div>
+                {document.lu ? (
+                  <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.45 }}>
+                    {[document.lu.numero ? `N° ${document.lu.numero}` : null, document.lu.date ? new Date(document.lu.date).toLocaleDateString("fr-FR") : null, `${document.lu.lignes.length} ligne${document.lu.lignes.length > 1 ? "s" : ""} lue${document.lu.lignes.length > 1 ? "s" : ""}`, document.lu.total_ht != null ? `${eur(document.lu.total_ht)} HT` : null].filter(Boolean).join(" · ")}
+                    {session?.total_ht != null && document.lu.total_ht != null && Math.abs(document.lu.total_ht - session.total_ht) > 0.05 && (
+                      <div style={{ color: document.lu.total_ht > session.total_ht ? "#b4443a" : "#b7791f", fontWeight: 700 }}>
+                        {document.lu.total_ht > session.total_ht ? "+" : "−"}{eur(Math.abs(document.lu.total_ht - session.total_ht))} par rapport à la commande ({eur(session.total_ht)} HT)
+                      </div>
+                    )}
+                    {(() => {
+                      const n = rappro.nbEcarts - rappro.horsCommande.length, h = rappro.horsCommande.length;
+                      if (!n && !h) return <div style={{ color: VERT, fontWeight: 600 }}>Conforme à la commande.</div>;
+                      return <div style={{ color: "#1a1a1a", fontWeight: 600 }}>{[n ? `${n} écart${n > 1 ? "s" : ""} avec la commande (filtre « Écarts »)` : null, h ? `${h} ligne${h > 1 ? "s" : ""} hors commande (en bas)` : null].filter(Boolean).join(" · ")}.</div>;
+                    })()}
+                  </div>
+                ) : <div style={{ fontSize: 12.5, color: "#b7791f" }}>Document non lu : contrôlez les lignes à la main.</div>}
+              </div>
+            )}
+            {avertissement && <div style={{ fontSize: 12.5, color: "#8a5a10", background: "rgba(183,121,31,0.10)", borderRadius: 8, padding: "6px 10px" }}>{avertissement}</div>}
+          </div>
+
           {/* Recherche + filtres */}
           <div style={{ display: "grid", gap: 8 }}>
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un produit…" style={{ ...CHAMP, height: 36, fontSize: 13 }} />
             <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
-              {([["tout", "Tout", lignes.length], ["a_controler", "À contrôler", nbAControler], ["problemes", "Problèmes", resume.problemes]] as [Filtre, string, number][]).map(([cle, lib, n]) => (
+              {([["tout", "Tout", lignes.length], ["a_controler", "À contrôler", nbAControler], ["problemes", "Problèmes", resume.problemes], ...(document?.lu ? [["ecarts", "Écarts", rappro.nbEcarts - rappro.horsCommande.length]] : [])] as [Filtre, string, number][]).map(([cle, lib, n]) => (
                 <button key={cle} type="button" className={`rc-pill${filtre === cle ? " on" : ""}`} onClick={() => setFiltre(cle)}>{lib} <span>{n}</span></button>
               ))}
             </div>
@@ -206,6 +276,28 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
                     </div>
                     {e && <Badge etat={l.etat_reception!} />}
                   </div>
+                  {document?.lu && (() => {
+                    const r = rappro.parLigne[l.id];
+                    if (!r) return null;
+                    const coul = r.statut === "conforme" ? VERT : r.statut === "inconnu" ? MUTED : r.statut === "absent" ? "#b4443a" : "#b7791f";
+                    return (
+                      <div style={{ fontSize: 12.5, borderRadius: 8, padding: "6px 10px", lineHeight: 1.4, border: `1px dashed ${coul}66`, color: "#1a1a1a" }}>
+                        <span style={{ fontWeight: 700, color: coul }}>Sur le bon : </span>
+                        {r.doc
+                          ? <>{r.doc.quantite != null ? `${qte(r.doc.quantite)}${r.doc.unite ? ` ${r.doc.unite}` : ""}` : "quantité ?"}{r.doc.prix_unitaire != null ? ` × ${eur(r.doc.prix_unitaire)}` : ""}{r.totalDoc != null ? ` = ${eur(r.totalDoc)}` : ""}
+                              {r.ecart != null && r.statut === "ecart" && <strong style={{ color: r.ecart > 0 ? "#b4443a" : "#b7791f" }}> ({r.ecart > 0 ? "+" : "−"}{eur(Math.abs(r.ecart))})</strong>}
+                              {r.statut === "conforme" && <span style={{ color: VERT }}> · conforme</span>}
+                              {r.doc.nom && r.doc.nom.toLowerCase() !== l.ingredient_name.toLowerCase() && <div style={{ fontSize: 11.5, color: FAIBLE }}>{r.doc.nom}</div>}</>
+                          : <span style={{ color: "#b4443a" }}>absent</span>}
+                        {r.suggestion && !lue && l.etat_reception !== r.suggestion.patch.etat_reception && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                            <span style={{ color: MUTED }}>{r.suggestion.libelle}</span>
+                            <button type="button" onClick={() => appliquer(l.id, { ...r.suggestion!.patch, qty_received: r.suggestion!.patch.qty_received ?? (r.suggestion!.patch.etat_reception === "prix" ? l.quantite : null), prix_recu: r.suggestion!.patch.prix_recu ?? null, facture_sur_bon: r.suggestion!.patch.facture_sur_bon ?? true })} style={{ ...GESTE, height: 28, fontSize: 12, borderColor: coul, color: coul }}>Appliquer</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {e && e.probleme && (
                     <div style={{ fontSize: 12.5, color: "#1a1a1a", background: "#f7f3ec", borderRadius: 8, padding: "6px 10px", lineHeight: 1.4 }}>
                       {l.etat_reception === "prix"
@@ -235,6 +327,20 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
               );
             })}
           </div>
+          {document?.lu && rappro.horsCommande.length > 0 && (filtre === "tout" || filtre === "ecarts") && (
+            <div style={{ display: "grid", gap: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em" }}>Sur le bon, hors commande · {rappro.horsCommande.length}</div>
+              {rappro.horsCommande.map((d, i) => {
+                const t = totalLigneDoc(d);
+                return (
+                  <div key={i} style={{ background: "#fff", border: `1px solid ${BORD}`, borderLeft: "4px solid #2563EB", borderRadius: 12, padding: "8px 12px", fontSize: 12.5 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{d.nom}</div>
+                    <div style={{ color: MUTED }}>{d.quantite != null ? `${qte(d.quantite)}${d.unite ? ` ${d.unite}` : ""}` : ""}{d.prix_unitaire != null ? ` × ${eur(d.prix_unitaire)}` : ""}{t != null ? ` = ${eur(t)}` : ""} · facturé sans avoir été commandé : à vérifier (livré ? consigne ? frais ?)</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {!lue && <div style={{ fontSize: 12, color: FAIBLE, lineHeight: 1.4 }}>Chaque geste est enregistré tout de suite. À la validation, les lignes non contrôlées sont comptées reçues conformes, le stock est mis à jour avec ce qui est réellement entré.</div>}
         </div>
       )}

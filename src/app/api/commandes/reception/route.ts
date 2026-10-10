@@ -34,11 +34,19 @@ export async function GET(req: NextRequest) {
 
   const { data: session } = await supabaseAdmin
     .from("commande_sessions")
-    .select("id, status, supplier_id, created_at, email_sent_at, received_at, total_ht, notes, suppliers(name)")
+    .select("id, status, supplier_id, created_at, email_sent_at, received_at, total_ht, notes, document_path, document_nom, document_type, document_lu, suppliers(name)")
     .eq("id", sessionId)
     .single();
 
+  // Document joint (bon ou facture) : lien signé valable une heure
+  let document = null;
+  if (session?.document_path) {
+    const { data: signe } = await supabaseAdmin.storage.from("reception-documents").createSignedUrl(session.document_path as string, 3600);
+    document = { nom: session.document_nom, type: session.document_type, url: signe?.signedUrl ?? null, lu: session.document_lu ?? null };
+  }
+
   return NextResponse.json({
+    document,
     session: session ? {
       id: session.id,
       status: session.status,
