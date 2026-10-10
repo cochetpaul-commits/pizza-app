@@ -17,7 +17,7 @@ function normalize(name: string): string {
 }
 
 /* ── Types ── */
-type ProduitAgg = { description: string; categorie: string; qty: number; ca_ttc: number; ca_ht: number };
+type ProduitAgg = { description: string; categorie: string; sous_categorie?: string | null; qty: number; ca_ttc: number; ca_ht: number };
 
 type RecipeCost = {
   name: string;
@@ -29,6 +29,8 @@ type RecipeCost = {
 type ProductRow = {
   name: string;
   categorie: string;
+  /** Sous-catégorie du menu Popina (vide si la caisse n'en donne pas) */
+  sous_categorie: string;
   qty: number;
   ca_ttc: number;
   ca_ht: number;
@@ -61,7 +63,7 @@ export async function GET(req: NextRequest) {
 
   /* ── 1+2. Ventes agrégées par produit (RPC SQL) + coûts recettes, en parallèle ── */
   async function fetchVentes(): Promise<ProduitAgg[]> {
-    const { data, error } = await supabaseAdmin.rpc("ventes_par_produit", { p_etab: etabId, p_from: from, p_to: to });
+    const { data, error } = await supabaseAdmin.rpc("ventes_par_produit_sc", { p_etab: etabId, p_from: from, p_to: to });
     if (error) throw new Error(error.message);
     return (data ?? []) as ProduitAgg[];
   }
@@ -252,9 +254,9 @@ export async function GET(req: NextRequest) {
   }
 
   /* ── 3. Produits vendus (déjà agrégés côté base) ── */
-  const prodMap = new Map<string, { qty: number; ca_ttc: number; ca_ht: number; categorie: string }>();
+  const prodMap = new Map<string, { qty: number; ca_ttc: number; ca_ht: number; categorie: string; sous_categorie: string }>();
   for (const r of allVentes) {
-    prodMap.set(r.description, { qty: Number(r.qty) || 0, ca_ttc: Number(r.ca_ttc) || 0, ca_ht: Number(r.ca_ht) || 0, categorie: r.categorie || "Autre" });
+    prodMap.set(r.description, { qty: Number(r.qty) || 0, ca_ttc: Number(r.ca_ttc) || 0, ca_ht: Number(r.ca_ht) || 0, categorie: r.categorie || "Autre", sous_categorie: (r.sous_categorie ?? "").trim() });
   }
 
   /* ── 4. Match & compute margins ── */
@@ -289,6 +291,7 @@ export async function GET(req: NextRequest) {
       products.push({
         name,
         categorie: sales.categorie,
+        sous_categorie: sales.sous_categorie,
         qty: sales.qty,
         ca_ttc,
         ca_ht,
@@ -303,6 +306,7 @@ export async function GET(req: NextRequest) {
       products.push({
         name,
         categorie: sales.categorie,
+        sous_categorie: sales.sous_categorie,
         qty: sales.qty,
         ca_ttc,
         ca_ht,
@@ -325,22 +329,36 @@ export async function GET(req: NextRequest) {
     string,
     { ca_ht: number; cogs: number; ca_ttc: number }
   > = {};
+  // Sous-catégories du menu Popina (10/10/2026) : même agrégat, une ligne par sous-catégorie
+  const sousMap: Record<string, Record<string, { ca_ht: number; cogs: number; ca_ttc: number; qty: number }>> = {};
   for (const p of products) {
     const cat = p.categorie || "Autre";
     if (!catMap[cat]) catMap[cat] = { ca_ht: 0, cogs: 0, ca_ttc: 0 };
     catMap[cat].ca_ht += p.ca_ht;
     catMap[cat].ca_ttc += p.ca_ttc;
     if (p.cout_total) catMap[cat].cogs += p.cout_total;
+    const sc = p.sous_categorie || "";
+    sousMap[cat] ??= {};
+    sousMap[cat][sc] ??= { ca_ht: 0, cogs: 0, ca_ttc: 0, qty: 0 };
+    sousMap[cat][sc].ca_ht += p.ca_ht;
+    sousMap[cat][sc].ca_ttc += p.ca_ttc;
+    sousMap[cat][sc].qty += p.qty;
+    if (p.cout_total) sousMap[cat][sc].cogs += p.cout_total;
   }
+  const arrondi = (v: { ca_ht: number; cogs: number; ca_ttc: number }) => ({
+    ca_ht: Math.round(v.ca_ht * 100) / 100,
+    ca_ttc: Math.round(v.ca_ttc * 100) / 100,
+    cogs: Math.round(v.cogs * 100) / 100,
+    marge: Math.round((v.ca_ht - v.cogs) * 100) / 100,
+    food_cost_pct: v.ca_ht > 0 ? Math.round((v.cogs / v.ca_ht) * 1000) / 10 : 0,
+  });
   const categories = Object.entries(catMap)
     .map(([cat, v]) => ({
       cat,
-      ca_ht: Math.round(v.ca_ht * 100) / 100,
-      ca_ttc: Math.round(v.ca_ttc * 100) / 100,
-      cogs: Math.round(v.cogs * 100) / 100,
-      marge: Math.round((v.ca_ht - v.cogs) * 100) / 100,
-      food_cost_pct:
-        v.ca_ht > 0 ? Math.round((v.cogs / v.ca_ht) * 1000) / 10 : 0,
+      ...arrondi(v),
+      sous: Object.entries(sousMap[cat] ?? {})
+        .map(([nom, s]) => ({ nom, qty: s.qty, ...arrondi(s) }))
+        .sort((a, b) => b.ca_ttc - a.ca_ttc),
     }))
     .sort((a, b) => b.ca_ttc - a.ca_ttc);
 
