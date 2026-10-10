@@ -56,6 +56,8 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/ventes":          "performances.view",
   "/ventes/marges":   "performances.pilotage",
   "/rentabilite":     "performances.pilotage",
+  // Caisse (Bello Mio) : saisie de la clôture du soir
+  "/cloture":         "caisse.cloture",
   // Personnel
   "/rh/equipe":       "profil.view_team",
   "/rh/employe":      "profil.view_team",
@@ -73,6 +75,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/commandes":    ALL,
   "/stock":        ALL,
   "/inventaire":   ALL,
+  "/cloture":      ALL,
   "/session":      ALL,
   "/settings/account": ALL,
   "/settings/stock": MANAGERS,

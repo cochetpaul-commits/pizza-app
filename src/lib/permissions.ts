@@ -69,6 +69,12 @@ export const PERM_SECTIONS: PermSection[] = [
     ],
   },
   {
+    label: "Caisse",
+    permissions: [
+      { key: "caisse.cloture", label: "Saisir la clôture de caisse" },
+    ],
+  },
+  {
     label: "Personnel",
     permissions: [
       { key: "profil.view_team", label: "Voir les fiches employes" },
@@ -84,18 +90,21 @@ export const DEFAULT_PERMS: Record<PermRole, Record<string, PermValue>> = {
     "operations.recettes": true, "operations.edit_recettes": false,
     "achats.view": false, "achats.edit": true, "commandes.valider": false, "achats.inventaire": false,
     "profil.view_team": false, "heures.edit_team": false,
+    "caisse.cloture": false,
   },
   manager: {
     "performances.view": true, "performances.pilotage": true, "performances.show_money": true,
     "operations.recettes": true, "operations.edit_recettes": true,
     "achats.view": true, "achats.edit": true, "commandes.valider": true, "achats.inventaire": true,
     "profil.view_team": true, "heures.edit_team": true,
+    "caisse.cloture": true,
   },
   admin: {
     "performances.view": true, "performances.pilotage": true, "performances.show_money": true,
     "operations.recettes": true, "operations.edit_recettes": true,
     "achats.view": true, "achats.edit": true, "commandes.valider": true, "achats.inventaire": true,
     "profil.view_team": true, "heures.edit_team": true,
+    "caisse.cloture": true,
   },
 };
 
