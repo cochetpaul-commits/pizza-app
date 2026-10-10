@@ -9,7 +9,7 @@ import { VoletDroit } from "@/components/produits/BaseProduits";
 import { OSWALD } from "@/components/TuileProduit";
 import { Tuile } from "@/components/ui/Tuile";
 import { EtatVide } from "@/components/ui/EtatVide";
-import { TableauMobile } from "@/components/ui/TableauMobile";
+import { CelluleProduit, TableauMobile } from "@/components/ui/TableauMobile";
 import { couleurTexteSur, styleBarreCategorie } from "@/lib/styleCategories";
 import { VueFiches } from "./VueFiches";
 import { useDonneesCarte } from "./useDonneesCarte";
@@ -465,28 +465,24 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
   const ligneMobile = (a: ArticleCarte, enSection: boolean) => (
     <tr key={a.id} className={`ca-ligne${ouvert?.id === a.id ? " on" : ""}`} onClick={() => { setOuvertId(a.id); setRelierOuvert(false); }} style={{ cursor: "pointer" }}>
       <td style={{ ...TD_SEC, padding: 0, width: 4, background: infoCategorie(a.categorie).couleur }} />
-      <td style={{ ...TD_SEC, padding: "10px 8px 10px 10px", minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 13.5, lineHeight: 1.25 }}>{a.nom}</div>
-        <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[enSection ? null : infoCategorie(a.categorie).libelle, a.lien ? libelleLien(a) : "non relié"].filter(Boolean).join(" · ")}</div>
-      </td>
-      <td style={{ ...TD_SEC, padding: "10px 6px 10px 8px", textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-        <div style={{ fontWeight: 700 }}>{euros(a.prix_ttc)}</div>
-        <div style={{ fontSize: 12, marginTop: 2 }}><FoodCostTexte a={a} /></div>
-      </td>
+      <CelluleProduit style={{ ...TD_SEC, padding: "10px 6px 10px 10px" }} titre={a.nom}
+        droite={<><span style={{ fontWeight: 700 }}>{euros(a.prix_ttc)}</span><span style={{ fontSize: 12, marginLeft: 8 }}><FoodCostTexte a={a} /></span></>}>
+        <div style={{ fontSize: 11.5, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[enSection ? null : infoCategorie(a.categorie).libelle, a.lien ? libelleLien(a) : "non relié"].filter(Boolean).join(" · ")}</div>
+      </CelluleProduit>
       <td style={{ ...TD_SEC, padding: "10px 12px 10px 0", textAlign: "right", width: 24, color: FAIBLE, fontWeight: 700 }}>→</td>
     </tr>
   );
   const tableauMobile = (liste: ArticleCarte[], enSection: boolean) => (
-    <TableauMobile enSection={enSection} colonnes={[{ libelle: "Article" }, { libelle: "Prix · food cost", align: "right", largeur: 108 }, { largeur: 24 }]}>
+    <TableauMobile enSection={enSection} colonnes={[{ libelle: "Article" }, { libelle: "Prix · food cost", align: "right", largeur: 136 }, { largeur: 24 }]}>
       {liste.map((a) => ligneMobile(a, enSection))}
     </TableauMobile>
   );
 
   return (
-    <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 14, alignContent: "start" }}>
       <style>{`.ca-ligne:hover td{background:#f7f3ec}.ca-ligne.on td{background:rgba(212,119,90,0.12)}.ca-ligne:last-child td{border-bottom:0}`}</style>
 
-      <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, 1fr)" : "repeat(2, 1fr)", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", gap: 10 }}>
         <Tuile couleur="#1a1a1a" icone="lien" libelle="Articles reliés" valeur={<>{compteurs.relies} <span style={{ fontSize: 14, color: MUTED }}>/ {compteurs.total}</span></>} sous={`${compteurs.fiches} à une fiche, ${compteurs.produits} à un produit`} active={lien === "tous" && fc === "tous"} onClick={() => { setLien("tous"); setFc("tous"); }} />
         <Tuile icone="sans" libelle="Non reliés" valeur={String(compteurs.nonRelies)} sous={compteurs.messages ? `hors ${compteurs.messages} touche${compteurs.messages > 1 ? "s" : ""} « Messages » de la caisse` : "touches de caisse sans fiche ni produit"} couleur={compteurs.nonRelies ? ATTENTION : undefined} active={lien === "aucun"} onClick={() => { setLien(lien === "aucun" ? "tous" : "aucun"); setFc("tous"); }} />
         <Tuile icone="foodcost" libelle="Food cost cuisine" valeur={compteurs.fcMoyen != null ? pct(compteurs.fcMoyen) : "—"} sous={compteurs.parCat || "pizze, antipasti, cucina, dolci"} couleur={compteurs.fcMoyen != null ? (verdictFoodCost(compteurs.fcMoyen)?.couleur ?? undefined) : undefined} />
@@ -592,9 +588,6 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
           onFermer={() => { setOuvertId(null); setRelierOuvert(false); }} onRecharger={recharger} onEditer={onEditer}
           relierOuvert={relierOuvert} setRelierOuvert={setRelierOuvert} />
       )}
-      {!bureau && peutEcrire && (
-        <button type="button" onClick={() => onEditer({})} style={{ position: "fixed", right: 16, bottom: 86, zIndex: 90, height: 44, padding: "0 18px", borderRadius: 22, border: "none", background: ACCENT, color: "#fff", fontWeight: 700, fontSize: 14, boxShadow: "0 6px 18px rgba(0,0,0,0.18)", fontFamily: "inherit" }}>+ Fiche</button>
-      )}
     </div>
   );
 }
@@ -640,7 +633,7 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
 
   return (
     <div style={{ background: "#f2ede4", minHeight: "100vh" }}>
-      <div style={{ padding: bureau ? "18px 28px 60px" : "12px 14px 90px", boxSizing: "border-box", display: "grid", gap: 14, alignContent: "start" }}>
+      <div style={{ padding: bureau ? "18px 28px 60px" : "12px 14px 60px", boxSizing: "border-box", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 14, alignContent: "start" }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
           <div>
             <h1 style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: bureau ? 28 : 22, textTransform: "uppercase", letterSpacing: ".02em", margin: 0, lineHeight: 1.05, color: "#1a1a1a" }}>Carte</h1>
@@ -650,8 +643,8 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
                 : "Sauces, bases, fonds et empâtements : ce qui entre dans les fiches."}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3, overflowX: "auto", maxWidth: "100%" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", minWidth: 0, maxWidth: "100%" }}>
+            <span style={{ display: "flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3, overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
               {vues.map((v) => (
                 <button key={v.cle} type="button" onClick={() => setVueChoisie(v.cle)} title={v.libelle}
                   style={{ padding: "6px 12px", borderRadius: 8, border: "none", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", background: vue === v.cle ? "#fff" : "transparent", color: vue === v.cle ? "#1a1a1a" : MUTED, boxShadow: vue === v.cle ? "0 1px 4px rgba(0,0,0,0.08)" : "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -660,7 +653,7 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
                 </button>
               ))}
             </span>
-            {bureau && peutEcrire && (
+            {peutEcrire && (
               <button type="button" onClick={() => setEdition(vue === "preparations" ? { cat: "preparation" } : {})} style={{ ...BTN, background: ACCENT, color: "#fff", border: "none", fontWeight: 700 }}>+ Nouvelle fiche</button>
             )}
           </div>

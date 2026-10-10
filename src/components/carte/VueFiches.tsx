@@ -6,7 +6,7 @@ import { VoletDroit } from "@/components/produits/BaseProduits";
 import { OSWALD } from "@/components/TuileProduit";
 import { Tuile } from "@/components/ui/Tuile";
 import { EtatVide } from "@/components/ui/EtatVide";
-import { TableauMobile } from "@/components/ui/TableauMobile";
+import { CelluleProduit, TableauMobile } from "@/components/ui/TableauMobile";
 import { couleurTexteSur, styleBarreCategorie } from "@/lib/styleCategories";
 import type { DonneesCarte, EditionFiche } from "./Carte";
 import type { FicheCarte, ReponseCarte } from "@/app/api/carte/route";
@@ -290,20 +290,16 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
     return (
       <tr key={l.id} className="cf-ligne" onClick={() => ouvrir(l)} style={{ cursor: "pointer" }}>
         <td style={{ ...TD, padding: 0, width: 4, background: g?.couleur }} />
-        <td style={{ ...TD, padding: "10px 8px 10px 10px", minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 13.5, lineHeight: 1.25 }}>{l.nom}</div>
-          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[enSection ? null : g?.libelle, l.sous, l.statut ? STATUTS[l.statut]?.libelle : null].filter(Boolean).join(" · ")}</div>
-        </td>
-        <td style={{ ...TD, padding: "10px 6px 10px 8px", textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-          <div style={{ fontWeight: 700 }}>{valeur}</div>
-          {detail && <div style={{ fontSize: 12, marginTop: 2 }}>{detail}</div>}
-        </td>
+        <CelluleProduit style={{ ...TD, padding: "10px 6px 10px 10px" }} titre={l.nom}
+          droite={<><span style={{ fontWeight: 700 }}>{valeur}</span>{detail && <span style={{ fontSize: 12, marginLeft: 8 }}>{detail}</span>}</>}>
+          <div style={{ fontSize: 11.5, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[enSection ? null : g?.libelle, l.sous, l.statut ? STATUTS[l.statut]?.libelle : null].filter(Boolean).join(" · ")}</div>
+        </CelluleProduit>
         <td style={{ ...TD, padding: "10px 12px 10px 0", textAlign: "right", width: 24, color: FAIBLE, fontWeight: 700 }}>→</td>
       </tr>
     );
   };
   const tableauMobile = (liste: Ligne[], enSection: boolean) => (
-    <TableauMobile enSection={enSection} colonnes={[{ libelle: mode === "fiches" ? "Fiche" : "Préparation" }, { libelle: mode === "fiches" ? "Prix · food cost" : "Coût", align: "right", largeur: 108 }, { largeur: 24 }]}>
+    <TableauMobile enSection={enSection} colonnes={[{ libelle: mode === "fiches" ? "Fiche" : "Préparation" }, { libelle: mode === "fiches" ? "Prix · food cost" : "Coût", align: "right", largeur: 136 }, { largeur: 24 }]}>
       {liste.map((l) => ligneMobile(l, enSection))}
     </TableauMobile>
   );
@@ -311,10 +307,10 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
   const creation: EditionFiche = mode === "preparations" ? { cat: "preparation" } : {};
 
   return (
-    <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 14, alignContent: "start" }}>
       <style>{`.cf-ligne:hover td{background:#f7f3ec}.cf-ligne.on td{background:rgba(212,119,90,0.12)}.cf-ligne:last-child td{border-bottom:0}`}</style>
 
-      <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, 1fr)" : "repeat(2, 1fr)", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", gap: 10 }}>
         <Tuile couleur="#1a1a1a" icone="fiche" libelle={mode === "fiches" ? "Fiches techniques" : "Préparations"} valeur={String(compteurs.total)} sous={compteurs.autres ? `+ ${compteurs.autres} ${mode === "fiches" ? "vins" : "empâtements et anciennes fiches"}` : mode === "fiches" ? "pizze, cuisine, cocktails" : "sauces, bases, pâtes"} active={statut === "tous"} onClick={() => setStatut("tous")} />
         <Tuile icone="recu" couleur={BON} libelle="Publiées" valeur={String(compteurs.publiees)} sous="visibles par l'équipe dans la Carte" active={statut === "publiee"} onClick={() => setStatut(statut === "publiee" ? "tous" : "publiee")} />
         <Tuile icone="sans" couleur={compteurs.sansCout ? MAUVAIS : BON} libelle="Sans coût" valeur={String(compteurs.sansCout)} sous="ingrédients sans prix d'achat" active={statut === "sans_cout"} onClick={() => setStatut(statut === "sans_cout" ? "tous" : "sans_cout")} />
@@ -416,9 +412,6 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
 
       {ouverte?.fiche && !editionOuverte && (
         <VoletLecture fiche={ouverte.fiche} groupe={groupeParCle.get(ouverte.groupe) ?? { cle: "", libelle: "", couleur: FAIBLE, ordre: 0 }} peutEcrire={peutEcrire} onFermer={() => setOuvertId(null)} onEditer={(e) => { setOuvertId(null); onEditer(e); }} />
-      )}
-      {!bureau && peutEcrire && (
-        <button type="button" onClick={() => onEditer(creation)} style={{ position: "fixed", right: 16, bottom: 86, zIndex: 90, height: 44, padding: "0 18px", borderRadius: 22, border: "none", background: ACCENT, color: "#fff", fontWeight: 700, fontSize: 14, fontFamily: "inherit", boxShadow: "0 6px 18px rgba(0,0,0,0.18)", cursor: "pointer" }}>+ Fiche</button>
       )}
     </div>
   );
