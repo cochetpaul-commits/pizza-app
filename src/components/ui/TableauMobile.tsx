@@ -48,3 +48,29 @@ export function TableauMobile({ colonnes, enSection, sansCadre, entete = true, c
     </div>
   );
 }
+
+/**
+ * Cellule produit du téléphone (10/10/2026) : le nom prend toute la largeur de la ligne, et la
+ * colonne de droite (prix, stock, compteur de quantité…) descend sous le titre, à droite des
+ * détails. Remplace les deux colonnes « nom » et « valeur » : la cellule s'étend sur les deux
+ * (colSpan), les colonnes de la grille restant celles de l'en-tête.
+ */
+export function CelluleProduit({ titre, droite, colSpan = 2, style, children }: {
+  titre: ReactNode;
+  /** Colonne de droite, sous le titre */
+  droite?: ReactNode;
+  colSpan?: number;
+  style?: CSSProperties;
+  /** Détails sous le titre, à gauche */
+  children?: ReactNode;
+}) {
+  return (
+    <td colSpan={colSpan} style={style}>
+      <div style={{ fontWeight: 600, fontSize: 13.5, color: "#1a1a1a", lineHeight: 1.25 }}>{titre}</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 3 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
+        {droite != null && <div style={{ flexShrink: 0, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{droite}</div>}
+      </div>
+    </td>
+  );
+}

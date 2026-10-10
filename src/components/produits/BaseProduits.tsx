@@ -13,7 +13,7 @@ import { Tuile } from "@/components/ui/Tuile";
 import Link from "next/link";
 import { dateInventaire, fmtQte, type StockItem } from "@/lib/stockTypes";
 import { EtatVide } from "@/components/ui/EtatVide";
-import { TableauMobile } from "@/components/ui/TableauMobile";
+import { CelluleProduit, TableauMobile } from "@/components/ui/TableauMobile";
 import { articleDeFiche, type FicheConditionnement } from "@/lib/inventaire";
 import { libelleColisage } from "@/lib/commandeArticles";
 
@@ -129,8 +129,8 @@ function affichageProduit(x: Ingredient, offer: LatestOffer | undefined) {
   };
 }
 
-/** Ligne produit sur téléphone (10/10/2026, même gabarit que le tableau bureau en trois colonnes) :
- * liseré de la catégorie, case, nom + catégorie · sous-catégorie · fournisseur · zone + état, prix + stock à droite, chevron */
+/** Ligne produit sur téléphone (10/10/2026) : liseré de la catégorie, case, nom sur toute la largeur,
+ * puis catégorie · sous-catégorie · fournisseur · zone + état à gauche et prix + stock à droite, chevron */
 const LigneMobile = React.memo(function LigneMobile({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, sansCategorie, stock }: LigneProps) {
   const a = affichageProduit(x, offer);
   const sous = [x.sub_category, fournisseur?.name, x.storage_zone].filter(Boolean).join(" · ");
@@ -142,24 +142,22 @@ const LigneMobile = React.memo(function LigneMobile({ x, offer, fournisseur, ale
           <input type="checkbox" checked={selectionnee} onChange={() => onToggleSelect(x.id)} style={{ width: 15, height: 15, accentColor: a.couleurCat, cursor: "pointer", display: "block" }} />
         </td>
       )}
-      <td style={{ ...TD, padding: "9px 8px 9px 10px" }}>
-        <div style={{ fontWeight: 600, fontSize: 13.5, color: a.inactive ? "#999" : "#1a1a1a", lineHeight: 1.25 }}>
-          {x.name}{x.is_derived && <span style={{ marginLeft: 6, fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", verticalAlign: "middle" }}>DÉRIVÉ</span>}
-        </div>
-        <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+      <CelluleProduit style={{ ...TD, padding: "9px 4px 9px 10px" }}
+        titre={<span style={{ color: a.inactive ? "#999" : undefined }}>{x.name}{x.is_derived && <span style={{ marginLeft: 6, fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", verticalAlign: "middle" }}>DÉRIVÉ</span>}</span>}
+        droite={<>
+          <div style={{ fontWeight: 700, fontSize: 13, color: a.aUnPrix ? "#1a1a1a" : FAIBLE }}>{a.aUnPrix ? a.prix : "Aucun prix"}</div>
+          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>
+            {alerte ? <span style={{ fontWeight: 700, color: alerte.direction === "up" ? "#DC2626" : "#16A34A" }}>{alerte.direction === "up" ? "+" : "-"}{(Math.abs(alerte.change_pct) * 100).toFixed(0)} %</span>
+              : stock ? <>stock <Stock s={stock} compact /></> : a.colisage}
+          </div>
+        </>}>
+        <div style={{ fontSize: 11.5, color: MUTED, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           {a.etat && <Chip fond={a.etat.fond} couleur={a.etat.couleur}>{a.etat.libelle}</Chip>}
           <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {!sansCategorie && <span style={{ color: a.texteCat, fontWeight: 700 }}>{CAT_LABELS[x.category] ?? x.category}</span>}{sous ? (sansCategorie ? sous : ` · ${sous}`) : ""}
           </span>
         </div>
-      </td>
-      <td style={{ ...TD, padding: "9px 4px 9px 0", textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: a.aUnPrix ? "#1a1a1a" : FAIBLE }}>{a.aUnPrix ? a.prix : "Aucun prix"}</div>
-        <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>
-          {alerte ? <span style={{ fontWeight: 700, color: alerte.direction === "up" ? "#DC2626" : "#16A34A" }}>{alerte.direction === "up" ? "+" : "-"}{(Math.abs(alerte.change_pct) * 100).toFixed(0)} %</span>
-            : stock ? <>stock <Stock s={stock} compact /></> : a.colisage}
-        </div>
-      </td>
+      </CelluleProduit>
       <td style={{ ...TD, padding: "9px 10px 9px 2px", width: 18, color: FAIBLE, fontSize: 18, textAlign: "right" }} aria-hidden>›</td>
     </tr>
   );

@@ -72,7 +72,7 @@ const qteTexte = (n: number) => String(Math.round(n * 100) / 100).replace(".", "
 import { couleurRayon } from "@/lib/rayons";
 import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
 import { BoutonCrayon, Compteur } from "@/components/TuileProduit";
-import { TableauMobile } from "@/components/ui/TableauMobile";
+import { CelluleProduit, TableauMobile } from "@/components/ui/TableauMobile";
 
 /**
  * Aller-retour vers la fiche produit (admins, managers) : l'état de l'écran est gardé le temps de corriger
@@ -342,9 +342,22 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     return (
       <tr key={a.ingredient_id}>
         <td style={{ ...TD, padding: 0, width: 4, background: couleur }} />
-        <td style={TD}>
-          <div style={{ fontWeight: 600, color: "#1a1a1a", lineHeight: 1.25 }}>{a.nom}</div>
-          <div style={{ fontSize: 11.5, color: "#6f6656", marginTop: 2 }}>
+        <CelluleProduit style={{ ...TD, paddingRight: 4 }} titre={a.nom} droite={
+          <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+            {brouillon ? (total === 0 ? (
+              <button type="button" aria-label={`Ajouter ${a.nom}`} onClick={() => fixerMaPart(a, m, 1)} style={{
+                height: 36, minWidth: 60, padding: "0 14px", borderRadius: 18, border: "none", background: ACCENT, color: "#fff", fontSize: 15, fontWeight: 700,
+                cursor: "pointer", touchAction: "manipulation", fontFamily: "inherit",
+              }}>+ 1</button>
+            ) : (
+              <Compteur valeur={qteTexte(total)} moinsActif={maPart > 0}
+                onMoins={() => fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2))}
+                onPlus={() => fixerMaPart(a, m, Math.round((maPart + pas) * 2) / 2)} />
+            )) : <span style={{ fontWeight: 700 }}>{total > 0 ? qteTexte(total) : "—"}</span>}
+            {total > 0 && prix != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{euros(total * prix)}</span>}
+          </div>
+        }>
+          <div style={{ fontSize: 11.5, color: "#6f6656" }}>
             {unite}{prix != null ? ` · ${euros(prix)} HT` : ""}{a.ref ? ` · réf. ${a.ref}` : ""}
             {a.zones.length > 0 && <span style={{ display: "inline-flex", gap: 4, marginLeft: 6, verticalAlign: "middle" }}>{a.zones.map((z) => <span key={z.nom} className="pastille" style={{ "--pastille-c": z.couleur ?? "#8a8378" } as React.CSSProperties}>{libelleZone(z.nom)}</span>)}</span>}
           </div>
@@ -366,22 +379,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
               ))}
             </span>
           )}
-        </td>
-        <td style={{ ...TD, padding: "9px 4px 9px 0", textAlign: "right", whiteSpace: "nowrap" }}>
-          <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-            {brouillon ? (total === 0 ? (
-              <button type="button" aria-label={`Ajouter ${a.nom}`} onClick={() => fixerMaPart(a, m, 1)} style={{
-                height: 36, minWidth: 60, padding: "0 14px", borderRadius: 18, border: "none", background: ACCENT, color: "#fff", fontSize: 15, fontWeight: 700,
-                cursor: "pointer", touchAction: "manipulation", fontFamily: "inherit",
-              }}>+ 1</button>
-            ) : (
-              <Compteur valeur={qteTexte(total)} moinsActif={maPart > 0}
-                onMoins={() => fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2))}
-                onPlus={() => fixerMaPart(a, m, Math.round((maPart + pas) * 2) / 2)} />
-            )) : <span style={{ fontWeight: 700 }}>{total > 0 ? qteTexte(total) : "—"}</span>}
-            {total > 0 && prix != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{euros(total * prix)}</span>}
-          </div>
-        </td>
+        </CelluleProduit>
         <td style={{ ...TD, padding: "9px 8px 9px 2px", width: 30, textAlign: "right" }}>
           {peutCorrigerFiche && <BoutonCrayon onClick={() => void ouvrirFiche(a)} title="Ouvrir la fiche produit" />}
         </td>

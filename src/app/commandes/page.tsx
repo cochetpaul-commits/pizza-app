@@ -11,7 +11,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
 import { BarreCommande, MenuCommande } from "@/components/commandes/BarreCommande";
 import { BottomSheet } from "@/components/layout/BottomSheet";
-import { TableauMobile } from "@/components/ui/TableauMobile";
+import { CelluleProduit, TableauMobile } from "@/components/ui/TableauMobile";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { useBureau, useLarge } from "@/hooks/useBureau";
 import { CommandesBureau, type CommandeLigne } from "@/components/commandes/CommandesBureau";
@@ -1643,7 +1643,7 @@ function CommandesPage() {
     );
   }
 
-  /** Téléphone (10/10/2026) : même tableau en trois colonnes — nom + conditionnement · zone · prix + stock, quantité à droite, fiche */
+  /** Téléphone (10/10/2026) : nom sur toute la largeur, puis conditionnement · zone · prix + stock à gauche et quantité à droite, fiche */
   function renderLigneProduitMobile(item: CatalogItem, isFav: boolean, couleur: string) {
     const qty = Number(quantities[item.id] ?? 0);
     const hasQty = qty > 0;
@@ -1660,13 +1660,20 @@ function CommandesPage() {
     return (
       <tr key={item.id}>
         <td style={{ ...TDL, padding: 0, width: 4, background: couleur }} />
-        <td style={TDL}>
+        <CelluleProduit style={{ ...TDL, paddingRight: 4 }} titre={
           <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
             <button type="button" onClick={() => toggleFavori(item.id, isFav)} title={isFav ? "Retirer des habituels" : "Ajouter aux habituels"}
               style={{ background: "none", border: "none", fontSize: 12, cursor: "pointer", opacity: isFav ? 1 : 0.25, padding: 0, lineHeight: "17px", flexShrink: 0 }}>&#x2B50;</button>
-            <span style={{ fontWeight: 600, color: "#1a1a1a", lineHeight: 1.25 }}>{item.name}</span>
+            <span>{item.name}</span>
           </div>
-          {sous && <div style={{ fontSize: 11.5, color: "#6f6a61", marginTop: 2 }}>{sous}</div>}
+        } droite={
+          <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
+            {packCount > 0 && unitToggle(item)}
+            {total != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{total.toFixed(2).replace(".", ",")} €</span>}
+          </div>
+        }>
+          {sous && <div style={{ fontSize: 11.5, color: "#6f6a61" }}>{sous}</div>}
           {(stockVal != null || (si && si.qty_to_order > 0)) && (
             <div style={{ fontSize: 11.5, marginTop: 2 }}>
               {stockVal != null && <span style={{ fontWeight: 700, color: couleurStock }}>stock {stockVal}</span>}
@@ -1674,14 +1681,7 @@ function CommandesPage() {
               {si && si.qty_to_order > 0 && <span style={{ fontWeight: 700, color: "#2563EB" }}> · à commander {si.qty_to_order}</span>}
             </div>
           )}
-        </td>
-        <td style={{ ...TDL, padding: "9px 4px 9px 0", textAlign: "right", whiteSpace: "nowrap" }}>
-          <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-            <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
-            {packCount > 0 && unitToggle(item)}
-            {total != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{total.toFixed(2).replace(".", ",")} €</span>}
-          </div>
-        </td>
+        </CelluleProduit>
         <td style={{ ...TDL, padding: "9px 8px 9px 2px", width: 30 }}>
           <a href={`/ingredients?edit=${item.id}&back=${encodeURIComponent("/commandes")}`} title="Modifier la fiche produit"
             style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: 8, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", textDecoration: "none", fontWeight: 700, fontSize: 12 }}>→</a>

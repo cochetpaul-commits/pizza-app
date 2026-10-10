@@ -17,7 +17,7 @@ import { CATEGORIES, CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingre
 import { couleurRayon, rayonDuProduit, RAYON_AUTRES, RAYON_PREPARATIONS } from "@/lib/rayons";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { BoutonCrayon, BoutonCroix, Compteur, Conditionnement as CondLibelle } from "@/components/TuileProduit";
-import { TableauMobile } from "@/components/ui/TableauMobile";
+import { CelluleProduit, TableauMobile } from "@/components/ui/TableauMobile";
 import { useBureau, useLarge } from "@/hooks/useBureau";
 import { couleurTexte, styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie } from "@/lib/styleCategories";
 import { correspondRecherche, filtrerRecherche, normaliserRecherche } from "@/lib/rechercheTolerante";
@@ -472,8 +472,12 @@ function Feuille() {
     return (
       <tr key={l.id}>
         <td style={{ ...TD, padding: 0, width: 4, background: couleurCat }} />
-        <td style={TD}>
-          <div style={{ fontWeight: 600, color: l.inactive ? "#999" : "#1a1a1a", lineHeight: 1.25 }}>{l.nom_feuille ?? l.nom}</div>
+        <CelluleProduit style={{ ...TD, paddingRight: 2 }} titre={<span style={{ color: l.inactive ? "#999" : undefined }}>{l.nom_feuille ?? l.nom}</span>} droite={
+          <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            {contenu != null && compteur("colis", deuxChamps ? nomColis ?? "colis" : pluriel(l.unite ?? "colis", 2), !deuxChamps && auPoids ? 0.5 : 1)}
+            {(deuxChamps || contenu == null) && compteur("unites", pluriel(l.unite ?? "unités", 2), contenu == null && auPoids ? 0.5 : 1)}
+          </div>
+        }>
           {remarque && (
             <span style={{ display: "inline-block", marginTop: 3, fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 8, background: l.inactive ? "#fde7e7" : l.aVerifier ? "#fde7ef" : "#fdf3d4", color: l.inactive ? "#a12b2b" : l.aVerifier ? "#b0306a" : "#8a6a12" }}>
               {l.inactive ? (f ? "fiche désactivée" : "fiche supprimée") : l.aVerifier ? "fiche à vérifier" : "rattaché par ressemblance"}
@@ -492,13 +496,7 @@ function Feuille() {
               <button type="button" onClick={() => void basculerComptage(l)} style={{ ...lien, fontSize: 11.5 }}>compter par {c!.libelle.split(" ")[0]}</button>
             )}
           </div>
-        </td>
-        <td style={{ ...TD, padding: "8px 2px 8px 0", textAlign: "right", whiteSpace: "nowrap" }}>
-          <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-            {contenu != null && compteur("colis", deuxChamps ? nomColis ?? "colis" : pluriel(l.unite ?? "colis", 2), !deuxChamps && auPoids ? 0.5 : 1)}
-            {(deuxChamps || contenu == null) && compteur("unites", pluriel(l.unite ?? "unités", 2), contenu == null && auPoids ? 0.5 : 1)}
-          </div>
-        </td>
+        </CelluleProduit>
         <td style={{ ...TD, padding: "8px 6px 8px 0", width: 30, textAlign: "center" }}>
           <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
             <span title={etat === "erreur" ? "Pas enregistré" : etat === "attente" ? "Enregistrement…" : etat === "ok" ? "Enregistré" : ""} style={{ width: 8, height: 8, borderRadius: 4, background: etat === "erreur" ? "#DC2626" : etat === "attente" ? "#e0b44c" : etat === "ok" ? "#2D6A4F" : "transparent" }} />
