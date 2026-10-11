@@ -470,13 +470,93 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
     setDrafts(rest);
   };
 
+  // ── Catégories créées depuis la fiche ──
+  // Une catégorie ou sous-catégorie tapée compte même sans « Entrée » : sur iPhone il n'y a pas de
+  // touche évidente pour valider, et « Enregistrer » la crée au passage (vécu 11/10, fiche Espresso).
+  async function creerCategorie(nomBrut: string): Promise<string | null> {
+    const nom = nomBrut.trim();
+    if (!nom) return null;
+    const slug = nom.toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
+    if (!slug) return null;
+    const connue = categories.find(c => c.slug === slug || c.nom.trim().toLowerCase() === nom.toLowerCase());
+    if (connue) return connue.slug;
+    const { data, error } = await supabase.from("categories").insert({ nom, slug, couleur: "#999999", famille_id: "autre", sous_categories: [], sort_order: 99 }).select().single();
+    if (error) {
+      // Déjà créée ailleurs (autre appareil, cache) : on la reprend
+      const { data: exist } = await supabase.from("categories").select("*").eq("slug", slug).maybeSingle();
+      if (!exist) { showToast(`Catégorie non créée : ${error.message}`); return null; }
+      setCategories(prev => prev.some(c => c.slug === slug) ? prev : [...prev, exist as Categorie]);
+      return slug;
+    }
+    setCategories(prev => [...prev, data as Categorie]);
+    return slug;
+  }
+
+  async function creerSousCategorie(nomBrut: string, catSlug: string): Promise<string | null> {
+    const nom = nomBrut.trim();
+    if (!nom || !catSlug) return null;
+    const { data: row } = await supabase.from("categories").select("id, sous_categories").eq("slug", catSlug).maybeSingle();
+    const actuelles = ((row?.sous_categories ?? []) as string[]);
+    const deja = actuelles.find(s => s.trim().toLowerCase() === nom.toLowerCase());
+    if (row && !deja) {
+      const newSubs = [...actuelles, nom];
+      const { error } = await supabase.from("categories").update({ sous_categories: newSubs }).eq("id", row.id);
+      if (error) { showToast(`Sous-catégorie non créée : ${error.message}`); return null; }
+      setCategories(prev => prev.map(c => c.slug === catSlug ? { ...c, sous_categories: newSubs } : c));
+    }
+    const retenue = deja ?? nom;
+    setExistingSubCats(prev => ({ ...prev, [catSlug]: [...new Set([...(prev[catSlug] ?? []), retenue])].sort() }));
+    return retenue;
+  }
+
+  async function validerNouvelleCategorie() {
+    const slug = await creerCategorie(newCatName);
+    if (!slug) return;
+    const c = categories.find(cc => cc.slug === slug);
+    const f = familles.find(ff => ff.id === (c?.famille_id ?? "autre"));
+    update({ categorie_slug: slug, sous_categorie: "", tva: f?.tva_defaut ?? fiche.tva });
+    setNewCatName(""); setShowNewCat(false);
+  }
+
+  async function validerNouvelleSousCategorie() {
+    let catSlug = fiche.categorie_slug;
+    if (!catSlug && showNewCat && newCatName.trim()) {
+      const slug = await creerCategorie(newCatName);
+      if (!slug) return;
+      catSlug = slug;
+      update({ categorie_slug: slug });
+      setNewCatName(""); setShowNewCat(false);
+    }
+    if (!catSlug) { showToast("Choisis d'abord la catégorie"); return; }
+    const sc = await creerSousCategorie(newSubCatName, catSlug);
+    if (!sc) return;
+    update({ sous_categorie: sc });
+    setNewSubCatName(""); setShowNewSubCat(false);
+  }
+
   // ── Save to DB ──
   async function handleSave() {
     if (!fiche.nom.trim()) { showToast("Le nom est requis"); return; }
-    if (!fiche.categorie_slug) { showToast("Choisis une catégorie (pizza, plat, préparation…)"); return; }
+    let catSlug = fiche.categorie_slug;
+    let sousCat = fiche.sous_categorie;
+    // Catégorie / sous-catégorie tapées mais pas encore validées : on les crée maintenant
+    if (showNewCat && newCatName.trim()) {
+      const slug = await creerCategorie(newCatName);
+      if (!slug) return;
+      catSlug = slug;
+      sousCat = "";
+      setNewCatName(""); setShowNewCat(false);
+    }
+    if (!catSlug) { showToast("Choisis une catégorie (pizza, plat, préparation…)"); return; }
+    if (showNewSubCat && newSubCatName.trim()) {
+      const sc = await creerSousCategorie(newSubCatName, catSlug);
+      if (!sc) return;
+      sousCat = sc;
+      setNewSubCatName(""); setShowNewSubCat(false);
+    }
+    if (catSlug !== fiche.categorie_slug || sousCat !== fiche.sous_categorie) update({ categorie_slug: catSlug, sous_categorie: sousCat });
     setSaving(true);
 
-    const catSlug = fiche.categorie_slug;
     const isEdit = !!fiche.id;
     const savePainterCost = patonCost;
     const saveTotalCost = coutRecetteTotal(fiche.lignes, savePainterCost);
@@ -487,7 +567,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
     const recData: Record<string, unknown> = {
       name: fiche.nom.trim(),
       category: catSlug,
-      sous_categorie: fiche.sous_categorie || null,
+      sous_categorie: sousCat || null,
       statut: fiche.statut,
       in_catalogue: fiche.statut === "publiee",
       is_active: true,
@@ -709,22 +789,17 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
             <label style={LBL}>Nom</label>
             <input type="text" value={fiche.nom} onChange={e => update({ nom: e.target.value })} placeholder="Ex : BURRATA" style={{ ...INPUT, fontWeight: 700, fontSize: 17 }} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 10 }}>
             <div>
               <label style={LBL}>Catégorie</label>
               {showNewCat ? (
                 <div style={{ display: "flex", gap: 6 }}>
-                  <input type="text" autoFocus value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nom de la catégorie" style={{ ...INPUT, borderColor: COLORS.terra }}
-                    onKeyDown={async e => {
-                      if (e.key === "Enter" && newCatName.trim()) {
-                        const slug = newCatName.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüç]+/g, "_").replace(/^_|_$/g, "");
-                        const { data, error } = await supabase.from("categories").insert({ nom: newCatName.trim(), slug, couleur: "#999999", famille_id: "autre", sous_categories: [], sort_order: 99 }).select().single();
-                        if (error) { alert(`Catégorie non créée : ${error.message}`); return; }
-                        if (data) { setCategories(prev => [...prev, data as Categorie]); update({ categorie_slug: slug, sous_categorie: "" }); }
-                        setNewCatName(""); setShowNewCat(false);
-                      }
+                  <input type="text" autoFocus value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nom de la catégorie" enterKeyHint="done" style={{ ...INPUT, borderColor: COLORS.terra, minWidth: 0 }}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && newCatName.trim()) { e.preventDefault(); void validerNouvelleCategorie(); }
                       if (e.key === "Escape") { setNewCatName(""); setShowNewCat(false); }
                     }} />
+                  <button type="button" disabled={!newCatName.trim()} onClick={() => void validerNouvelleCategorie()} style={{ ...PETIT, height: 44, background: COLORS.terra, color: "#fff", borderColor: COLORS.terra, opacity: newCatName.trim() ? 1 : 0.5 }}>OK</button>
                   <button type="button" onClick={() => { setNewCatName(""); setShowNewCat(false); }} style={{ ...PETIT, height: 44 }}>×</button>
                 </div>
               ) : (
@@ -746,21 +821,12 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
               <label style={LBL}>Sous-catégorie</label>
               {showNewSubCat ? (
                 <div style={{ display: "flex", gap: 6 }}>
-                  <input type="text" autoFocus value={newSubCatName} onChange={e => setNewSubCatName(e.target.value)} placeholder="Nom de la sous-catégorie" style={{ ...INPUT, borderColor: COLORS.terra }}
-                    onKeyDown={async e => {
-                      if (e.key === "Enter" && newSubCatName.trim()) {
-                        const scName = newSubCatName.trim();
-                        if (cat) {
-                          const newSubs = [...(cat.sous_categories ?? []), scName];
-                          await supabase.from("categories").update({ sous_categories: newSubs }).eq("id", cat.id);
-                          setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, sous_categories: newSubs } : c));
-                        }
-                        setExistingSubCats(prev => ({ ...prev, [fiche.categorie_slug]: [...new Set([...(prev[fiche.categorie_slug] ?? []), scName])].sort() }));
-                        update({ sous_categorie: scName });
-                        setNewSubCatName(""); setShowNewSubCat(false);
-                      }
+                  <input type="text" autoFocus value={newSubCatName} onChange={e => setNewSubCatName(e.target.value)} placeholder="Nom de la sous-catégorie" enterKeyHint="done" style={{ ...INPUT, borderColor: COLORS.terra, minWidth: 0 }}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && newSubCatName.trim()) { e.preventDefault(); void validerNouvelleSousCategorie(); }
                       if (e.key === "Escape") { setNewSubCatName(""); setShowNewSubCat(false); }
                     }} />
+                  <button type="button" disabled={!newSubCatName.trim()} onClick={() => void validerNouvelleSousCategorie()} style={{ ...PETIT, height: 44, background: COLORS.terra, color: "#fff", borderColor: COLORS.terra, opacity: newSubCatName.trim() ? 1 : 0.5 }}>OK</button>
                   <button type="button" onClick={() => { setNewSubCatName(""); setShowNewSubCat(false); }} style={{ ...PETIT, height: 44 }}>×</button>
                 </div>
               ) : (
