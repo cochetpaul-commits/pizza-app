@@ -21,7 +21,7 @@ import { openApiFile } from "@/lib/fetchApi";
 import { couleurTexte } from "@/lib/styleCategories";
 import { useBureau } from "@/hooks/useBureau";
 import { fermerOffresActives } from "@/lib/offerClosing";
-import { chargerReferentielFiche, invaliderReferentielFiche } from "@/lib/referentielFiche";
+import { chargerReferentielFicheSur, invaliderReferentielFiche } from "@/lib/referentielFiche";
 
 // ── Brouillons non enregistrés ──────────────────────────────────────
 // Le 03/09/2026, des fiches saisies sur un appareil dont la session était
@@ -106,7 +106,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
 
   const [fiche, setFiche] = useState<FicheState>(() => ({
     ...defaultFiche(etabSlug),
-    ...(initialCategorie ? { categorie_slug: initialCategorie } : {}),
+    // Nouvelle fiche sans catégorie imposée : rien de présélectionné (avant : « Pizza » d'office), le choix est demandé
+    ...(initialCategorie ? { categorie_slug: initialCategorie } : recipeId ? {} : { categorie_slug: "" }),
     comme_ingredient: autoCommeIngredient(initialCategorie, initialSousCategorie),
     ...(initialSousCategorie ? { sous_categorie: initialSousCategorie } : {}),
     ...(initialNom ? { nom: initialNom } : {}),
@@ -137,7 +138,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   useEffect(() => {
     (async () => {
     const [ref, recRes, lignesRes] = await Promise.all([
-      chargerReferentielFiche(etabSlug),
+      chargerReferentielFicheSur(etabSlug),
       recipeId ? supabase.from("kitchen_recipes").select("*").eq("id", recipeId).single() : Promise.resolve(null),
       recipeId ? supabase.from("kitchen_recipe_lines").select("*").eq("recipe_id", recipeId) : Promise.resolve(null),
     ]);
@@ -472,6 +473,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   // ── Save to DB ──
   async function handleSave() {
     if (!fiche.nom.trim()) { showToast("Le nom est requis"); return; }
+    if (!fiche.categorie_slug) { showToast("Choisis une catégorie (pizza, plat, préparation…)"); return; }
     setSaving(true);
 
     const catSlug = fiche.categorie_slug;
@@ -733,6 +735,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
                   const f = familles.find(ff => ff.id === (c?.famille_id ?? "autre"));
                   update({ categorie_slug: slug, sous_categorie: "", tva: f?.tva_defaut ?? 10 });
                 }}>
+                  {!fiche.categorie_slug && <option value="" disabled>Choisir…</option>}
                   {fiche.categorie_slug && !categories.some(c => c.slug === fiche.categorie_slug) && <option value={fiche.categorie_slug}>{fiche.categorie_slug}</option>}
                   {categories.map(c => <option key={c.slug} value={c.slug}>{c.nom}</option>)}
                   <option value="__new__">+ Créer une catégorie</option>
