@@ -204,12 +204,26 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
 - [x] *(05/10/2026)* 40 warnings ESLint restants : déjà à 0 (vérifié,
   `eslint src --max-warnings 0` passe sans rien à corriger — probablement
   réglé au fil des exécutions précédentes sans être recoché ici).
-- `babel-plugin-react-compiler` en devDeps sans config visible — confirmé le
-  05/10/2026 : aucun `babel.config.*`/`.babelrc`, aucune mention dans
-  `next.config.ts`, aucun usage dans `src/` → dépendance morte, à retirer
-  (`npm uninstall babel-plugin-react-compiler`) lors d'une prochaine
-  exécution.
+- [x] *(12/10/2026)* `babel-plugin-react-compiler` en devDeps sans config
+  visible — retiré (`npm uninstall babel-plugin-react-compiler`), confirmé
+  sans impact (build, tsc, eslint, tests tous verts).
 - Vignettes `<img>` brutes dans CatalogueSalleTab et StepsList → `next/image`.
+- **Découverte (12/10/2026) — code mort probable dans `ventes/page.tsx`** :
+  tout le bloc « graphique tendance par catégorie » (états `catTrendData`,
+  `catTrendRange`, `catTrendFilterCat`, `catTrendFilterProd`, `prodTrendData`,
+  `trendCatProducts`, `catTrendChartRef`, les 2 `useEffect` qui vont chercher
+  `/api/ventes/marges/trend`, et le `useEffect` de ~175 lignes qui construit
+  et dessine le graphique Chart.js — lignes ~258-567) n'a **aucun** `<canvas
+  ref={catTrendChartRef}>` dans le JSX de la page : la condition
+  `if (!catTrendChartRef.current || ...) return;` est donc toujours vraie et
+  le graphique n'est jamais dessiné. Le code fait quand même 2 appels réseau
+  à chaque ouverture de `/ventes` pour rien. C'est probablement un chantier
+  commencé puis non branché à l'écran (le point n°1 de cette liste parlait
+  encore de ce graphique comme s'il était affiché — ce n'est pas le cas).
+  **Pas supprimé cette fois** : pourrait être un travail en cours de Paul/Pierre
+  pour une future UI, décision à trancher par eux. Si l'intention est
+  abandonnée, supprimer tout le bloc (states + 2 effects + le rendu de
+  graphique) fera gagner ~190 lignes et 2 requêtes réseau inutiles par visite.
 
 ## Règles pour la suite (leçons de cette nuit)
 
