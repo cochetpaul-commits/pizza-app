@@ -80,6 +80,8 @@ export type FicheState = {
   cooked_weight_g: number | null;
   /** La fiche produit un ingrédient « recette maison » (sirop, sauce, base…) réutilisable dans d'autres fiches */
   comme_ingredient: boolean;
+  /** Ingrédient maison compté à la pièce (une tasse d'espresso, une boule, une portion) plutôt qu'au kilo */
+  ingredient_par_piece: boolean;
   output_ingredient_id: string | null;
   // Multi-prix: [{mode: "portion"|"kg"|"piece"|"litre", prix: number, tva: number, label?: string}]
   prix_lignes: PrixLigne[];
@@ -226,6 +228,7 @@ export function defaultFiche(etabSlug: string): FicheState {
     sell_price_per_portion: null,
     cooked_weight_g: null,
     comme_ingredient: false,
+    ingredient_par_piece: false,
     output_ingredient_id: null,
     prix_lignes: [],
     description: "",

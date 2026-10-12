@@ -35,6 +35,9 @@ type DraftEntry = {
 // Une fiche de préparation (sirop, sauce, base…) sert d'ingrédient à d'autres fiches
 const autoCommeIngredient = (cat?: string | null, sc?: string | null) =>
   /^(preparation|production|sauce)$/i.test(cat ?? "") || /sirop|sauce|base|pr[ée]pa|infusion|pur[ée]e/i.test(sc ?? "");
+// Ingrédient maison compté à la pièce : son prix d'achat est enregistré « par pièce »
+const UNITES_PIECE = ["piece", "pièce", "unite", "unité", "pc", "pcs", "tasse", "bouteille"];
+const estParPiece = (label: unknown) => UNITES_PIECE.includes(String(label ?? "").toLowerCase().trim());
 const ARCHIVE_TTL_MS = 72 * 60 * 60 * 1000;
 const archiveKey = (etabSlug: string) => `fiche-drafts:${etabSlug}`;
 function readArchive(etabSlug: string): DraftEntry[] {
@@ -195,6 +198,30 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       // Enrich CPU with ingredient meta (density, piece weight)
       for (const i of ingList) {
         const id = i.id as string;
+        // Fallback: purchase_price
+        const cpuOffre = cpuMap[id];
+        if (!cpuOffre || (!cpuOffre.g && !cpuOffre.ml && !cpuOffre.pcs)) {
+          const pp = Number(i.purchase_price) || 0;
+          const pu = Number(i.purchase_unit) || 1;
+          const pul = String(i.purchase_unit_label ?? "").toLowerCase().trim();
+          if (pp > 0 && pu > 0) {
+            const perUnit = pp / pu;
+            if (pul === "kg") cpuMap[id] = { g: perUnit / 1000 };
+            else if (pul === "g") cpuMap[id] = { g: perUnit };
+            else if (pul === "l" || pul === "litre") cpuMap[id] = { ml: perUnit / 1000 };
+            else if (pul === "cl") cpuMap[id] = { ml: perUnit / 10 };
+            else if (pul === "ml") cpuMap[id] = { ml: perUnit };
+            else if (estParPiece(pul)) cpuMap[id] = { pcs: perUnit };
+            else cpuMap[id] = { g: perUnit / 1000 }; // default: treat as kg
+          }
+        }
+        // Fallback: cost_per_unit (generated column, €/g)
+        if (!cpuMap[id] || (!cpuMap[id].g && !cpuMap[id].ml && !cpuMap[id].pcs)) {
+          const costPU = Number(i.cost_per_unit) || 0;
+          if (costPU > 0) cpuMap[id] = { g: costPU };
+        }
+        // Conversions (densité, poids pièce), aussi sur le prix d'achat de repli : une recette maison
+        // au kilo avec un poids par portion se compte alors à la pièce (1 tasse = 14 g de café)
         let cpu = cpuMap[id];
         if (cpu) {
           cpu = enrichCpuWithConversions({
@@ -207,27 +234,6 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
             cpu = { ...cpu, ml: cpu.pcs / pvml };
           }
           cpuMap[id] = cpu;
-        }
-        // Fallback: purchase_price
-        if (!cpu || (!cpu.g && !cpu.ml && !cpu.pcs)) {
-          const pp = Number(i.purchase_price) || 0;
-          const pu = Number(i.purchase_unit) || 1;
-          const pul = String(i.purchase_unit_label ?? "").toLowerCase().trim();
-          if (pp > 0 && pu > 0) {
-            const perUnit = pp / pu;
-            if (pul === "kg") cpuMap[id] = { g: perUnit / 1000 };
-            else if (pul === "g") cpuMap[id] = { g: perUnit };
-            else if (pul === "l" || pul === "litre") cpuMap[id] = { ml: perUnit / 1000 };
-            else if (pul === "cl") cpuMap[id] = { ml: perUnit / 10 };
-            else if (pul === "ml") cpuMap[id] = { ml: perUnit };
-            else if (pul === "bouteille" || pul === "piece" || pul === "pièce" || pul === "unite" || pul === "unité") cpuMap[id] = { pcs: perUnit };
-            else cpuMap[id] = { g: perUnit / 1000 }; // default: treat as kg
-          }
-        }
-        // Fallback: cost_per_unit (generated column, €/g)
-        if (!cpuMap[id] || (!cpuMap[id].g && !cpuMap[id].ml && !cpuMap[id].pcs)) {
-          const costPU = Number(i.cost_per_unit) || 0;
-          if (costPU > 0) cpuMap[id] = { g: costPU };
         }
       }
 
@@ -245,6 +251,9 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
         const cat = String(i.category ?? "");
         if (["vins", "spiritueux", "biere", "soft", "liqueurs", "sirops"].includes(cat) && cpu.ml != null && cpu.ml > 0) {
           base = "cl"; prixBase = cpu.ml * 10;
+        }
+        if (i.source === "recette_maison" && estParPiece(i.purchase_unit_label) && cpu.pcs != null && cpu.pcs > 0) {
+          base = "pc"; prixBase = cpu.pcs;
         }
         return {
           id,
@@ -270,7 +279,9 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           piece_weight_g: (i.piece_weight_g as number) ?? null,
         };
         const pvml = (i.piece_volume_ml as number) ?? null;
-        const label = formatCpuLabel(cpu, meta, pvml, null);
+        const label = i.source === "recette_maison" && estParPiece(i.purchase_unit_label) && cpu.pcs
+          ? `${cpu.pcs.toFixed(2).replace(".", ",")} € la pièce`
+          : formatCpuLabel(cpu, meta, pvml, null);
         if (label && label !== "Prix ND") labelMap[id] = label;
         metaMap[id] = buildRecipeMeta(
           i as unknown as Parameters<typeof buildRecipeMeta>[0],
@@ -336,6 +347,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
             sell_price_per_portion: rec.sell_price_per_portion ? Number(rec.sell_price_per_portion) : null,
             cooked_weight_g: rec.cooked_weight_g ? Number(rec.cooked_weight_g) : null,
             comme_ingredient: !!rec.output_ingredient_id,
+            ingredient_par_piece: estParPiece(ingList.find(x => x.id === rec.output_ingredient_id)?.purchase_unit_label),
             output_ingredient_id: (rec.output_ingredient_id as string) ?? null,
             prix_lignes: Array.isArray(rec.prix_lignes) ? rec.prix_lignes as PrixLigne[] : [],
             description: (rec.description_courte as string) ?? "",
@@ -647,9 +659,12 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
         const payload = {
           name: fiche.nom.trim(),
           category: /sirop/i.test(fiche.sous_categorie ?? "") ? "sirops" : "preparation",
-          purchase_price: costKg, purchase_unit: 1, purchase_unit_label: "kg", purchase_unit_name: "kg",
+          ...(fiche.ingredient_par_piece
+            ? { purchase_price: saveCostPerPortion > 0 ? Math.round(saveCostPerPortion * 10000) / 10000 : null, purchase_unit: 1, purchase_unit_label: "pièce", purchase_unit_name: "pièce", default_unit: "pcs" }
+            : { purchase_price: costKg, purchase_unit: 1, purchase_unit_label: "kg", purchase_unit_name: "kg", default_unit: "g" }),
           source: "recette_maison", recipe_id: savedId, is_active: true, status: "validated",
-          piece_weight_g: fiche.portions > 1 && wRef > 0 ? Math.round((wRef / fiche.portions) * 100) / 100 : null,
+          // Poids d'une portion : permet de compter l'ingrédient à la pièce dans une autre fiche
+          piece_weight_g: wRef > 0 ? Math.round((wRef / Math.max(1, fiche.portions)) * 100) / 100 : null,
           establishments: (fiche.establishments ?? []).map((e: string) => (e.includes("piccola") ? "piccola" : "bellomio")),
           ...(liquide ? { density_g_per_ml: 1 } : {}),
         };
@@ -657,7 +672,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           const { error: e1 } = await withTimeout(supabase.from("ingredients").update(payload).eq("id", ingId));
           if (e1) showToast("Fiche enregistrée, mais l'ingrédient maison n'a pas pu être mis à jour : " + e1.message);
         } else {
-          const { data: cree, error: e2 } = await withTimeout(supabase.from("ingredients").insert({ ...payload, default_unit: "g", allergens: null, supplier_id: null, etablissement_id: resolvedEtab?.id ?? null }).select("id").single());
+          const { data: cree, error: e2 } = await withTimeout(supabase.from("ingredients").insert({ ...payload, allergens: null, supplier_id: null, etablissement_id: resolvedEtab?.id ?? null }).select("id").single());
           if (e2) showToast("Fiche enregistrée, mais l'ingrédient maison n'a pas pu être créé : " + e2.message);
           ingId = (cree as { id: string } | null)?.id ?? null;
         }
@@ -1087,7 +1102,18 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
               )}
             </div>
           )}
-          <Bascule titre="Utilisable comme ingrédient" aide="Pour une sauce, une base, une pâte reprise dans d'autres fiches : elle apparaît dans la recherche d'ingrédients avec son prix au kilo." actif={!!fiche.comme_ingredient} onChange={v => update({ comme_ingredient: v })} />
+          <Bascule titre="Utilisable comme ingrédient" aide="Pour une sauce, une base, un espresso repris dans d'autres fiches : elle apparaît dans la recherche d'ingrédients, au kilo ou à la pièce." actif={!!fiche.comme_ingredient} onChange={v => update({ comme_ingredient: v })} />
+          {fiche.comme_ingredient && (
+            <div style={{ display: "grid", gap: 6 }}>
+              <div style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 12, padding: 3, gap: 3, width: "fit-content" }}>
+                <button type="button" onClick={() => update({ ingredient_par_piece: false })} style={pilule(!fiche.ingredient_par_piece)}>Au kilo</button>
+                <button type="button" onClick={() => update({ ingredient_par_piece: true })} style={pilule(!!fiche.ingredient_par_piece)}>À la pièce</button>
+              </div>
+              <div style={NOTE}>{fiche.ingredient_par_piece
+                ? `1 pièce = 1 ${fam.portions_label} de cette fiche (une tasse, une boule…) : ${eur(costPerPortion)}. Dans une autre fiche, on l'ajoute en « pcs ».`
+                : `Prix au kilo calculé sur le poids de la recette${fiche.cooked_weight_g ? " cuite" : ""}. Pour une tasse ou une boule, choisis « À la pièce ».`}</div>
+            </div>
+          )}
         </div>
 
         {/* PIED */}
