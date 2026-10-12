@@ -42,6 +42,16 @@ describe("fond de caisse", () => {
     expect(r2.incomplet).toBeGreaterThan(0);
   });
 
+  it("12/10 réel : fond au centime, billet de 20 € du fond idéal gardé", () => {
+    const c = { "10": 5, "20": 5, "50": 4, "100": 12, "200": 8, "500": 2, "1000": 11, "2000": 3, "5000": 2 };
+    const r = composerFond(c, 100);
+    expect(r.totalLaisse).toBe(10000);
+    expect(r.totalSorti).toBe(21150);
+    expect(r.laisser["2000"]).toBe(1);
+    expect(r.laisser["1000"]).toBe(4); // 41,50 € de pièces et de 5 € : il faut un 10 € de plus et rendre 1,50 € de pièces
+    expect(r.laisser["5000"]).toBeUndefined();
+  });
+
   it("ce qui manque pour refaire le fond idéal", () => {
     const c = idealEnComptage();
     c["100"] = 10; c["1"] = 0;

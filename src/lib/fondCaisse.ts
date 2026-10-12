@@ -46,26 +46,45 @@ export type CompositionFond = {
 
 const lire = (c: Comptage, k: number) => Math.max(0, Math.floor(Number(c[String(k)]) || 0));
 
-/** Une combinaison exacte de `cible` avec les coupures disponibles, petite monnaie d'abord (null si impossible) */
-function combinaisonExacte(dispo: Comptage, cible: number): Comptage | null {
+/**
+ * La meilleure combinaison exacte de `cible` avec les coupures du tiroir (null si impossible).
+ * Chaque coupure prise dans la limite du fond idéal vaut beaucoup ; au-delà, la petite monnaie
+ * vaut plus que les gros billets. Sac à dos par coupure (14 coupures × montant en centimes).
+ * Vécu 12/10 : le remplissage pas à pas ratait le fond au centime (50 c manquants) et la reprise
+ * oubliait le billet de 20 € du fond idéal.
+ */
+function meilleureCombinaison(dispo: Comptage, cible: number, ideal: Record<number, number>): Comptage | null {
   if (cible <= 0) return {};
-  const de = new Array<number>(cible + 1).fill(0);   // coupure utilisée pour atteindre ce montant
-  const atteint = new Array<boolean>(cible + 1).fill(false);
-  atteint[0] = true;
-  for (const k of [...COUPURES].reverse()) {
-    const n = lire(dispo, k);
-    if (!n) continue;
-    // Somme bornée classique : nombre de pièces de k utilisées pour atteindre m (0 si déjà atteint sans elles)
-    const utilise = new Array<number>(cible + 1).fill(0);
-    for (let m = k; m <= cible; m++) {
-      if (!atteint[m] && atteint[m - k] && utilise[m - k] < n) {
-        atteint[m] = true; de[m] = k; utilise[m] = utilise[m - k] + 1;
+  const ordre = [...COUPURES].reverse(); // petite monnaie d'abord
+  const IMPOSSIBLE = -Infinity;
+  let score = new Float64Array(cible + 1).fill(IMPOSSIBLE);
+  score[0] = 0;
+  const choix: Int16Array[] = [];
+  ordre.forEach((k, rang) => {
+    const n = Math.min(lire(dispo, k), Math.floor(cible / k));
+    const q = ideal[k] ?? 0;
+    const valeur = (j: number) => Math.min(j, q) * 1e6 + Math.max(0, j - q) * (ordre.length - rang);
+    const suivant = new Float64Array(cible + 1).fill(IMPOSSIBLE);
+    const pris = new Int16Array(cible + 1);
+    for (let m = 0; m <= cible; m++) {
+      for (let j = 0; j <= n && j * k <= m; j++) {
+        const avant = score[m - j * k];
+        if (avant === IMPOSSIBLE) continue;
+        const v = avant + valeur(j);
+        if (v > suivant[m]) { suivant[m] = v; pris[m] = j; }
       }
     }
-  }
-  if (!atteint[cible]) return null;
+    score = suivant;
+    choix.push(pris);
+  });
+  if (score[cible] === IMPOSSIBLE) return null;
   const out: Comptage = {};
-  for (let m = cible; m > 0; m -= de[m]) out[String(de[m])] = (out[String(de[m])] ?? 0) + 1;
+  let m = cible;
+  for (let i = ordre.length - 1; i >= 0; i--) {
+    const j = choix[i][m];
+    if (j > 0) out[String(ordre[i])] = j;
+    m -= j * ordre[i];
+  }
   return out;
 }
 
@@ -79,14 +98,12 @@ export function composerFond(comptage: Comptage, fondEuros: number, ideal: Recor
   if (compte <= fond) {
     for (const k of COUPURES) prendre(k, lire(comptage, k));
   } else {
-    // 1. Le fond idéal, petite monnaie d'abord
-    for (const k of [...COUPURES].reverse()) prendre(k, Math.min(lire(comptage, k), ideal[k] ?? 0, Math.floor((fond - total) / k)));
-    // 2. Compléter avec le reste, petite monnaie d'abord
-    for (const k of [...COUPURES].reverse()) prendre(k, Math.min(lire(comptage, k) - (laisser[String(k)] ?? 0), Math.floor((fond - total) / k)));
-    // 3. Pas au centime près (ex. il reste 1 € à faire et plus que des pièces de 2 €) : combinaison exacte
-    if (total !== fond) {
-      const exacte = combinaisonExacte(comptage, fond);
-      if (exacte) { laisser = exacte; total = fond; }
+    const meilleure = meilleureCombinaison(comptage, fond, ideal);
+    if (meilleure) { laisser = meilleure; total = fond; }
+    else {
+      // Pas de combinaison au centime : au plus près, fond idéal puis petite monnaie
+      for (const k of [...COUPURES].reverse()) prendre(k, Math.min(lire(comptage, k), ideal[k] ?? 0, Math.floor((fond - total) / k)));
+      for (const k of [...COUPURES].reverse()) prendre(k, Math.min(lire(comptage, k) - (laisser[String(k)] ?? 0), Math.floor((fond - total) / k)));
     }
   }
 
