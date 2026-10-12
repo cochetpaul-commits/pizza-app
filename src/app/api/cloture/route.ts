@@ -48,6 +48,7 @@ export async function PUT(req: NextRequest) {
   const resultat = calculerCloture(body.saisie);
   const { data: existante } = await supabaseAdmin.from("clotures").select("statut").eq("etablissement_id", a.etabId).eq("jour", body.jour).maybeSingle();
   if (body.valider && resultat.niveau !== "ok") return NextResponse.json({ error: "La caisse ne tombe pas juste : corrige d'abord l'écart, puis recopie les montants Popina." }, { status: 400 });
+  if (body.valider && resultat.manquePourValider.length) return NextResponse.json({ error: `Pour valider, il manque ${resultat.manquePourValider.join(" et ")}.` }, { status: 400 });
   const maintenant = new Date().toISOString();
   const ligne = {
     etablissement_id: a.etabId, jour: body.jour, saisie: body.saisie, resultat, niveau: resultat.niveau,

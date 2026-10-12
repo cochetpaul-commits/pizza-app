@@ -6,6 +6,7 @@ import { useBureau } from "@/hooks/useBureau";
 import { fetchApi } from "@/lib/fetchApi";
 import { calculerCloture, eur, lireMontant, recapCloture, VIDE, type SaisieCloture } from "@/lib/cloture";
 import { aideCloture, heureParis, jourService, lireExportFlatpay, type TransactionFlatpay } from "@/lib/flatpay";
+import { COUPURES, estBillet, libelleCoupure, listerCoupures, type Comptage } from "@/lib/fondCaisse";
 
 /**
  * Clôture de caisse du soir, Bello Mio (10/10/2026). Déroulé : le Z du TPE sort, l'équipe recopie
@@ -36,24 +37,29 @@ const CHAMPS_POPINA: Champ[] = [
   { cle: "conecs", libelle: "Carte Connecs" },
   { cle: "conecsNb", libelle: "Nombre de Connecs", aide: "Le chiffre devant « Carte Connecs »", entier: true },
   { cle: "amex", libelle: "American Express" },
-  { cle: "especes", libelle: "Espèces" },
+  { cle: "especes", libelle: "Espèces", aide: "Obligatoire pour valider (0 s'il n'y en a pas)" },
   { cle: "pourboires", libelle: "Total pourboires", aide: "Pourboires saisis pour une facture (à annuler avant le Z)" },
   { cle: "pourboireAmexFacture", libelle: "Dont pourboire AMEX", aide: "Seulement si un pourboire facture est sur un AMEX" },
-];
-const CHAMPS_TIROIR: Champ[] = [
-  { cle: "fond", libelle: "Fond de caisse" },
-  { cle: "compte", libelle: "Espèces comptées", aide: "Fond compris, hors cagnotte (facultatif)" },
 ];
 
 type Textes = Record<"z" | "popina" | "tiroir", Record<string, string>>;
 const versTextes = (s: SaisieCloture): Textes => {
   const t = (o: Record<string, number | null>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v == null ? "" : String(v).replace(".", ",")]));
-  return { z: t(s.z), popina: t(s.popina), tiroir: t(s.tiroir) };
+  return { z: t(s.z), popina: t(s.popina), tiroir: t({ fond: s.tiroir.fond, compte: s.tiroir.compte }) };
 };
 const versSaisie = (t: Textes): SaisieCloture => {
   const n = (o: Record<string, string>, base: Record<string, number | null>) => Object.fromEntries(Object.keys(base).map((k) => [k, lireMontant(o[k] ?? "")])) as never;
-  return { z: n(t.z, VIDE.z), popina: n(t.popina, VIDE.popina), tiroir: n(t.tiroir, VIDE.tiroir) };
+  return { z: n(t.z, VIDE.z), popina: n(t.popina, VIDE.popina), tiroir: n(t.tiroir, { fond: null, compte: null }) };
 };
+const assembler = (t: Textes, coupures: Comptage): SaisieCloture => {
+  const s = versSaisie(t);
+  const propre = Object.fromEntries(Object.entries(coupures).filter(([, n]) => n > 0));
+  return { ...s, tiroir: { ...s.tiroir, coupures: Object.keys(propre).length ? propre : null } };
+};
+/** Lundi de la semaine d'un jour (AAAA-MM-JJ) */
+const lundi = (jour: string) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
+const dateCourte = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+type Historique = { jour: string; statut: string; resultat: { fondCaisse?: { totalSorti: number } | null } | null };
 const dateLongue = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 const decaler = (jour: string, n: number) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
@@ -61,6 +67,8 @@ export function Cloture() {
   const bureau = useBureau();
   const [jour, setJour] = useState(() => jourService(new Date()));
   const [textes, setTextes] = useState<Textes>(() => versTextes(VIDE));
+  const [coupures, setCoupures] = useState<Comptage>({});
+  const [historique, setHistorique] = useState<Historique[]>([]);
   const [corrections, setCorrections] = useState<string[]>([]);
   const [nouvelleCorrection, setNouvelleCorrection] = useState("");
   const [notes, setNotes] = useState("");
@@ -85,12 +93,14 @@ export function Cloture() {
         if (annule) return;
         if (!r.ok) { setEtat((e) => ({ ...e, chargement: false, erreur: j?.error ?? "Chargement impossible" })); return; }
         const c = j.cloture;
-        setTextes(versTextes(c?.saisie?.z ? (c.saisie as SaisieCloture) : VIDE));
+        const lue = c?.saisie?.z ? (c.saisie as SaisieCloture) : VIDE;
+        setTextes(versTextes(lue));
+        setCoupures(lue.tiroir?.coupures ?? {});
         setCorrections(Array.isArray(c?.corrections) ? c.corrections : []);
         setNotes(c?.notes ?? "");
         setStatut(c?.statut === "validee" ? "validee" : "en_cours");
         setTransactions(j.transactions ?? []);
-        dernier.current = JSON.stringify({ s: c?.saisie?.z ? versSaisie(versTextes(c.saisie as SaisieCloture)) : versSaisie(versTextes(VIDE)), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
+        dernier.current = JSON.stringify({ s: assembler(versTextes(lue), lue.tiroir?.coupures ?? {}), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
         setEtat((e) => ({ ...e, chargement: false }));
         charge.current = true;
       } catch (e) { if (!annule) setEtat((s) => ({ ...s, chargement: false, erreur: e instanceof Error ? e.message : "Chargement impossible" })); }
@@ -98,7 +108,17 @@ export function Cloture() {
     return () => { annule = true; };
   }, [jour]);
 
-  const saisie = useMemo(() => versSaisie(textes), [textes]);
+  const saisie = useMemo(() => assembler(textes, coupures), [textes, coupures]);
+
+  // Historique : enveloppes de la semaine pour le dépôt en banque
+  const chargerHistorique = useCallback(async () => {
+    try {
+      const r = await fetchApi("/api/cloture?historique=1");
+      const j = await r.json().catch(() => null);
+      if (r.ok) setHistorique(j?.clotures ?? []);
+    } catch { /* l'enveloppe de la semaine est un plus, pas bloquant */ }
+  }, []);
+  useEffect(() => { void chargerHistorique(); }, [chargerHistorique]);
   const resultat = useMemo(() => calculerCloture(saisie), [saisie]);
   const aide = useMemo(() => aideCloture(transactions, resultat.residu), [transactions, resultat.residu]);
 
@@ -110,8 +130,9 @@ export function Cloture() {
       if (!r.ok) { setEtat((e) => ({ ...e, enregistrement: false, erreur: j?.error ?? "Enregistrement impossible" })); return; }
       setStatut(j.cloture?.statut === "validee" ? "validee" : "en_cours");
       setEtat((e) => ({ ...e, enregistrement: false, info: valider ? "Clôture validée : tu peux arrêter la caisse Popina." : null }));
+      if (valider) void chargerHistorique();
     } catch (e) { setEtat((s) => ({ ...s, enregistrement: false, erreur: e instanceof Error ? e.message : "Enregistrement impossible" })); }
-  }, [jour, saisie, corrections, notes]);
+  }, [jour, saisie, corrections, notes, chargerHistorique]);
 
   // Enregistrement automatique, une seconde après la dernière frappe (rien pour une journée vide ou inchangée)
   useEffect(() => {
@@ -160,6 +181,19 @@ export function Cloture() {
   const ajouterCorrection = () => { const c = nouvelleCorrection.trim(); if (!c) return; setCorrections((l) => [...l, c]); setNouvelleCorrection(""); };
   const recap = recapCloture(jour, saisie, resultat, corrections);
   const [copie, setCopie] = useState(false);
+
+  const enveloppes = useMemo(() => {
+    const parJour = new Map<string, number>();
+    for (const h of historique) { const v = h.resultat?.fondCaisse?.totalSorti; if (v != null) parJour.set(h.jour, v); }
+    if (resultat.fondCaisse) parJour.set(jour, resultat.fondCaisse.totalSorti); else parJour.delete(jour);
+    const semaine = (l: string) => [...parJour.entries()].filter(([j]) => lundi(j) === l).sort(([a], [b]) => a.localeCompare(b));
+    const cette = semaine(lundi(jour));
+    const precedente = semaine(lundi(decaler(lundi(jour), -7)));
+    const somme = (l: [string, number][]) => l.reduce((a, [, v]) => a + v, 0);
+    return { lundi: lundi(jour), cette, precedente, totalCette: somme(cette), totalPrecedente: somme(precedente) };
+  }, [historique, resultat.fondCaisse, jour]);
+  const changerCoupure = (k: number, n: number) => setCoupures((c) => ({ ...c, [String(k)]: Math.max(0, Math.min(9999, Math.floor(n) || 0)) }));
+  const peutValider = resultat.niveau === "ok" && resultat.manquePourValider.length === 0;
 
   const couleur = resultat.niveau === "ok" ? VERT : resultat.niveau === "mode" ? AMBRE : resultat.niveau === "vide" ? MUTED : ROUGE;
   const fond = resultat.niveau === "ok" ? "#E6EFE7" : resultat.niveau === "mode" ? "#F7EDD6" : resultat.niveau === "vide" ? "#fff" : "#F8E5E2";
@@ -212,7 +246,70 @@ export function Cloture() {
             {bloc("Ticket Z du TPE", "Le ticket Flatpay imprimé à la clôture du TPE.", "z", CHAMPS_Z)}
             {bloc("Écran Popina", "Avant d'arrêter la caisse, sans rien corriger.", "popina", CHAMPS_POPINA)}
           </div>
-          {bloc("Tiroir", "Facultatif, pour vérifier les espèces.", "tiroir", CHAMPS_TIROIR)}
+          {/* Tiroir : comptage par coupure, fond à laisser, enveloppe de la banque */}
+          <fieldset style={{ border: `1.5px solid ${BORD}`, borderRadius: 14, background: "#fff", margin: 0, padding: "12px 14px 12px", minWidth: 0, display: "grid", gap: 10 }}>
+            <legend style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 17, textTransform: "uppercase", letterSpacing: ".03em", padding: "0 6px" }}>Tiroir</legend>
+            <div style={{ color: MUTED, fontSize: 12.5, marginTop: -4 }}>Compte tout le tiroir, fond compris, sans la cagnotte des pourboires.</div>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14.5, fontWeight: 600 }}>
+              Fond de caisse
+              <input inputMode="decimal" autoComplete="off" value={textes.tiroir.fond ?? ""} onChange={(e) => changer("tiroir", "fond", e.target.value)} placeholder="100"
+                style={{ font: "inherit", fontSize: 17, fontWeight: 700, textAlign: "right", width: 90, boxSizing: "border-box", padding: "6px 10px", border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4" }} />
+              <span style={{ color: MUTED, fontWeight: 400, fontSize: 13 }}>€</span>
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: bureau ? "1fr 1fr" : "minmax(0, 1fr)", gap: bureau ? 18 : 4 }}>
+              {[COUPURES.filter(estBillet), COUPURES.filter((k) => !estBillet(k))].map((groupe, gi) => (
+                <div key={gi}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".05em", margin: "4px 0" }}>{gi ? "Pièces" : "Billets"}</div>
+                  {groupe.map((k) => {
+                    const n = coupures[String(k)] ?? 0;
+                    return (
+                      <div key={k} style={{ display: "grid", gridTemplateColumns: "64px 40px minmax(0, 72px) 40px 1fr", alignItems: "center", gap: 6, padding: "4px 0", borderTop: "1px solid #f0ebe2" }}>
+                        <span style={{ fontWeight: 700, fontSize: 15 }}>{libelleCoupure(k)}</span>
+                        <button type="button" aria-label={`Retirer ${libelleCoupure(k)}`} onClick={() => changerCoupure(k, n - 1)} style={{ ...BTN, width: 40, padding: 0, borderColor: BORD }}>−</button>
+                        <input inputMode="numeric" autoComplete="off" value={n || ""} placeholder="0" onChange={(e) => changerCoupure(k, Number(e.target.value.replace(/\D/g, "")))}
+                          style={{ font: "inherit", fontSize: 18, fontWeight: 700, textAlign: "center", width: "100%", boxSizing: "border-box", height: 40, border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4", fontVariantNumeric: "tabular-nums" }} />
+                        <button type="button" aria-label={`Ajouter ${libelleCoupure(k)}`} onClick={() => changerCoupure(k, n + 1)} style={{ ...BTN, width: 40, padding: 0, borderColor: BORD }}>+</button>
+                        <span style={{ textAlign: "right", color: n ? "#1a1a1a" : FAIBLE, fontVariantNumeric: "tabular-nums", fontSize: 14 }}>{eur((n * k) / 100)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", alignItems: "baseline", borderTop: `1.5px solid ${BORD}`, paddingTop: 10 }}>
+              <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22 }}>{resultat.tiroirCompte != null ? eur(resultat.tiroirCompte) : "—"}</span>
+              <span style={{ color: MUTED, fontSize: 13.5 }}>compté · {eur(resultat.tiroirAttendu)} attendu (fond + espèces Popina)</span>
+              {resultat.ecartTiroir != null && saisie.popina.especes != null && (
+                <span style={{ fontWeight: 700, color: Math.abs(resultat.ecartTiroir) < 0.005 ? VERT : ROUGE }}>{Math.abs(resultat.ecartTiroir) < 0.005 ? "Tiroir juste" : `${resultat.ecartTiroir > 0 ? "+" : "−"}${eur(Math.abs(resultat.ecartTiroir))}`}</span>
+              )}
+            </div>
+            {resultat.fondCaisse && (() => {
+              const f = resultat.fondCaisse;
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: bureau ? "1fr 1fr" : "minmax(0, 1fr)", gap: 10 }}>
+                  <div style={{ borderRadius: 12, background: "#E6EFE7", padding: "10px 12px" }}>
+                    <div style={{ fontWeight: 700, color: VERT, fontSize: 14 }}>À laisser dans la caisse · {eur(f.totalLaisse / 100)}</div>
+                    <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.45 }}>{listerCoupures(f.laisser) || "Rien"}</div>
+                    {f.incomplet > 0 && <div style={{ fontSize: 13, color: ROUGE, marginTop: 4 }}>Il manque {eur(f.incomplet / 100)} pour faire le fond{f.compte > f.fond ? " au centime : pas la bonne monnaie" : ""}. Prévois du change.</div>}
+                  </div>
+                  <div style={{ borderRadius: 12, background: "#F7EDD6", padding: "10px 12px" }}>
+                    <div style={{ fontWeight: 700, color: AMBRE, fontSize: 14 }}>Enveloppe banque · {eur(f.totalSorti / 100)}</div>
+                    <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.45 }}>{listerCoupures(f.sortir) || "Rien à sortir"}</div>
+                  </div>
+                  {Object.keys(f.manqueIdeal).length > 0 && (
+                    <div style={{ gridColumn: "1 / -1", fontSize: 13, color: MUTED }}>Pour refaire le fond idéal du lundi, il manque : {listerCoupures(f.manqueIdeal)}.</div>
+                  )}
+                </div>
+              );
+            })()}
+            {(enveloppes.cette.length > 0 || enveloppes.precedente.length > 0) && (
+              <div style={{ fontSize: 13.5, display: "grid", gap: 4, borderTop: "1px solid #f0ebe2", paddingTop: 8 }}>
+                <div><strong>Enveloppes de la semaine du {dateCourte(enveloppes.lundi)} : {eur(enveloppes.totalCette / 100)}</strong>
+                  {enveloppes.cette.length > 0 && <span style={{ color: MUTED }}> ({enveloppes.cette.map(([j, v]) => `${dateCourte(j)} ${eur(v / 100)}`).join(" · ")})</span>}</div>
+                {enveloppes.precedente.length > 0 && <div style={{ color: AMBRE, fontWeight: 700 }}>Semaine précédente, à déposer à la banque : {eur(enveloppes.totalPrecedente / 100)}</div>}
+              </div>
+            )}
+          </fieldset>
 
           {/* Verdict */}
           <section aria-live="polite" style={{ borderRadius: 16, padding: bureau ? 20 : 16, border: `2px solid ${couleur}`, background: fond }}>
@@ -295,11 +392,12 @@ export function Cloture() {
           </section>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-            <button type="button" disabled={resultat.niveau !== "ok" || etat.enregistrement} onClick={() => void enregistrer(true)}
-              style={{ ...BTN, background: resultat.niveau === "ok" ? VERT : "#c9c2b4", borderColor: resultat.niveau === "ok" ? VERT : "#c9c2b4", color: "#fff", cursor: resultat.niveau === "ok" ? "pointer" : "not-allowed" }}>
+            <button type="button" disabled={!peutValider || etat.enregistrement} onClick={() => void enregistrer(true)}
+              style={{ ...BTN, background: peutValider ? VERT : "#c9c2b4", borderColor: peutValider ? VERT : "#c9c2b4", color: "#fff", cursor: peutValider ? "pointer" : "not-allowed" }}>
               {statut === "validee" ? "Clôture validée ✓" : "Valider la clôture"}
             </button>
             <button type="button" disabled={resultat.niveau === "vide"} onClick={() => { void navigator.clipboard?.writeText(recap).then(() => { setCopie(true); setTimeout(() => setCopie(false), 1600); }); }} style={BTN}>{copie ? "Copié" : "Copier le récap"}</button>
+            {resultat.niveau === "ok" && resultat.manquePourValider.length > 0 && <span style={{ fontSize: 13, color: ROUGE, fontWeight: 600 }}>Pour valider, il manque {resultat.manquePourValider.join(" et ")}.</span>}
             <span style={{ fontSize: 12.5, color: MUTED }}>{etat.enregistrement ? "Enregistrement…" : etat.info ?? "Enregistré automatiquement."}</span>
           </div>
 

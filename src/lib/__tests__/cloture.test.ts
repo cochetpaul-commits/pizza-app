@@ -51,6 +51,21 @@ describe("clôture du soir (cas réels du brief)", () => {
     const juste = calculerCloture(saisie({ total: 100, pourboires: 0, conecs: 0 }, { cb: 100, conecs: 0, especes: 50 }, { fond: 100, compte: 150 }));
     expect(juste.etapes.join(" ")).toMatch(/Tiroir juste/);
   });
+  it("12/10 : comptage par coupure, fond laissé et enveloppe", () => {
+    // Popina : 211,50 € d'espèces, fond de 100 € → 311,50 € attendus
+    const coupures = { "5000": 2, "2000": 6, "1000": 4, "500": 2, "200": 10, "100": 14, "50": 11, "20": 5, "10": 8, "5": 1, "2": 5, "1": 5 };
+    const r = calculerCloture(saisie({ total: 2954, pourboires: 22, conecs: 0 }, { cb: 2932, conecs: 0, especes: 211.5 }, { fond: 100, coupures }));
+    expect(r.tiroirCompte).toBe(311.5);
+    expect(r.ecartTiroir).toBe(0);
+    expect(r.fondCaisse?.totalLaisse).toBe(10000);
+    expect(r.fondCaisse?.totalSorti).toBe(21150);
+    expect(r.manquePourValider).toEqual([]);
+  });
+  it("valider demande les espèces Popina et le comptage", () => {
+    const r = calculerCloture(saisie({ total: 100, pourboires: 0, conecs: 0 }, { cb: 100, conecs: 0 }));
+    expect(r.niveau).toBe("ok");
+    expect(r.manquePourValider).toEqual(["les espèces de l'écran Popina", "le comptage du tiroir"]);
+  });
   it("saisie incomplète", () => {
     expect(calculerCloture(VIDE).niveau).toBe("vide");
   });

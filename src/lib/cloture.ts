@@ -10,6 +10,8 @@
  * comptent pour la paie.
  */
 
+import { comptageSaisi, composerFond, totalComptage, type Comptage, type CompositionFond } from "@/lib/fondCaisse";
+
 export type SaisieZ = {
   /** Bloc EUR, ligne TOTAL NET (pourboires compris) */
   total: number | null;
@@ -37,7 +39,12 @@ export type SaisiePopina = {
   pourboireAmexFacture: number | null;
 };
 
-export type SaisieTiroir = { fond: number | null; compte: number | null };
+export type SaisieTiroir = {
+  fond: number | null;
+  compte: number | null;
+  /** Comptage coupure par coupure (clé : coupure en centimes) ; remplace « compte » quand il est saisi */
+  coupures?: Comptage | null;
+};
 
 export type SaisieCloture = { z: SaisieZ; popina: SaisiePopina; tiroir: SaisieTiroir };
 
@@ -62,7 +69,13 @@ export type ResultatCloture = {
   /** Pourboires carte du jour pour la paie : TPE uniquement (EUR + Conecs + AMEX) */
   pourboiresPaie: number;
   tiroirAttendu: number;
+  /** Espèces comptées (comptage par coupure s'il est saisi) */
+  tiroirCompte: number | null;
   ecartTiroir: number | null;
+  /** Ce qu'il faut laisser pour le fond et ce qui part à la banque (avec le comptage par coupure) */
+  fondCaisse: CompositionFond | null;
+  /** Ce qui manque pour pouvoir valider (espèces Popina, comptage du tiroir) */
+  manquePourValider: string[];
 };
 
 export const VIDE: SaisieCloture = {
@@ -99,7 +112,14 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
   const pourboireAmex = diffAmex > 0 ? diffAmex : 0;
   const residu = r2(ecartCb + ecartConecs + ecartAmex);
   const tiroirAttendu = r2(v0(tiroir.fond) + v0(p.especes) + pourboiresPopina);
-  const ecartTiroir = tiroir.compte == null ? null : r2(tiroir.compte - tiroirAttendu);
+  const parCoupures = comptageSaisi(tiroir.coupures);
+  const tiroirCompte = parCoupures ? totalComptage(tiroir.coupures) / 100 : tiroir.compte;
+  const ecartTiroir = tiroirCompte == null ? null : r2(tiroirCompte - tiroirAttendu);
+  const fondCaisse = parCoupures && tiroir.coupures ? composerFond(tiroir.coupures, v0(tiroir.fond)) : null;
+  const manquePourValider = [
+    ...(p.especes == null ? ["les espèces de l'écran Popina"] : []),
+    ...(tiroirCompte == null ? ["le comptage du tiroir"] : []),
+  ];
   const pourboiresPaie = r2(v0(z.pourboires) + v0(z.conecsPourboires) + pourboireAmex);
 
   const lignes: LigneEcart[] = [
@@ -107,7 +127,7 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
     { mode: "conecs", libelle: "Carte Connecs", popina: v0(p.conecs), attendu: cibleConecs, ecart: ecartConecs },
     { mode: "amex", libelle: "American Express", popina: v0(p.amex), attendu: v0(z.amex), ecart: ecartAmex },
   ];
-  const base = { lignes, cibleCb, ecartCb, cibleConecs, ecartConecs, ecartAmex, residu, pourboireAmex, pourboiresPaie, tiroirAttendu, ecartTiroir };
+  const base = { lignes, cibleCb, ecartCb, cibleConecs, ecartConecs, ecartAmex, residu, pourboireAmex, pourboiresPaie, tiroirAttendu, tiroirCompte, ecartTiroir, fondCaisse, manquePourValider };
 
   if (z.total == null || p.cb == null) return { ...base, niveau: "vide", titre: "Remplis le ticket Z et l'écran Popina pour voir le verdict.", etapes: [] };
 
@@ -146,8 +166,8 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
     etapes.push("Si l'écart reste introuvable (faute de frappe d'un ou deux euros), corrige le mode de paiement sur une table pour que la ventilation tombe juste, et note laquelle ci-dessous : le contrôle du lendemain retrouvera la vraie cause.");
   }
   if (ecartTiroir != null) {
-    if (nul(ecartTiroir)) etapes.push(`Tiroir juste : ${eur(tiroir.compte ?? 0)} pour ${eur(tiroirAttendu)} attendu.`);
-    else etapes.push(`Tiroir : ${eur(tiroir.compte ?? 0)} compté pour ${eur(tiroirAttendu)} attendu (${signe(ecartTiroir)}). ${Math.abs(ecartTiroir - residu) < 0.005 ? "C'est le même écart que la carte : un paiement carte saisi en espèces (ou des espèces saisies en carte si l'écart est positif)." : "Recompte le tiroir avant de chercher plus loin."}`);
+    if (nul(ecartTiroir)) etapes.push(`Tiroir juste : ${eur(tiroirCompte ?? 0)} pour ${eur(tiroirAttendu)} attendu.`);
+    else etapes.push(`Tiroir : ${eur(tiroirCompte ?? 0)} compté pour ${eur(tiroirAttendu)} attendu (${signe(ecartTiroir)}). ${Math.abs(ecartTiroir - residu) < 0.005 ? "C'est le même écart que la carte : un paiement carte saisi en espèces (ou des espèces saisies en carte si l'écart est positif)." : "Recompte le tiroir avant de chercher plus loin."}`);
   }
   if (pourboiresPopina > 0.005) etapes.push(`Pourboires saisis dans Popina pour des factures : ${eur(pourboiresPopina)}. Annule-les avant d'arrêter la caisse, comme convenu ; le calcul en tient déjà compte.`);
   return { ...base, niveau, titre, etapes };
@@ -160,7 +180,8 @@ export function recapCloture(jour: string, s: SaisieCloture, r: ResultatCloture,
     `Verdict : ${r.titre}`,
     ...r.lignes.map((l) => `${l.libelle} : Popina ${eur(l.popina)} pour ${eur(l.attendu)} attendu (${nul(l.ecart) ? "juste" : signe(l.ecart)})`),
     `Pourboires carte pour la paie : ${eur(r.pourboiresPaie)}${r.pourboireAmex > 0 ? ` (dont AMEX ${eur(r.pourboireAmex)})` : ""}`,
-    r.ecartTiroir != null ? `Tiroir : ${eur(s.tiroir.compte ?? 0)} pour ${eur(r.tiroirAttendu)} attendu (${nul(r.ecartTiroir) ? "juste" : signe(r.ecartTiroir)})` : null,
+    r.ecartTiroir != null ? `Tiroir : ${eur(r.tiroirCompte ?? 0)} pour ${eur(r.tiroirAttendu)} attendu (${nul(r.ecartTiroir) ? "juste" : signe(r.ecartTiroir)})` : null,
+    r.fondCaisse ? `Fond laissé : ${eur(r.fondCaisse.totalLaisse / 100)} · enveloppe banque : ${eur(r.fondCaisse.totalSorti / 100)}` : null,
     ...corrections.map((c) => `Correction : ${c}`),
     ...r.etapes.map((e) => `• ${e}`),
   ];
