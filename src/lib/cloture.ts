@@ -65,9 +65,9 @@ export type ResultatCloture = {
   ecartAmex: number;
   /** Somme des écarts : ce qui reste quand les erreurs de mode sont corrigées */
   residu: number;
-  /** Pourboire AMEX calculé par différence (0 si négatif) */
+  /** Pourboire AMEX calculé par différence (déjà compris dans les pourboires du Z) */
   pourboireAmex: number;
-  /** Pourboires carte du jour pour la paie : TPE uniquement (EUR + Conecs + AMEX) */
+  /** Pourboires carte du jour pour la paie : TPE uniquement (ligne POURBOIRES du Z, AMEX compris, + Conecs) */
   pourboiresPaie: number;
   tiroirAttendu: number;
   /** Espèces comptées (comptage par coupure s'il est saisi) */
@@ -104,15 +104,21 @@ export function lireMontant(s: string): number | null {
 export function calculerCloture(s: SaisieCloture): ResultatCloture {
   const { z, popina: p, tiroir } = s;
   const pourboiresPopina = v0(p.pourboires);
-  const pourboiresPopinaCb = r2(pourboiresPopina - v0(p.pourboireAmexFacture));
-  const cibleCb = r2(v0(z.total) - v0(z.amex) - v0(z.pourboires) + pourboiresPopinaCb);
-  const ecartCb = r2(v0(p.cb) - cibleCb);
+  // « Dont pourboire AMEX » ne compte que s'il y a des pourboires saisis dans Popina (vécu 13/10 : 2,12 € tapés là par erreur)
+  const pourboireAmexFacture = Math.min(v0(p.pourboireAmexFacture), pourboiresPopina);
+  const pourboiresPopinaCb = r2(pourboiresPopina - pourboireAmexFacture);
   const cibleConecs = r2(v0(z.conecs) - v0(z.conecsPourboires));
   const ecartConecs = r2(v0(p.conecs) - cibleConecs);
-  const popinaAmexVentes = r2(v0(p.amex) - v0(p.pourboireAmexFacture));
+  const popinaAmexVentes = r2(v0(p.amex) - pourboireAmexFacture);
   const diffAmex = r2(v0(z.amex) - popinaAmexVentes);
   const ecartAmex = diffAmex < 0 ? r2(-diffAmex) : 0;
-  const pourboireAmex = diffAmex > 0 ? diffAmex : 0;
+  // Pourboire AMEX passé au TPE (montant TPE − vente Popina). Vécu 13/10 : il est compté dans la ligne
+  // POURBOIRES du Z comme les autres (détail Flatpay de l'AMEX : « Pourboires 2,12 EUR »), donc on ne
+  // le retire qu'une fois. Si Popina n'a aucun AMEX, le paiement a été saisi en carte : pas de pourboire déductible.
+  const pourboireAmex = diffAmex > 0 && v0(p.amex) > 0 ? Math.min(diffAmex, v0(z.pourboires)) : 0;
+  // Carte attendue dans Popina : total du Z − AMEX (pourboire compris) − pourboires hors AMEX + pourboires saisis dans Popina
+  const cibleCb = r2(v0(z.total) - v0(z.amex) - (v0(z.pourboires) - pourboireAmex) + pourboiresPopinaCb);
+  const ecartCb = r2(v0(p.cb) - cibleCb);
   const residu = r2(ecartCb + ecartConecs + ecartAmex);
   const tiroirAttendu = r2(v0(tiroir.fond) + v0(p.especes) + pourboiresPopina);
   const parCoupures = comptageSaisi(tiroir.coupures);
@@ -126,7 +132,7 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
     ...(p.especes == null ? ["les espèces de l'écran Popina"] : []),
     ...(tiroirCompte == null ? ["le comptage du tiroir"] : []),
   ];
-  const pourboiresPaie = r2(v0(z.pourboires) + v0(z.conecsPourboires) + pourboireAmex);
+  const pourboiresPaie = r2(v0(z.pourboires) + v0(z.conecsPourboires));
 
   const lignes: LigneEcart[] = [
     { mode: "cb", libelle: "Carte de crédit", popina: v0(p.cb), attendu: cibleCb, ecart: ecartCb },

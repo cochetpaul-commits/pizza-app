@@ -36,11 +36,22 @@ describe("clôture du soir (cas réels du brief)", () => {
     expect(r.residu).toBe(0);
     expect(r.niveau).toBe("mode");
   });
-  it("AMEX : pourboire par différence, compté pour la paie", () => {
-    const r = calculerCloture(saisie({ total: 500, pourboires: 10, amex: 105, conecs: 0 }, { cb: 385, amex: 100, conecs: 0 }));
+  it("AMEX : pourboire par différence, déjà compris dans les pourboires du Z", () => {
+    // Z : 500 € dont 10 € de pourboires, dont 5 € sur l'AMEX de 105 € (100 € dans Popina)
+    const r = calculerCloture(saisie({ total: 500, pourboires: 10, amex: 105, conecs: 0 }, { cb: 390, amex: 100, conecs: 0 }));
     expect(r.pourboireAmex).toBe(5);
-    expect(r.pourboiresPaie).toBe(15);
+    expect(r.pourboiresPaie).toBe(10);
     expect(r.niveau).toBe("ok");
+  });
+  it("13/10 réel : 9 pourboires dont 2,12 € AMEX, 0,30 € de carte arrondie (table 40-1)", () => {
+    const z = { total: 4914.98, pourboires: 38.18, amex: 72.62, conecs: 168, conecsNb: 7 };
+    const r = calculerCloture(saisie(z, { cb: 4806, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7 }));
+    expect(r.cibleCb).toBe(4806.3);
+    expect(r.ecartCb).toBe(-0.3);
+    expect(r.pourboiresPaie).toBe(38.18);
+    // « Dont pourboire AMEX » tapé par erreur alors que Popina n'a aucun pourboire : ignoré
+    const erreur = calculerCloture(saisie(z, { cb: 4806, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7, pourboires: 0, pourboireAmexFacture: 2.12 }));
+    expect(erreur.ecartCb).toBe(-0.3);
   });
   it("tiroir : une carte saisie en espèces manque à la fois en carte et dans le tiroir", () => {
     // 30 € payés par carte saisis en espèces : carte −30, espèces Popina +30 → tiroir compté 30 € sous l'attendu

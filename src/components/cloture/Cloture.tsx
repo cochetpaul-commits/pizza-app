@@ -23,7 +23,7 @@ const ROUGE = "#B8342A";
 const AMBRE = "#8A5A00";
 const ACCENT = "#D4775A";
 
-type Champ = { cle: string; libelle: string; aide?: string; entier?: boolean };
+type Champ = { cle: string; libelle: string; aide?: string; entier?: boolean; siPourboires?: boolean };
 const CHAMPS_Z: Champ[] = [
   { cle: "total", libelle: "Total net", aide: "Premier bloc, ligne « TOTAL NET »" },
   { cle: "pourboires", libelle: "Pourboires", aide: "Premier bloc, ligne « POURBOIRES »" },
@@ -39,7 +39,7 @@ const CHAMPS_POPINA: Champ[] = [
   { cle: "amex", libelle: "American Express" },
   { cle: "especes", libelle: "Espèces", aide: "Obligatoire pour valider (0 s'il n'y en a pas)" },
   { cle: "pourboires", libelle: "Total pourboires", aide: "Pourboires saisis pour une facture (à annuler avant le Z)" },
-  { cle: "pourboireAmexFacture", libelle: "Dont pourboire AMEX", aide: "Seulement si un pourboire facture est sur un AMEX" },
+  { cle: "pourboireAmexFacture", libelle: "Dont pourboire AMEX", aide: "Seulement si le total pourboires ci-dessus contient un pourboire sur un AMEX ; sinon vide", siPourboires: true },
 ];
 
 type Textes = Record<"z" | "popina" | "tiroir", Record<string, string>>;
@@ -213,7 +213,7 @@ export function Cloture() {
     <fieldset style={{ border: `1.5px solid ${BORD}`, borderRadius: 14, background: "#fff", margin: 0, padding: "12px 14px 6px", minWidth: 0 }}>
       <legend style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 17, textTransform: "uppercase", letterSpacing: ".03em", padding: "0 6px" }}>{titre}</legend>
       <div style={{ color: MUTED, fontSize: 12.5, margin: "-2px 0 6px" }}>{source}</div>
-      {champs.map((c, i) => (
+      {champs.filter((c) => !c.siPourboires || (saisie.popina.pourboires ?? 0) > 0 || !!textes[nom][c.cle]).map((c, i) => (
         <label key={c.cle} style={{ display: "grid", gridTemplateColumns: "1fr 128px", alignItems: "center", gap: 10, padding: "7px 0", borderTop: i ? `1px solid #f0ebe2` : "none" }}>
           <span style={{ fontSize: 14.5, fontWeight: 600, minWidth: 0 }}>{c.libelle}{c.aide && <small style={{ display: "block", color: MUTED, fontSize: 11.5, fontWeight: 400, lineHeight: 1.3 }}>{c.aide}</small>}</span>
           <input inputMode={c.entier ? "numeric" : "decimal"} autoComplete="off" value={textes[nom][c.cle] ?? ""} onChange={(e) => changer(nom, c.cle, e.target.value)} placeholder={c.entier ? "0" : "0,00"}
