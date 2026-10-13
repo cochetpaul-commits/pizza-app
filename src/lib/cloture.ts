@@ -101,6 +101,24 @@ export function lireMontant(s: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Montants d'addition qui donnent `paye` avec un pourboire usuel (0, 3, 5, 10, 15 %), les montants ronds
+ * (,00 ou ,50, comme les prix de la carte) d'abord. Vécu 13/10 : l'AMEX de 72,62 € au TPE était une
+ * addition de 70,50 € dans Popina (3 %) ; chercher 72,62 € dans Popina ne menait à rien.
+ */
+export function additionsPossibles(paye: number): { montant: number; pourboire: number }[] {
+  const cible = Math.round(paye * 100);
+  const out: { montant: number; pourboire: number }[] = [];
+  for (const pct of [0, 3, 5, 10, 15]) {
+    const base = Math.floor(cible / (1 + pct / 100));
+    for (const c of [base - 1, base, base + 1]) {
+      if (c > 0 && Math.round(c * (1 + pct / 100)) === cible && !out.some((o) => o.montant === c / 100)) out.push({ montant: c / 100, pourboire: pct });
+    }
+  }
+  const rond = (m: number) => Math.round(m * 100) % 50 === 0;
+  return out.sort((a, b) => Number(rond(b.montant)) - Number(rond(a.montant)) || a.pourboire - b.pourboire);
+}
+
 export function calculerCloture(s: SaisieCloture): ResultatCloture {
   const { z, popina: p, tiroir } = s;
   const pourboiresPopina = v0(p.pourboires);
@@ -155,7 +173,14 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
   if (ecartConecs > 0.005) modes.push(`Popina a ${eur(ecartConecs)} de Conecs en trop.${nbTxt} Le paiement Conecs de ${eur(ecartConecs)} qui n'est pas sur le TPE était une carte bancaire : ouvre le ticket et passe ce paiement en Carte de crédit.`);
   if (ecartConecs < -0.005) modes.push(`Il manque ${eur(-ecartConecs)} de Conecs dans Popina.${nbTxt} Un paiement de ${eur(-ecartConecs)} saisi en Carte de crédit était un Conecs : ouvre le ticket et passe-le en Carte Connecs.`);
   if (ecartAmex > 0.005) modes.push(`Popina a ${eur(ecartAmex)} d'AMEX de plus que le TPE. Un paiement saisi en American Express était une autre carte : passe-le en Carte de crédit.`);
-  if (amexEnCarte) modes.push(`Le TPE a ${eur(v0(z.amex))} d'AMEX (pourboire compris) et Popina aucun : le paiement AMEX a été saisi en Carte de crédit. Cherche dans Popina un paiement carte de ${eur(v0(z.amex))} ou un peu moins (sans le pourboire), ouvre le ticket et passe-le en American Express.`);
+  if (amexEnCarte) {
+    // Popina affiche l'addition, sans le pourboire : on donne les montants à chercher, pas celui du TPE
+    const possibles = additionsPossibles(v0(z.amex));
+    const ronds = possibles.filter((a) => Math.round(a.montant * 100) % 50 === 0);
+    const liste = (ronds.length ? ronds : possibles).slice(0, 3)
+      .map((a) => `${eur(a.montant)}${a.pourboire ? ` (+ ${a.pourboire} % de pourboire)` : " (sans pourboire)"}`).join(", ou ");
+    modes.push(`Le TPE a ${eur(v0(z.amex))} d'AMEX, pourboire compris, et Popina aucun : un paiement AMEX a été saisi en Carte de crédit. Popina montre l'addition sans le pourboire : cherche un paiement carte de ${liste}. Ouvre ce ticket et passe le paiement en American Express. L'export Flatpay donne l'heure exacte de l'AMEX.`);
+  }
   else if (diffAmex > 0.005 && diffAmex > v0(p.amex) * 0.25) modes.push(`L'AMEX du TPE dépasse Popina de ${eur(diffAmex)}, c'est beaucoup pour un pourboire : vérifie qu'un AMEX n'a pas été saisi en Carte de crédit.`);
 
   const etapes: string[] = [];
