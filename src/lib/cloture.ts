@@ -45,6 +45,8 @@ export type SaisieTiroir = {
   compte: number | null;
   /** Comptage coupure par coupure (clé : coupure en centimes) ; remplace « compte » quand il est saisi */
   coupures?: Comptage | null;
+  /** Pourboires en espèces mélangés au tiroir et sortis (ni fond ni banque) */
+  pourboiresSortis?: number | null;
   /** Ce qui a réellement été laissé dans la caisse ce soir : le fond de départ du lendemain */
   laisse?: Comptage | null;
 };
@@ -90,7 +92,7 @@ export type ResultatCloture = {
 export const VIDE: SaisieCloture = {
   z: { total: null, pourboires: null, amex: null, conecs: null, conecsPourboires: null, conecsNb: null },
   popina: { cb: null, conecs: null, conecsNb: null, amex: null, especes: null, pourboires: null, pourboireAmexFacture: null },
-  tiroir: { fond: 100, compte: null },
+  tiroir: { fond: 100, compte: null, pourboiresSortis: null },
 };
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -122,7 +124,8 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
   const residu = r2(ecartCb + ecartConecs + ecartAmex);
   const tiroirAttendu = r2(v0(tiroir.fond) + v0(p.especes) + pourboiresPopina);
   const parCoupures = comptageSaisi(tiroir.coupures);
-  const tiroirCompte = parCoupures ? totalComptage(tiroir.coupures) / 100 : tiroir.compte;
+  // Les pièces de pourboire comptées avec le tiroir ne sont ni au fond ni à la banque (vécu 12/10 : 50 c)
+  const tiroirCompte = parCoupures ? r2(totalComptage(tiroir.coupures) / 100 - v0(tiroir.pourboiresSortis)) : tiroir.compte;
   const ecartTiroir = tiroirCompte == null ? null : r2(tiroirCompte - tiroirAttendu);
   // Le fond à laisser vise toujours 100 € (fond idéal), quel que soit le fond de départ du jour
   const fondCaisse = parCoupures && tiroir.coupures ? composerFond(tiroir.coupures, FOND_CIBLE) : null;
@@ -130,7 +133,7 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
   const fondLaisse = laisseSaisi ? totalComptage(tiroir.laisse) / 100 : null;
   const enveloppe = tiroirCompte == null ? null
     : fondLaisse != null ? r2(tiroirCompte - fondLaisse)
-    : fondCaisse ? fondCaisse.totalSorti / 100 : null;
+    : fondCaisse ? r2(fondCaisse.totalSorti / 100 - v0(tiroir.pourboiresSortis)) : null;
   const laisseImpossible = laisseSaisi && tiroir.coupures
     ? COUPURES.filter((k) => (Number(tiroir.laisse?.[String(k)]) || 0) > (Number(tiroir.coupures?.[String(k)]) || 0)).map(libelleCoupure)
     : [];

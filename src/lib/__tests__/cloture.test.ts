@@ -73,6 +73,11 @@ describe("clôture du soir (cas réels du brief)", () => {
     expect(avec.enveloppe).toBe(212);
     expect(avec.ecartTiroir).toBe(0.5);
     expect(avec.manquePourValider).toEqual([]);
+    // Les 50 c de trop étaient des pourboires : sortis du tiroir, l'enveloppe fait 211,50 €
+    const pb = calculerCloture({ ...base, tiroir: { ...base.tiroir, laisse, pourboiresSortis: 0.5 } });
+    expect(pb.tiroirCompte).toBe(311.5);
+    expect(pb.ecartTiroir).toBe(0);
+    expect(pb.enveloppe).toBe(211.5);
     const trop = calculerCloture({ ...base, tiroir: { ...base.tiroir, laisse: { "5000": 3 } } });
     expect(trop.laisseImpossible).toEqual(["50 €"]);
   });

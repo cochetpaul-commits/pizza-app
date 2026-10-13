@@ -45,11 +45,11 @@ const CHAMPS_POPINA: Champ[] = [
 type Textes = Record<"z" | "popina" | "tiroir", Record<string, string>>;
 const versTextes = (s: SaisieCloture): Textes => {
   const t = (o: Record<string, number | null>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v == null ? "" : String(v).replace(".", ",")]));
-  return { z: t(s.z), popina: t(s.popina), tiroir: t({ fond: s.tiroir.fond, compte: s.tiroir.compte }) };
+  return { z: t(s.z), popina: t(s.popina), tiroir: t({ fond: s.tiroir.fond, compte: s.tiroir.compte, pourboiresSortis: s.tiroir.pourboiresSortis ?? null }) };
 };
 const versSaisie = (t: Textes): SaisieCloture => {
   const n = (o: Record<string, string>, base: Record<string, number | null>) => Object.fromEntries(Object.keys(base).map((k) => [k, lireMontant(o[k] ?? "")])) as never;
-  return { z: n(t.z, VIDE.z), popina: n(t.popina, VIDE.popina), tiroir: n(t.tiroir, { fond: null, compte: null }) };
+  return { z: n(t.z, VIDE.z), popina: n(t.popina, VIDE.popina), tiroir: n(t.tiroir, { fond: null, compte: null, pourboiresSortis: null }) };
 };
 const propre = (c: Comptage | null | undefined): Comptage | null => {
   const o = Object.fromEntries(Object.entries(c ?? {}).filter(([, n]) => n > 0));
@@ -300,6 +300,13 @@ export function Cloture() {
               {veille && <span style={{ color: MUTED, fontWeight: 400, fontSize: 12.5, flexBasis: "100%" }}>Laissé à la clôture du {dateCourte(veille.jour)} : {eur(totalComptage(veille.laisse) / 100)} ({listerCoupures(veille.laisse)})</span>}
             </label>
             {grille(coupures, changerCoupure)}
+            <label style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 14.5, fontWeight: 600 }}>
+              Pourboires sortis du tiroir
+              <input inputMode="decimal" autoComplete="off" value={textes.tiroir.pourboiresSortis ?? ""} onChange={(e) => changer("tiroir", "pourboiresSortis", e.target.value)} placeholder="0,00"
+                style={{ font: "inherit", fontSize: 17, fontWeight: 700, textAlign: "right", width: 90, boxSizing: "border-box", padding: "6px 10px", border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4" }} />
+              <span style={{ color: MUTED, fontWeight: 400, fontSize: 13 }}>€</span>
+              <span style={{ color: MUTED, fontWeight: 400, fontSize: 12.5, flexBasis: "100%" }}>Pièces de pourboire comptées avec la caisse : retirées du total, elles ne vont ni dans le fond ni à la banque.</span>
+            </label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", alignItems: "baseline", borderTop: `1.5px solid ${BORD}`, paddingTop: 10 }}>
               <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22 }}>{resultat.tiroirCompte != null ? eur(resultat.tiroirCompte) : "—"}</span>
               <span style={{ color: MUTED, fontSize: 13.5 }}>compté · {eur(resultat.tiroirAttendu)} attendu (fond + espèces Popina)</span>
@@ -319,6 +326,7 @@ export function Cloture() {
                   <div style={{ borderRadius: 12, background: "#F7EDD6", padding: "10px 12px" }}>
                     <div style={{ fontWeight: 700, color: AMBRE, fontSize: 14 }}>Enveloppe banque · {eur(resultat.enveloppe ?? f.totalSorti / 100)}</div>
                     <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.45 }}>{listerCoupures(resultat.fondLaisse != null ? difference(coupures, laisse) : f.sortir) || "Rien à sortir"}</div>
+                    {(saisie.tiroir.pourboiresSortis ?? 0) > 0 && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 4 }}>Moins {eur(saisie.tiroir.pourboiresSortis ?? 0)} de pourboires à prendre dans ces coupures.</div>}
                   </div>
                   <div style={{ gridColumn: "1 / -1", borderRadius: 12, border: `1.5px solid ${resultat.fondLaisse != null ? VERT : ACCENT}`, padding: "10px 12px", display: "grid", gap: 8 }}>
                     {resultat.fondLaisse == null ? (
