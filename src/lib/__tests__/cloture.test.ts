@@ -53,6 +53,16 @@ describe("clôture du soir (cas réels du brief)", () => {
     const erreur = calculerCloture(saisie(z, { cb: 4806, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7, pourboires: 0, pourboireAmexFacture: 2.12 }));
     expect(erreur.ecartCb).toBe(-0.3);
   });
+  it("13/10 : AMEX saisi en Carte de crédit, une seule erreur de mode à corriger", () => {
+    const z = { total: 4914.98, pourboires: 38.18, amex: 72.62, conecs: 168, conecsNb: 7 };
+    // Avant correction : l'AMEX de 70,50 € est dans la carte Popina (et la table 40-1 déjà arrondie)
+    const r = calculerCloture(saisie(z, { cb: 4876.8, amex: 0, conecs: 168, conecsNb: 7, especes: 773.7 }));
+    expect(r.niveau).toBe("mode");
+    expect(r.etapes[0]).toMatch(/AMEX a été saisi en Carte de crédit/);
+    // Après correction dans Popina : tout colle
+    const ok = calculerCloture(saisie(z, { cb: 4806.3, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7 }));
+    expect(ok.niveau).toBe("ok");
+  });
   it("tiroir : une carte saisie en espèces manque à la fois en carte et dans le tiroir", () => {
     // 30 € payés par carte saisis en espèces : carte −30, espèces Popina +30 → tiroir compté 30 € sous l'attendu
     const r = calculerCloture(saisie({ total: 100, pourboires: 0, conecs: 0 }, { cb: 70, conecs: 0, especes: 80 }, { fond: 100, compte: 150 }));

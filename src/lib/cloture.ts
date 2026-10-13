@@ -119,7 +119,12 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
   // Carte attendue dans Popina : total du Z − AMEX (pourboire compris) − pourboires hors AMEX + pourboires saisis dans Popina
   const cibleCb = r2(v0(z.total) - v0(z.amex) - (v0(z.pourboires) - pourboireAmex) + pourboiresPopinaCb);
   const ecartCb = r2(v0(p.cb) - cibleCb);
-  const residu = r2(ecartCb + ecartConecs + ecartAmex);
+  // AMEX saisi en Carte de crédit (vécu 13/10) : le TPE a de l'AMEX, Popina aucun. Sa vente est dans la carte
+  // Popina et son pourboire dans les pourboires du Z : l'écart carte vaut alors exactement l'AMEX du TPE, ce
+  // n'est pas un écart à chercher ailleurs.
+  const amexEnCarte = v0(z.amex) > 0.005 && v0(p.amex) < 0.005;
+  const ecartCbHorsAmex = amexEnCarte ? r2(ecartCb - v0(z.amex)) : ecartCb;
+  const residu = r2(ecartCbHorsAmex + ecartConecs + ecartAmex);
   const tiroirAttendu = r2(v0(tiroir.fond) + v0(p.especes) + pourboiresPopina);
   const parCoupures = comptageSaisi(tiroir.coupures);
   const tiroirCompte = parCoupures ? totalComptage(tiroir.coupures) / 100 : tiroir.compte;
@@ -150,7 +155,7 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
   if (ecartConecs > 0.005) modes.push(`Popina a ${eur(ecartConecs)} de Conecs en trop.${nbTxt} Le paiement Conecs de ${eur(ecartConecs)} qui n'est pas sur le TPE était une carte bancaire : ouvre le ticket et passe ce paiement en Carte de crédit.`);
   if (ecartConecs < -0.005) modes.push(`Il manque ${eur(-ecartConecs)} de Conecs dans Popina.${nbTxt} Un paiement de ${eur(-ecartConecs)} saisi en Carte de crédit était un Conecs : ouvre le ticket et passe-le en Carte Connecs.`);
   if (ecartAmex > 0.005) modes.push(`Popina a ${eur(ecartAmex)} d'AMEX de plus que le TPE. Un paiement saisi en American Express était une autre carte : passe-le en Carte de crédit.`);
-  if (diffAmex > 0.005 && v0(p.amex) === 0) modes.push(`Le TPE a ${eur(v0(z.amex))} d'AMEX et Popina aucun. Le paiement AMEX a été saisi en Carte de crédit : passe-le en American Express (son pourboire est compris dans le montant du TPE).`);
+  if (amexEnCarte) modes.push(`Le TPE a ${eur(v0(z.amex))} d'AMEX (pourboire compris) et Popina aucun : le paiement AMEX a été saisi en Carte de crédit. Cherche dans Popina un paiement carte de ${eur(v0(z.amex))} ou un peu moins (sans le pourboire), ouvre le ticket et passe-le en American Express.`);
   else if (diffAmex > 0.005 && diffAmex > v0(p.amex) * 0.25) modes.push(`L'AMEX du TPE dépasse Popina de ${eur(diffAmex)}, c'est beaucoup pour un pourboire : vérifie qu'un AMEX n'a pas été saisi en Carte de crédit.`);
 
   const etapes: string[] = [];
@@ -167,7 +172,10 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
     niveau = "manque";
     titre = modes.length ? `Une erreur de mode de paiement, puis ${eur(-residu)} de carte à chercher.` : `Il manque ${eur(-residu)} de carte dans Popina.`;
     etapes.push(...modes);
-    etapes.push(`Un paiement carte a été saisi en espèces, ou une table payée au TPE n'est pas soldée dans Popina. Cherche une transaction d'environ ${eur(-residu)} au TPE, pourboire compris : importe l'export Flatpay du jour pour voir les candidates avec leur heure.`);
+    etapes.push(-residu < 1
+      // Vécu 13/10 : 0,30 € = une carte payée 24,50 € au TPE pour 24,20 € dans Popina, sans la touche pourboire
+      ? `Un si petit écart vient presque toujours d'une carte payée un peu au-dessus de l'addition (montant arrondi par le client, sans la touche pourboire). Compare les petits paiements carte de Popina avec le TPE : rouvre la table et ajoute ${eur(-residu)} payés en carte.`
+      : `Un paiement carte a été saisi en espèces, ou une table payée au TPE n'est pas soldée dans Popina. Cherche une transaction d'environ ${eur(-residu)} au TPE, pourboire compris : importe l'export Flatpay du jour pour voir les candidates avec leur heure.`);
   } else {
     niveau = "trop";
     titre = modes.length ? `Une erreur de mode de paiement, puis ${eur(residu)} de carte en trop à chercher.` : `Popina a ${eur(residu)} de carte en trop.`;
