@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 /**
  * Clôture de caisse du soir (10/10/2026).
  * GET ?jour=YYYY-MM-DD : la clôture du jour (saisie, verdict, corrections), les transactions
- *     Flatpay déjà importées pour ce jour, et le fond laissé à la clôture précédente (fond de départ). GET ?historique=1 : les 60 dernières clôtures.
+ *     Flatpay déjà importées pour ce jour. GET ?historique=1 : les 60 dernières clôtures.
  * PUT { jour, saisie, corrections, notes, valider? } : enregistre (le verdict est recalculé ici) ;
  *     « valider » n'est accepté que si la caisse tombe juste.
  */
@@ -26,17 +26,13 @@ export async function GET(req: NextRequest) {
   }
   const jour = req.nextUrl.searchParams.get("jour") ?? "";
   if (!JOUR.test(jour)) return NextResponse.json({ error: "jour requis (AAAA-MM-JJ)" }, { status: 400 });
-  const [{ data: cloture }, { data: tx }, { data: precedente }] = await Promise.all([
+  const [{ data: cloture }, { data: tx }] = await Promise.all([
     supabaseAdmin.from("clotures").select("*").eq("etablissement_id", a.etabId).eq("jour", jour).maybeSingle(),
     supabaseAdmin.from("flatpay_transactions").select("horodatage, jour, mode, type_carte, montant_centimes, statut, operation, terminal, emetteur, source")
       .eq("etablissement_id", a.etabId).eq("jour", jour).order("horodatage"),
-    supabaseAdmin.from("clotures").select("jour, saisie").eq("etablissement_id", a.etabId).lt("jour", jour)
-      .order("jour", { ascending: false }).limit(1).maybeSingle(),
   ]);
-  const laisseVeille = (precedente?.saisie as SaisieCloture | null)?.tiroir?.laisse ?? null;
   return NextResponse.json({
     cloture: cloture ?? null,
-    veille: precedente && laisseVeille ? { jour: precedente.jour, laisse: laisseVeille } : null,
     transactions: (tx ?? []).map((t) => ({
       horodatage: t.horodatage, jour: t.jour, mode: t.mode, typeCarte: t.type_carte ?? "", montant: (t.montant_centimes as number) / 100,
       statut: t.statut ?? "", operation: t.operation ?? "", terminal: t.terminal, emetteur: t.emetteur, source: t.source,

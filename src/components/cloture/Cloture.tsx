@@ -6,7 +6,7 @@ import { useBureau } from "@/hooks/useBureau";
 import { fetchApi } from "@/lib/fetchApi";
 import { calculerCloture, eur, lireMontant, recapCloture, VIDE, type SaisieCloture } from "@/lib/cloture";
 import { aideCloture, heureParis, jourService, lireExportFlatpay, type TransactionFlatpay } from "@/lib/flatpay";
-import { COUPURES, estBillet, FOND_CIBLE, libelleCoupure, listerCoupures, totalComptage, type Comptage } from "@/lib/fondCaisse";
+import { COUPURES, estBillet, libelleCoupure, listerCoupures, type Comptage } from "@/lib/fondCaisse";
 
 /**
  * Clôture de caisse du soir, Bello Mio (10/10/2026). Déroulé : le Z du TPE sort, l'équipe recopie
@@ -45,22 +45,21 @@ const CHAMPS_POPINA: Champ[] = [
 type Textes = Record<"z" | "popina" | "tiroir", Record<string, string>>;
 const versTextes = (s: SaisieCloture): Textes => {
   const t = (o: Record<string, number | null>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v == null ? "" : String(v).replace(".", ",")]));
-  return { z: t(s.z), popina: t(s.popina), tiroir: t({ fond: s.tiroir.fond, compte: s.tiroir.compte, pourboiresSortis: s.tiroir.pourboiresSortis ?? null }) };
+  return { z: t(s.z), popina: t(s.popina), tiroir: t({ fond: s.tiroir.fond, compte: s.tiroir.compte }) };
 };
 const versSaisie = (t: Textes): SaisieCloture => {
   const n = (o: Record<string, string>, base: Record<string, number | null>) => Object.fromEntries(Object.keys(base).map((k) => [k, lireMontant(o[k] ?? "")])) as never;
-  return { z: n(t.z, VIDE.z), popina: n(t.popina, VIDE.popina), tiroir: n(t.tiroir, { fond: null, compte: null, pourboiresSortis: null }) };
+  return { z: n(t.z, VIDE.z), popina: n(t.popina, VIDE.popina), tiroir: n(t.tiroir, { fond: null, compte: null }) };
 };
 const propre = (c: Comptage | null | undefined): Comptage | null => {
   const o = Object.fromEntries(Object.entries(c ?? {}).filter(([, n]) => n > 0));
   return Object.keys(o).length ? o : null;
 };
-const assembler = (t: Textes, coupures: Comptage, laisse: Comptage): SaisieCloture => {
+const assembler = (t: Textes, coupures: Comptage): SaisieCloture => {
   const s = versSaisie(t);
-  return { ...s, tiroir: { ...s.tiroir, coupures: propre(coupures), laisse: propre(laisse) } };
+  return { ...s, tiroir: { ...s.tiroir, coupures: propre(coupures) } };
 };
-/** Comptage − fond laissé, par coupure */
-const difference = (a: Comptage, b: Comptage): Comptage => Object.fromEntries(COUPURES.map((k) => [String(k), Math.max(0, (a[String(k)] ?? 0) - (b[String(k)] ?? 0))]).filter(([, n]) => (n as number) > 0));
+
 /** Lundi de la semaine d'un jour (AAAA-MM-JJ) */
 const lundi = (jour: string) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
 const dateCourte = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
@@ -73,9 +72,7 @@ export function Cloture() {
   const [jour, setJour] = useState(() => jourService(new Date()));
   const [textes, setTextes] = useState<Textes>(() => versTextes(VIDE));
   const [coupures, setCoupures] = useState<Comptage>({});
-  const [laisse, setLaisse] = useState<Comptage>({});
-  const [editionLaisse, setEditionLaisse] = useState(false);
-  const [veille, setVeille] = useState<{ jour: string; laisse: Comptage } | null>(null);
+
   const [historique, setHistorique] = useState<Historique[]>([]);
   const [corrections, setCorrections] = useState<string[]>([]);
   const [nouvelleCorrection, setNouvelleCorrection] = useState("");
@@ -101,20 +98,15 @@ export function Cloture() {
         if (annule) return;
         if (!r.ok) { setEtat((e) => ({ ...e, chargement: false, erreur: j?.error ?? "Chargement impossible" })); return; }
         const c = j.cloture;
-        // Nouvelle journée : le fond de départ est ce qui a été laissé à la clôture précédente
-        const v = j.veille as { jour: string; laisse: Comptage } | null;
-        const lue: SaisieCloture = c?.saisie?.z ? (c.saisie as SaisieCloture)
-          : v ? { ...VIDE, tiroir: { ...VIDE.tiroir, fond: totalComptage(v.laisse) / 100 } } : VIDE;
+        const lue: SaisieCloture = c?.saisie?.z ? (c.saisie as SaisieCloture) : VIDE;
         setTextes(versTextes(lue));
         setCoupures(lue.tiroir?.coupures ?? {});
-        setLaisse(lue.tiroir?.laisse ?? {});
-        setEditionLaisse(false);
-        setVeille(v ?? null);
+
         setCorrections(Array.isArray(c?.corrections) ? c.corrections : []);
         setNotes(c?.notes ?? "");
         setStatut(c?.statut === "validee" ? "validee" : "en_cours");
         setTransactions(j.transactions ?? []);
-        dernier.current = JSON.stringify({ s: assembler(versTextes(lue), lue.tiroir?.coupures ?? {}, lue.tiroir?.laisse ?? {}), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
+        dernier.current = JSON.stringify({ s: assembler(versTextes(lue), lue.tiroir?.coupures ?? {}), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
         setEtat((e) => ({ ...e, chargement: false }));
         charge.current = true;
       } catch (e) { if (!annule) setEtat((s) => ({ ...s, chargement: false, erreur: e instanceof Error ? e.message : "Chargement impossible" })); }
@@ -122,7 +114,7 @@ export function Cloture() {
     return () => { annule = true; };
   }, [jour]);
 
-  const saisie = useMemo(() => assembler(textes, coupures, laisse), [textes, coupures, laisse]);
+  const saisie = useMemo(() => assembler(textes, coupures), [textes, coupures]);
 
   // Historique : enveloppes de la semaine pour le dépôt en banque
   const chargerHistorique = useCallback(async () => {
@@ -209,9 +201,7 @@ export function Cloture() {
     const somme = (l: [string, number][]) => l.reduce((a, [, v]) => a + v, 0);
     return { lundi: lundi(jour), cette, precedente, totalCette: Math.round(somme(cette) * 100) / 100, totalPrecedente: Math.round(somme(precedente) * 100) / 100 };
   }, [historique, resultat.enveloppe, jour]);
-  const borner = (n: number) => Math.max(0, Math.min(9999, Math.floor(n) || 0));
-  const changerCoupure = (k: number, n: number) => setCoupures((c) => ({ ...c, [String(k)]: borner(n) }));
-  const changerLaisse = (k: number, n: number) => setLaisse((c) => ({ ...c, [String(k)]: borner(n) }));
+  const changerCoupure = (k: number, n: number) => setCoupures((c) => ({ ...c, [String(k)]: Math.max(0, Math.min(9999, Math.floor(n) || 0)) }));
   const peutValider = resultat.niveau === "ok" && resultat.manquePourValider.length === 0;
 
   const couleur = resultat.niveau === "ok" ? VERT : resultat.niveau === "mode" ? AMBRE : resultat.niveau === "vide" ? MUTED : ROUGE;
@@ -293,25 +283,19 @@ export function Cloture() {
             <legend style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 17, textTransform: "uppercase", letterSpacing: ".03em", padding: "0 6px" }}>Tiroir</legend>
             <div style={{ color: MUTED, fontSize: 12.5, marginTop: -4 }}>Compte tout le tiroir, fond compris, sans la cagnotte des pourboires.</div>
             <label style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 14.5, fontWeight: 600 }}>
-              Fond de départ
+              Fond de caisse
               <input inputMode="decimal" autoComplete="off" value={textes.tiroir.fond ?? ""} onChange={(e) => changer("tiroir", "fond", e.target.value)} placeholder="100"
                 style={{ font: "inherit", fontSize: 17, fontWeight: 700, textAlign: "right", width: 90, boxSizing: "border-box", padding: "6px 10px", border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4" }} />
               <span style={{ color: MUTED, fontWeight: 400, fontSize: 13 }}>€</span>
-              {veille && <span style={{ color: MUTED, fontWeight: 400, fontSize: 12.5, flexBasis: "100%" }}>Laissé à la clôture du {dateCourte(veille.jour)} : {eur(totalComptage(veille.laisse) / 100)} ({listerCoupures(veille.laisse)})</span>}
             </label>
             {grille(coupures, changerCoupure)}
-            <label style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 14.5, fontWeight: 600 }}>
-              Pourboires sortis du tiroir
-              <input inputMode="decimal" autoComplete="off" value={textes.tiroir.pourboiresSortis ?? ""} onChange={(e) => changer("tiroir", "pourboiresSortis", e.target.value)} placeholder="0,00"
-                style={{ font: "inherit", fontSize: 17, fontWeight: 700, textAlign: "right", width: 90, boxSizing: "border-box", padding: "6px 10px", border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4" }} />
-              <span style={{ color: MUTED, fontWeight: 400, fontSize: 13 }}>€</span>
-              <span style={{ color: MUTED, fontWeight: 400, fontSize: 12.5, flexBasis: "100%" }}>Pièces de pourboire comptées avec la caisse : retirées du total, elles ne vont ni dans le fond ni à la banque.</span>
-            </label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", alignItems: "baseline", borderTop: `1.5px solid ${BORD}`, paddingTop: 10 }}>
               <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22 }}>{resultat.tiroirCompte != null ? eur(resultat.tiroirCompte) : "—"}</span>
               <span style={{ color: MUTED, fontSize: 13.5 }}>compté · {eur(resultat.tiroirAttendu)} attendu (fond + espèces Popina)</span>
               {resultat.ecartTiroir != null && saisie.popina.especes != null && (
-                <span style={{ fontWeight: 700, color: Math.abs(resultat.ecartTiroir) < 0.005 ? VERT : ROUGE }}>{Math.abs(resultat.ecartTiroir) < 0.005 ? "Tiroir juste" : `${resultat.ecartTiroir > 0 ? "+" : "−"}${eur(Math.abs(resultat.ecartTiroir))}`}</span>
+                <span style={{ fontWeight: 700, color: Math.abs(resultat.ecartTiroir) < 0.005 ? VERT : resultat.ecartTiroir > 0 ? AMBRE : ROUGE }}>{Math.abs(resultat.ecartTiroir) < 0.005 ? "Tiroir juste"
+                  : resultat.ecartTiroir > 0 ? `${eur(resultat.ecartTiroir)} de trop perçu : aux pourboires de l'équipe`
+                  : `Il manque ${eur(-resultat.ecartTiroir)} : à prendre dans les pourboires`}</span>
               )}
             </div>
             {resultat.fondCaisse && (() => {
@@ -324,31 +308,14 @@ export function Cloture() {
                     {f.incomplet > 0 && <div style={{ fontSize: 13, color: ROUGE, marginTop: 4 }}>Il manque {eur(f.incomplet / 100)} pour faire le fond{f.compte > f.fond ? " au centime : pas la bonne monnaie" : ""}. Prévois du change.</div>}
                   </div>
                   <div style={{ borderRadius: 12, background: "#F7EDD6", padding: "10px 12px" }}>
-                    <div style={{ fontWeight: 700, color: AMBRE, fontSize: 14 }}>Enveloppe banque · {eur(resultat.enveloppe ?? f.totalSorti / 100)}</div>
-                    <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.45 }}>{listerCoupures(resultat.fondLaisse != null ? difference(coupures, laisse) : f.sortir) || "Rien à sortir"}</div>
-                    {(saisie.tiroir.pourboiresSortis ?? 0) > 0 && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 4 }}>Moins {eur(saisie.tiroir.pourboiresSortis ?? 0)} de pourboires à prendre dans ces coupures.</div>}
-                  </div>
-                  <div style={{ gridColumn: "1 / -1", borderRadius: 12, border: `1.5px solid ${resultat.fondLaisse != null ? VERT : ACCENT}`, padding: "10px 12px", display: "grid", gap: 8 }}>
-                    {resultat.fondLaisse == null ? (
-                      <>
-                        <div style={{ fontWeight: 700, fontSize: 14 }}>Qu&apos;as-tu laissé dans la caisse ?</div>
-                        <div style={{ fontSize: 12.5, color: MUTED }}>C&apos;est le fond de départ de la prochaine clôture.</div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                          <button type="button" onClick={() => { setLaisse(f.laisser); setEditionLaisse(false); }} style={{ ...BTN, background: VERT, borderColor: VERT, color: "#fff" }}>J&apos;ai laissé le fond proposé</button>
-                          <button type="button" onClick={() => { setLaisse(f.laisser); setEditionLaisse(true); }} style={{ ...BTN, borderColor: BORD }}>J&apos;ai laissé autre chose</button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "4px 12px" }}>
-                          <span style={{ fontWeight: 700, fontSize: 14, color: VERT }}>Laissé dans la caisse · {eur(resultat.fondLaisse)}</span>
-                          <button type="button" onClick={() => setEditionLaisse((e) => !e)} style={{ border: "none", background: "none", color: ACCENT, fontWeight: 700, fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>{editionLaisse ? "Fermer" : "Modifier"}</button>
-                        </div>
-                        {!editionLaisse && <div style={{ fontSize: 14, lineHeight: 1.45 }}>{listerCoupures(laisse)}</div>}
-                        {Math.abs(resultat.fondLaisse - FOND_CIBLE) >= 0.005 && <div style={{ fontSize: 13, color: AMBRE }}>Le fond fait {eur(resultat.fondLaisse)} au lieu de {eur(FOND_CIBLE)} : c&apos;est ce montant qui sera attendu demain.</div>}
-                        {resultat.laisseImpossible.length > 0 && <div style={{ fontSize: 13, color: ROUGE, fontWeight: 600 }}>Plus de coupures laissées que comptées : {resultat.laisseImpossible.join(", ")}. Corrige le comptage ou le fond laissé.</div>}
-                        {editionLaisse && grille(laisse, changerLaisse)}
-                      </>
+                    <div style={{ fontWeight: 700, color: AMBRE, fontSize: 14 }}>À sortir · {eur(f.totalSorti / 100)}</div>
+                    <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.45 }}>{listerCoupures(f.sortir) || "Rien à sortir"}</div>
+                    {resultat.enveloppe != null && (
+                      <div style={{ fontSize: 13, marginTop: 4, lineHeight: 1.4 }}>
+                        <strong>Enveloppe banque : {eur(resultat.enveloppe)}</strong> (espèces Popina)
+                        {resultat.ecartTiroir != null && resultat.ecartTiroir > 0.005 && <span style={{ color: MUTED }}> · {eur(resultat.ecartTiroir)} pour les pourboires de l&apos;équipe</span>}
+                        {resultat.ecartTiroir != null && resultat.ecartTiroir < -0.005 && <span style={{ color: MUTED }}> · {eur(-resultat.ecartTiroir)} à compléter avec les pourboires</span>}
+                      </div>
                     )}
                   </div>
                   {Object.keys(f.manqueIdeal).length > 0 && (
