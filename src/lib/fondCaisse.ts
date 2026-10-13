@@ -18,6 +18,9 @@ export const FOND_IDEAL: Record<number, number> = {
 
 export type Comptage = Record<string, number>;
 
+/** Montant du fond à laisser chaque soir (€) : le total du fond idéal */
+export const FOND_CIBLE = Object.entries(FOND_IDEAL).reduce((t, [k, n]) => t + Number(k) * n, 0) / 100;
+
 export const libelleCoupure = (c: number) => (c >= 100 ? `${c / 100} €` : `${c} c`);
 
 export function totalComptage(c: Comptage | null | undefined): number {

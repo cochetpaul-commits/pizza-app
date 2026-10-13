@@ -6,7 +6,7 @@ import { useBureau } from "@/hooks/useBureau";
 import { fetchApi } from "@/lib/fetchApi";
 import { calculerCloture, eur, lireMontant, recapCloture, VIDE, type SaisieCloture } from "@/lib/cloture";
 import { aideCloture, heureParis, jourService, lireExportFlatpay, type TransactionFlatpay } from "@/lib/flatpay";
-import { COUPURES, estBillet, libelleCoupure, listerCoupures, type Comptage } from "@/lib/fondCaisse";
+import { COUPURES, estBillet, FOND_CIBLE, libelleCoupure, listerCoupures, totalComptage, type Comptage } from "@/lib/fondCaisse";
 
 /**
  * Clôture de caisse du soir, Bello Mio (10/10/2026). Déroulé : le Z du TPE sort, l'équipe recopie
@@ -51,15 +51,20 @@ const versSaisie = (t: Textes): SaisieCloture => {
   const n = (o: Record<string, string>, base: Record<string, number | null>) => Object.fromEntries(Object.keys(base).map((k) => [k, lireMontant(o[k] ?? "")])) as never;
   return { z: n(t.z, VIDE.z), popina: n(t.popina, VIDE.popina), tiroir: n(t.tiroir, { fond: null, compte: null }) };
 };
-const assembler = (t: Textes, coupures: Comptage): SaisieCloture => {
-  const s = versSaisie(t);
-  const propre = Object.fromEntries(Object.entries(coupures).filter(([, n]) => n > 0));
-  return { ...s, tiroir: { ...s.tiroir, coupures: Object.keys(propre).length ? propre : null } };
+const propre = (c: Comptage | null | undefined): Comptage | null => {
+  const o = Object.fromEntries(Object.entries(c ?? {}).filter(([, n]) => n > 0));
+  return Object.keys(o).length ? o : null;
 };
+const assembler = (t: Textes, coupures: Comptage, laisse: Comptage): SaisieCloture => {
+  const s = versSaisie(t);
+  return { ...s, tiroir: { ...s.tiroir, coupures: propre(coupures), laisse: propre(laisse) } };
+};
+/** Comptage − fond laissé, par coupure */
+const difference = (a: Comptage, b: Comptage): Comptage => Object.fromEntries(COUPURES.map((k) => [String(k), Math.max(0, (a[String(k)] ?? 0) - (b[String(k)] ?? 0))]).filter(([, n]) => (n as number) > 0));
 /** Lundi de la semaine d'un jour (AAAA-MM-JJ) */
 const lundi = (jour: string) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
 const dateCourte = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
-type Historique = { jour: string; statut: string; resultat: { fondCaisse?: { totalSorti: number } | null } | null };
+type Historique = { jour: string; statut: string; resultat: { enveloppe?: number | null; fondCaisse?: { totalSorti: number } | null } | null };
 const dateLongue = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 const decaler = (jour: string, n: number) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
@@ -68,6 +73,9 @@ export function Cloture() {
   const [jour, setJour] = useState(() => jourService(new Date()));
   const [textes, setTextes] = useState<Textes>(() => versTextes(VIDE));
   const [coupures, setCoupures] = useState<Comptage>({});
+  const [laisse, setLaisse] = useState<Comptage>({});
+  const [editionLaisse, setEditionLaisse] = useState(false);
+  const [veille, setVeille] = useState<{ jour: string; laisse: Comptage } | null>(null);
   const [historique, setHistorique] = useState<Historique[]>([]);
   const [corrections, setCorrections] = useState<string[]>([]);
   const [nouvelleCorrection, setNouvelleCorrection] = useState("");
@@ -93,14 +101,20 @@ export function Cloture() {
         if (annule) return;
         if (!r.ok) { setEtat((e) => ({ ...e, chargement: false, erreur: j?.error ?? "Chargement impossible" })); return; }
         const c = j.cloture;
-        const lue = c?.saisie?.z ? (c.saisie as SaisieCloture) : VIDE;
+        // Nouvelle journée : le fond de départ est ce qui a été laissé à la clôture précédente
+        const v = j.veille as { jour: string; laisse: Comptage } | null;
+        const lue: SaisieCloture = c?.saisie?.z ? (c.saisie as SaisieCloture)
+          : v ? { ...VIDE, tiroir: { ...VIDE.tiroir, fond: totalComptage(v.laisse) / 100 } } : VIDE;
         setTextes(versTextes(lue));
         setCoupures(lue.tiroir?.coupures ?? {});
+        setLaisse(lue.tiroir?.laisse ?? {});
+        setEditionLaisse(false);
+        setVeille(v ?? null);
         setCorrections(Array.isArray(c?.corrections) ? c.corrections : []);
         setNotes(c?.notes ?? "");
         setStatut(c?.statut === "validee" ? "validee" : "en_cours");
         setTransactions(j.transactions ?? []);
-        dernier.current = JSON.stringify({ s: assembler(versTextes(lue), lue.tiroir?.coupures ?? {}), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
+        dernier.current = JSON.stringify({ s: assembler(versTextes(lue), lue.tiroir?.coupures ?? {}, lue.tiroir?.laisse ?? {}), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
         setEtat((e) => ({ ...e, chargement: false }));
         charge.current = true;
       } catch (e) { if (!annule) setEtat((s) => ({ ...s, chargement: false, erreur: e instanceof Error ? e.message : "Chargement impossible" })); }
@@ -108,7 +122,7 @@ export function Cloture() {
     return () => { annule = true; };
   }, [jour]);
 
-  const saisie = useMemo(() => assembler(textes, coupures), [textes, coupures]);
+  const saisie = useMemo(() => assembler(textes, coupures, laisse), [textes, coupures, laisse]);
 
   // Historique : enveloppes de la semaine pour le dépôt en banque
   const chargerHistorique = useCallback(async () => {
@@ -184,15 +198,20 @@ export function Cloture() {
 
   const enveloppes = useMemo(() => {
     const parJour = new Map<string, number>();
-    for (const h of historique) { const v = h.resultat?.fondCaisse?.totalSorti; if (v != null) parJour.set(h.jour, v); }
-    if (resultat.fondCaisse) parJour.set(jour, resultat.fondCaisse.totalSorti); else parJour.delete(jour);
+    for (const h of historique) {
+      const v = h.resultat?.enveloppe ?? (h.resultat?.fondCaisse ? h.resultat.fondCaisse.totalSorti / 100 : null);
+      if (v != null) parJour.set(h.jour, v);
+    }
+    if (resultat.enveloppe != null) parJour.set(jour, resultat.enveloppe); else parJour.delete(jour);
     const semaine = (l: string) => [...parJour.entries()].filter(([j]) => lundi(j) === l).sort(([a], [b]) => a.localeCompare(b));
     const cette = semaine(lundi(jour));
     const precedente = semaine(lundi(decaler(lundi(jour), -7)));
     const somme = (l: [string, number][]) => l.reduce((a, [, v]) => a + v, 0);
-    return { lundi: lundi(jour), cette, precedente, totalCette: somme(cette), totalPrecedente: somme(precedente) };
-  }, [historique, resultat.fondCaisse, jour]);
-  const changerCoupure = (k: number, n: number) => setCoupures((c) => ({ ...c, [String(k)]: Math.max(0, Math.min(9999, Math.floor(n) || 0)) }));
+    return { lundi: lundi(jour), cette, precedente, totalCette: Math.round(somme(cette) * 100) / 100, totalPrecedente: Math.round(somme(precedente) * 100) / 100 };
+  }, [historique, resultat.enveloppe, jour]);
+  const borner = (n: number) => Math.max(0, Math.min(9999, Math.floor(n) || 0));
+  const changerCoupure = (k: number, n: number) => setCoupures((c) => ({ ...c, [String(k)]: borner(n) }));
+  const changerLaisse = (k: number, n: number) => setLaisse((c) => ({ ...c, [String(k)]: borner(n) }));
   const peutValider = resultat.niveau === "ok" && resultat.manquePourValider.length === 0;
 
   const couleur = resultat.niveau === "ok" ? VERT : resultat.niveau === "mode" ? AMBRE : resultat.niveau === "vide" ? MUTED : ROUGE;
@@ -215,6 +234,29 @@ export function Cloture() {
   );
 
   const BTN: CSSProperties = { height: 40, padding: "0 16px", borderRadius: 10, border: `1.5px solid #1a1a1a`, background: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a" };
+  const grille = (valeurs: Comptage, changer: (k: number, n: number) => void) => (
+  <div style={{ display: "grid", gridTemplateColumns: bureau ? "1fr 1fr" : "minmax(0, 1fr)", gap: bureau ? 18 : 4 }}>
+    {[COUPURES.filter(estBillet), COUPURES.filter((k) => !estBillet(k))].map((groupe, gi) => (
+      <div key={gi}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".05em", margin: "4px 0" }}>{gi ? "Pièces" : "Billets"}</div>
+        {groupe.map((k) => {
+          const n = valeurs[String(k)] ?? 0;
+          return (
+            <div key={k} style={{ display: "grid", gridTemplateColumns: "64px 40px minmax(0, 72px) 40px 1fr", alignItems: "center", gap: 6, padding: "4px 0", borderTop: "1px solid #f0ebe2" }}>
+              <span style={{ fontWeight: 700, fontSize: 15 }}>{libelleCoupure(k)}</span>
+              <button type="button" aria-label={`Retirer ${libelleCoupure(k)}`} onClick={() => changer(k, n - 1)} style={{ ...BTN, width: 40, padding: 0, borderColor: BORD }}>−</button>
+              <input inputMode="numeric" autoComplete="off" value={n || ""} placeholder="0" onChange={(e) => changer(k, Number(e.target.value.replace(/\D/g, "")))}
+                style={{ font: "inherit", fontSize: 18, fontWeight: 700, textAlign: "center", width: "100%", boxSizing: "border-box", height: 40, border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4", fontVariantNumeric: "tabular-nums" }} />
+              <button type="button" aria-label={`Ajouter ${libelleCoupure(k)}`} onClick={() => changer(k, n + 1)} style={{ ...BTN, width: 40, padding: 0, borderColor: BORD }}>+</button>
+              <span style={{ textAlign: "right", color: n ? "#1a1a1a" : FAIBLE, fontVariantNumeric: "tabular-nums", fontSize: 14 }}>{eur((n * k) / 100)}</span>
+            </div>
+          );
+        })}
+      </div>
+    ))}
+  </div>
+  );
+
   const ligneTx = (t: TransactionFlatpay, extra?: React.ReactNode) => (
     <div key={`${t.horodatage}-${t.montant}-${t.typeCarte}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid #f0ebe2", fontSize: 13.5 }}>
       <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", width: 44 }}>{heureParis(t.horodatage)}</span>
@@ -250,32 +292,14 @@ export function Cloture() {
           <fieldset style={{ border: `1.5px solid ${BORD}`, borderRadius: 14, background: "#fff", margin: 0, padding: "12px 14px 12px", minWidth: 0, display: "grid", gap: 10 }}>
             <legend style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 17, textTransform: "uppercase", letterSpacing: ".03em", padding: "0 6px" }}>Tiroir</legend>
             <div style={{ color: MUTED, fontSize: 12.5, marginTop: -4 }}>Compte tout le tiroir, fond compris, sans la cagnotte des pourboires.</div>
-            <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14.5, fontWeight: 600 }}>
-              Fond de caisse
+            <label style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 14.5, fontWeight: 600 }}>
+              Fond de départ
               <input inputMode="decimal" autoComplete="off" value={textes.tiroir.fond ?? ""} onChange={(e) => changer("tiroir", "fond", e.target.value)} placeholder="100"
                 style={{ font: "inherit", fontSize: 17, fontWeight: 700, textAlign: "right", width: 90, boxSizing: "border-box", padding: "6px 10px", border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4" }} />
               <span style={{ color: MUTED, fontWeight: 400, fontSize: 13 }}>€</span>
+              {veille && <span style={{ color: MUTED, fontWeight: 400, fontSize: 12.5, flexBasis: "100%" }}>Laissé à la clôture du {dateCourte(veille.jour)} : {eur(totalComptage(veille.laisse) / 100)} ({listerCoupures(veille.laisse)})</span>}
             </label>
-            <div style={{ display: "grid", gridTemplateColumns: bureau ? "1fr 1fr" : "minmax(0, 1fr)", gap: bureau ? 18 : 4 }}>
-              {[COUPURES.filter(estBillet), COUPURES.filter((k) => !estBillet(k))].map((groupe, gi) => (
-                <div key={gi}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".05em", margin: "4px 0" }}>{gi ? "Pièces" : "Billets"}</div>
-                  {groupe.map((k) => {
-                    const n = coupures[String(k)] ?? 0;
-                    return (
-                      <div key={k} style={{ display: "grid", gridTemplateColumns: "64px 40px minmax(0, 72px) 40px 1fr", alignItems: "center", gap: 6, padding: "4px 0", borderTop: "1px solid #f0ebe2" }}>
-                        <span style={{ fontWeight: 700, fontSize: 15 }}>{libelleCoupure(k)}</span>
-                        <button type="button" aria-label={`Retirer ${libelleCoupure(k)}`} onClick={() => changerCoupure(k, n - 1)} style={{ ...BTN, width: 40, padding: 0, borderColor: BORD }}>−</button>
-                        <input inputMode="numeric" autoComplete="off" value={n || ""} placeholder="0" onChange={(e) => changerCoupure(k, Number(e.target.value.replace(/\D/g, "")))}
-                          style={{ font: "inherit", fontSize: 18, fontWeight: 700, textAlign: "center", width: "100%", boxSizing: "border-box", height: 40, border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4", fontVariantNumeric: "tabular-nums" }} />
-                        <button type="button" aria-label={`Ajouter ${libelleCoupure(k)}`} onClick={() => changerCoupure(k, n + 1)} style={{ ...BTN, width: 40, padding: 0, borderColor: BORD }}>+</button>
-                        <span style={{ textAlign: "right", color: n ? "#1a1a1a" : FAIBLE, fontVariantNumeric: "tabular-nums", fontSize: 14 }}>{eur((n * k) / 100)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
+            {grille(coupures, changerCoupure)}
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", alignItems: "baseline", borderTop: `1.5px solid ${BORD}`, paddingTop: 10 }}>
               <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22 }}>{resultat.tiroirCompte != null ? eur(resultat.tiroirCompte) : "—"}</span>
               <span style={{ color: MUTED, fontSize: 13.5 }}>compté · {eur(resultat.tiroirAttendu)} attendu (fond + espèces Popina)</span>
@@ -293,8 +317,31 @@ export function Cloture() {
                     {f.incomplet > 0 && <div style={{ fontSize: 13, color: ROUGE, marginTop: 4 }}>Il manque {eur(f.incomplet / 100)} pour faire le fond{f.compte > f.fond ? " au centime : pas la bonne monnaie" : ""}. Prévois du change.</div>}
                   </div>
                   <div style={{ borderRadius: 12, background: "#F7EDD6", padding: "10px 12px" }}>
-                    <div style={{ fontWeight: 700, color: AMBRE, fontSize: 14 }}>Enveloppe banque · {eur(f.totalSorti / 100)}</div>
-                    <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.45 }}>{listerCoupures(f.sortir) || "Rien à sortir"}</div>
+                    <div style={{ fontWeight: 700, color: AMBRE, fontSize: 14 }}>Enveloppe banque · {eur(resultat.enveloppe ?? f.totalSorti / 100)}</div>
+                    <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.45 }}>{listerCoupures(resultat.fondLaisse != null ? difference(coupures, laisse) : f.sortir) || "Rien à sortir"}</div>
+                  </div>
+                  <div style={{ gridColumn: "1 / -1", borderRadius: 12, border: `1.5px solid ${resultat.fondLaisse != null ? VERT : ACCENT}`, padding: "10px 12px", display: "grid", gap: 8 }}>
+                    {resultat.fondLaisse == null ? (
+                      <>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>Qu&apos;as-tu laissé dans la caisse ?</div>
+                        <div style={{ fontSize: 12.5, color: MUTED }}>C&apos;est le fond de départ de la prochaine clôture.</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          <button type="button" onClick={() => { setLaisse(f.laisser); setEditionLaisse(false); }} style={{ ...BTN, background: VERT, borderColor: VERT, color: "#fff" }}>J&apos;ai laissé le fond proposé</button>
+                          <button type="button" onClick={() => { setLaisse(f.laisser); setEditionLaisse(true); }} style={{ ...BTN, borderColor: BORD }}>J&apos;ai laissé autre chose</button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "4px 12px" }}>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: VERT }}>Laissé dans la caisse · {eur(resultat.fondLaisse)}</span>
+                          <button type="button" onClick={() => setEditionLaisse((e) => !e)} style={{ border: "none", background: "none", color: ACCENT, fontWeight: 700, fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>{editionLaisse ? "Fermer" : "Modifier"}</button>
+                        </div>
+                        {!editionLaisse && <div style={{ fontSize: 14, lineHeight: 1.45 }}>{listerCoupures(laisse)}</div>}
+                        {Math.abs(resultat.fondLaisse - FOND_CIBLE) >= 0.005 && <div style={{ fontSize: 13, color: AMBRE }}>Le fond fait {eur(resultat.fondLaisse)} au lieu de {eur(FOND_CIBLE)} : c&apos;est ce montant qui sera attendu demain.</div>}
+                        {resultat.laisseImpossible.length > 0 && <div style={{ fontSize: 13, color: ROUGE, fontWeight: 600 }}>Plus de coupures laissées que comptées : {resultat.laisseImpossible.join(", ")}. Corrige le comptage ou le fond laissé.</div>}
+                        {editionLaisse && grille(laisse, changerLaisse)}
+                      </>
+                    )}
                   </div>
                   {Object.keys(f.manqueIdeal).length > 0 && (
                     <div style={{ gridColumn: "1 / -1", fontSize: 13, color: MUTED }}>Pour refaire le fond idéal du lundi, il manque : {listerCoupures(f.manqueIdeal)}.</div>
@@ -304,9 +351,9 @@ export function Cloture() {
             })()}
             {(enveloppes.cette.length > 0 || enveloppes.precedente.length > 0) && (
               <div style={{ fontSize: 13.5, display: "grid", gap: 4, borderTop: "1px solid #f0ebe2", paddingTop: 8 }}>
-                <div><strong>Enveloppes de la semaine du {dateCourte(enveloppes.lundi)} : {eur(enveloppes.totalCette / 100)}</strong>
-                  {enveloppes.cette.length > 0 && <span style={{ color: MUTED }}> ({enveloppes.cette.map(([j, v]) => `${dateCourte(j)} ${eur(v / 100)}`).join(" · ")})</span>}</div>
-                {enveloppes.precedente.length > 0 && <div style={{ color: AMBRE, fontWeight: 700 }}>Semaine précédente, à déposer à la banque : {eur(enveloppes.totalPrecedente / 100)}</div>}
+                <div><strong>Enveloppes de la semaine du {dateCourte(enveloppes.lundi)} : {eur(enveloppes.totalCette)}</strong>
+                  {enveloppes.cette.length > 0 && <span style={{ color: MUTED }}> ({enveloppes.cette.map(([j, v]) => `${dateCourte(j)} ${eur(v)}`).join(" · ")})</span>}</div>
+                {enveloppes.precedente.length > 0 && <div style={{ color: AMBRE, fontWeight: 700 }}>Semaine précédente, à déposer à la banque : {eur(enveloppes.totalPrecedente)}</div>}
               </div>
             )}
           </fieldset>

@@ -10,7 +10,7 @@
  * comptent pour la paie.
  */
 
-import { comptageSaisi, composerFond, totalComptage, type Comptage, type CompositionFond } from "@/lib/fondCaisse";
+import { comptageSaisi, composerFond, COUPURES, FOND_CIBLE, libelleCoupure, totalComptage, type Comptage, type CompositionFond } from "@/lib/fondCaisse";
 
 export type SaisieZ = {
   /** Bloc EUR, ligne TOTAL NET (pourboires compris) */
@@ -40,10 +40,13 @@ export type SaisiePopina = {
 };
 
 export type SaisieTiroir = {
+  /** Fond de départ : ce qui a été laissé la veille (100 € par défaut) */
   fond: number | null;
   compte: number | null;
   /** Comptage coupure par coupure (clé : coupure en centimes) ; remplace « compte » quand il est saisi */
   coupures?: Comptage | null;
+  /** Ce qui a réellement été laissé dans la caisse ce soir : le fond de départ du lendemain */
+  laisse?: Comptage | null;
 };
 
 export type SaisieCloture = { z: SaisieZ; popina: SaisiePopina; tiroir: SaisieTiroir };
@@ -74,6 +77,12 @@ export type ResultatCloture = {
   ecartTiroir: number | null;
   /** Ce qu'il faut laisser pour le fond et ce qui part à la banque (avec le comptage par coupure) */
   fondCaisse: CompositionFond | null;
+  /** Fond réellement laissé (€), null tant qu'il n'est pas confirmé */
+  fondLaisse: number | null;
+  /** Enveloppe banque (€) : comptée − fond réellement laissé (ou proposé tant qu'il n'est pas confirmé) */
+  enveloppe: number | null;
+  /** Coupures laissées en plus grand nombre que comptées */
+  laisseImpossible: string[];
   /** Ce qui manque pour pouvoir valider (espèces Popina, comptage du tiroir) */
   manquePourValider: string[];
 };
@@ -115,10 +124,21 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
   const parCoupures = comptageSaisi(tiroir.coupures);
   const tiroirCompte = parCoupures ? totalComptage(tiroir.coupures) / 100 : tiroir.compte;
   const ecartTiroir = tiroirCompte == null ? null : r2(tiroirCompte - tiroirAttendu);
-  const fondCaisse = parCoupures && tiroir.coupures ? composerFond(tiroir.coupures, v0(tiroir.fond)) : null;
+  // Le fond à laisser vise toujours 100 € (fond idéal), quel que soit le fond de départ du jour
+  const fondCaisse = parCoupures && tiroir.coupures ? composerFond(tiroir.coupures, FOND_CIBLE) : null;
+  const laisseSaisi = comptageSaisi(tiroir.laisse);
+  const fondLaisse = laisseSaisi ? totalComptage(tiroir.laisse) / 100 : null;
+  const enveloppe = tiroirCompte == null ? null
+    : fondLaisse != null ? r2(tiroirCompte - fondLaisse)
+    : fondCaisse ? fondCaisse.totalSorti / 100 : null;
+  const laisseImpossible = laisseSaisi && tiroir.coupures
+    ? COUPURES.filter((k) => (Number(tiroir.laisse?.[String(k)]) || 0) > (Number(tiroir.coupures?.[String(k)]) || 0)).map(libelleCoupure)
+    : [];
   const manquePourValider = [
     ...(p.especes == null ? ["les espèces de l'écran Popina"] : []),
     ...(tiroirCompte == null ? ["le comptage du tiroir"] : []),
+    ...(parCoupures && !laisseSaisi ? ["le fond laissé dans la caisse"] : []),
+    ...(laisseImpossible.length ? ["un fond laissé possible (plus de coupures que comptées)"] : []),
   ];
   const pourboiresPaie = r2(v0(z.pourboires) + v0(z.conecsPourboires) + pourboireAmex);
 
@@ -127,7 +147,7 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
     { mode: "conecs", libelle: "Carte Connecs", popina: v0(p.conecs), attendu: cibleConecs, ecart: ecartConecs },
     { mode: "amex", libelle: "American Express", popina: v0(p.amex), attendu: v0(z.amex), ecart: ecartAmex },
   ];
-  const base = { lignes, cibleCb, ecartCb, cibleConecs, ecartConecs, ecartAmex, residu, pourboireAmex, pourboiresPaie, tiroirAttendu, tiroirCompte, ecartTiroir, fondCaisse, manquePourValider };
+  const base = { lignes, cibleCb, ecartCb, cibleConecs, ecartConecs, ecartAmex, residu, pourboireAmex, pourboiresPaie, tiroirAttendu, tiroirCompte, ecartTiroir, fondCaisse, fondLaisse, enveloppe, laisseImpossible, manquePourValider };
 
   if (z.total == null || p.cb == null) return { ...base, niveau: "vide", titre: "Remplis le ticket Z et l'écran Popina pour voir le verdict.", etapes: [] };
 
@@ -181,7 +201,7 @@ export function recapCloture(jour: string, s: SaisieCloture, r: ResultatCloture,
     ...r.lignes.map((l) => `${l.libelle} : Popina ${eur(l.popina)} pour ${eur(l.attendu)} attendu (${nul(l.ecart) ? "juste" : signe(l.ecart)})`),
     `Pourboires carte pour la paie : ${eur(r.pourboiresPaie)}${r.pourboireAmex > 0 ? ` (dont AMEX ${eur(r.pourboireAmex)})` : ""}`,
     r.ecartTiroir != null ? `Tiroir : ${eur(r.tiroirCompte ?? 0)} pour ${eur(r.tiroirAttendu)} attendu (${nul(r.ecartTiroir) ? "juste" : signe(r.ecartTiroir)})` : null,
-    r.fondCaisse ? `Fond laissé : ${eur(r.fondCaisse.totalLaisse / 100)} · enveloppe banque : ${eur(r.fondCaisse.totalSorti / 100)}` : null,
+    r.enveloppe != null ? `Fond laissé : ${eur(r.fondLaisse ?? (r.fondCaisse?.totalLaisse ?? 0) / 100)}${r.fondLaisse == null ? " (proposé)" : ""} · enveloppe banque : ${eur(r.enveloppe)}` : null,
     ...corrections.map((c) => `Correction : ${c}`),
     ...r.etapes.map((e) => `• ${e}`),
   ];

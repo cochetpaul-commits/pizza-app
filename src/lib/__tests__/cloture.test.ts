@@ -59,7 +59,22 @@ describe("clôture du soir (cas réels du brief)", () => {
     expect(r.ecartTiroir).toBe(0);
     expect(r.fondCaisse?.totalLaisse).toBe(10000);
     expect(r.fondCaisse?.totalSorti).toBe(21150);
-    expect(r.manquePourValider).toEqual([]);
+    expect(r.manquePourValider).toEqual(["le fond laissé dans la caisse"]);
+  });
+  it("12/10 corrigé : fond réellement laissé, enveloppe et fond de départ du lendemain", () => {
+    const coupures = { "10": 5, "20": 5, "50": 5, "100": 12, "200": 8, "500": 2, "1000": 11, "2000": 3, "5000": 2 };
+    const laisse = { "2000": 2, "1000": 2, "500": 2, "200": 8, "100": 10, "50": 5, "20": 5, "10": 5 };
+    const base = saisie({ total: 2954, pourboires: 22, conecs: 0 }, { cb: 2932, conecs: 0, especes: 211.5 }, { fond: 100, coupures });
+    const sans = calculerCloture(base);
+    expect(sans.manquePourValider).toEqual(["le fond laissé dans la caisse"]);
+    expect(sans.enveloppe).toBe(212);
+    const avec = calculerCloture({ ...base, tiroir: { ...base.tiroir, laisse } });
+    expect(avec.fondLaisse).toBe(100);
+    expect(avec.enveloppe).toBe(212);
+    expect(avec.ecartTiroir).toBe(0.5);
+    expect(avec.manquePourValider).toEqual([]);
+    const trop = calculerCloture({ ...base, tiroir: { ...base.tiroir, laisse: { "5000": 3 } } });
+    expect(trop.laisseImpossible).toEqual(["50 €"]);
   });
   it("valider demande les espèces Popina et le comptage", () => {
     const r = calculerCloture(saisie({ total: 100, pourboires: 0, conecs: 0 }, { cb: 100, conecs: 0 }));
