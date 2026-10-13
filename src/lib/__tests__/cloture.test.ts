@@ -59,7 +59,7 @@ describe("clôture du soir (cas réels du brief)", () => {
     const r = calculerCloture(saisie(z, { cb: 4876.8, amex: 0, conecs: 168, conecsNb: 7, especes: 773.7 }));
     expect(r.niveau).toBe("mode");
     expect(r.etapes[0]).toMatch(/AMEX a été saisi en Carte de crédit/);
-    expect(r.etapes[0]).toMatch(/cherche un paiement carte de 70,50 € \(\+ 3 % de pourboire\)/);
+    expect(r.etapes[0]).toMatch(/cherche d'abord un paiement carte de 70,50 € \(3 % de pourboire\), sinon 72,62 € \(sans pourboire\), 69,16 € \(5 % de pourboire\)/);
     expect(additionsPossibles(72.62)[0]).toEqual({ montant: 70.5, pourboire: 3 });
     // Après correction dans Popina : tout colle
     const ok = calculerCloture(saisie(z, { cb: 4806.3, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7 }));
