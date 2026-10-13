@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { calculerCloture, type SaisieCloture } from "@/lib/cloture";
+import { calculerCloture, noteManquante, type SaisieCloture } from "@/lib/cloture";
 import { accesCloture } from "./acces";
 
 export const runtime = "nodejs";
@@ -45,14 +45,21 @@ export async function PUT(req: NextRequest) {
   if ("erreur" in a) return a.erreur;
   const body = await req.json().catch(() => null) as { jour?: string; saisie?: SaisieCloture; corrections?: string[]; notes?: string | null; valider?: boolean } | null;
   if (!body?.jour || !JOUR.test(body.jour) || !body.saisie?.z || !body.saisie.popina || !body.saisie.tiroir) return NextResponse.json({ error: "jour et saisie requis" }, { status: 400 });
-  const resultat = calculerCloture(body.saisie);
-  const { data: existante } = await supabaseAdmin.from("clotures").select("statut").eq("etablissement_id", a.etabId).eq("jour", body.jour).maybeSingle();
+  const { data: existante } = await supabaseAdmin.from("clotures").select("statut, saisie").eq("etablissement_id", a.etabId).eq("jour", body.jour).maybeSingle();
+  // Un petit écart carte réglé en « prix sur mesure » reste attaché à la soirée, même une fois la carte juste :
+  // la note de correction est obligatoire pour valider (règle de Paul, 14/10/2026)
+  const premier = calculerCloture(body.saisie);
+  const ajustement = premier.petitEcart ?? body.saisie.ajustement ?? (existante?.saisie as SaisieCloture | null)?.ajustement ?? null;
+  const saisie: SaisieCloture = { ...body.saisie, ajustement };
+  const resultat = calculerCloture(saisie);
+  const corrections = (body.corrections ?? []).map((c) => String(c).trim()).filter(Boolean).slice(0, 50);
   if (body.valider && resultat.niveau !== "ok") return NextResponse.json({ error: "La caisse ne tombe pas juste : corrige d'abord l'écart, puis recopie les montants Popina." }, { status: 400 });
+  if (body.valider && noteManquante(resultat, corrections)) return NextResponse.json({ error: "Note la correction en prix sur mesure (la table et le montant) avant de valider." }, { status: 400 });
   if (body.valider && resultat.manquePourValider.length) return NextResponse.json({ error: `Pour valider, il manque ${resultat.manquePourValider.join(" et ")}.` }, { status: 400 });
   const maintenant = new Date().toISOString();
   const ligne = {
-    etablissement_id: a.etabId, jour: body.jour, saisie: body.saisie, resultat, niveau: resultat.niveau,
-    corrections: (body.corrections ?? []).map((c) => String(c).trim()).filter(Boolean).slice(0, 50),
+    etablissement_id: a.etabId, jour: body.jour, saisie, resultat, niveau: resultat.niveau,
+    corrections,
     notes: body.notes?.trim() || null, pourboires_paie: resultat.niveau === "vide" ? null : resultat.pourboiresPaie,
     updated_by: a.userId, updated_at: maintenant,
     ...(body.valider ? { statut: "validee", validee_at: maintenant } : existante?.statut === "validee" && resultat.niveau !== "ok" ? { statut: "en_cours", validee_at: null } : {}),

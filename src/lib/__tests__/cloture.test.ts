@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { additionsPossibles, calculerCloture, lireMontant, VIDE, type SaisieCloture } from "@/lib/cloture";
+import { additionsPossibles, calculerCloture, lireMontant, noteManquante, VIDE, type SaisieCloture } from "@/lib/cloture";
 
 const saisie = (z: Partial<SaisieCloture["z"]>, p: Partial<SaisieCloture["popina"]>, t: Partial<SaisieCloture["tiroir"]> = {}): SaisieCloture => ({
   z: { ...VIDE.z, amex: 0, conecsPourboires: 0, ...z },
@@ -64,6 +64,27 @@ describe("clôture du soir (cas réels du brief)", () => {
     // Après correction dans Popina : tout colle
     const ok = calculerCloture(saisie(z, { cb: 4806.3, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7 }));
     expect(ok.niveau).toBe("ok");
+  });
+  it("petit écart carte (2 € max, liquide bon) : prix sur mesure et note obligatoire", () => {
+    const z = { total: 4914.98, pourboires: 38.18, amex: 72.62, conecs: 168, conecsNb: 7 };
+    // 13/10 : la table 40-1 payée 24,50 € pour 24,20 € ; tiroir compté juste (873,70 €)
+    const tiroir = { fond: 100, compte: 873.7 };
+    const r = calculerCloture(saisie(z, { cb: 4806, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7 }, tiroir));
+    expect(r.petitEcart).toBe(-0.3);
+    expect(r.etapes.join(" ")).toMatch(/Prix sur mesure » : augmente-le de 0,30 €/);
+    expect(noteManquante(r, [])).toBe(true);
+    // Après la correction dans Popina : carte juste, mais l'ajustement reste attaché et la note est exigée
+    const apres = calculerCloture({ ...saisie(z, { cb: 4806.3, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7 }, tiroir), ajustement: r.petitEcart });
+    expect(apres.niveau).toBe("ok");
+    expect(noteManquante(apres, [])).toBe(true);
+    expect(noteManquante(apres, ["Table 40-1 : prix sur mesure +0,30 €"])).toBe(false);
+    // Tiroir pas encore compté : pas de prix sur mesure, on demande de compter
+    const sansTiroir = calculerCloture(saisie(z, { cb: 4806, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7 }));
+    expect(sansTiroir.petitEcart).toBeNull();
+    expect(sansTiroir.etapes.join(" ")).toMatch(/Compte le tiroir/);
+    // Plus de 2 € : vraie erreur à chercher
+    const gros = calculerCloture(saisie(z, { cb: 4803, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7 }, tiroir));
+    expect(gros.petitEcart).toBeNull();
   });
   it("tiroir : une carte saisie en espèces manque à la fois en carte et dans le tiroir", () => {
     // 30 € payés par carte saisis en espèces : carte −30, espèces Popina +30 → tiroir compté 30 € sous l'attendu

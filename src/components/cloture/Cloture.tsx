@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSPrope
 import { OSWALD } from "@/components/TuileProduit";
 import { useBureau } from "@/hooks/useBureau";
 import { fetchApi } from "@/lib/fetchApi";
-import { calculerCloture, eur, lireMontant, recapCloture, VIDE, type SaisieCloture } from "@/lib/cloture";
+import { calculerCloture, eur, lireMontant, noteManquante, recapCloture, VIDE, type SaisieCloture } from "@/lib/cloture";
 import { aideCloture, heureParis, jourService, lireExportFlatpay, type TransactionFlatpay } from "@/lib/flatpay";
 import { COUPURES, estBillet, libelleCoupure, listerCoupures, type Comptage } from "@/lib/fondCaisse";
 
@@ -55,9 +55,9 @@ const propre = (c: Comptage | null | undefined): Comptage | null => {
   const o = Object.fromEntries(Object.entries(c ?? {}).filter(([, n]) => n > 0));
   return Object.keys(o).length ? o : null;
 };
-const assembler = (t: Textes, coupures: Comptage): SaisieCloture => {
+const assembler = (t: Textes, coupures: Comptage, ajustement: number | null): SaisieCloture => {
   const s = versSaisie(t);
-  return { ...s, tiroir: { ...s.tiroir, coupures: propre(coupures) } };
+  return { ...s, tiroir: { ...s.tiroir, coupures: propre(coupures) }, ajustement };
 };
 
 /** Lundi de la semaine d'un jour (AAAA-MM-JJ) */
@@ -76,6 +76,9 @@ export function Cloture() {
   const [historique, setHistorique] = useState<Historique[]>([]);
   const [corrections, setCorrections] = useState<string[]>([]);
   const [nouvelleCorrection, setNouvelleCorrection] = useState("");
+  /** Petit écart carte réglé en prix sur mesure pendant la soirée (gardé par le serveur) */
+  const [ajustement, setAjustement] = useState<number | null>(null);
+  const correctionRef = useRef<HTMLInputElement>(null);
   const [notes, setNotes] = useState("");
   const [statut, setStatut] = useState<"en_cours" | "validee">("en_cours");
   const [transactions, setTransactions] = useState<TransactionFlatpay[]>([]);
@@ -101,12 +104,13 @@ export function Cloture() {
         const lue: SaisieCloture = c?.saisie?.z ? (c.saisie as SaisieCloture) : VIDE;
         setTextes(versTextes(lue));
         setCoupures(lue.tiroir?.coupures ?? {});
+        setAjustement(lue.ajustement ?? null);
 
         setCorrections(Array.isArray(c?.corrections) ? c.corrections : []);
         setNotes(c?.notes ?? "");
         setStatut(c?.statut === "validee" ? "validee" : "en_cours");
         setTransactions(j.transactions ?? []);
-        dernier.current = JSON.stringify({ s: assembler(versTextes(lue), lue.tiroir?.coupures ?? {}), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
+        dernier.current = JSON.stringify({ s: assembler(versTextes(lue), lue.tiroir?.coupures ?? {}, lue.ajustement ?? null), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
         setEtat((e) => ({ ...e, chargement: false }));
         charge.current = true;
       } catch (e) { if (!annule) setEtat((s) => ({ ...s, chargement: false, erreur: e instanceof Error ? e.message : "Chargement impossible" })); }
@@ -114,7 +118,7 @@ export function Cloture() {
     return () => { annule = true; };
   }, [jour]);
 
-  const saisie = useMemo(() => assembler(textes, coupures), [textes, coupures]);
+  const saisie = useMemo(() => assembler(textes, coupures, ajustement), [textes, coupures, ajustement]);
 
   // Historique : enveloppes de la semaine pour le dépôt en banque
   const chargerHistorique = useCallback(async () => {
@@ -135,6 +139,7 @@ export function Cloture() {
       const j = await r.json().catch(() => null);
       if (!r.ok) { setEtat((e) => ({ ...e, enregistrement: false, erreur: j?.error ?? "Enregistrement impossible" })); return; }
       setStatut(j.cloture?.statut === "validee" ? "validee" : "en_cours");
+      setAjustement(j.cloture?.saisie?.ajustement ?? null);
       setEtat((e) => ({ ...e, enregistrement: false, info: valider ? "Clôture validée : tu peux arrêter la caisse Popina." : null }));
       if (valider) void chargerHistorique();
     } catch (e) { setEtat((s) => ({ ...s, enregistrement: false, erreur: e instanceof Error ? e.message : "Enregistrement impossible" })); }
@@ -202,7 +207,13 @@ export function Cloture() {
     return { lundi: lundi(jour), cette, precedente, totalCette: Math.round(somme(cette) * 100) / 100, totalPrecedente: Math.round(somme(precedente) * 100) / 100 };
   }, [historique, resultat.enveloppe, jour]);
   const changerCoupure = (k: number, n: number) => setCoupures((c) => ({ ...c, [String(k)]: Math.max(0, Math.min(9999, Math.floor(n) || 0)) }));
-  const peutValider = resultat.niveau === "ok" && resultat.manquePourValider.length === 0;
+  const noteRequise = noteManquante(resultat, corrections);
+  const peutValider = resultat.niveau === "ok" && resultat.manquePourValider.length === 0 && !noteRequise;
+  const preparerNote = () => {
+    const a = resultat.ajustement ?? 0;
+    setNouvelleCorrection(`Table … : prix sur mesure ${a < 0 ? "+" : "−"}${eur(Math.abs(a))} en carte (écart carte TPE / Popina)`);
+    setTimeout(() => correctionRef.current?.focus(), 0);
+  };
 
   const couleur = resultat.niveau === "ok" ? VERT : resultat.niveau === "mode" ? AMBRE : resultat.niveau === "vide" ? MUTED : ROUGE;
   const fond = resultat.niveau === "ok" ? "#E6EFE7" : resultat.niveau === "mode" ? "#F7EDD6" : resultat.niveau === "vide" ? "#fff" : "#F8E5E2";
@@ -396,8 +407,14 @@ export function Cloture() {
           </section>
 
           {/* Corrections et notes */}
-          <section style={{ border: `1.5px solid ${BORD}`, borderRadius: 14, background: "#fff", padding: "12px 14px", display: "grid", gap: 8 }}>
+          <section style={{ border: `1.5px solid ${noteRequise ? ACCENT : BORD}`, borderRadius: 14, background: "#fff", padding: "12px 14px", display: "grid", gap: 8 }}>
             <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 17, textTransform: "uppercase" }}>Corrections faites dans Popina</div>
+            {noteRequise && (
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, background: "#FBEFEA", fontSize: 13.5 }}>
+                <span style={{ flex: "1 1 220px" }}>Ajustement en prix sur mesure de <strong>{eur(Math.abs(resultat.ajustement ?? 0))}</strong> : note la table et le montant, c&apos;est obligatoire pour valider.</span>
+                <button type="button" onClick={preparerNote} style={{ ...BTN, height: 36, borderColor: ACCENT, color: ACCENT }}>Préparer la note</button>
+              </div>
+            )}
             <div style={{ color: MUTED, fontSize: 12.5 }}>Une ligne par correction : la table, l&apos;heure, ce qui a changé. Le contrôle de la nuit les reconnaîtra.</div>
             {corrections.map((c, i) => (
               <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, padding: "4px 0", borderTop: "1px solid #f0ebe2" }}>
@@ -406,7 +423,7 @@ export function Cloture() {
               </div>
             ))}
             <div style={{ display: "flex", gap: 8 }}>
-              <input value={nouvelleCorrection} onChange={(e) => setNouvelleCorrection(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") ajouterCorrection(); }} placeholder="Ex. : table 12 à 21 h 40, 26 € passés d'Espèces à Carte"
+              <input ref={correctionRef} value={nouvelleCorrection} onChange={(e) => setNouvelleCorrection(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") ajouterCorrection(); }} placeholder="Ex. : table 12 à 21 h 40, 26 € passés d'Espèces à Carte"
                 style={{ flex: 1, minWidth: 0, height: 40, padding: "0 12px", borderRadius: 10, border: `1.5px solid ${BORD}`, fontSize: 14, fontFamily: "inherit" }} />
               <button type="button" onClick={ajouterCorrection} style={{ ...BTN, borderColor: BORD }}>Ajouter</button>
             </div>
@@ -419,6 +436,7 @@ export function Cloture() {
               {statut === "validee" ? "Clôture validée ✓" : "Valider la clôture"}
             </button>
             <button type="button" disabled={resultat.niveau === "vide"} onClick={() => { void navigator.clipboard?.writeText(recap).then(() => { setCopie(true); setTimeout(() => setCopie(false), 1600); }); }} style={BTN}>{copie ? "Copié" : "Copier le récap"}</button>
+            {resultat.niveau === "ok" && noteRequise && <span style={{ fontSize: 13, color: ROUGE, fontWeight: 600 }}>Pour valider, note la correction en prix sur mesure.</span>}
             {resultat.niveau === "ok" && resultat.manquePourValider.length > 0 && <span style={{ fontSize: 13, color: ROUGE, fontWeight: 600 }}>Pour valider, il manque {resultat.manquePourValider.join(" et ")}.</span>}
             <span style={{ fontSize: 12.5, color: MUTED }}>{etat.enregistrement ? "Enregistrement…" : etat.info ?? "Enregistré automatiquement."}</span>
           </div>
