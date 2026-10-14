@@ -86,6 +86,20 @@ describe("clôture du soir (cas réels du brief)", () => {
     const gros = calculerCloture(saisie(z, { cb: 4803, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7 }, tiroir));
     expect(gros.petitEcart).toBeNull();
   });
+  it("14/10 : 20 € d'espèces saisis en carte, tiroir +20,10 € : erreur de mode, pas un trop perçu", () => {
+    const z = { total: 4640.39, pourboires: 43.44, amex: 205.35, conecs: 75, conecsNb: 3 };
+    const r = calculerCloture(saisie(z, { cb: 4421.45, amex: 195.5, conecs: 75, conecsNb: 3, especes: 488.25 }, { fond: 100, compte: 608.35 }));
+    expect(r.erreurEspecesCarte).toBe(true);
+    expect(r.titre).toMatch(/20,00 € payés en espèces ont été saisis en carte/);
+    expect(r.etapes.join(" ")).toMatch(/repasse-le en Espèces/);
+    expect(r.etapes.join(" ")).toMatch(/il restera 0,10 € de trop perçu/);
+    expect(r.etapes.join(" ")).not.toMatch(/À donner aux pourboires/);
+    expect(r.petitEcart).toBeNull();
+    // Après correction : carte juste, 0,10 € de trop perçu pour les pourboires
+    const ok = calculerCloture(saisie(z, { cb: 4401.45, amex: 195.5, conecs: 75, conecsNb: 3, especes: 508.25 }, { fond: 100, compte: 608.35 }));
+    expect(ok.niveau).toBe("ok");
+    expect(ok.etapes.join(" ")).toMatch(/0,10 € de trop perçu.*pourboires de l'équipe/);
+  });
   it("tiroir : une carte saisie en espèces manque à la fois en carte et dans le tiroir", () => {
     // 30 € payés par carte saisis en espèces : carte −30, espèces Popina +30 → tiroir compté 30 € sous l'attendu
     const r = calculerCloture(saisie({ total: 100, pourboires: 0, conecs: 0 }, { cb: 70, conecs: 0, especes: 80 }, { fond: 100, compte: 150 }));

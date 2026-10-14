@@ -24,21 +24,22 @@ const AMBRE = "#8A5A00";
 const ACCENT = "#D4775A";
 
 type Champ = { cle: string; libelle: string; aide?: string; entier?: boolean; siPourboires?: boolean };
+// Même ordre que le ticket Z Flatpay et l'écran de clôture Popina (demande de Paul, 14/10)
 const CHAMPS_Z: Champ[] = [
-  { cle: "total", libelle: "Total net", aide: "Premier bloc, ligne « TOTAL NET »" },
-  { cle: "pourboires", libelle: "Pourboires", aide: "Premier bloc, ligne « POURBOIRES »" },
-  { cle: "amex", libelle: "American Express", aide: "Accords cartes, ligne AMEX ; 0 s'il n'y en a pas" },
+  { cle: "total", libelle: "Total net", aide: "Bloc DEVISE EUR, ligne « TOTAL NET »" },
+  { cle: "pourboires", libelle: "Pourboires", aide: "Bloc DEVISE EUR, ligne « POURBOIRES »" },
+  { cle: "amex", libelle: "American Express", aide: "Accords cartes, ligne « American Express » ; 0 s'il n'y en a pas" },
   { cle: "conecs", libelle: "Conecs total net", aide: "Bloc CONECS, ligne « TOTAL NET »" },
+  { cle: "conecsNb", libelle: "Nombre de Conecs", aide: "Bloc CONECS, le chiffre après « TOTAL NET x »", entier: true },
   { cle: "conecsPourboires", libelle: "Conecs pourboires", aide: "Bloc CONECS, ligne « POURBOIRES »" },
-  { cle: "conecsNb", libelle: "Nombre de Conecs", aide: "Bloc CONECS, le chiffre après « VENTE x »", entier: true },
 ];
 const CHAMPS_POPINA: Champ[] = [
-  { cle: "cb", libelle: "Carte de crédit" },
-  { cle: "conecs", libelle: "Carte Connecs" },
-  { cle: "conecsNb", libelle: "Nombre de Connecs", aide: "Le chiffre devant « Carte Connecs »", entier: true },
-  { cle: "amex", libelle: "American Express" },
   { cle: "especes", libelle: "Espèces", aide: "Obligatoire pour valider (0 s'il n'y en a pas)" },
-  { cle: "pourboires", libelle: "Total pourboires", aide: "Pourboires saisis pour une facture (à annuler avant le Z)" },
+  { cle: "cb", libelle: "Carte de crédit" },
+  { cle: "amex", libelle: "American Express", aide: "0 s'il n'y en a pas" },
+  { cle: "conecs", libelle: "Carte Connecs" },
+  { cle: "conecsNb", libelle: "Nombre de Carte Connecs", aide: "Le chiffre devant « Carte Connecs »", entier: true },
+  { cle: "pourboires", libelle: "Total pourboires", aide: "Colonne de droite ; à annuler avant le Z s'il y en a" },
   { cle: "pourboireAmexFacture", libelle: "Dont pourboire AMEX", aide: "Seulement si le total pourboires ci-dessus contient un pourboire sur un AMEX ; sinon vide", siPourboires: true },
 ];
 
@@ -208,6 +209,8 @@ export function Cloture() {
   }, [historique, resultat.enveloppe, jour]);
   const changerCoupure = (k: number, n: number) => setCoupures((c) => ({ ...c, [String(k)]: Math.max(0, Math.min(9999, Math.floor(n) || 0)) }));
   const noteRequise = noteManquante(resultat, corrections);
+  /** L'écart du tiroir ne se règle avec les pourboires que quand la carte est juste */
+  const carteJuste = resultat.niveau !== "vide" && Math.abs(resultat.residu) < 0.005;
   const peutValider = resultat.niveau === "ok" && resultat.manquePourValider.length === 0 && !noteRequise;
   const preparerNote = () => {
     const a = resultat.ajustement ?? 0;
@@ -304,7 +307,10 @@ export function Cloture() {
               <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22 }}>{resultat.tiroirCompte != null ? eur(resultat.tiroirCompte) : "—"}</span>
               <span style={{ color: MUTED, fontSize: 13.5 }}>compté · {eur(resultat.tiroirAttendu)} attendu (fond + espèces Popina)</span>
               {resultat.ecartTiroir != null && saisie.popina.especes != null && (
-                <span style={{ fontWeight: 700, color: Math.abs(resultat.ecartTiroir) < 0.005 ? VERT : resultat.ecartTiroir > 0 ? AMBRE : ROUGE }}>{Math.abs(resultat.ecartTiroir) < 0.005 ? "Tiroir juste"
+                <span style={{ fontWeight: 700, color: Math.abs(resultat.ecartTiroir) < 0.005 ? VERT : carteJuste && resultat.ecartTiroir > 0 ? AMBRE : ROUGE }}>{Math.abs(resultat.ecartTiroir) < 0.005 ? "Tiroir juste"
+                  : resultat.niveau === "vide" ? `Écart de ${eur(Math.abs(resultat.ecartTiroir))} : remplis d'abord le ticket Z et Popina`
+                  : resultat.erreurEspecesCarte ? `${resultat.ecartTiroir > 0 ? "+" : "−"}${eur(Math.abs(resultat.ecartTiroir))}, le même écart que la carte : erreur de mode, voir le verdict`
+                  : !carteJuste ? `Écart de ${eur(Math.abs(resultat.ecartTiroir))} : règle d'abord la carte`
                   : resultat.ecartTiroir > 0 ? `${eur(resultat.ecartTiroir)} de trop perçu : aux pourboires de l'équipe`
                   : `Il manque ${eur(-resultat.ecartTiroir)} : à prendre dans les pourboires`}</span>
               )}
@@ -324,8 +330,8 @@ export function Cloture() {
                     {resultat.enveloppe != null && (
                       <div style={{ fontSize: 13, marginTop: 4, lineHeight: 1.4 }}>
                         <strong>Enveloppe banque : {eur(resultat.enveloppe)}</strong> (espèces Popina)
-                        {resultat.ecartTiroir != null && resultat.ecartTiroir > 0.005 && <span style={{ color: MUTED }}> · {eur(resultat.ecartTiroir)} pour les pourboires de l&apos;équipe</span>}
-                        {resultat.ecartTiroir != null && resultat.ecartTiroir < -0.005 && <span style={{ color: MUTED }}> · {eur(-resultat.ecartTiroir)} à compléter avec les pourboires</span>}
+                        {carteJuste && resultat.ecartTiroir != null && resultat.ecartTiroir > 0.005 && <span style={{ color: MUTED }}> · {eur(resultat.ecartTiroir)} pour les pourboires de l&apos;équipe</span>}
+                        {carteJuste && resultat.ecartTiroir != null && resultat.ecartTiroir < -0.005 && <span style={{ color: MUTED }}> · {eur(-resultat.ecartTiroir)} à compléter avec les pourboires</span>}
                       </div>
                     )}
                   </div>

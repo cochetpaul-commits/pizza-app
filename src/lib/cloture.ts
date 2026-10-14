@@ -80,6 +80,8 @@ export type ResultatCloture = {
   /** Espèces comptées (comptage par coupure s'il est saisi) */
   tiroirCompte: number | null;
   ecartTiroir: number | null;
+  /** Le tiroir a le même écart que la carte (à 2 € près) : des espèces saisies en carte, ou l'inverse */
+  erreurEspecesCarte: boolean;
   /** Ce qu'il faut laisser pour le fond et ce qui part à la banque (avec le comptage par coupure) */
   fondCaisse: CompositionFond | null;
   /** Enveloppe banque (€) : les espèces Popina du soir (le trop perçu ou le manque se règle avec les pourboires) */
@@ -177,7 +179,7 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
     { mode: "conecs", libelle: "Carte Connecs", popina: v0(p.conecs), attendu: cibleConecs, ecart: ecartConecs },
     { mode: "amex", libelle: "American Express", popina: v0(p.amex), attendu: v0(z.amex), ecart: ecartAmex },
   ];
-  const base = { lignes, cibleCb, ecartCb, cibleConecs, ecartConecs, ecartAmex, residu, pourboireAmex, pourboiresPaie, tiroirAttendu, tiroirCompte, ecartTiroir, fondCaisse, enveloppe, manquePourValider, petitEcart: null as number | null, ajustement: s.ajustement ?? null };
+  const base = { lignes, cibleCb, ecartCb, cibleConecs, ecartConecs, ecartAmex, residu, pourboireAmex, pourboiresPaie, tiroirAttendu, tiroirCompte, ecartTiroir, erreurEspecesCarte: false, fondCaisse, enveloppe, manquePourValider, petitEcart: null as number | null, ajustement: s.ajustement ?? null };
 
   if (z.total == null || p.cb == null) return { ...base, niveau: "vide", titre: "Remplis le ticket Z et l'écran Popina pour voir le verdict.", etapes: [] };
 
@@ -199,7 +201,12 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
 
   // Petit écart carte (règle de Paul, 14/10) : liquide bon, Conecs et AMEX justes, carte à moins de 2 € près.
   // On ne cherche pas : on rouvre une table payée en carte et on ajuste un article en « prix sur mesure ».
-  const liquideBon = ecartTiroir != null && (nul(ecartTiroir) || Math.abs(ecartTiroir - residu) >= 0.005);
+  // Espèces saisies en carte (ou l'inverse) : carte et tiroir ont le même écart, à quelques pièces de pourboire
+  // près. Vécu 14/10 : 20 € d'espèces tapés en carte, carte +20,00 € et tiroir +20,10 € ; l'app parlait de
+  // trop perçu à donner aux pourboires parce qu'elle exigeait les deux écarts égaux au centime.
+  const erreurEspecesCarte = ecartTiroir != null && !nul(residu) && Math.sign(ecartTiroir) === Math.sign(residu)
+    && Math.abs(ecartTiroir - residu) <= SEUIL_AJUSTEMENT;
+  const liquideBon = ecartTiroir != null && !erreurEspecesCarte;
   const petitEcart = !nul(residu) && modes.length === 0 && Math.abs(residu) <= SEUIL_AJUSTEMENT && liquideBon ? residu : null;
   const ajustement = petitEcart ?? s.ajustement ?? null;
 
@@ -213,6 +220,14 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
     niveau = "mode";
     titre = "Une erreur de mode de paiement à corriger.";
     etapes.push(...modes, "Recopie ensuite les nouveaux montants Popina : le verdict doit passer au vert avant d'arrêter la caisse.");
+  } else if (erreurEspecesCarte) {
+    niveau = residu < 0 ? "manque" : "trop";
+    titre = residu > 0 ? `Erreur de mode : ${eur(residu)} payés en espèces ont été saisis en carte.` : `Erreur de mode : ${eur(-residu)} payés par carte ont été saisis en espèces.`;
+    etapes.push(...modes);
+    etapes.push(residu > 0
+      ? `La carte Popina a ${eur(residu)} de trop et le tiroir ${eur(ecartTiroir ?? 0)} de trop : c'est le même paiement. Cherche dans Popina un paiement Carte de crédit de ${eur(residu)} et repasse-le en Espèces.`
+      : `La carte Popina a ${eur(-residu)} de moins que le TPE et il manque ${eur(-(ecartTiroir ?? 0))} au tiroir : c'est le même paiement. Cherche dans Popina un paiement en Espèces d'environ ${eur(-residu)} (le TPE compte le pourboire) et repasse-le en Carte de crédit.`,
+      "Recopie ensuite la carte et les espèces Popina : le verdict et le tiroir doivent passer au vert.");
   } else if (residu < 0) {
     niveau = "manque";
     titre = modes.length ? `Une erreur de mode de paiement, puis ${eur(-residu)} de carte à chercher.` : `Il manque ${eur(-residu)} de carte dans Popina.`;
@@ -231,20 +246,24 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
       "Note la correction ci-dessous (la table et le montant), puis recopie la carte Popina : le verdict doit passer au vert.");
     else etapes.push(`Un paiement saisi en carte dans Popina a été réglé autrement (espèces le plus souvent), ou un montant a été mal tapé. Cherche dans Popina un paiement carte de ${eur(residu)} qui n'est pas au TPE : l'export Flatpay du jour montre les transactions de ce montant et leur heure.`);
   }
-  if ((niveau === "manque" || niveau === "trop") && petitEcart == null) {
+  if ((niveau === "manque" || niveau === "trop") && petitEcart == null && !erreurEspecesCarte) {
     etapes.push(Math.abs(residu) <= SEUIL_AJUSTEMENT && ecartTiroir == null
       ? `Compte le tiroir : si le liquide est bon, un écart carte de ${SEUIL_AJUSTEMENT} € ou moins se règle en « prix sur mesure » sur une table payée en carte.`
       : `Au-delà de ${SEUIL_AJUSTEMENT} €, c'est une vraie erreur : trouve-la avant d'arrêter la caisse.`);
   }
   if (ecartTiroir != null) {
     if (nul(ecartTiroir)) etapes.push(`Tiroir juste : ${eur(tiroirCompte ?? 0)} pour ${eur(tiroirAttendu)} attendu.`);
-    else if (Math.abs(ecartTiroir - residu) < 0.005) etapes.push(`Tiroir : ${eur(tiroirCompte ?? 0)} compté pour ${eur(tiroirAttendu)} attendu (${signe(ecartTiroir)}). C'est le même écart que la carte : un paiement carte saisi en espèces (ou des espèces saisies en carte si l'écart est positif).`);
+    else if (erreurEspecesCarte) {
+      const reste = r2(ecartTiroir - residu);
+      etapes.push(`Tiroir : ${eur(tiroirCompte ?? 0)} compté pour ${eur(tiroirAttendu)} attendu (${signe(ecartTiroir)}), le même écart que la carte.${nul(reste) ? "" : ` Une fois le mode corrigé, il restera ${reste > 0 ? `${eur(reste)} de trop perçu pour les pourboires` : `${eur(-reste)} à prendre dans les pourboires`}.`}`);
+    }
+    else if (!nul(residu)) etapes.push(`Tiroir : ${eur(tiroirCompte ?? 0)} compté pour ${eur(tiroirAttendu)} attendu (${signe(ecartTiroir)}). Règle d'abord la carte : l'écart du tiroir se juge quand la carte est juste.`);
     else if (ecartTiroir > 0) etapes.push(`Tiroir : ${eur(ecartTiroir)} de trop perçu (${eur(tiroirCompte ?? 0)} compté pour ${eur(tiroirAttendu)} attendu). À donner aux pourboires de l'équipe.`);
     else etapes.push(`Tiroir : il manque ${eur(-ecartTiroir)} (${eur(tiroirCompte ?? 0)} compté pour ${eur(tiroirAttendu)} attendu). Erreur de rendu de monnaie : à prendre dans les pourboires.`);
   }
   if (pourboiresPopina > 0.005) etapes.push(`Pourboires saisis dans Popina pour des factures : ${eur(pourboiresPopina)}. Annule-les avant d'arrêter la caisse, comme convenu ; le calcul en tient déjà compte.`);
   if (niveau === "ok" && ajustement != null && s.ajustement != null) etapes.push(`Ajustement de ${signe(-ajustement)} en prix sur mesure : il doit être noté dans les corrections avant de valider.`);
-  return { ...base, niveau, titre, etapes, petitEcart, ajustement };
+  return { ...base, niveau, titre, etapes, petitEcart, ajustement, erreurEspecesCarte };
 }
 
 /** Récap à copier (message à l'équipe ou à Paul) */
