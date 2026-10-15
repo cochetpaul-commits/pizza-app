@@ -108,7 +108,8 @@ describe("clôture du soir (cas réels du brief)", () => {
     expect(r.ecartTiroir).toBe(-30);
     expect(r.etapes.join(" ")).toMatch(/même écart que la carte/);
     const juste = calculerCloture(saisie({ total: 100, pourboires: 0, conecs: 0 }, { cb: 100, conecs: 0, especes: 50 }, { fond: 100, compte: 150 }));
-    expect(juste.etapes.join(" ")).toMatch(/Tiroir juste/);
+    expect(juste.ecartTiroir).toBe(0);
+    expect(juste.etapes.join(" ")).not.toMatch(/Tiroir/);
   });
   it("12/10 : comptage par coupure, fond laissé et enveloppe", () => {
     // Popina : 211,50 € d'espèces, fond de 100 € → 311,50 € attendus

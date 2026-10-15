@@ -254,7 +254,8 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
       : `Au-delà de ${SEUIL_AJUSTEMENT} €, c'est une vraie erreur : trouve-la avant d'arrêter la caisse.`);
   }
   if (ecartTiroir != null) {
-    if (nul(ecartTiroir)) etapes.push(`Tiroir juste : ${eur(tiroirCompte ?? 0)} pour ${eur(tiroirAttendu)} attendu.`);
+    // Tiroir juste : affiché dans le bloc Tiroir, pas répété dans le verdict
+    if (nul(ecartTiroir)) { /* rien */ }
     else if (erreurEspecesCarte) {
       const reste = r2(ecartTiroir - residu);
       etapes.push(`Tiroir : ${eur(tiroirCompte ?? 0)} compté pour ${eur(tiroirAttendu)} attendu (${signe(ecartTiroir)}), le même écart que la carte.${nul(reste) ? "" : ` Une fois le mode corrigé, il restera ${reste > 0 ? `${eur(reste)} de trop perçu pour les pourboires` : `${eur(-reste)} à prendre dans les pourboires`}.`}`);

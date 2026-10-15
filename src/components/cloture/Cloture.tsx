@@ -7,7 +7,7 @@ import { fetchApi } from "@/lib/fetchApi";
 import { calculerCloture, eur, lireMontant, noteManquante, recapCloture, VIDE, type SaisieCloture } from "@/lib/cloture";
 import { aideCloture, heureParis, jourService, lireExportFlatpay, type TransactionFlatpay } from "@/lib/flatpay";
 import type { ControleNuit } from "@/lib/controleNuit";
-import { additionner, COUPURES, estBillet, libelleCoupure, listerCoupures, totalComptage, type Comptage } from "@/lib/fondCaisse";
+import { additionner, COUPURES, estBillet, libelleCoupure, listerCoupures, totalComptage, type Comptage, type CompositionFond } from "@/lib/fondCaisse";
 
 /**
  * Clôture de caisse du soir, Bello Mio (10/10/2026). Déroulé : le Z du TPE sort, l'équipe recopie
@@ -46,7 +46,7 @@ const CHAMPS_POPINA: Champ[] = [
 
 type Textes = Record<"z" | "popina" | "tiroir", Record<string, string>>;
 const versTextes = (s: SaisieCloture): Textes => {
-  const t = (o: Record<string, number | null>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v == null ? "" : String(v).replace(".", ",")]));
+  const t = (o: Record<string, number | null>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v == null ? "" : (/nb$/i.test(k) ? String(v) : v.toFixed(2)).replace(".", ",")]));
   return { z: t(s.z), popina: t(s.popina), tiroir: t({ fond: s.tiroir.fond, compte: s.tiroir.compte }) };
 };
 const versSaisie = (t: Textes): SaisieCloture => {
@@ -85,6 +85,7 @@ export function Cloture() {
   const [statut, setStatut] = useState<"en_cours" | "validee">("en_cours");
   const [controle, setControle] = useState<{ c: ControleNuit; at: string } | null>(null);
   const [controleEnCours, setControleEnCours] = useState<string | null>(null);
+  const [grosBillets, setGrosBillets] = useState(false);
   const [transactions, setTransactions] = useState<TransactionFlatpay[]>([]);
   const [etat, setEtat] = useState<{ chargement: boolean; enregistrement: boolean; erreur: string | null; info: string | null }>({ chargement: true, enregistrement: false, erreur: null, info: null });
   const [import_, setImport] = useState<{ enCours: boolean; message: string | null }>({ enCours: false, message: null });
@@ -261,6 +262,7 @@ export function Cloture() {
         <label key={c.cle} style={{ display: "grid", gridTemplateColumns: "1fr 128px", alignItems: "center", gap: 10, padding: "7px 0", borderTop: i ? `1px solid #f0ebe2` : "none" }}>
           <span style={{ fontSize: 14.5, fontWeight: 600, minWidth: 0 }}>{c.libelle}{c.aide && <small style={{ display: "block", color: MUTED, fontSize: 11.5, fontWeight: 400, lineHeight: 1.3 }}>{c.aide}</small>}</span>
           <input inputMode={c.entier ? "numeric" : "decimal"} autoComplete="off" value={textes[nom][c.cle] ?? ""} onChange={(e) => changer(nom, c.cle, e.target.value)} placeholder={c.entier ? "0" : "0,00"}
+            onBlur={(e) => { const v = lireMontant(e.target.value); if (v != null && !c.entier) changer(nom, c.cle, v.toFixed(2).replace(".", ",")); }}
             style={{ font: "inherit", fontSize: 19, fontWeight: 700, textAlign: "right", width: "100%", boxSizing: "border-box", padding: "8px 10px", border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4", color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }} />
         </label>
       ))}
@@ -268,28 +270,43 @@ export function Cloture() {
   );
 
   const BTN: CSSProperties = { height: 40, padding: "0 16px", borderRadius: 10, border: `1.5px solid #1a1a1a`, background: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a" };
-  const grille = (valeurs: Comptage, changer: (k: number, n: number) => void) => (
-  <div style={{ display: "grid", gridTemplateColumns: bureau ? "1fr 1fr" : "minmax(0, 1fr)", gap: bureau ? 18 : 4 }}>
-    {[COUPURES.filter(estBillet), COUPURES.filter((k) => !estBillet(k))].map((groupe, gi) => (
-      <div key={gi}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".05em", margin: "4px 0" }}>{gi ? "Pièces" : "Billets"}</div>
-        {groupe.map((k) => {
-          const n = valeurs[String(k)] ?? 0;
-          return (
-            <div key={k} style={{ display: "grid", gridTemplateColumns: "64px 40px minmax(0, 72px) 40px 1fr", alignItems: "center", gap: 6, padding: "4px 0", borderTop: "1px solid #f0ebe2" }}>
-              <span style={{ fontWeight: 700, fontSize: 15 }}>{libelleCoupure(k)}</span>
-              <button type="button" aria-label={`Retirer ${libelleCoupure(k)}`} onClick={() => changer(k, n - 1)} style={{ ...BTN, width: 40, padding: 0, borderColor: BORD }}>−</button>
-              <input inputMode="numeric" autoComplete="off" value={n || ""} placeholder="0" onChange={(e) => changer(k, Number(e.target.value.replace(/\D/g, "")))}
-                style={{ font: "inherit", fontSize: 18, fontWeight: 700, textAlign: "center", width: "100%", boxSizing: "border-box", height: 40, border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4", fontVariantNumeric: "tabular-nums" }} />
-              <button type="button" aria-label={`Ajouter ${libelleCoupure(k)}`} onClick={() => changer(k, n + 1)} style={{ ...BTN, width: 40, padding: 0, borderColor: BORD }}>+</button>
-              <span style={{ textAlign: "right", color: n ? "#1a1a1a" : FAIBLE, fontVariantNumeric: "tabular-nums", fontSize: 14 }}>{eur((n * k) / 100)}</span>
+  /** Billets de 200 € et 100 € : repliés sauf s'il y en a (presque jamais en caisse) */
+  const gros = (k: number) => k >= 10000;
+  const grille = (valeurs: Comptage, changer: (k: number, n: number) => void, repartition?: CompositionFond | null) => {
+    const voirGros = grosBillets || COUPURES.some((k) => gros(k) && (valeurs[String(k)] ?? 0) > 0);
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: bureau ? "1fr 1fr" : "minmax(0, 1fr)", gap: bureau ? 18 : 4 }}>
+        {[COUPURES.filter(estBillet), COUPURES.filter((k) => !estBillet(k))].map((groupe, gi) => (
+          <div key={gi}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "4px 0" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".05em" }}>{gi ? "Pièces" : "Billets"}</span>
+              {!gi && !voirGros && <button type="button" onClick={() => setGrosBillets(true)} style={{ border: "none", background: "none", padding: 0, color: ACCENT, fontWeight: 700, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>+ billets de 100 et 200 €</button>}
             </div>
-          );
-        })}
+            {groupe.filter((k) => voirGros || !gros(k)).map((k) => {
+              const n = valeurs[String(k)] ?? 0;
+              // Ce qu'on garde et ce qu'on sort, ligne par ligne : on sépare le tiroir en le parcourant
+              const garder = repartition?.laisser[String(k)] ?? 0;
+              const sortir = repartition?.sortir[String(k)] ?? 0;
+              return (
+                <div key={k} style={{ display: "grid", gridTemplateColumns: "52px 36px minmax(0, 64px) 36px 1fr", alignItems: "center", gap: 6, padding: "3px 0", borderTop: "1px solid #f0ebe2" }}>
+                  <span style={{ fontWeight: 700, fontSize: 15 }}>{libelleCoupure(k)}</span>
+                  <button type="button" aria-label={`Retirer ${libelleCoupure(k)}`} onClick={() => changer(k, n - 1)} style={{ ...BTN, width: 36, height: 36, padding: 0, borderColor: BORD }}>−</button>
+                  <input inputMode="numeric" autoComplete="off" value={n || ""} placeholder="0" onChange={(e) => changer(k, Number(e.target.value.replace(/\D/g, "")))}
+                    style={{ font: "inherit", fontSize: 17, fontWeight: 700, textAlign: "center", width: "100%", boxSizing: "border-box", height: 36, border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4", fontVariantNumeric: "tabular-nums" }} />
+                  <button type="button" aria-label={`Ajouter ${libelleCoupure(k)}`} onClick={() => changer(k, n + 1)} style={{ ...BTN, width: 36, height: 36, padding: 0, borderColor: BORD }}>+</button>
+                  <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontSize: 13.5, lineHeight: 1.2 }}>
+                    {repartition && n > 0
+                      ? <>{garder > 0 && <span style={{ color: VERT, fontWeight: 700, whiteSpace: "nowrap" }}>laisser {garder}</span>}{garder > 0 && sortir > 0 && <br />}{sortir > 0 && <span style={{ color: AMBRE, fontWeight: 700, whiteSpace: "nowrap" }}>sortir {sortir}</span>}</>
+                      : <span style={{ color: n ? "#1a1a1a" : FAIBLE }}>{eur((n * k) / 100)}</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
-    ))}
-  </div>
-  );
+    );
+  };
 
   const ligneTx = (t: TransactionFlatpay, extra?: React.ReactNode) => (
     <div key={`${t.horodatage}-${t.montant}-${t.typeCarte}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid #f0ebe2", fontSize: 13.5 }}>
@@ -322,6 +339,35 @@ export function Cloture() {
             {bloc("Ticket Z du TPE", "Le ticket Flatpay imprimé à la clôture du TPE.", "z", CHAMPS_Z)}
             {bloc("Écran Popina", "Avant d'arrêter la caisse, sans rien corriger.", "popina", CHAMPS_POPINA)}
           </div>
+          {/* Verdict */}
+          <section aria-live="polite" style={{ borderRadius: 16, padding: bureau ? 20 : 16, border: `2px solid ${couleur}`, background: fond }}>
+            <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: bureau ? 28 : 22, lineHeight: 1.1, color: couleur }}>{resultat.titre}</div>
+            {resultat.etapes.length > 0 && <ol style={{ margin: "10px 0 0", paddingLeft: 22, fontSize: 15, lineHeight: 1.45 }}>{resultat.etapes.map((e, i) => <li key={i} style={{ margin: "6px 0" }}>{e}</li>)}</ol>}
+            {resultat.petitEcart != null && ajustement == null && (
+              <button type="button" onClick={() => { setAjustement(resultat.petitEcart); preparerNote(resultat.petitEcart ?? 0); }}
+                style={{ ...BTN, marginTop: 10, background: ACCENT, borderColor: ACCENT, color: "#fff" }}>J&apos;ai fait l&apos;ajustement dans Popina</button>
+            )}
+            {resultat.niveau !== "vide" && (
+              <div style={{ overflowX: "auto", marginTop: 12 }}>
+                <div style={{ display: "grid", fontSize: bureau ? 14.5 : 14, fontVariantNumeric: "tabular-nums" }}>
+                  {resultat.lignes.map((l) => {
+                    const juste = Math.abs(l.ecart) < 0.005;
+                    return (
+                      <div key={l.mode} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", alignItems: "baseline", gap: "0 12px", padding: "6px 2px", borderTop: `1px solid ${BORD}` }}>
+                        <span>{l.libelle}</span>
+                        <span style={{ whiteSpace: "nowrap" }}>{eur(l.popina)}</span>
+                        <span style={{ whiteSpace: "nowrap", fontWeight: 700, color: juste ? VERT : ROUGE, minWidth: 60, textAlign: "right" }}>{juste ? "juste" : `${l.ecart > 0 ? "+" : "−"}${eur(Math.abs(l.ecart))}`}</span>
+                        {!juste && <span style={{ gridColumn: "1 / -1", fontSize: 12.5, color: MUTED }}>attendu {eur(l.attendu)} d&apos;après le ticket Z</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ marginTop: 10, fontSize: 14 }}>Pourboires carte pour la paie : <strong>{eur(resultat.pourboiresPaie)}</strong>{resultat.pourboireAmex > 0 && <span style={{ color: MUTED }}> (dont AMEX {eur(resultat.pourboireAmex)})</span>}</div>
+                <div style={{ marginTop: 2, fontSize: 13, color: MUTED }}>Cumul de {new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { month: "long" })} : <strong style={{ color: "#1a1a1a" }}>{eur(pourboiresMois)}</strong></div>
+              </div>
+            )}
+          </section>
+
           {/* Tiroir : comptage par coupure, fond à laisser, enveloppe de la banque */}
           <fieldset style={{ border: `1.5px solid ${BORD}`, borderRadius: 14, background: "#fff", margin: 0, padding: "12px 14px 12px", minWidth: 0, display: "grid", gap: 10 }}>
             <legend style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 17, textTransform: "uppercase", letterSpacing: ".03em", padding: "0 6px" }}>Tiroir</legend>
@@ -332,7 +378,7 @@ export function Cloture() {
                 style={{ font: "inherit", fontSize: 17, fontWeight: 700, textAlign: "right", width: 90, boxSizing: "border-box", padding: "6px 10px", border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4" }} />
               <span style={{ color: MUTED, fontWeight: 400, fontSize: 13 }}>€</span>
             </label>
-            {grille(coupures, changerCoupure)}
+            {grille(coupures, changerCoupure, resultat.fondCaisse)}
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", alignItems: "baseline", borderTop: `1.5px solid ${BORD}`, paddingTop: 10 }}>
               <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22 }}>{resultat.tiroirCompte != null ? eur(resultat.tiroirCompte) : "—"}</span>
               <span style={{ color: MUTED, fontSize: 13.5 }}>compté · {eur(resultat.tiroirAttendu)} attendu (fond + espèces Popina)</span>
@@ -351,12 +397,12 @@ export function Cloture() {
                 <div style={{ display: "grid", gridTemplateColumns: bureau ? "1fr 1fr" : "minmax(0, 1fr)", gap: 10 }}>
                   <div style={{ borderRadius: 12, background: "#E6EFE7", padding: "10px 12px" }}>
                     <div style={{ fontWeight: 700, color: VERT, fontSize: 14 }}>À laisser dans la caisse · {eur(f.totalLaisse / 100)}</div>
-                    <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.45 }}>{listerCoupures(f.laisser) || "Rien"}</div>
+                    <div style={{ fontSize: 12.5, color: MUTED, marginTop: 2 }}>Le détail est dans la grille : « laisser ».</div>
                     {f.incomplet > 0 && <div style={{ fontSize: 13, color: ROUGE, marginTop: 4 }}>Il manque {eur(f.incomplet / 100)} pour faire le fond{f.compte > f.fond ? " au centime : pas la bonne monnaie" : ""}. Prévois du change.</div>}
                   </div>
                   <div style={{ borderRadius: 12, background: "#F7EDD6", padding: "10px 12px" }}>
                     <div style={{ fontWeight: 700, color: AMBRE, fontSize: 14 }}>À sortir · {eur(f.totalSorti / 100)}</div>
-                    <div style={{ fontSize: 14, marginTop: 4, lineHeight: 1.45 }}>{listerCoupures(f.sortir) || "Rien à sortir"}</div>
+                    <div style={{ fontSize: 12.5, color: MUTED, marginTop: 2 }}>Le détail est dans la grille : « sortir ».</div>
                     {resultat.enveloppe != null && (
                       <div style={{ fontSize: 13, marginTop: 4, lineHeight: 1.4 }}>
                         <strong>Enveloppe banque : {eur(resultat.enveloppe)}</strong> (espèces Popina)
@@ -416,33 +462,6 @@ export function Cloture() {
             })()}
           </fieldset>
 
-          {/* Verdict */}
-          <section aria-live="polite" style={{ borderRadius: 16, padding: bureau ? 20 : 16, border: `2px solid ${couleur}`, background: fond }}>
-            <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: bureau ? 28 : 22, lineHeight: 1.1, color: couleur }}>{resultat.titre}</div>
-            {resultat.etapes.length > 0 && <ol style={{ margin: "10px 0 0", paddingLeft: 22, fontSize: 15, lineHeight: 1.45 }}>{resultat.etapes.map((e, i) => <li key={i} style={{ margin: "6px 0" }}>{e}</li>)}</ol>}
-            {resultat.petitEcart != null && ajustement == null && (
-              <button type="button" onClick={() => { setAjustement(resultat.petitEcart); preparerNote(resultat.petitEcart ?? 0); }}
-                style={{ ...BTN, marginTop: 10, background: ACCENT, borderColor: ACCENT, color: "#fff" }}>J&apos;ai fait l&apos;ajustement dans Popina</button>
-            )}
-            {resultat.niveau !== "vide" && (
-              <div style={{ overflowX: "auto", marginTop: 12 }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: bureau ? 14.5 : 13.5, fontVariantNumeric: "tabular-nums" }}>
-                  <thead><tr>{["Mode", "Popina", "Attendu", "Écart"].map((h, i) => <th key={h} style={{ textAlign: i ? "right" : "left", color: MUTED, fontSize: 12, fontWeight: 600, padding: "6px 6px", borderTop: `1px solid ${BORD}` }}>{h}</th>)}</tr></thead>
-                  <tbody>{resultat.lignes.map((l) => (
-                    <tr key={l.mode}>
-                      <td style={{ padding: "6px", borderTop: `1px solid ${BORD}` }}>{l.libelle}</td>
-                      <td style={{ padding: "6px 4px", borderTop: `1px solid ${BORD}`, textAlign: "right", whiteSpace: "nowrap" }}>{eur(l.popina)}</td>
-                      <td style={{ padding: "6px 4px", borderTop: `1px solid ${BORD}`, textAlign: "right", whiteSpace: "nowrap" }}>{eur(l.attendu)}</td>
-                      <td style={{ padding: "6px 4px", borderTop: `1px solid ${BORD}`, textAlign: "right", whiteSpace: "nowrap", fontWeight: 700, color: Math.abs(l.ecart) < 0.005 ? VERT : ROUGE }}>{Math.abs(l.ecart) < 0.005 ? "juste" : `${l.ecart > 0 ? "+" : "−"}${eur(Math.abs(l.ecart))}`}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-                <div style={{ marginTop: 10, fontSize: 14 }}>Pourboires carte pour la paie : <strong>{eur(resultat.pourboiresPaie)}</strong>{resultat.pourboireAmex > 0 && <span style={{ color: MUTED }}> (dont AMEX {eur(resultat.pourboireAmex)})</span>}</div>
-                <div style={{ marginTop: 2, fontSize: 13, color: MUTED }}>Cumul de {new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { month: "long" })} : <strong style={{ color: "#1a1a1a" }}>{eur(pourboiresMois)}</strong></div>
-              </div>
-            )}
-          </section>
-
           {/* Contrôle de la nuit : le vrai Z Popina relu vers 1 h */}
           {(controle || jour < jourService(new Date())) && (() => {
             const c = controle?.c;
@@ -479,14 +498,20 @@ export function Cloture() {
             );
           })()}
 
-          {/* Export Flatpay */}
+          {/* Export Flatpay : replié quand tout colle (il ne sert qu'en cas d'écart) */}
+          <input ref={fichierRef} type="file" multiple accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={(e) => void importer(e.target.files)} />
+          {resultat.niveau === "ok" && transactions.length === 0 && !import_.message ? (
+            <div style={{ fontSize: 13, color: MUTED, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "baseline" }}>
+              Export Flatpay : pas besoin ce soir, tout colle.
+              <button type="button" onClick={() => fichierRef.current?.click()} style={{ border: "none", background: "none", padding: 0, color: ACCENT, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Déposer quand même</button>
+            </div>
+          ) : (
           <section style={{ border: `1.5px solid ${BORD}`, borderRadius: 14, background: "#fff", padding: "12px 14px", display: "grid", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <div style={{ flex: "1 1 220px", minWidth: 0 }}>
                 <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 17, textTransform: "uppercase" }}>Export Flatpay du jour</div>
                 <div style={{ color: MUTED, fontSize: 12.5 }}>En cas d&apos;écart : app Flatpay de l&apos;iPad, transactions du jour, export ; et l&apos;export « titre restaurant » s&apos;il y a des Conecs.</div>
               </div>
-              <input ref={fichierRef} type="file" multiple accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={(e) => void importer(e.target.files)} />
               <button type="button" disabled={import_.enCours} onClick={() => fichierRef.current?.click()} style={{ ...BTN, borderColor: ACCENT, color: ACCENT }}>{import_.enCours ? "Lecture…" : transactions.length ? "Ajouter un export" : "Déposer l'export"}</button>
             </div>
             {import_.message && <div style={{ fontSize: 12.5, color: MUTED }}>{import_.message}</div>}
@@ -518,6 +543,7 @@ export function Cloture() {
               </div>
             )}
           </section>
+          )}
 
           {/* Corrections et notes */}
           <section style={{ border: `1.5px solid ${noteRequise ? ACCENT : BORD}`, borderRadius: 14, background: "#fff", padding: "12px 14px", display: "grid", gap: 8 }}>
@@ -555,10 +581,11 @@ export function Cloture() {
             <span style={{ fontSize: 12.5, color: MUTED }}>{etat.enregistrement ? "Enregistrement…" : etat.info ?? "Enregistré automatiquement."}</span>
           </div>
 
-          <div style={{ color: MUTED, fontSize: 13.5, lineHeight: 1.5, maxWidth: "70ch" }}>
+          <details style={{ color: MUTED, fontSize: 13.5, lineHeight: 1.5, maxWidth: "70ch" }}>
+            <summary style={{ cursor: "pointer", fontWeight: 700, color: "#1a1a1a" }}>Les règles de la clôture</summary>
             <p><strong style={{ color: "#1a1a1a" }}>Les règles.</strong> La caisse doit tomber juste au centime avant d&apos;arrêter Popina. On corrige le mode de paiement sur le bon ticket ; on n&apos;invente jamais de montant. Un petit écart de carte (2 € ou moins, liquide bon) se règle en « prix sur mesure » sur une table payée en carte, et on le note ci-dessus. La nuit, l&apos;app relit le vrai Z Popina et vérifie la soirée.</p>
             <p><strong style={{ color: "#1a1a1a" }}>Les pourboires.</strong> Seuls ceux du TPE comptent pour la paie. Le liquide laissé sur la monnaie se passe en « monnaie rendue » et va dans la cagnotte : on ne le tape pas. Un pourboire carte n&apos;est saisi dans Popina que pour une facture, et on l&apos;annule avant d&apos;arrêter la caisse. Le tiroir se règle avec la cagnotte seulement quand la carte est juste : un trop perçu va aux pourboires, un manque (monnaie mal rendue) s&apos;y prend.</p>
-          </div>
+          </details>
         </>
       )}
     </div>
