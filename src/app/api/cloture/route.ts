@@ -45,12 +45,10 @@ export async function PUT(req: NextRequest) {
   if ("erreur" in a) return a.erreur;
   const body = await req.json().catch(() => null) as { jour?: string; saisie?: SaisieCloture; corrections?: string[]; notes?: string | null; valider?: boolean } | null;
   if (!body?.jour || !JOUR.test(body.jour) || !body.saisie?.z || !body.saisie.popina || !body.saisie.tiroir) return NextResponse.json({ error: "jour et saisie requis" }, { status: 400 });
-  const { data: existante } = await supabaseAdmin.from("clotures").select("statut, saisie").eq("etablissement_id", a.etabId).eq("jour", body.jour).maybeSingle();
-  // Un petit écart carte réglé en « prix sur mesure » reste attaché à la soirée, même une fois la carte juste :
-  // la note de correction est obligatoire pour valider (règle de Paul, 14/10/2026)
-  const premier = calculerCloture(body.saisie);
-  const ajustement = premier.petitEcart ?? body.saisie.ajustement ?? (existante?.saisie as SaisieCloture | null)?.ajustement ?? null;
-  const saisie: SaisieCloture = { ...body.saisie, ajustement };
+  const { data: existante } = await supabaseAdmin.from("clotures").select("statut").eq("etablissement_id", a.etabId).eq("jour", body.jour).maybeSingle();
+  // Un ajustement en « prix sur mesure » est déclaré par l'équipe (bouton dans l'écran) : la note de correction
+  // est alors obligatoire pour valider (règle de Paul, 14/10/2026)
+  const saisie: SaisieCloture = { ...body.saisie, ajustement: typeof body.saisie.ajustement === "number" ? body.saisie.ajustement : null };
   const resultat = calculerCloture(saisie);
   const corrections = (body.corrections ?? []).map((c) => String(c).trim()).filter(Boolean).slice(0, 50);
   if (body.valider && resultat.niveau !== "ok") return NextResponse.json({ error: "La caisse ne tombe pas juste : corrige d'abord l'écart, puis recopie les montants Popina." }, { status: 400 });

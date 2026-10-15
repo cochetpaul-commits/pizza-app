@@ -223,8 +223,8 @@ export function Cloture() {
   /** L'écart du tiroir ne se règle avec les pourboires que quand la carte est juste */
   const carteJuste = resultat.niveau !== "vide" && Math.abs(resultat.residu) < 0.005;
   const peutValider = resultat.niveau === "ok" && resultat.manquePourValider.length === 0 && !noteRequise;
-  const preparerNote = () => {
-    const a = resultat.ajustement ?? 0;
+  const preparerNote = (montant?: number) => {
+    const a = montant ?? resultat.ajustement ?? 0;
     setNouvelleCorrection(`Table … : prix sur mesure ${a < 0 ? "+" : "−"}${eur(Math.abs(a))} en carte (écart carte TPE / Popina)`);
     setTimeout(() => correctionRef.current?.focus(), 0);
   };
@@ -401,6 +401,10 @@ export function Cloture() {
           <section aria-live="polite" style={{ borderRadius: 16, padding: bureau ? 20 : 16, border: `2px solid ${couleur}`, background: fond }}>
             <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: bureau ? 28 : 22, lineHeight: 1.1, color: couleur }}>{resultat.titre}</div>
             {resultat.etapes.length > 0 && <ol style={{ margin: "10px 0 0", paddingLeft: 22, fontSize: 15, lineHeight: 1.45 }}>{resultat.etapes.map((e, i) => <li key={i} style={{ margin: "6px 0" }}>{e}</li>)}</ol>}
+            {resultat.petitEcart != null && ajustement == null && (
+              <button type="button" onClick={() => { setAjustement(resultat.petitEcart); preparerNote(resultat.petitEcart ?? 0); }}
+                style={{ ...BTN, marginTop: 10, background: ACCENT, borderColor: ACCENT, color: "#fff" }}>J&apos;ai fait l&apos;ajustement dans Popina</button>
+            )}
             {resultat.niveau !== "vide" && (
               <div style={{ overflowX: "auto", marginTop: 12 }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14.5, fontVariantNumeric: "tabular-nums" }}>
@@ -464,8 +468,9 @@ export function Cloture() {
             <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 17, textTransform: "uppercase" }}>Corrections faites dans Popina</div>
             {noteRequise && (
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, background: "#FBEFEA", fontSize: 13.5 }}>
-                <span style={{ flex: "1 1 220px" }}>Ajustement en prix sur mesure de <strong>{eur(Math.abs(resultat.ajustement ?? 0))}</strong> : note la table et le montant, c&apos;est obligatoire pour valider.</span>
-                <button type="button" onClick={preparerNote} style={{ ...BTN, height: 36, borderColor: ACCENT, color: ACCENT }}>Préparer la note</button>
+                <span style={{ flex: "1 1 220px" }}>Ajustement en prix sur mesure de <strong>{eur(Math.abs(resultat.ajustement ?? 0))}</strong> : note la table et le montant, c&apos;est obligatoire pour valider.
+                  {" "}<button type="button" onClick={() => setAjustement(null)} style={{ border: "none", background: "none", padding: 0, color: MUTED, textDecoration: "underline", cursor: "pointer", font: "inherit", fontSize: 12.5 }}>Pas d&apos;ajustement finalement</button></span>
+                <button type="button" onClick={() => preparerNote()} style={{ ...BTN, height: 36, borderColor: ACCENT, color: ACCENT }}>Préparer la note</button>
               </div>
             )}
             <div style={{ color: MUTED, fontSize: 12.5 }}>Une ligne par correction : la table, l&apos;heure, ce qui a changé. Le contrôle de la nuit les reconnaîtra.</div>

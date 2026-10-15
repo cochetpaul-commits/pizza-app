@@ -49,7 +49,7 @@ export type SaisieTiroir = {
 
 export type SaisieCloture = {
   z: SaisieZ; popina: SaisiePopina; tiroir: SaisieTiroir;
-  /** Petit écart carte constaté pendant la clôture (€, négatif = manque dans Popina) : corrigé en « prix sur mesure », note obligatoire */
+  /** Petit écart carte corrigé en « prix sur mesure », déclaré par l'équipe (€, négatif = manque dans Popina) : note obligatoire */
   ajustement?: number | null;
 };
 
@@ -90,7 +90,7 @@ export type ResultatCloture = {
   manquePourValider: string[];
   /** Petit écart carte à régler en « prix sur mesure » maintenant (€, négatif = manque dans Popina), sinon null */
   petitEcart: number | null;
-  /** Ajustement de la soirée (petit écart en cours ou déjà corrigé) : une note est obligatoire pour valider */
+  /** Ajustement déclaré pour la soirée : une note est obligatoire pour valider */
   ajustement: number | null;
 };
 
@@ -208,7 +208,9 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
     && Math.abs(ecartTiroir - residu) <= SEUIL_AJUSTEMENT;
   const liquideBon = ecartTiroir != null && !erreurEspecesCarte;
   const petitEcart = !nul(residu) && modes.length === 0 && Math.abs(residu) <= SEUIL_AJUSTEMENT && liquideBon ? residu : null;
-  const ajustement = petitEcart ?? s.ajustement ?? null;
+  // L'ajustement n'est retenu que quand l'équipe le déclare (bouton « J'ai fait l'ajustement ») : vécu 15/10,
+  // un montant mal tapé un instant (0,48 €) avait été pris pour un ajustement et exigeait une note
+  const ajustement = s.ajustement ?? null;
 
   const etapes: string[] = [];
   let niveau: Niveau;
@@ -262,7 +264,7 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
     else etapes.push(`Tiroir : il manque ${eur(-ecartTiroir)} (${eur(tiroirCompte ?? 0)} compté pour ${eur(tiroirAttendu)} attendu). Erreur de rendu de monnaie : à prendre dans les pourboires.`);
   }
   if (pourboiresPopina > 0.005) etapes.push(`Pourboires saisis dans Popina pour des factures : ${eur(pourboiresPopina)}. Annule-les avant d'arrêter la caisse, comme convenu ; le calcul en tient déjà compte.`);
-  if (niveau === "ok" && ajustement != null && s.ajustement != null) etapes.push(`Ajustement de ${signe(-ajustement)} en prix sur mesure : il doit être noté dans les corrections avant de valider.`);
+  if (niveau === "ok" && ajustement != null) etapes.push(`Ajustement de ${signe(-ajustement)} en prix sur mesure : il doit être noté dans les corrections avant de valider.`);
   return { ...base, niveau, titre, etapes, petitEcart, ajustement, erreurEspecesCarte };
 }
 

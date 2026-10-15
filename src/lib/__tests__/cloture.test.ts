@@ -72,7 +72,8 @@ describe("clôture du soir (cas réels du brief)", () => {
     const r = calculerCloture(saisie(z, { cb: 4806, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7 }, tiroir));
     expect(r.petitEcart).toBe(-0.3);
     expect(r.etapes.join(" ")).toMatch(/Prix sur mesure » : augmente-le de 0,30 €/);
-    expect(noteManquante(r, [])).toBe(true);
+    // Rien n'est exigé tant que l'équipe n'a pas déclaré l'ajustement (vécu 15/10 : faute de frappe passagère)
+    expect(noteManquante(r, [])).toBe(false);
     // Après la correction dans Popina : carte juste, mais l'ajustement reste attaché et la note est exigée
     const apres = calculerCloture({ ...saisie(z, { cb: 4806.3, amex: 70.5, conecs: 168, conecsNb: 7, especes: 773.7 }, tiroir), ajustement: r.petitEcart });
     expect(apres.niveau).toBe("ok");
