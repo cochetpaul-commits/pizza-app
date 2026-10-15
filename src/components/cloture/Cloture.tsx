@@ -6,7 +6,7 @@ import { useBureau } from "@/hooks/useBureau";
 import { fetchApi } from "@/lib/fetchApi";
 import { calculerCloture, eur, lireMontant, noteManquante, recapCloture, VIDE, type SaisieCloture } from "@/lib/cloture";
 import { aideCloture, heureParis, jourService, lireExportFlatpay, type TransactionFlatpay } from "@/lib/flatpay";
-import { COUPURES, estBillet, libelleCoupure, listerCoupures, type Comptage } from "@/lib/fondCaisse";
+import { additionner, COUPURES, estBillet, libelleCoupure, listerCoupures, totalComptage, type Comptage } from "@/lib/fondCaisse";
 
 /**
  * Clôture de caisse du soir, Bello Mio (10/10/2026). Déroulé : le Z du TPE sort, l'équipe recopie
@@ -64,7 +64,7 @@ const assembler = (t: Textes, coupures: Comptage, ajustement: number | null): Sa
 /** Lundi de la semaine d'un jour (AAAA-MM-JJ) */
 const lundi = (jour: string) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
 const dateCourte = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
-type Historique = { jour: string; statut: string; resultat: { enveloppe?: number | null; fondCaisse?: { totalSorti: number } | null } | null };
+type Historique = { jour: string; statut: string; resultat: { enveloppe?: number | null; fondCaisse?: { totalSorti: number; sortir?: Comptage } | null } | null };
 const dateLongue = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 const decaler = (jour: string, n: number) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
@@ -205,8 +205,19 @@ export function Cloture() {
     const cette = semaine(lundi(jour));
     const precedente = semaine(lundi(decaler(lundi(jour), -7)));
     const somme = (l: [string, number][]) => l.reduce((a, [, v]) => a + v, 0);
-    return { lundi: lundi(jour), cette, precedente, totalCette: Math.round(somme(cette) * 100) / 100, totalPrecedente: Math.round(somme(precedente) * 100) / 100 };
-  }, [historique, resultat.enveloppe, jour]);
+    // Bordereau de banque : billets et pièces sortis chaque soir (bloc « À sortir »), additionnés sur la semaine
+    const sorties = new Map<string, Comptage | undefined>();
+    for (const h of historique) sorties.set(h.jour, h.resultat?.fondCaisse?.sortir);
+    sorties.set(jour, resultat.fondCaisse?.sortir);
+    const bordereau = (l: [string, number][]) => {
+      const c = additionner(l.map(([j]) => sorties.get(j)));
+      return { coupures: c, total: totalComptage(c) / 100, soirsSansComptage: l.filter(([j]) => !sorties.get(j)).map(([j]) => j) };
+    };
+    return {
+      lundi: lundi(jour), cette, precedente, totalCette: Math.round(somme(cette) * 100) / 100, totalPrecedente: Math.round(somme(precedente) * 100) / 100,
+      lundiPrecedent: lundi(decaler(lundi(jour), -7)), bordereauCette: bordereau(cette), bordereauPrecedente: bordereau(precedente),
+    };
+  }, [historique, resultat.enveloppe, resultat.fondCaisse, jour]);
   const changerCoupure = (k: number, n: number) => setCoupures((c) => ({ ...c, [String(k)]: Math.max(0, Math.min(9999, Math.floor(n) || 0)) }));
   const noteRequise = noteManquante(resultat, corrections);
   /** L'écart du tiroir ne se règle avec les pourboires que quand la carte est juste */
@@ -348,6 +359,42 @@ export function Cloture() {
                 {enveloppes.precedente.length > 0 && <div style={{ color: AMBRE, fontWeight: 700 }}>Semaine précédente, à déposer à la banque : {eur(enveloppes.totalPrecedente)}</div>}
               </div>
             )}
+            {(() => {
+              // Bordereau de la semaine à déposer (la précédente), sinon celui de la semaine en cours
+              const avecPrec = enveloppes.precedente.length > 0;
+              const b = avecPrec ? enveloppes.bordereauPrecedente : enveloppes.bordereauCette;
+              const totalEnveloppes = avecPrec ? enveloppes.totalPrecedente : enveloppes.totalCette;
+              if (b.total <= 0) return null;
+              const lignes = COUPURES.filter((k) => (b.coupures[String(k)] ?? 0) > 0);
+              const billets = lignes.filter(estBillet);
+              const pieces = lignes.filter((k) => !estBillet(k));
+              const totalPieces = pieces.reduce((t, k) => t + k * (b.coupures[String(k)] ?? 0), 0) / 100;
+              const nbPieces = pieces.reduce((t, k) => t + (b.coupures[String(k)] ?? 0), 0);
+              const ecart = Math.round((b.total - totalEnveloppes) * 100) / 100;
+              const cellule: CSSProperties = { padding: "4px 6px", borderTop: "1px solid #f0ebe2", fontVariantNumeric: "tabular-nums" };
+              return (
+                <details style={{ fontSize: 13.5, borderTop: "1px solid #f0ebe2", paddingTop: 8 }}>
+                  <summary style={{ cursor: "pointer", fontWeight: 700 }}>Bordereau de banque, semaine du {dateCourte(avecPrec ? enveloppes.lundiPrecedent : enveloppes.lundi)}{avecPrec ? "" : " (en cours)"} : {eur(b.total)}</summary>
+                  <table style={{ width: "100%", maxWidth: 420, borderCollapse: "collapse", marginTop: 8 }}>
+                    <tbody>
+                      {billets.map((k) => (
+                        <tr key={k}><td style={cellule}>Billets de {libelleCoupure(k)}</td><td style={{ ...cellule, textAlign: "right" }}>{b.coupures[String(k)]}</td><td style={{ ...cellule, textAlign: "right" }}>{eur((k * (b.coupures[String(k)] ?? 0)) / 100)}</td></tr>
+                      ))}
+                      {pieces.length > 0 && <tr><td style={{ ...cellule, fontWeight: 700 }}>Pièces</td><td style={{ ...cellule, textAlign: "right", fontWeight: 700 }}>{nbPieces}</td><td style={{ ...cellule, textAlign: "right", fontWeight: 700 }}>{eur(totalPieces)}</td></tr>}
+                      {pieces.map((k) => (
+                        <tr key={k}><td style={{ ...cellule, paddingLeft: 18, color: MUTED }}>{libelleCoupure(k)}</td><td style={{ ...cellule, textAlign: "right", color: MUTED }}>{b.coupures[String(k)]}</td><td style={{ ...cellule, textAlign: "right", color: MUTED }}>{eur((k * (b.coupures[String(k)] ?? 0)) / 100)}</td></tr>
+                      ))}
+                      <tr><td style={{ ...cellule, fontWeight: 700, borderTop: `1.5px solid ${BORD}` }}>Total</td><td style={{ ...cellule, borderTop: `1.5px solid ${BORD}` }} /><td style={{ ...cellule, textAlign: "right", fontWeight: 700, borderTop: `1.5px solid ${BORD}` }}>{eur(b.total)}</td></tr>
+                    </tbody>
+                  </table>
+                  <div style={{ fontSize: 12.5, color: MUTED, marginTop: 6, lineHeight: 1.45 }}>
+                    Les billets sont ceux sortis chaque soir en laissant le fond proposé. Les pièces sont indicatives : recompte-les si vous avez fait de la monnaie.
+                    {Math.abs(ecart) >= 0.005 && <> {ecart > 0 ? `${eur(ecart)} de plus que les enveloppes : le trop perçu donné aux pourboires, à retirer des pièces.` : `${eur(-ecart)} de moins que les enveloppes : complété avec les pourboires.`}</>}
+                    {b.soirsSansComptage.length > 0 && <> Soir sans comptage du tiroir : {b.soirsSansComptage.map(dateCourte).join(", ")}, son enveloppe n&apos;est pas détaillée.</>}
+                  </div>
+                </details>
+              );
+            })()}
           </fieldset>
 
           {/* Verdict */}

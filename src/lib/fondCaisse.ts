@@ -121,3 +121,10 @@ export function composerFond(comptage: Comptage, fondEuros: number, ideal: Recor
 export function listerCoupures(c: Comptage): string {
   return COUPURES.filter((k) => lire(c, k) > 0).map((k) => `${lire(c, k)} × ${libelleCoupure(k)}`).join(", ");
 }
+
+/** Somme de plusieurs comptages (bordereau de banque de la semaine : les enveloppes des soirs) */
+export function additionner(comptages: (Comptage | null | undefined)[]): Comptage {
+  const out: Comptage = {};
+  for (const c of comptages) for (const k of COUPURES) { const n = lire(c ?? {}, k); if (n) out[String(k)] = (out[String(k)] ?? 0) + n; }
+  return out;
+}

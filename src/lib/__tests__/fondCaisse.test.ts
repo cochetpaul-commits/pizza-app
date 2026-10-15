@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composerFond, FOND_IDEAL, listerCoupures, totalComptage, type Comptage } from "@/lib/fondCaisse";
+import { additionner, composerFond, FOND_IDEAL, listerCoupures, totalComptage, type Comptage } from "@/lib/fondCaisse";
 
 const idealEnComptage = (): Comptage => Object.fromEntries(Object.entries(FOND_IDEAL).map(([k, n]) => [k, n]));
 
@@ -58,5 +58,11 @@ describe("fond de caisse", () => {
     const r = composerFond(c, 100);
     expect(r.manqueIdeal).toEqual({ "100": 3, "1": 5 });
     expect(listerCoupures(r.manqueIdeal)).toBe("3 × 1 €, 5 × 1 c");
+  });
+
+  it("bordereau de la semaine : somme des enveloppes par coupure", () => {
+    const b = additionner([{ "5000": 2, "1000": 7, "200": 1 }, { "5000": 1, "2000": 3, "50": 2 }, null]);
+    expect(b).toEqual({ "5000": 3, "2000": 3, "1000": 7, "200": 1, "50": 2 });
+    expect(totalComptage(b)).toBe(28300);
   });
 });
