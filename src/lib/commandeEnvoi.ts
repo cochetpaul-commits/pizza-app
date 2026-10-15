@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { hasPermission } from "@/lib/permissions";
+import { normalizeRole } from "@/lib/rbac";
 import { libelleColisage, libelleElement, nomUnite, quantiteLisible, taille, type CommandeArticle } from "@/lib/commandeArticles";
 import { livraisonPrecommande, prochaineLivraison, type RegleLivraison } from "@/lib/commandeLivraison";
 
@@ -49,6 +50,27 @@ export async function refusDroit(userId: string, supplierId: string): Promise<st
   ]);
   if (peutValiderEnvoyer(profil?.role as string | null, !!fournisseur?.envoi_equipier, permissions)) return null;
   return "Vous n'avez pas le droit de valider et d'envoyer les commandes de ce fournisseur : demandez à un manager, ou l'autorisation « Valider les commandes » sur votre fiche employé.";
+}
+
+/**
+ * Franco de port (vécu 14/10/2026 : commande Carniato envoyée à 135,79 € HT pour 350 € de franco).
+ * Une commande sous le franco du fournisseur ne part pas. Seule la direction (group_admin) peut l'envoyer
+ * quand même, en le confirmant. Les fournisseurs au franco en bouteilles (cavistes) restent contrôlés à
+ * l'écran de commande, où le colisage des cartons est connu.
+ */
+export async function controleFranco(userId: string, supplierId: string, totalHt: number): Promise<{ message: string; forcable: boolean } | null> {
+  const [{ data: f }, { data: profil }] = await Promise.all([
+    supabaseAdmin.from("suppliers").select("name, franco_minimum, franco_bouteilles").eq("id", supplierId).maybeSingle(),
+    supabaseAdmin.from("profiles").select("role").eq("id", userId).maybeSingle(),
+  ]);
+  const minimum = Number(f?.franco_minimum) || 0;
+  if (minimum <= 0 || (Number(f?.franco_bouteilles) || 0) > 0) return null;
+  if (totalHt >= minimum - 0.005) return null;
+  const eur = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  return {
+    message: `Franco non atteint chez ${f?.name ?? "ce fournisseur"} : ${eur(totalHt)} HT pour ${eur(minimum)} de franco, il manque ${eur(minimum - totalHt)}. Complète la commande avant de l'envoyer.`,
+    forcable: normalizeRole(String(profil?.role ?? "")) === "group_admin",
+  };
 }
 
 export type LigneEnvoi = { rayon: string; rayonOrdre: number; nom: string; quantite: number; unite: string; texte: string; ref: string | null };

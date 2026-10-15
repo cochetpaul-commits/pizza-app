@@ -3,7 +3,7 @@ import { Resend } from "resend";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import { destinatairesBloques, DOMAINE_AUTORISE_HORS_PRODUCTION } from "@/lib/envoiGardeFou";
-import { chargerEnvoi, corpsMail, refusDroit, type Envoi } from "@/lib/commandeEnvoi";
+import { chargerEnvoi, controleFranco, corpsMail, refusDroit, type Envoi } from "@/lib/commandeEnvoi";
 import { precommandeEnRetard } from "@/lib/commandeLivraison";
 
 export const runtime = "nodejs";
@@ -16,7 +16,7 @@ const FROM_EMAIL = process.env.RESEND_FROM ?? "commande@bellomio.fr";
 /**
  * GET  ?session_id=… → aperçu pour l'écran de confirmation (rien n'est envoyé) :
  *                      produits, total HT, date et adresse de livraison, destinataires, droits, blocage hors production.
- * POST { session_id } → envoi par Resend aux contacts cochés « Commandes », PDF joint ;
+ * POST { session_id, forcer_franco? } → envoi par Resend (sous le franco : refusé, sauf direction qui confirme) aux contacts cochés « Commandes », PDF joint ;
  *                      la commande passe en « envoyee » et l'envoi est inscrit au journal (réussi ou non).
  */
 
@@ -31,8 +31,8 @@ async function contexte(req: NextRequest, sessionId: string | null) {
   if (!sessionId) return { erreur: NextResponse.json({ error: "session_id requis" }, { status: 400 }) };
   const envoi = await chargerEnvoi(sessionId, auth.etabId, new Date(), auth.userId);
   if (!envoi) return { erreur: NextResponse.json({ error: "Commande introuvable" }, { status: 404 }) };
-  const refus = await refusDroit(auth.userId, envoi.fournisseur.id);
-  return { ...auth, envoi, refus };
+  const [refus, franco] = await Promise.all([refusDroit(auth.userId, envoi.fournisseur.id), controleFranco(auth.userId, envoi.fournisseur.id, envoi.totalHt)]);
+  return { ...auth, envoi, refus, franco };
 }
 
 function problemes(envoi: Envoi): string | null {
@@ -47,7 +47,7 @@ function problemes(envoi: Envoi): string | null {
 export async function GET(request: NextRequest) {
   const c = await contexte(request, request.nextUrl.searchParams.get("session_id"));
   if ("erreur" in c) return c.erreur;
-  const { envoi, refus } = c;
+  const { envoi, refus, franco } = c;
   return NextResponse.json({
     fournisseur: envoi.fournisseur.nom,
     type: envoi.type,
@@ -59,7 +59,9 @@ export async function GET(request: NextRequest) {
     adresse: envoi.etab.adresse ? `${envoi.etab.nom}, ${envoi.etab.adresse}` : envoi.etab.nom,
     destinataires: envoi.destinataires,
     deja_envoyee_le: envoi.session.email_sent_at,
-    refus: refus ?? problemes(envoi),
+    refus: refus ?? problemes(envoi) ?? (franco && !franco.forcable ? franco.message : null),
+    // Direction : avertissement, l'envoi reste possible en le confirmant
+    franco_avertissement: franco?.forcable ? franco.message : null,
   });
 }
 
@@ -70,8 +72,9 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const c = await contexte(request, (body as { session_id?: string }).session_id ?? null);
   if ("erreur" in c) return c.erreur;
-  const { envoi, refus, etabId, userId } = c;
+  const { envoi, refus, franco, etabId, userId } = c;
   if (refus) return NextResponse.json({ error: refus }, { status: 403 });
+  if (franco && !(franco.forcable && (body as { forcer_franco?: boolean }).forcer_franco === true)) return NextResponse.json({ error: franco.message, franco: true }, { status: 400 });
   const pb = problemes(envoi);
   if (pb) return NextResponse.json({ error: pb, bloque_hors_production: pb.startsWith("Envoi bloqué") }, { status: pb.startsWith("Envoi bloqué") ? 403 : 400 });
 

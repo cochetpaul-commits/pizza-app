@@ -1036,6 +1036,8 @@ function CommandesPage() {
     fournisseur: string; type?: "jour" | "precommande"; avertissement?: string | null; nb_produits: number; total_ht: number;
     livraison: { date: string; libelle: string } | null; adresse: string;
     destinataires: string[]; deja_envoyee_le: string | null; refus: string | null;
+    /** Direction seulement : commande sous le franco, envoi possible en le confirmant */
+    franco_avertissement?: string | null;
   };
   const [ongletMael, setOngletMael] = useState<"jour" | "precommande">("jour");
   const [envoiAConfirmer, setEnvoiAConfirmer] = useState<{ sessionId: string; apercu: ApercuEnvoi | null; erreur: string | null } | null>(null);
@@ -1061,7 +1063,7 @@ function CommandesPage() {
       const res = await fetchApi("/api/commandes/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId }),
+        body: JSON.stringify({ session_id: sessionId, forcer_franco: !!envoiAConfirmer.apercu?.franco_avertissement }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -2423,6 +2425,11 @@ function CommandesPage() {
                       {a.avertissement}
                     </div>
                   )}
+                  {a.franco_avertissement && (
+                    <div style={{ fontSize: 14, fontWeight: 600, background: "#fbeaea", color: "#8a2b2b", border: "1px solid #f0c4c4", borderRadius: 8, padding: "10px 12px" }}>
+                      {a.franco_avertissement} Tu peux l&apos;envoyer quand même (direction).
+                    </div>
+                  )}
                   {a.deja_envoyee_le && (
                     <div style={{ fontSize: 13, background: "#fbf0dc", color: "#7a5a2b", borderRadius: 8, padding: "8px 10px" }}>
                       Déjà envoyée le {new Date(a.deja_envoyee_le).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} : ce mail la remplacera (mise à jour).
@@ -2441,7 +2448,7 @@ function CommandesPage() {
                 {a && !erreur && (
                   <button type="button" onClick={() => void confirmerEnvoi()} disabled={sendingEmail}
                     style={{ flex: 1.4, height: 50, borderRadius: 12, border: "none", background: "#D4775A", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: sendingEmail ? 0.6 : 1 }}>
-                    {sendingEmail ? "Envoi…" : "Confirmer l'envoi"}
+                    {sendingEmail ? "Envoi…" : a.franco_avertissement ? "Envoyer quand même" : "Confirmer l'envoi"}
                   </button>
                 )}
               </div>

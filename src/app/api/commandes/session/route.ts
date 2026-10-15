@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import { notifyGroupAdmins } from "@/lib/pushNotify";
-import { refusDroit } from "@/lib/commandeEnvoi";
+import { controleFranco, refusDroit } from "@/lib/commandeEnvoi";
 
 /**
  * POST /api/commandes/session
@@ -131,6 +131,11 @@ export async function PATCH(req: NextRequest) {
 
   if (lignes) {
     update.total_ht = lignes.reduce((sum, l) => sum + (Number(l.total_ligne_ht) || 0), 0);
+  }
+  // Une commande validée sous le franco ne passe pas (la direction, elle, peut)
+  if (status === "validee") {
+    const franco = await controleFranco(userId, existing.supplier_id as string, Number(update.total_ht) || 0);
+    if (franco && !franco.forcable) return NextResponse.json({ error: franco.message, franco: true }, { status: 400 });
   }
 
   const { data: session, error } = await supabaseAdmin
