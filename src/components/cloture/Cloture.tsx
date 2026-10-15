@@ -6,6 +6,7 @@ import { useBureau } from "@/hooks/useBureau";
 import { fetchApi } from "@/lib/fetchApi";
 import { calculerCloture, eur, lireMontant, noteManquante, recapCloture, VIDE, type SaisieCloture } from "@/lib/cloture";
 import { aideCloture, heureParis, jourService, lireExportFlatpay, type TransactionFlatpay } from "@/lib/flatpay";
+import type { ControleNuit } from "@/lib/controleNuit";
 import { additionner, COUPURES, estBillet, libelleCoupure, listerCoupures, totalComptage, type Comptage } from "@/lib/fondCaisse";
 
 /**
@@ -64,7 +65,7 @@ const assembler = (t: Textes, coupures: Comptage, ajustement: number | null): Sa
 /** Lundi de la semaine d'un jour (AAAA-MM-JJ) */
 const lundi = (jour: string) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
 const dateCourte = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
-type Historique = { jour: string; statut: string; resultat: { enveloppe?: number | null; fondCaisse?: { totalSorti: number; sortir?: Comptage } | null } | null };
+type Historique = { jour: string; statut: string; pourboires_paie?: number | null; resultat: { enveloppe?: number | null; fondCaisse?: { totalSorti: number; sortir?: Comptage } | null } | null };
 const dateLongue = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 const decaler = (jour: string, n: number) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
@@ -82,6 +83,8 @@ export function Cloture() {
   const correctionRef = useRef<HTMLInputElement>(null);
   const [notes, setNotes] = useState("");
   const [statut, setStatut] = useState<"en_cours" | "validee">("en_cours");
+  const [controle, setControle] = useState<{ c: ControleNuit; at: string } | null>(null);
+  const [controleEnCours, setControleEnCours] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<TransactionFlatpay[]>([]);
   const [etat, setEtat] = useState<{ chargement: boolean; enregistrement: boolean; erreur: string | null; info: string | null }>({ chargement: true, enregistrement: false, erreur: null, info: null });
   const [import_, setImport] = useState<{ enCours: boolean; message: string | null }>({ enCours: false, message: null });
@@ -110,6 +113,8 @@ export function Cloture() {
         setCorrections(Array.isArray(c?.corrections) ? c.corrections : []);
         setNotes(c?.notes ?? "");
         setStatut(c?.statut === "validee" ? "validee" : "en_cours");
+        setControle(c?.controle ? { c: c.controle as ControleNuit, at: c.controle_at as string } : null);
+        setControleEnCours(null);
         setTransactions(j.transactions ?? []);
         dernier.current = JSON.stringify({ s: assembler(versTextes(lue), lue.tiroir?.coupures ?? {}, lue.ajustement ?? null), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
         setEtat((e) => ({ ...e, chargement: false }));
@@ -189,6 +194,20 @@ export function Cloture() {
       setImport({ enCours: false, message: `Lecture impossible : ${e instanceof Error ? e.message : "fichier illisible"}` });
     } finally { if (fichierRef.current) fichierRef.current.value = ""; }
   }
+
+  const lancerControle = async () => {
+    setControleEnCours("Contrôle en cours…");
+    try {
+      const r = await fetchApi(`/api/cron/cloture-controle?jour=${jour}`);
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.controle) { setControleEnCours(j?.error ?? (r.status === 401 ? "Réservé à la direction." : "Contrôle impossible.")); return; }
+      setControle({ c: j.controle as ControleNuit, at: new Date().toISOString() });
+      setControleEnCours(null);
+    } catch { setControleEnCours("Contrôle impossible, vérifie la connexion."); }
+  };
+  const moisCle = jour.slice(0, 7);
+  const pourboiresMois = Math.round((historique.filter((h) => h.jour.slice(0, 7) === moisCle && h.jour !== jour).reduce((t, h) => t + (Number(h.pourboires_paie) || 0), 0)
+    + (resultat.niveau !== "vide" ? resultat.pourboiresPaie : 0)) * 100) / 100;
 
   const ajouterCorrection = () => { const c = nouvelleCorrection.trim(); if (!c) return; setCorrections((l) => [...l, c]); setNouvelleCorrection(""); };
   const recap = recapCloture(jour, saisie, resultat, corrections);
@@ -407,21 +426,58 @@ export function Cloture() {
             )}
             {resultat.niveau !== "vide" && (
               <div style={{ overflowX: "auto", marginTop: 12 }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14.5, fontVariantNumeric: "tabular-nums" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: bureau ? 14.5 : 13.5, fontVariantNumeric: "tabular-nums" }}>
                   <thead><tr>{["Mode", "Popina", "Attendu", "Écart"].map((h, i) => <th key={h} style={{ textAlign: i ? "right" : "left", color: MUTED, fontSize: 12, fontWeight: 600, padding: "6px 6px", borderTop: `1px solid ${BORD}` }}>{h}</th>)}</tr></thead>
                   <tbody>{resultat.lignes.map((l) => (
                     <tr key={l.mode}>
                       <td style={{ padding: "6px", borderTop: `1px solid ${BORD}` }}>{l.libelle}</td>
-                      <td style={{ padding: "6px", borderTop: `1px solid ${BORD}`, textAlign: "right" }}>{eur(l.popina)}</td>
-                      <td style={{ padding: "6px", borderTop: `1px solid ${BORD}`, textAlign: "right" }}>{eur(l.attendu)}</td>
-                      <td style={{ padding: "6px", borderTop: `1px solid ${BORD}`, textAlign: "right", fontWeight: 700, color: Math.abs(l.ecart) < 0.005 ? VERT : ROUGE }}>{Math.abs(l.ecart) < 0.005 ? "juste" : `${l.ecart > 0 ? "+" : "−"}${eur(Math.abs(l.ecart))}`}</td>
+                      <td style={{ padding: "6px 4px", borderTop: `1px solid ${BORD}`, textAlign: "right", whiteSpace: "nowrap" }}>{eur(l.popina)}</td>
+                      <td style={{ padding: "6px 4px", borderTop: `1px solid ${BORD}`, textAlign: "right", whiteSpace: "nowrap" }}>{eur(l.attendu)}</td>
+                      <td style={{ padding: "6px 4px", borderTop: `1px solid ${BORD}`, textAlign: "right", whiteSpace: "nowrap", fontWeight: 700, color: Math.abs(l.ecart) < 0.005 ? VERT : ROUGE }}>{Math.abs(l.ecart) < 0.005 ? "juste" : `${l.ecart > 0 ? "+" : "−"}${eur(Math.abs(l.ecart))}`}</td>
                     </tr>
                   ))}</tbody>
                 </table>
                 <div style={{ marginTop: 10, fontSize: 14 }}>Pourboires carte pour la paie : <strong>{eur(resultat.pourboiresPaie)}</strong>{resultat.pourboireAmex > 0 && <span style={{ color: MUTED }}> (dont AMEX {eur(resultat.pourboireAmex)})</span>}</div>
+                <div style={{ marginTop: 2, fontSize: 13, color: MUTED }}>Cumul de {new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { month: "long" })} : <strong style={{ color: "#1a1a1a" }}>{eur(pourboiresMois)}</strong></div>
               </div>
             )}
           </section>
+
+          {/* Contrôle de la nuit : le vrai Z Popina relu vers 1 h */}
+          {(controle || jour < jourService(new Date())) && (() => {
+            const c = controle?.c;
+            const coul = !c ? MUTED : c.niveau === "ok" ? VERT : c.niveau === "absent" ? AMBRE : ROUGE;
+            return (
+              <section style={{ border: `1.5px solid ${c ? coul : BORD}`, borderRadius: 14, background: "#fff", padding: "12px 14px", display: "grid", gap: 8 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "4px 10px" }}>
+                  <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 17, textTransform: "uppercase", flex: "1 1 auto" }}>Contrôle de la nuit</div>
+                  <button type="button" disabled={controleEnCours === "Contrôle en cours…"} onClick={() => void lancerControle()} style={{ border: "none", background: "none", color: ACCENT, fontWeight: 700, fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>{c ? "Relancer" : "Lancer maintenant"}</button>
+                </div>
+                {controleEnCours && <div style={{ fontSize: 13, color: MUTED }}>{controleEnCours}</div>}
+                {!c ? <div style={{ fontSize: 13.5, color: MUTED }}>Pas encore fait : il passe vers 1 h, une fois le Z Popina publié.</div> : (
+                  <>
+                    <div style={{ fontWeight: 700, color: coul, fontSize: 15, lineHeight: 1.35 }}>{c.titre}</div>
+                    {c.differences.length > 0 && (
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5, fontVariantNumeric: "tabular-nums" }}>
+                        <thead><tr>{["Popina", "Recopié le soir", "Z Popina"].map((h, i) => <th key={h} style={{ textAlign: i ? "right" : "left", color: MUTED, fontSize: 12, fontWeight: 600, padding: "4px" }}>{h}</th>)}</tr></thead>
+                        <tbody>{c.differences.map((d) => (
+                          <tr key={d.libelle}><td style={{ padding: "4px", borderTop: "1px solid #f0ebe2" }}>{d.libelle}</td><td style={{ padding: "4px", borderTop: "1px solid #f0ebe2", textAlign: "right", whiteSpace: "nowrap" }}>{eur(d.soir)}</td><td style={{ padding: "4px", borderTop: "1px solid #f0ebe2", textAlign: "right", whiteSpace: "nowrap", fontWeight: 700 }}>{eur(d.reel)}</td></tr>
+                        ))}</tbody>
+                      </table>
+                    )}
+                    {c.messages.length > 0 && <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, lineHeight: 1.45 }}>{c.messages.map((m, i) => <li key={i}>{m}</li>)}</ul>}
+                    {c.rapprochement && (c.rapprochement.tpeSeuls.length > 0 || c.rapprochement.popinaSeuls.length > 0) && (
+                      <div style={{ fontSize: 13, display: "grid", gap: 2 }}>
+                        {c.rapprochement.tpeSeuls.map((t, i) => <div key={`t${i}`}>TPE sans Popina : <strong>{eur(t.montant)}</strong> à {t.heure}{t.mode === "amex" ? " (AMEX)" : ""}</div>)}
+                        {c.rapprochement.popinaSeuls.map((t, i) => <div key={`p${i}`}>Popina sans TPE : <strong>{eur(t.montant)}</strong>{t.heure ? ` à ${t.heure}` : ""}{t.table ? `, ${t.table}` : ""}</div>)}
+                      </div>
+                    )}
+                    {controle && <div style={{ fontSize: 12, color: FAIBLE }}>Contrôlé le {new Date(controle.at).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>}
+                  </>
+                )}
+              </section>
+            );
+          })()}
 
           {/* Export Flatpay */}
           <section style={{ border: `1.5px solid ${BORD}`, borderRadius: 14, background: "#fff", padding: "12px 14px", display: "grid", gap: 8 }}>
@@ -500,8 +556,8 @@ export function Cloture() {
           </div>
 
           <div style={{ color: MUTED, fontSize: 13.5, lineHeight: 1.5, maxWidth: "70ch" }}>
-            <p><strong style={{ color: "#1a1a1a" }}>Les règles.</strong> La caisse doit tomber juste au centime avant d&apos;arrêter Popina. On corrige le mode de paiement sur le bon ticket ; on n&apos;invente jamais de montant. Si un petit écart reste introuvable, on corrige le mode sur une table et on le note ci-dessus : le contrôle du lendemain trouvera la vraie cause.</p>
-            <p><strong style={{ color: "#1a1a1a" }}>Les pourboires.</strong> Seuls ceux du TPE comptent pour la paie. Le liquide laissé sur la monnaie se passe en « monnaie rendue » et va dans la cagnotte : on ne le tape pas. Un pourboire carte n&apos;est saisi dans Popina que pour une facture, et on l&apos;annule avant d&apos;arrêter la caisse. On ne prend jamais dans les pourboires pour combler un écart.</p>
+            <p><strong style={{ color: "#1a1a1a" }}>Les règles.</strong> La caisse doit tomber juste au centime avant d&apos;arrêter Popina. On corrige le mode de paiement sur le bon ticket ; on n&apos;invente jamais de montant. Un petit écart de carte (2 € ou moins, liquide bon) se règle en « prix sur mesure » sur une table payée en carte, et on le note ci-dessus. La nuit, l&apos;app relit le vrai Z Popina et vérifie la soirée.</p>
+            <p><strong style={{ color: "#1a1a1a" }}>Les pourboires.</strong> Seuls ceux du TPE comptent pour la paie. Le liquide laissé sur la monnaie se passe en « monnaie rendue » et va dans la cagnotte : on ne le tape pas. Un pourboire carte n&apos;est saisi dans Popina que pour une facture, et on l&apos;annule avant d&apos;arrêter la caisse. Le tiroir se règle avec la cagnotte seulement quand la carte est juste : un trop perçu va aux pourboires, un manque (monnaie mal rendue) s&apos;y prend.</p>
           </div>
         </>
       )}

@@ -37,6 +37,14 @@
       "schedule": "30 7 * * *"
     },
     {
+      "path": "/api/cron/cloture-controle",
+      "schedule": "15 23 * * *"
+    },
+    {
+      "path": "/api/cron/cloture-controle?passe=matin",
+      "schedule": "0 6 * * *"
+    },
+    {
       "path": "/api/cron/factures-manquantes",
       "schedule": "0 8 * * 1"
     }
