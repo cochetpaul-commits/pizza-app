@@ -207,7 +207,17 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
 - [x] *(12/10/2026)* `babel-plugin-react-compiler` en devDeps sans config
   visible — retiré (`npm uninstall babel-plugin-react-compiler`), confirmé
   sans impact (build, tsc, eslint, tests tous verts).
-- Vignettes `<img>` brutes dans CatalogueSalleTab et StepsList → `next/image`.
+- [x] *(19/10/2026)* Vignette `<img>` brute dans `CatalogueSalleTab.tsx` (56×56,
+  carrée, `objectFit: cover`) → `next/image`, même patron que les miniatures
+  `photo_url` déjà faites dans `PizzaFormV2.tsx`/`CuisineFormV2.tsx`/
+  `CocktailFormV2.tsx` (le domaine Supabase Storage est déjà dans
+  `remotePatterns` de `next.config.ts`, donc rien à configurer). Reste
+  `StepsList.tsx` (photo d'étape avec `maxHeight: 120` seulement, largeur
+  variable selon l'aspect ratio de la photo) : `next/image` exige des
+  dimensions fixes ou un conteneur de taille fixe avec `fill` — les deux
+  changeraient le rendu visuel (recadrage ou lettrboxing) par rapport à
+  l'actuel « hauteur max, largeur libre », à vérifier dans un navigateur
+  avant de toucher — pas fait cette fois, pas de navigateur disponible ici.
 - **Découverte (12/10/2026) — code mort probable dans `ventes/page.tsx`** :
   tout le bloc « graphique tendance par catégorie » (états `catTrendData`,
   `catTrendRange`, `catTrendFilterCat`, `catTrendFilterProd`, `prodTrendData`,

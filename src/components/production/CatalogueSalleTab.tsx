@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -180,8 +181,7 @@ function FicheCard({ fiche, isOpen, onToggle, canEdit, onUpdate }: {
     <div style={{ borderRadius: 12, border: "1px solid #e5ddd0", background: "#fff", overflow: "hidden", opacity: fiche.in_catalogue ? 1 : 0.5 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer" }} onClick={onToggle}>
         {fiche.photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={fiche.photo_url} alt={fiche.name} style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover" }} />
+          <Image src={fiche.photo_url} alt={fiche.name} width={56} height={56} style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover" }} />
         ) : (
           <div style={{ width: 56, height: 56, borderRadius: 10, background: col.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ fontSize: 20, fontWeight: 800, color: col.fg }}>{(fiche.name || "?").charAt(0).toUpperCase()}</span>
