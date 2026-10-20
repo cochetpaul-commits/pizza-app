@@ -16,7 +16,9 @@ const FROM_EMAIL = process.env.RESEND_FROM ?? "commande@bellomio.fr";
 /**
  * GET  ?session_id=… → aperçu pour l'écran de confirmation (rien n'est envoyé) :
  *                      produits, total HT, date et adresse de livraison, destinataires, droits, blocage hors production.
- * POST { session_id, forcer_franco? } → envoi par Resend (sous le franco : refusé, sauf direction qui confirme) aux contacts cochés « Commandes », PDF joint ;
+ * POST { session_id, forcer_franco? } → envoi par Resend (sous le franco : refusé, sauf direction qui confirme)
+ * POST { session_id, canal: "whatsapp" } → fournisseur commandé par WhatsApp (Maël) : le PDF a été partagé depuis
+ *                      le téléphone ; on marque la commande envoyée et on inscrit l'envoi au journal (rien n'est envoyé ici). aux contacts cochés « Commandes », PDF joint ;
  *                      la commande passe en « envoyee » et l'envoi est inscrit au journal (réussi ou non).
  */
 
@@ -37,6 +39,8 @@ async function contexte(req: NextRequest, sessionId: string | null) {
 
 function problemes(envoi: Envoi): string | null {
   if (envoi.lignes.length === 0) return "La commande est vide.";
+  if (envoi.session.status === "recue" || envoi.session.status === "annulee") return "Cette commande est déjà reçue ou annulée.";
+  if (envoi.fournisseur.canal === "whatsapp") return null; // pas de mail : les contacts « Commandes » ne servent pas
   if (envoi.destinataires.length === 0) return "Aucun contact coché « Commandes » sur la fiche fournisseur : rien ne peut être envoyé.";
   const bloques = destinatairesBloques(envoi.destinataires);
   if (bloques.length) return `Envoi bloqué hors production : ${bloques.join(", ")} n'est pas une adresse @${DOMAINE_AUTORISE_HORS_PRODUCTION}. Rien n'a été envoyé.`;
@@ -58,6 +62,9 @@ export async function GET(request: NextRequest) {
     livraison: envoi.livraison,
     adresse: envoi.etab.adresse ? `${envoi.etab.nom}, ${envoi.etab.adresse}` : envoi.etab.nom,
     destinataires: envoi.destinataires,
+    canal: envoi.fournisseur.canal,
+    whatsapp: envoi.fournisseur.whatsapp,
+    fichier: nomFichier(envoi),
     deja_envoyee_le: envoi.session.email_sent_at,
     refus: refus ?? problemes(envoi) ?? (franco && !franco.forcable ? franco.message : null),
     // Direction : avertissement, l'envoi reste possible en le confirmant
@@ -65,11 +72,14 @@ export async function GET(request: NextRequest) {
   });
 }
 
+const nomFichier = (envoi: Envoi) => `commande-${envoi.fournisseur.nom.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${envoi.livraison?.date ?? new Date().toISOString().slice(0, 10)}.pdf`;
+const sujetEnvoi = (envoi: Envoi, remplace: string | null) => `${remplace ? "[MISE À JOUR] " : ""}${envoi.type === "precommande" ? "Précommande" : "Commande"} ${envoi.etab.nom} — livraison ${envoi.livraison?.libelle ?? "à convenir"}`;
+
 export async function POST(request: NextRequest) {
-  if (!process.env.RESEND_API_KEY) {
+  const body = await request.json().catch(() => ({}));
+  if ((body as { canal?: string }).canal !== "whatsapp" && !process.env.RESEND_API_KEY) {
     return NextResponse.json({ error: "RESEND_API_KEY manquante dans les variables d'environnement" }, { status: 500 });
   }
-  const body = await request.json().catch(() => ({}));
   const c = await contexte(request, (body as { session_id?: string }).session_id ?? null);
   if ("erreur" in c) return c.erreur;
   const { envoi, refus, franco, etabId, userId } = c;
@@ -79,11 +89,22 @@ export async function POST(request: NextRequest) {
   if (pb) return NextResponse.json({ error: pb, bloque_hors_production: pb.startsWith("Envoi bloqué") }, { status: pb.startsWith("Envoi bloqué") ? 403 : 400 });
 
   const sessionId = envoi.session.id;
-  const journal = (x: { succes: boolean; sujet: string; resend_id?: string | null; erreur?: string | null }) =>
+  const journal = (x: { succes: boolean; sujet: string; resend_id?: string | null; erreur?: string | null; canal?: string; destinataires?: string[] }) =>
     supabaseAdmin.from("commande_envois").insert({
-      session_id: sessionId, envoye_par: userId, destinataires: envoi.destinataires, sujet: x.sujet,
-      livraison_prevue: envoi.livraison?.date ?? null, resend_id: x.resend_id ?? null, succes: x.succes, erreur: x.erreur ?? null,
+      session_id: sessionId, envoye_par: userId, destinataires: x.destinataires ?? envoi.destinataires, sujet: x.sujet,
+      livraison_prevue: envoi.livraison?.date ?? null, resend_id: x.resend_id ?? null, succes: x.succes, erreur: x.erreur ?? null, canal: x.canal ?? "email",
     });
+
+  // WhatsApp : le PDF a été partagé depuis le téléphone, on enregistre l'envoi
+  if (envoi.fournisseur.canal === "whatsapp") {
+    if ((body as { canal?: string }).canal !== "whatsapp") return NextResponse.json({ error: `${envoi.fournisseur.nom} se commande par WhatsApp : partage le PDF depuis l'écran d'envoi.` }, { status: 400 });
+    const vers = `WhatsApp · ${envoi.fournisseur.whatsapp.groupe ?? envoi.fournisseur.whatsapp.numero ?? envoi.fournisseur.nom}`;
+    const sujet = sujetEnvoi(envoi, envoi.session.email_sent_at ? "renvoi" : null);
+    await journal({ succes: true, sujet, canal: "whatsapp", destinataires: [vers] });
+    const maintenant = new Date().toISOString();
+    await supabaseAdmin.from("commande_sessions").update({ status: "envoyee", email_sent_at: maintenant, email_sent_to: vers, updated_at: maintenant }).eq("id", sessionId);
+    return NextResponse.json({ ok: true, canal: "whatsapp", recipients: [vers], subject: sujet, livraison: envoi.livraison });
+  }
 
   // PDF (route interne, mêmes droits que l'appelant)
   const host = request.headers.get("host") ?? "localhost:3000";
@@ -104,8 +125,8 @@ export async function POST(request: NextRequest) {
   const remplace = envoi.session.email_sent_at
     ? new Date(envoi.session.email_sent_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })
     : null;
-  const sujet = `${remplace ? "[MISE À JOUR] " : ""}${envoi.type === "precommande" ? "Précommande" : "Commande"} ${envoi.etab.nom} — livraison ${envoi.livraison?.libelle ?? "à convenir"}`;
-  const fichier = `commande-${envoi.fournisseur.nom.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${envoi.livraison?.date ?? new Date().toISOString().slice(0, 10)}.pdf`;
+  const sujet = sujetEnvoi(envoi, remplace);
+  const fichier = nomFichier(envoi);
 
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);

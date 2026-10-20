@@ -78,7 +78,9 @@ export type Envoi = {
   session: { id: string; status: string; notes: string | null; created_at: string; email_sent_at: string | null; supplier_id: string };
   /** « jour » ou « precommande » (précommande du mercredi, livrée le mercredi suivant) */
   type: "jour" | "precommande";
-  fournisseur: { id: string; nom: string; simplifiee: boolean; numero_client: string | null; pied: string | null };
+  fournisseur: { id: string; nom: string; simplifiee: boolean; numero_client: string | null; pied: string | null;
+    /** Canal de commande : mail (Resend) ou WhatsApp (PDF partagé depuis le téléphone, vécu Maël 20/10) */
+    canal: "email" | "whatsapp"; whatsapp: { numero: string | null; groupe: string | null } };
   /** Prénom de la personne qui envoie (ou qui a envoyé) la commande */
   envoyeur: string | null;
   /** Date de la commande = date d'envoi (heure de Paris), « 28 septembre 2026 » */
@@ -100,10 +102,11 @@ export const dateParis = (d: Date, opts: Intl.DateTimeFormatOptions = { day: "nu
 export async function chargerEnvoi(sessionId: string, etabId: string, quand: Date = new Date(), userId?: string): Promise<Envoi | null> {
   const { data: s } = await supabaseAdmin
     .from("commande_sessions")
-    .select("id, status, notes, created_at, email_sent_at, supplier_id, type, suppliers(id, name, commande_simplifiee, delivery_schedule, client_code, pied_commande)")
+    .select("id, status, notes, created_at, email_sent_at, supplier_id, type, suppliers(id, name, commande_simplifiee, delivery_schedule, client_code, pied_commande, canal_commande, whatsapp_numero, whatsapp_groupe)")
     .eq("id", sessionId).eq("etablissement_id", etabId).maybeSingle();
   if (!s) return null;
-  const sup = s.suppliers as unknown as { id: string; name: string; commande_simplifiee: boolean; delivery_schedule: RegleLivraison[] | null; client_code: string | null; pied_commande: string | null };
+  const sup = s.suppliers as unknown as { id: string; name: string; commande_simplifiee: boolean; delivery_schedule: RegleLivraison[] | null; client_code: string | null; pied_commande: string | null;
+    canal_commande: string | null; whatsapp_numero: string | null; whatsapp_groupe: string | null };
 
   const [{ data: etab }, { data: contacts }, { data: lignes }, { data: memes }, { data: rayons }] = await Promise.all([
     supabaseAdmin.from("etablissements").select("nom, adresse").eq("id", etabId).single(),
@@ -193,7 +196,10 @@ export async function chargerEnvoi(sessionId: string, etabId: string, quand: Dat
   return {
     session: { id: s.id, status: s.status, notes: s.notes, created_at: s.created_at, email_sent_at: s.email_sent_at, supplier_id: s.supplier_id },
     type: s.type === "precommande" ? "precommande" : "jour",
-    fournisseur: { id: sup.id, nom: sup.name, simplifiee: !!sup.commande_simplifiee, numero_client: sup.client_code ?? null, pied: sup.pied_commande ?? null },
+    fournisseur: {
+      id: sup.id, nom: sup.name, simplifiee: !!sup.commande_simplifiee, numero_client: sup.client_code ?? null, pied: sup.pied_commande ?? null,
+      canal: sup.canal_commande === "whatsapp" ? "whatsapp" : "email", whatsapp: { numero: sup.whatsapp_numero ?? null, groupe: sup.whatsapp_groupe ?? null },
+    },
     envoyeur,
     dateCommande: dateParis(dateEnvoi),
     etab: { nom: etab?.nom ?? "Restaurant", adresse: etab?.adresse ?? null },

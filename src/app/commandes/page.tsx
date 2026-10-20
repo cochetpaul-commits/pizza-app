@@ -1038,24 +1038,65 @@ function CommandesPage() {
     destinataires: string[]; deja_envoyee_le: string | null; refus: string | null;
     /** Direction seulement : commande sous le franco, envoi possible en le confirmant */
     franco_avertissement?: string | null;
+    /** Maël : commande par WhatsApp, le PDF est partagé depuis le téléphone */
+    canal?: "email" | "whatsapp"; whatsapp?: { numero: string | null; groupe: string | null }; fichier?: string;
   };
   const [ongletMael, setOngletMael] = useState<"jour" | "precommande">("jour");
+  const [pdfWhatsapp, setPdfWhatsapp] = useState<File | null>(null);
+  const [whatsappManuel, setWhatsappManuel] = useState(false);
   const [envoiAConfirmer, setEnvoiAConfirmer] = useState<{ sessionId: string; apercu: ApercuEnvoi | null; erreur: string | null } | null>(null);
 
   // Toutes les actions « Envoyer » passent par ici : écran de confirmation avant l'envoi
   async function sendEmailOnly(sessionId: string) {
     setEnvoiAConfirmer({ sessionId, apercu: null, erreur: null });
+    setPdfWhatsapp(null);
+    setWhatsappManuel(false);
     try {
       const res = await fetchApi(`/api/commandes/send-email?session_id=${encodeURIComponent(sessionId)}`);
       const json = await res.json();
       if (!res.ok) setEnvoiAConfirmer({ sessionId, apercu: null, erreur: json.error ?? "Aperçu impossible" });
-      else setEnvoiAConfirmer({ sessionId, apercu: json as ApercuEnvoi, erreur: null });
+      else {
+        setEnvoiAConfirmer({ sessionId, apercu: json as ApercuEnvoi, erreur: null });
+        setPdfWhatsapp(null);
+        if ((json as ApercuEnvoi).canal === "whatsapp") {
+          const pdf = await fetchApi(`/api/commandes/pdf?session_id=${encodeURIComponent(sessionId)}`);
+          if (pdf.ok) setPdfWhatsapp(new File([await pdf.blob()], (json as ApercuEnvoi).fichier ?? "commande.pdf", { type: "application/pdf" }));
+        }
+      }
     } catch {
       setEnvoiAConfirmer({ sessionId, apercu: null, erreur: "Aperçu impossible, vérifie la connexion" });
     }
   }
 
-  async function confirmerEnvoi() {
+  /**
+   * WhatsApp (Maël, 20/10) : le menu de partage de l'iPhone s'ouvre avec le PDF, on choisit WhatsApp puis le
+   * groupe du fournisseur. Une fois partagé, la commande est marquée envoyée. Sans partage de fichier
+   * (ordinateur), le PDF est téléchargé et WhatsApp s'ouvre sur le numéro.
+   */
+  async function partagerWhatsapp() {
+    const a = envoiAConfirmer?.apercu;
+    if (!a || !pdfWhatsapp) return;
+    if (typeof navigator !== "undefined" && navigator.canShare?.({ files: [pdfWhatsapp] })) {
+      try {
+        await navigator.share({ files: [pdfWhatsapp], title: `${a.type === "precommande" ? "Précommande" : "Commande"} ${a.fournisseur}` });
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return; // partage annulé : rien n'est marqué
+        setEnvoiAConfirmer((x) => x && { ...x, erreur: "Partage impossible : utilise « Télécharger le PDF »." });
+        return;
+      }
+      await confirmerEnvoi("whatsapp");
+      return;
+    }
+    const url = URL.createObjectURL(pdfWhatsapp);
+    const lien = document.createElement("a");
+    lien.href = url; lien.download = pdfWhatsapp.name; lien.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    const numero = (a.whatsapp?.numero ?? "").replace(/\D/g, "");
+    if (numero) window.open(`https://wa.me/${numero}`, "_blank");
+    setWhatsappManuel(true);
+  }
+
+  async function confirmerEnvoi(canal?: "whatsapp") {
     if (!envoiAConfirmer) return;
     const sessionId = envoiAConfirmer.sessionId;
     setSendingEmail(true);
@@ -1063,11 +1104,13 @@ function CommandesPage() {
       const res = await fetchApi("/api/commandes/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, forcer_franco: !!envoiAConfirmer.apercu?.franco_avertissement }),
+        body: JSON.stringify({ session_id: sessionId, forcer_franco: !!envoiAConfirmer.apercu?.franco_avertissement, ...(canal ? { canal } : {}) }),
       });
       const data = await res.json();
       if (data.ok) {
         setEnvoiAConfirmer(null);
+        setPdfWhatsapp(null);
+        setWhatsappManuel(false);
         // Vécu 08/10 : envoyée depuis la liste « en cours », la commande y restait affichée en brouillon
         // avec son bouton Supprimer ; une commande Carniato déjà partie chez le fournisseur a été effacée.
         const envoyee = activeSessions.find((s) => s.id === sessionId);
@@ -2419,7 +2462,11 @@ function CommandesPage() {
                   <div><strong>{a.nb_produits}</strong> produit{a.nb_produits > 1 ? "s" : ""} · <strong>{a.total_ht.toFixed(2).replace(".", ",")} € HT</strong></div>
                   <div>Livraison : <strong>{a.livraison?.libelle ?? "date non définie"}</strong></div>
                   <div style={{ fontSize: 13, color: "#6f6656" }}>{a.adresse}</div>
-                  <div style={{ fontSize: 13, color: "#6f6656" }}>À : {a.destinataires.length ? a.destinataires.join(", ") : "aucun contact coché « Commandes »"}</div>
+                  {a.canal === "whatsapp"
+                    ? <div style={{ fontSize: 14, background: "#e9f6ee", color: "#1f5b39", borderRadius: 8, padding: "10px 12px", lineHeight: 1.4 }}>
+                        Par <strong>WhatsApp</strong> : dans le partage, choisis WhatsApp puis {a.whatsapp?.groupe ? <>le groupe <strong>« {a.whatsapp.groupe} »</strong></> : "le contact du fournisseur"}, et envoie le PDF.
+                      </div>
+                    : <div style={{ fontSize: 13, color: "#6f6656" }}>À : {a.destinataires.length ? a.destinataires.join(", ") : "aucun contact coché « Commandes »"}</div>}
                   {a.avertissement && (
                     <div style={{ fontSize: 14, fontWeight: 600, background: "#fbf0dc", color: "#7a5a2b", border: "1px solid #f0d49c", borderRadius: 8, padding: "10px 12px" }}>
                       {a.avertissement}
@@ -2445,7 +2492,18 @@ function CommandesPage() {
                   style={{ flex: 1, height: 50, borderRadius: 12, border: "1.5px solid #ddd6c8", background: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
                   {erreur ? "Fermer" : "Annuler"}
                 </button>
-                {a && !erreur && (
+                {a && !erreur && a.canal === "whatsapp" && (
+                  whatsappManuel
+                    ? <button type="button" onClick={() => void confirmerEnvoi("whatsapp")} disabled={sendingEmail}
+                        style={{ flex: 1.4, height: 50, borderRadius: 12, border: "none", background: "#1f8a4c", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: sendingEmail ? 0.6 : 1 }}>
+                        C&apos;est envoyé sur WhatsApp
+                      </button>
+                    : <button type="button" onClick={() => void partagerWhatsapp()} disabled={sendingEmail || !pdfWhatsapp}
+                        style={{ flex: 1.4, height: 50, borderRadius: 12, border: "none", background: "#1f8a4c", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: sendingEmail || !pdfWhatsapp ? 0.6 : 1 }}>
+                        {!pdfWhatsapp ? "Préparation du PDF…" : sendingEmail ? "Enregistrement…" : a.franco_avertissement ? "Partager quand même" : "Partager le PDF sur WhatsApp"}
+                      </button>
+                )}
+                {a && !erreur && a.canal !== "whatsapp" && (
                   <button type="button" onClick={() => void confirmerEnvoi()} disabled={sendingEmail}
                     style={{ flex: 1.4, height: 50, borderRadius: 12, border: "none", background: "#D4775A", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: sendingEmail ? 0.6 : 1 }}>
                     {sendingEmail ? "Envoi…" : a.franco_avertissement ? "Envoyer quand même" : "Confirmer l'envoi"}
