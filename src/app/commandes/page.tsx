@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 
 import { RequireRole } from "@/components/RequireRole";
 import { StepperInput } from "@/components/StepperInput";
+import { fmtLitres, totalLitres } from "@/lib/francoLitres";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -24,7 +25,7 @@ import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCa
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type DeliveryRule = { day: string; cutoff: string; delivery_day: string };
-type Supplier = { id: string; name: string; commande_simplifiee?: boolean; envoi_equipier?: boolean; franco_minimum: number | null; franco_bouteilles?: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null; website: string | null; portal_login: string | null; portal_password: string | null };
+type Supplier = { id: string; name: string; commande_simplifiee?: boolean; envoi_equipier?: boolean; franco_minimum: number | null; franco_bouteilles?: number | null; franco_litres?: number | null; delivery_schedule: DeliveryRule[] | null; color: string | null; website: string | null; portal_login: string | null; portal_password: string | null };
 
 type Ligne = {
   id: string;
@@ -64,6 +65,8 @@ type CatalogItem = {
   favori_commande?: boolean;
   pack_count: number | null;
   pack_each_qty: number | null;
+  /** Contenu d'un bac / d'une pièce en ml (minimum de commande en litres) */
+  piece_volume_ml?: number | null;
   stock_objectif: number | null;
   stock_min: number | null;
   storage_zone: string | null;
@@ -421,7 +424,7 @@ function CommandesPage() {
       const { data, error } = await Promise.race([
         supabase
           .from("suppliers")
-          .select("id, name, etablissement_id, commande_simplifiee, envoi_equipier, franco_minimum, franco_bouteilles, delivery_schedule, color, website")
+          .select("id, name, etablissement_id, commande_simplifiee, envoi_equipier, franco_minimum, franco_bouteilles, franco_litres, delivery_schedule, color, website")
           .eq("is_active", true)
           .order("name"),
         timeout,
@@ -1311,7 +1314,15 @@ function CommandesPage() {
     return sum + qty * (oq ?? parCarton ?? 1);
   }, 0);
   const francoBtlPercent = francoBtl && francoBtl > 0 ? Math.min(100, (orderBottles / francoBtl) * 100) : null;
-  const francoAtteint = (francoMin != null && francoMin > 0 && orderTotal >= francoMin) || (francoBtl != null && francoBtl > 0 && orderBottles >= francoBtl);
+  // Minimum en litres (Éric Élien, glaces) : chaque bac compte pour son contenu
+  const francoL = currentSupplier?.franco_litres ?? null;
+  const orderLitres = francoL && francoL > 0
+    ? totalLitres(catalog.map((item) => ({ quantite: Number(quantities[item.id] ?? 0), unite: item.order_unit, pieceVolumeMl: item.piece_volume_ml ?? null })))
+    : 0;
+  const francoLPercent = francoL && francoL > 0 ? Math.min(100, (orderLitres / francoL) * 100) : null;
+  const francoAtteint = francoL != null && francoL > 0
+    ? orderLitres >= francoL - 0.005
+    : (francoMin != null && francoMin > 0 && orderTotal >= francoMin) || (francoBtl != null && francoBtl > 0 && orderBottles >= francoBtl);
 
   // Save order unit label
   async function saveOrderUnit(ingredientId: string, label: string) {
@@ -2236,12 +2247,26 @@ function CommandesPage() {
             </div>
 
             {/* Franco */}
-            {((francoMin != null && francoMin > 0) || (francoBtl != null && francoBtl > 0)) && (
+            {((francoMin != null && francoMin > 0) || (francoBtl != null && francoBtl > 0) || (francoL != null && francoL > 0)) && (
               <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
-                  Franco
+                  {francoL != null && francoL > 0 ? "Minimum de commande" : "Franco"}
                 </div>
-                {francoMin != null && francoMin > 0 && (<>
+                {francoL != null && francoL > 0 && (<>
+                  <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: francoAtteint ? "#16a34a" : "#D4775A" }}>
+                    {fmtLitres(orderLitres)} / {fmtLitres(francoL)}
+                  </div>
+                  <div style={{ height: 4, background: "#f0ebe2", borderRadius: 2, overflow: "hidden", marginTop: 6 }}>
+                    <div style={{
+                      height: "100%", borderRadius: 2, transition: "width 0.3s ease",
+                      width: `${francoLPercent ?? 0}%`,
+                      background: francoAtteint
+                        ? "linear-gradient(90deg, #16a34a, #22c55e)"
+                        : "linear-gradient(90deg, #D4775A, #E8956F)",
+                    }} />
+                  </div>
+                </>)}
+                {(francoL == null || francoL <= 0) && francoMin != null && francoMin > 0 && (<>
                   <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: francoAtteint ? "#16a34a" : "#D4775A" }}>
                     {orderTotal.toFixed(0)} € / {francoMin} €
                   </div>
@@ -2255,7 +2280,7 @@ function CommandesPage() {
                     }} />
                   </div>
                 </>)}
-                {francoBtl != null && francoBtl > 0 && (<>
+                {(francoL == null || francoL <= 0) && francoBtl != null && francoBtl > 0 && (<>
                   <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: francoMin ? 17 : 24, marginTop: francoMin ? 10 : 0, color: francoAtteint ? "#16a34a" : "#D4775A" }}>
                     {francoMin ? "ou " : ""}{orderBottles} / {francoBtl} bouteilles
                   </div>
@@ -2269,7 +2294,7 @@ function CommandesPage() {
                     }} />
                   </div>
                 </>)}
-                {francoAtteint && <div style={{ fontSize: 11, fontWeight: 700, color: "#16a34a", marginTop: 6 }}>✓ Franco atteint</div>}
+                {francoAtteint && <div style={{ fontSize: 11, fontWeight: 700, color: "#16a34a", marginTop: 6 }}>✓ {francoL != null && francoL > 0 ? "Minimum atteint" : "Franco atteint"}</div>}
               </div>
             )}
           </div>

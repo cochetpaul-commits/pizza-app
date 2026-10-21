@@ -134,7 +134,7 @@ export async function PATCH(req: NextRequest) {
   }
   // Une commande validée sous le franco ne passe pas (la direction, elle, peut)
   if (status === "validee") {
-    const franco = await controleFranco(userId, existing.supplier_id as string, Number(update.total_ht) || 0);
+    const franco = await controleFranco(userId, existing.supplier_id as string, Number(update.total_ht) || 0, id);
     if (franco && !franco.forcable) return NextResponse.json({ error: franco.message, franco: true }, { status: 400 });
   }
 

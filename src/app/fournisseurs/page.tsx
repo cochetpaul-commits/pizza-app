@@ -22,7 +22,7 @@ type SupplierRow = {
   contact_name: string | null;
   notes: string | null;
   franco_minimum: number | null;
-  franco_bouteilles: number | null;
+  franco_bouteilles: number | null; franco_litres?: number | null;
   franco_obligatoire: boolean | null;
   mercuriale_only: boolean | null;
   delivery_schedule: { day: string; cutoff: string; delivery_day: string }[] | null;
@@ -65,6 +65,7 @@ type ModalForm = {
   email: string;
   franco_minimum: string;
   franco_bouteilles: string;
+  franco_litres: string;
   franco_obligatoire: boolean;
   mercuriale_only: boolean;
   notes: string;
@@ -113,7 +114,7 @@ const EMPTY_FORM: ModalForm = {
   phone: "",
   email: "",
   franco_minimum: "",
-  franco_bouteilles: "",
+  franco_bouteilles: "", franco_litres: "",
   franco_obligatoire: false,
   mercuriale_only: false,
   notes: "",
@@ -146,7 +147,7 @@ const readonlyBadge: React.CSSProperties = {
   padding: "2px 8px", borderRadius: 6, display: "inline-block",
 };
 
-const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_bouteilles,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code,color";
+const SELECT_FIELDS = "id,name,is_active,email,phone,contact_name,notes,franco_minimum,franco_bouteilles,franco_litres,franco_obligatoire,mercuriale_only,delivery_schedule,address,city,postal_code,siret,category,payment_terms,delivery_days,website,tva_intra,etablissement_id,client_code,color";
 
 // Titres de section de la fiche fournisseur : tout est affiché, plus d'accordéons (09/10/2026)
 const titreSection: React.CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "#6f6a61", padding: "12px 0 6px", marginBottom: 2, borderTop: "1px solid #ece6db" };
@@ -318,6 +319,7 @@ export default function FournisseursPage() {
       email: s.email ?? "",
       franco_minimum: s.franco_minimum != null ? String(s.franco_minimum) : "",
       franco_bouteilles: s.franco_bouteilles != null ? String(s.franco_bouteilles) : "",
+      franco_litres: s.franco_litres != null ? String(s.franco_litres) : "",
       franco_obligatoire: s.franco_obligatoire ?? false,
       mercuriale_only: s.mercuriale_only ?? false,
       notes: s.notes ?? "",
@@ -413,6 +415,7 @@ export default function FournisseursPage() {
       notes: form.notes.trim() || null,
       franco_minimum: francoVal ? parseFloat(francoVal) : null,
       franco_bouteilles: form.franco_bouteilles.trim() ? parseInt(form.franco_bouteilles, 10) : null,
+      franco_litres: form.franco_litres.trim() ? parseFloat(form.franco_litres.replace(",", ".")) : null,
       franco_obligatoire: form.franco_obligatoire,
       mercuriale_only: form.mercuriale_only,
       delivery_schedule: schedule.length > 0 ? schedule : null,
@@ -729,6 +732,10 @@ export default function FournisseursPage() {
               <div>
                 <div style={labelStyle}>ou franco en bouteilles</div>
                 <input style={{ ...inputStyle, width: 110 }} value={form.franco_bouteilles} onChange={(e) => setForm((f) => ({ ...f, franco_bouteilles: e.target.value }))} placeholder="ex: 36" type="number" min="0" step="6" />
+              </div>
+              <div>
+                <div style={labelStyle}>ou minimum en litres</div>
+                <input style={{ ...inputStyle, width: 110 }} value={form.franco_litres} onChange={(e) => setForm((f) => ({ ...f, franco_litres: e.target.value }))} placeholder="ex: 10" type="number" min="0" step="0.5" />
               </div>
               <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", paddingTop: 14 }}>
                 <input type="checkbox" checked={form.mercuriale_only} onChange={(e) => setForm((f) => ({ ...f, mercuriale_only: e.target.checked }))} style={{ accentColor: bodyColor }} />
