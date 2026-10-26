@@ -16,6 +16,18 @@ export const FOND_IDEAL: Record<number, number> = {
   2000: 1, 1000: 3, 500: 2, 200: 10, 100: 13, 50: 10, 20: 5, 10: 8, 5: 1, 2: 5, 1: 5,
 };
 
+/**
+ * Fond idéal du lundi soir (Paul, 26/10/2026), 100 € : on démarre la semaine avec beaucoup de monnaie
+ * (60 € de pièces), les autres soirs gardent le fond idéal ci-dessus.
+ */
+export const FOND_IDEAL_LUNDI: Record<number, number> = {
+  2000: 1, 1000: 2, 500: 2, 200: 10, 100: 20, 50: 14, 20: 10, 10: 8, 5: 3, 2: 2, 1: 1,
+};
+
+/** Lundi (jour de service AAAA-MM-JJ) : fond du lundi ; sinon le fond ordinaire */
+export const idealPourJour = (jour: string | null | undefined): Record<number, number> =>
+  jour && new Date(`${jour}T12:00:00Z`).getUTCDay() === 1 ? FOND_IDEAL_LUNDI : FOND_IDEAL;
+
 export type Comptage = Record<string, number>;
 
 /** Montant du fond à laisser chaque soir (€) : le total du fond idéal */
@@ -56,7 +68,7 @@ const lire = (c: Comptage, k: number) => Math.max(0, Math.floor(Number(c[String(
  * Vécu 12/10 : le remplissage pas à pas ratait le fond au centime (50 c manquants) et la reprise
  * oubliait le billet de 20 € du fond idéal.
  */
-function meilleureCombinaison(dispo: Comptage, cible: number, ideal: Record<number, number>): Comptage | null {
+function meilleureCombinaison(dispo: Comptage, cible: number, ideal: Record<number, number>, preferer: "petites" | "grosses" = "petites"): Comptage | null {
   if (cible <= 0) return {};
   const ordre = [...COUPURES].reverse(); // petite monnaie d'abord
   const IMPOSSIBLE = -Infinity;
@@ -66,7 +78,8 @@ function meilleureCombinaison(dispo: Comptage, cible: number, ideal: Record<numb
   ordre.forEach((k, rang) => {
     const n = Math.min(lire(dispo, k), Math.floor(cible / k));
     const q = ideal[k] ?? 0;
-    const valeur = (j: number) => Math.min(j, q) * 1e6 + Math.max(0, j - q) * (ordre.length - rang);
+    const poids = preferer === "petites" ? ordre.length - rang : rang + 1;
+    const valeur = (j: number) => Math.min(j, q) * 1e6 + Math.max(0, j - q) * poids;
     const suivant = new Float64Array(cible + 1).fill(IMPOSSIBLE);
     const pris = new Int16Array(cible + 1);
     for (let m = 0; m <= cible; m++) {
@@ -115,6 +128,50 @@ export function composerFond(comptage: Comptage, fondEuros: number, ideal: Recor
   const manqueIdeal: Comptage = {};
   for (const k of COUPURES) { const n = (ideal[k] ?? 0) - lire(comptage, k); if (n > 0) manqueIdeal[String(k)] = n; }
   return { compte, fond, laisser, totalLaisse: total, sortir, totalSorti: compte - total, incomplet: Math.max(0, fond - total), manqueIdeal };
+}
+
+export type EchangeCagnotte = {
+  /** Pièces de la cagnotte à mettre dans le tiroir */
+  pieces: Comptage;
+  /** Billets du tiroir à donner à la cagnotte, même montant */
+  billets: Comptage;
+  /** Centimes */
+  montant: number;
+};
+
+/**
+ * Faire la monnaie avec la cagnotte des pourboires (Paul, 26/10/2026) : les pièces de la cagnotte
+ * passent dans le tiroir contre des billets, par tranches rondes (5, 10, 20 €), pour que les pourboires
+ * sortent en billets et que la monnaie serve à rendre. On prend d'abord les pièces qui manquent au fond
+ * idéal, dans la limite de ce que la cagnotte a en pièces et le tiroir en billets. Null si rien à échanger.
+ */
+export function echangerCagnotte(cagnotte: Comptage, tiroir: Comptage, ideal: Record<number, number> = FOND_IDEAL): EchangeCagnotte | null {
+  const pieces: Comptage = {};
+  for (const k of COUPURES) if (!estBillet(k) && lire(cagnotte, k) > 0) pieces[String(k)] = lire(cagnotte, k);
+  const billetsTiroir: Comptage = {};
+  for (const k of COUPURES) if (estBillet(k) && lire(tiroir, k) > 0) billetsTiroir[String(k)] = lire(tiroir, k);
+  const totalPieces = totalComptage(pieces);
+  const totalBillets = totalComptage(billetsTiroir);
+  // Ce qui manque au fond idéal, en pièces : on vise au moins ça, arrondi aux 5 € supérieurs
+  const manque: Comptage = {};
+  for (const k of COUPURES) { const n = (ideal[k] ?? 0) - lire(tiroir, k); if (n > 0 && !estBillet(k)) manque[String(k)] = n; }
+  const plafond = Math.min(totalPieces, totalBillets);
+  let cible = Math.min(plafond - (plafond % 500), Math.ceil(totalComptage(manque) / 500) * 500);
+  // Rien ne manque au fond : on échange quand même ce qu'on peut, la cagnotte veut des billets
+  if (cible <= 0) cible = plafond - (plafond % 500);
+  for (let m = cible; m >= 500; m -= 500) {
+    const piecesPrises = meilleureCombinaison(pieces, m, manque, "grosses");
+    const billetsPris = meilleureCombinaison(billetsTiroir, m, {}, "grosses");
+    if (piecesPrises && billetsPris) return { pieces: piecesPrises, billets: billetsPris, montant: m };
+  }
+  return null;
+}
+
+/** Comptage après un échange : tiroir + pièces − billets */
+export function appliquerEchange(tiroir: Comptage, e: EchangeCagnotte): Comptage {
+  const out: Comptage = {};
+  for (const k of COUPURES) { const n = lire(tiroir, k) + lire(e.pieces, k) - lire(e.billets, k); if (n > 0) out[String(k)] = n; }
+  return out;
 }
 
 /** « 2 × 20 €, 3 × 1 € » */

@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   if ("erreur" in a) return a.erreur;
   if (req.nextUrl.searchParams.get("historique")) {
     const { data, error } = await supabaseAdmin.from("clotures")
-      .select("jour, niveau, statut, pourboires_paie, corrections, validee_at, updated_at, resultat")
+      .select("jour, niveau, statut, pourboires_paie, pourboires_especes, corrections, validee_at, updated_at, resultat")
       .eq("etablissement_id", a.etabId).order("jour", { ascending: false }).limit(60);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ clotures: data ?? [] });
@@ -49,7 +49,7 @@ export async function PUT(req: NextRequest) {
   // Un ajustement en « prix sur mesure » est déclaré par l'équipe (bouton dans l'écran) : la note de correction
   // est alors obligatoire pour valider (règle de Paul, 14/10/2026)
   const saisie: SaisieCloture = { ...body.saisie, ajustement: typeof body.saisie.ajustement === "number" ? body.saisie.ajustement : null };
-  const resultat = calculerCloture(saisie);
+  const resultat = calculerCloture(saisie, body.jour);
   const corrections = (body.corrections ?? []).map((c) => String(c).trim()).filter(Boolean).slice(0, 50);
   if (body.valider && resultat.niveau !== "ok") return NextResponse.json({ error: "La caisse ne tombe pas juste : corrige d'abord l'écart, puis recopie les montants Popina." }, { status: 400 });
   if (body.valider && noteManquante(resultat, corrections)) return NextResponse.json({ error: "Note la correction en prix sur mesure (la table et le montant) avant de valider." }, { status: 400 });
@@ -59,6 +59,7 @@ export async function PUT(req: NextRequest) {
     etablissement_id: a.etabId, jour: body.jour, saisie, resultat, niveau: resultat.niveau,
     corrections,
     notes: body.notes?.trim() || null, pourboires_paie: resultat.niveau === "vide" ? null : resultat.pourboiresPaie,
+    pourboires_especes: resultat.pourboiresEspeces,
     updated_by: a.userId, updated_at: maintenant,
     ...(body.valider ? { statut: "validee", validee_at: maintenant } : existante?.statut === "validee" && resultat.niveau !== "ok" ? { statut: "en_cours", validee_at: null } : {}),
     ...(existante ? {} : { created_by: a.userId }),

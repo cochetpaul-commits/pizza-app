@@ -99,6 +99,7 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     { kind: "divider", label: "Équipe" },
     { kind: "page", label: "Équipe", href: "/rh/equipe", icon: "users", roles: MANAGERS },
     { kind: "page", label: "Congés", href: "/rh/conges", icon: "beach", roles: MANAGERS },
+    ...(piccola ? [] : [{ kind: "page", label: "Pourboires", href: "/rh/pourboires", icon: "wallet", permission: "heures.edit_team" } as NavEntry]),
     { kind: "divider", label: "Pilotage" },
     { kind: "page", label: "Ventes", href: "/ventes", icon: "barChart", permission: "performances.view" },
     { kind: "page", label: "Achats", href: "/achats", icon: "fileText", permission: "achats.view" },

@@ -7,6 +7,7 @@ import { DateRangePicker, shiftRange, type DateRange } from "@/components/ui/Dat
 import { usePilotageRange } from "@/lib/pilotageRange";
 import { useTopBar } from "@/components/layout/TopBarContext";
 import { fetchApi } from "@/lib/fetchApi";
+import { MesPourboires } from "@/components/pourboires/PourboiresMois";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { couleurTexte } from "@/lib/styleCategories";
 
@@ -354,6 +355,8 @@ export default function MonTableauPage() {
         </div>
       )}
 
+      {/* Pourboires du mois : la part estimée de chacun, à J-1 */}
+      {!loading && !err && <MesPourboires />}
       {loading && <p style={{ color: "#999", fontSize: 13, textAlign: "center", padding: 40 }}>Chargement…</p>}
       {!loading && err && (
         <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: 24, textAlign: "center", fontSize: 13, color: "#999" }}>

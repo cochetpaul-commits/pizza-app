@@ -57,15 +57,17 @@ const propre = (c: Comptage | null | undefined): Comptage | null => {
   const o = Object.fromEntries(Object.entries(c ?? {}).filter(([, n]) => n > 0));
   return Object.keys(o).length ? o : null;
 };
-const assembler = (t: Textes, coupures: Comptage, ajustement: number | null): SaisieCloture => {
+const assembler = (t: Textes, coupures: Comptage, ajustement: number | null, cagnotte: Comptage | null): SaisieCloture => {
   const s = versSaisie(t);
-  return { ...s, tiroir: { ...s.tiroir, coupures: propre(coupures) }, ajustement };
+  return { ...s, tiroir: { ...s.tiroir, coupures: propre(coupures) }, ajustement, cagnotte: cagnotte ? { total: null, coupures: propre(cagnotte) } : null };
 };
+const estVendredi = (jour: string) => new Date(`${jour}T12:00:00Z`).getUTCDay() === 5;
+const estLundi = (jour: string) => new Date(`${jour}T12:00:00Z`).getUTCDay() === 1;
 
 /** Lundi de la semaine d'un jour (AAAA-MM-JJ) */
 const lundi = (jour: string) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
 const dateCourte = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
-type Historique = { jour: string; statut: string; pourboires_paie?: number | null; resultat: { enveloppe?: number | null; fondCaisse?: { totalSorti: number; sortir?: Comptage } | null } | null };
+type Historique = { jour: string; statut: string; pourboires_paie?: number | null; pourboires_especes?: number | null; resultat: { enveloppe?: number | null; fondCaisse?: { totalSorti: number; sortir?: Comptage } | null } | null };
 const dateLongue = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 const decaler = (jour: string, n: number) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
@@ -74,6 +76,8 @@ export function Cloture() {
   const [jour, setJour] = useState(() => jourService(new Date()));
   const [textes, setTextes] = useState<Textes>(() => versTextes(VIDE));
   const [coupures, setCoupures] = useState<Comptage>({});
+  /** Cagnotte des pourboires espèces, vidée et comptée le vendredi (null : pas ce soir) */
+  const [cagnotte, setCagnotte] = useState<Comptage | null>(null);
 
   const [historique, setHistorique] = useState<Historique[]>([]);
   const [corrections, setCorrections] = useState<string[]>([]);
@@ -110,6 +114,7 @@ export function Cloture() {
         setTextes(versTextes(lue));
         setCoupures(lue.tiroir?.coupures ?? {});
         setAjustement(lue.ajustement ?? null);
+        setCagnotte(lue.cagnotte?.coupures ?? (lue.cagnotte?.total != null ? {} : null));
 
         setCorrections(Array.isArray(c?.corrections) ? c.corrections : []);
         setNotes(c?.notes ?? "");
@@ -117,7 +122,7 @@ export function Cloture() {
         setControle(c?.controle ? { c: c.controle as ControleNuit, at: c.controle_at as string } : null);
         setControleEnCours(null);
         setTransactions(j.transactions ?? []);
-        dernier.current = JSON.stringify({ s: assembler(versTextes(lue), lue.tiroir?.coupures ?? {}, lue.ajustement ?? null), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
+        dernier.current = JSON.stringify({ s: assembler(versTextes(lue), lue.tiroir?.coupures ?? {}, lue.ajustement ?? null, lue.cagnotte?.coupures ?? null), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
         setEtat((e) => ({ ...e, chargement: false }));
         charge.current = true;
       } catch (e) { if (!annule) setEtat((s) => ({ ...s, chargement: false, erreur: e instanceof Error ? e.message : "Chargement impossible" })); }
@@ -125,7 +130,7 @@ export function Cloture() {
     return () => { annule = true; };
   }, [jour]);
 
-  const saisie = useMemo(() => assembler(textes, coupures, ajustement), [textes, coupures, ajustement]);
+  const saisie = useMemo(() => assembler(textes, coupures, ajustement, cagnotte), [textes, coupures, ajustement, cagnotte]);
 
   // Historique : enveloppes de la semaine pour le dépôt en banque
   const chargerHistorique = useCallback(async () => {
@@ -136,7 +141,7 @@ export function Cloture() {
     } catch { /* l'enveloppe de la semaine est un plus, pas bloquant */ }
   }, []);
   useEffect(() => { void chargerHistorique(); }, [chargerHistorique]);
-  const resultat = useMemo(() => calculerCloture(saisie), [saisie]);
+  const resultat = useMemo(() => calculerCloture(saisie, jour), [saisie, jour]);
   const aide = useMemo(() => aideCloture(transactions, resultat.residu), [transactions, resultat.residu]);
 
   const enregistrer = useCallback(async (valider = false) => {
@@ -207,8 +212,9 @@ export function Cloture() {
     } catch { setControleEnCours("Contrôle impossible, vérifie la connexion."); }
   };
   const moisCle = jour.slice(0, 7);
-  const pourboiresMois = Math.round((historique.filter((h) => h.jour.slice(0, 7) === moisCle && h.jour !== jour).reduce((t, h) => t + (Number(h.pourboires_paie) || 0), 0)
-    + (resultat.niveau !== "vide" ? resultat.pourboiresPaie : 0)) * 100) / 100;
+  const autresJours = historique.filter((h) => h.jour.slice(0, 7) === moisCle && h.jour !== jour);
+  const pourboiresMois = Math.round((autresJours.reduce((t, h) => t + (Number(h.pourboires_paie) || 0), 0) + (resultat.niveau !== "vide" ? resultat.pourboiresPaie : 0)) * 100) / 100;
+  const especesMois = Math.round((autresJours.reduce((t, h) => t + (Number(h.pourboires_especes) || 0), 0) + (resultat.pourboiresEspeces ?? 0)) * 100) / 100;
 
   const ajouterCorrection = () => { const c = nouvelleCorrection.trim(); if (!c) return; setCorrections((l) => [...l, c]); setNouvelleCorrection(""); };
   const recap = recapCloture(jour, saisie, resultat, corrections);
@@ -239,6 +245,7 @@ export function Cloture() {
     };
   }, [historique, resultat.enveloppe, resultat.fondCaisse, jour]);
   const changerCoupure = (k: number, n: number) => setCoupures((c) => ({ ...c, [String(k)]: Math.max(0, Math.min(9999, Math.floor(n) || 0)) }));
+  const changerCagnotte = (k: number, n: number) => setCagnotte((c) => ({ ...(c ?? {}), [String(k)]: Math.max(0, Math.min(9999, Math.floor(n) || 0)) }));
   const noteRequise = noteManquante(resultat, corrections);
   /** L'écart du tiroir ne se règle avec les pourboires que quand la carte est juste */
   const carteJuste = resultat.niveau !== "vide" && Math.abs(resultat.residu) < 0.005;
@@ -363,7 +370,7 @@ export function Cloture() {
                   })}
                 </div>
                 <div style={{ marginTop: 10, fontSize: 14 }}>Pourboires carte pour la paie : <strong>{eur(resultat.pourboiresPaie)}</strong>{resultat.pourboireAmex > 0 && <span style={{ color: MUTED }}> (dont AMEX {eur(resultat.pourboireAmex)})</span>}</div>
-                <div style={{ marginTop: 2, fontSize: 13, color: MUTED }}>Cumul de {new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { month: "long" })} : <strong style={{ color: "#1a1a1a" }}>{eur(pourboiresMois)}</strong></div>
+                <div style={{ marginTop: 2, fontSize: 13, color: MUTED }}>Pot de {new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { month: "long" })} : <strong style={{ color: "#1a1a1a" }}>{eur(pourboiresMois + especesMois)}</strong> (carte {eur(pourboiresMois)}{especesMois > 0 ? `, espèces ${eur(especesMois)}` : ""})</div>
               </div>
             )}
           </section>
@@ -412,7 +419,7 @@ export function Cloture() {
                     )}
                   </div>
                   {Object.keys(f.manqueIdeal).length > 0 && (
-                    <div style={{ gridColumn: "1 / -1", fontSize: 13, color: MUTED }}>Pour refaire le fond idéal du lundi, il manque : {listerCoupures(f.manqueIdeal)}.</div>
+                    <div style={{ gridColumn: "1 / -1", fontSize: 13, color: MUTED }}>Pour refaire le fond idéal{estLundi(jour) ? " du lundi" : ""}, il manque : {listerCoupures(f.manqueIdeal)}.{!cagnotte && " Fais la monnaie avec la cagnotte (bouton ci-dessous)."}</div>
                   )}
                 </div>
               );
@@ -460,6 +467,37 @@ export function Cloture() {
                 </details>
               );
             })()}
+          </fieldset>
+
+          {/* Cagnotte des pourboires espèces : vidée et comptée le vendredi, monnaie faite avec le tiroir */}
+          <fieldset style={{ border: `1.5px solid ${cagnotte || estVendredi(jour) ? AMBRE : BORD}`, borderRadius: 14, background: "#fff", margin: 0, padding: "12px 14px 12px", minWidth: 0, display: "grid", gap: 10 }}>
+            <legend style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 17, textTransform: "uppercase", letterSpacing: ".03em", padding: "0 6px" }}>Cagnotte des pourboires</legend>
+            {!cagnotte ? (
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+                <span style={{ color: estVendredi(jour) ? AMBRE : MUTED, fontSize: 13.5, fontWeight: estVendredi(jour) ? 700 : 400 }}>
+                  {estVendredi(jour) ? "C'est vendredi : vide la cagnotte, compte-la, elle entre dans le pot du mois." : "La cagnotte se vide et se compte le vendredi soir. Pas besoin ce soir."}
+                </span>
+                <button type="button" onClick={() => setCagnotte({})} style={{ ...BTN, borderColor: AMBRE, color: AMBRE }}>{estVendredi(jour) ? "Compter la cagnotte" : "La compter quand même ce soir"}</button>
+              </div>
+            ) : (<>
+              <div style={{ color: MUTED, fontSize: 12.5, marginTop: -4 }}>Compte tout ce qu&apos;il y a dans la cagnotte, billets et pièces. Le total part dans le pot du mois ; les pièces servent à faire la monnaie du tiroir.</div>
+              {grille(cagnotte, changerCagnotte)}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", alignItems: "baseline", borderTop: `1.5px solid ${BORD}`, paddingTop: 10 }}>
+                <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22 }}>{eur(resultat.pourboiresEspeces ?? 0)}</span>
+                <span style={{ color: MUTED, fontSize: 13.5 }}>de pourboires espèces pour le pot du mois</span>
+                <button type="button" onClick={() => setCagnotte(null)} style={{ border: "none", background: "none", padding: 0, color: MUTED, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>Finalement pas ce soir</button>
+              </div>
+              {resultat.echange ? (
+                <div style={{ borderRadius: 12, background: "#F7EDD6", padding: "10px 12px", fontSize: 13.5, lineHeight: 1.45 }}>
+                  <div style={{ fontWeight: 700, color: AMBRE }}>Fais la monnaie · {eur(resultat.echange.montant / 100)}</div>
+                  <div>Mets dans le tiroir : <strong>{listerCoupures(resultat.echange.pieces)}</strong>.</div>
+                  <div>Sors du tiroir pour la cagnotte : <strong>{listerCoupures(resultat.echange.billets)}</strong>.</div>
+                  <div style={{ color: MUTED, fontSize: 12.5, marginTop: 2 }}>Le fond et l&apos;enveloppe ci-dessus sont calculés après cet échange : les pourboires sortent en billets, la monnaie reste au tiroir.</div>
+                </div>
+              ) : resultat.tiroirCompte != null && (resultat.pourboiresEspeces ?? 0) > 0 ? (
+                <div style={{ fontSize: 12.5, color: MUTED }}>Pas de monnaie à faire : il faut au moins 5 € de pièces dans la cagnotte et autant en billets dans le tiroir.</div>
+              ) : null}
+            </>)}
           </fieldset>
 
           {/* Contrôle de la nuit : le vrai Z Popina relu vers 1 h */}
@@ -584,7 +622,8 @@ export function Cloture() {
           <details style={{ color: MUTED, fontSize: 13.5, lineHeight: 1.5, maxWidth: "70ch" }}>
             <summary style={{ cursor: "pointer", fontWeight: 700, color: "#1a1a1a" }}>Les règles de la clôture</summary>
             <p><strong style={{ color: "#1a1a1a" }}>Les règles.</strong> La caisse doit tomber juste au centime avant d&apos;arrêter Popina. On corrige le mode de paiement sur le bon ticket ; on n&apos;invente jamais de montant. Un petit écart de carte (2 € ou moins, liquide bon) se règle en « prix sur mesure » sur une table payée en carte, et on le note ci-dessus. La nuit, l&apos;app relit le vrai Z Popina et vérifie la soirée.</p>
-            <p><strong style={{ color: "#1a1a1a" }}>Les pourboires.</strong> Seuls ceux du TPE comptent pour la paie. Le liquide laissé sur la monnaie se passe en « monnaie rendue » et va dans la cagnotte : on ne le tape pas. Un pourboire carte n&apos;est saisi dans Popina que pour une facture, et on l&apos;annule avant d&apos;arrêter la caisse. Le tiroir se règle avec la cagnotte seulement quand la carte est juste : un trop perçu va aux pourboires, un manque (monnaie mal rendue) s&apos;y prend.</p>
+            <p><strong style={{ color: "#1a1a1a" }}>Les pourboires.</strong> Ceux du TPE entrent chaque soir dans le pot du mois. Le liquide laissé sur la monnaie se passe en « monnaie rendue » et va dans la cagnotte : on ne le tape pas. Le vendredi soir, on vide la cagnotte, on la compte ici, et elle entre dans le pot ; l&apos;app dit quelles pièces mettre au tiroir contre des billets, pour que les pourboires sortent en billets. Un pourboire carte n&apos;est saisi dans Popina que pour une facture, et on l&apos;annule avant d&apos;arrêter la caisse. Le tiroir se règle avec la cagnotte seulement quand la carte est juste : un trop perçu va aux pourboires, un manque (monnaie mal rendue) s&apos;y prend. Le pot est réparti sur les jours de présence (Mon tableau).</p>
+            <p><strong style={{ color: "#1a1a1a" }}>Le fond.</strong> 100 € chaque soir. Le lundi soir, on refait le fond du début de semaine, avec plus de monnaie (20 pièces de 1 €, 14 de 50 c) ; les autres soirs, le fond ordinaire.</p>
           </details>
         </>
       )}

@@ -10,7 +10,7 @@
  * comptent pour la paie.
  */
 
-import { comptageSaisi, composerFond, FOND_CIBLE, totalComptage, type Comptage, type CompositionFond } from "@/lib/fondCaisse";
+import { appliquerEchange, comptageSaisi, composerFond, echangerCagnotte, FOND_CIBLE, idealPourJour, totalComptage, type Comptage, type CompositionFond, type EchangeCagnotte } from "@/lib/fondCaisse";
 
 export type SaisieZ = {
   /** Bloc EUR, ligne TOTAL NET (pourboires compris) */
@@ -47,10 +47,19 @@ export type SaisieTiroir = {
   coupures?: Comptage | null;
 };
 
+/** Cagnotte des pourboires en espèces, vidée et comptée le vendredi soir (Paul, 26/10/2026) */
+export type SaisieCagnotte = {
+  total: number | null;
+  /** Comptage coupure par coupure (clé : coupure en centimes) ; remplace « total » quand il est saisi */
+  coupures?: Comptage | null;
+};
+
 export type SaisieCloture = {
   z: SaisieZ; popina: SaisiePopina; tiroir: SaisieTiroir;
   /** Petit écart carte corrigé en « prix sur mesure », déclaré par l'équipe (€, négatif = manque dans Popina) : note obligatoire */
   ajustement?: number | null;
+  /** Pourboires espèces de la semaine (cagnotte vidée le vendredi), ajoutés au pot du mois */
+  cagnotte?: SaisieCagnotte | null;
 };
 
 /** Seuil du petit écart carte réglé en « prix sur mesure » (règle de Paul, 14/10/2026) */
@@ -92,6 +101,10 @@ export type ResultatCloture = {
   petitEcart: number | null;
   /** Ajustement déclaré pour la soirée : une note est obligatoire pour valider */
   ajustement: number | null;
+  /** Pourboires espèces comptés ce soir (cagnotte vidée), pour le pot du mois ; null si rien de saisi */
+  pourboiresEspeces: number | null;
+  /** Monnaie à faire entre la cagnotte et le tiroir (pièces contre billets), quand les deux sont comptés par coupure */
+  echange: EchangeCagnotte | null;
 };
 
 /** La note de correction manque-t-elle pour valider ? */
@@ -136,7 +149,7 @@ export function additionsPossibles(paye: number): { montant: number; pourboire: 
   return out.sort((a, b) => Number(rond(b.montant)) - Number(rond(a.montant)) || a.pourboire - b.pourboire);
 }
 
-export function calculerCloture(s: SaisieCloture): ResultatCloture {
+export function calculerCloture(s: SaisieCloture, jour?: string | null): ResultatCloture {
   const { z, popina: p, tiroir } = s;
   const pourboiresPopina = v0(p.pourboires);
   // « Dont pourboire AMEX » ne compte que s'il y a des pourboires saisis dans Popina (vécu 13/10 : 2,12 € tapés là par erreur)
@@ -164,8 +177,14 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
   const parCoupures = comptageSaisi(tiroir.coupures);
   const tiroirCompte = parCoupures ? totalComptage(tiroir.coupures) / 100 : tiroir.compte;
   const ecartTiroir = tiroirCompte == null ? null : r2(tiroirCompte - tiroirAttendu);
-  // Ce qu'il faut laisser pour retrouver 100 € de fond, d'après le comptage
-  const fondCaisse = parCoupures && tiroir.coupures ? composerFond(tiroir.coupures, FOND_CIBLE) : null;
+  // Cagnotte des pourboires vidée ce soir (le vendredi) : total, et monnaie à faire avec le tiroir
+  const cagnotteParCoupures = comptageSaisi(s.cagnotte?.coupures);
+  const pourboiresEspeces = cagnotteParCoupures ? totalComptage(s.cagnotte?.coupures) / 100 : s.cagnotte?.total ?? null;
+  // Le lundi soir, le fond idéal est celui du début de semaine (plus de monnaie)
+  const ideal = idealPourJour(jour);
+  const echange = parCoupures && tiroir.coupures && cagnotteParCoupures && s.cagnotte?.coupures ? echangerCagnotte(s.cagnotte.coupures, tiroir.coupures, ideal) : null;
+  // Ce qu'il faut laisser pour retrouver 100 € de fond, d'après le comptage (après la monnaie faite avec la cagnotte)
+  const fondCaisse = parCoupures && tiroir.coupures ? composerFond(echange ? appliquerEchange(tiroir.coupures, echange) : tiroir.coupures, FOND_CIBLE, ideal) : null;
   // Règle de Paul (13/10) : l'écart du tiroir se règle avec les pourboires de l'équipe ; la banque reçoit les espèces Popina
   const enveloppe = tiroirCompte != null && p.especes != null ? r2(p.especes) : null;
   const manquePourValider = [
@@ -179,7 +198,7 @@ export function calculerCloture(s: SaisieCloture): ResultatCloture {
     { mode: "conecs", libelle: "Carte Connecs", popina: v0(p.conecs), attendu: cibleConecs, ecart: ecartConecs },
     { mode: "amex", libelle: "American Express", popina: v0(p.amex), attendu: v0(z.amex), ecart: ecartAmex },
   ];
-  const base = { lignes, cibleCb, ecartCb, cibleConecs, ecartConecs, ecartAmex, residu, pourboireAmex, pourboiresPaie, tiroirAttendu, tiroirCompte, ecartTiroir, erreurEspecesCarte: false, fondCaisse, enveloppe, manquePourValider, petitEcart: null as number | null, ajustement: s.ajustement ?? null };
+  const base = { lignes, cibleCb, ecartCb, cibleConecs, ecartConecs, ecartAmex, residu, pourboireAmex, pourboiresPaie, tiroirAttendu, tiroirCompte, ecartTiroir, erreurEspecesCarte: false, fondCaisse, enveloppe, manquePourValider, petitEcart: null as number | null, ajustement: s.ajustement ?? null, pourboiresEspeces, echange };
 
   if (z.total == null || p.cb == null) return { ...base, niveau: "vide", titre: "Remplis le ticket Z et l'écran Popina pour voir le verdict.", etapes: [] };
 
@@ -276,6 +295,7 @@ export function recapCloture(jour: string, s: SaisieCloture, r: ResultatCloture,
     `Verdict : ${r.titre}`,
     ...r.lignes.map((l) => `${l.libelle} : Popina ${eur(l.popina)} pour ${eur(l.attendu)} attendu (${nul(l.ecart) ? "juste" : signe(l.ecart)})`),
     `Pourboires carte pour la paie : ${eur(r.pourboiresPaie)}${r.pourboireAmex > 0 ? ` (dont AMEX ${eur(r.pourboireAmex)})` : ""}`,
+    r.pourboiresEspeces != null ? `Pourboires espèces (cagnotte vidée) : ${eur(r.pourboiresEspeces)}` : null,
     r.ecartTiroir != null ? `Tiroir : ${eur(r.tiroirCompte ?? 0)} pour ${eur(r.tiroirAttendu)} attendu (${nul(r.ecartTiroir) ? "juste" : signe(r.ecartTiroir)})` : null,
     r.enveloppe != null ? `Enveloppe banque : ${eur(r.enveloppe)} · fond laissé : ${eur(FOND_CIBLE)}` : null,
     ...corrections.map((c) => `Correction : ${c}`),

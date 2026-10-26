@@ -63,6 +63,7 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/rh/employe":      "profil.view_team",
   "/personnel":       "profil.view_team",
   "/rh/emargement":   "heures.edit_team",
+  "/rh/pourboires":   "heures.edit_team",
 };
 
 /** Routes and which roles can access them (prefix match) */
