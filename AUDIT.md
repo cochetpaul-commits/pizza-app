@@ -185,6 +185,30 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
      persister l'ordre — remplacé par un seul `upsert()` groupé
      (`{ id, sort_order }` uniquement, pour ne pas toucher aux autres colonnes
      en cas d'édition concurrente).
+   - [x] *(26/10/2026)* `fournisseurs/page.tsx` et `fournisseurs/[id]/page.tsx`
+     faisaient un `update()` par contact fournisseur modifié à la sauvegarde
+     de la fiche → remplacé par un seul `upsert(toUpdate, { onConflict: "id" })`
+     groupé (même patron que `settings/categories` ci-dessus). `api/meteo/route.ts`
+     (cron météo) faisait un `upsert()` par créneau (jusqu'à 14, midi+soir sur
+     7 jours) → un seul `upsert(rows, { onConflict: "date_service,service" })`.
+     Repérés mais **pas corrigés cette fois** (à reprendre au fil de l'eau) :
+     - `inventaire/[id]/page.tsx` (~l.168-176) : boucle d'`update()` déclenchée
+       au **chargement** de chaque inventaire non clôturé (correction auto du
+       conditionnement), potentiellement 50-100+ lignes par fiche — le plus
+       gros reste identifié, mais chaque ligne a des valeurs différentes et
+       seules certaines colonnes changent ; un `upsert()` groupé sur un
+       sous-ensemble de colonnes n'a pas été tenté sans pouvoir vérifier dans
+       un vrai navigateur/base que les autres colonnes (quantité, zone…) ne
+       sont pas écrasées — trop risqué sur une fiche d'inventaire vivante en
+       production sans ce test.
+     - `rh/SimulationContent.tsx` (salaires simulés par employé),
+       `api/factures/prix-a-valider/route.ts` (fermeture des offres actives,
+       valeurs calculées par ligne), `api/ingredients/merge/route.ts`
+       (suppression de doublons par table lors d'une fusion de fiche),
+       `lib/invoices/importEngine.ts` (import de facture),
+       `api/ventes/import/route.ts` (import de ventes) : N généralement petit
+       à moyen (quelques unités à quelques dizaines), actions ponctuelles —
+       gain réel mais plus modeste, remis à une prochaine exécution.
 4. **Dashboard / bello-mio / piccola-mia / tresorerie** paginent
    `ventes_lignes` par 1000 côté client pour faire de simples sommes →
    déplacer l'agrégation côté serveur (comme `/api/ventes/stats`).

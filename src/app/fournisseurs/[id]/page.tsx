@@ -300,12 +300,8 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
         if (insErr) { setSaving(false); alert(insErr.message); return; }
       }
 
-      for (const row of toUpdate) {
-        const { id: contactId, ...rest } = row;
-        const { error: updErr } = await supabase
-          .from("supplier_contacts")
-          .update(rest)
-          .eq("id", contactId!);
+      if (toUpdate.length > 0) {
+        const { error: updErr } = await supabase.from("supplier_contacts").upsert(toUpdate, { onConflict: "id" });
         if (updErr) { setSaving(false); alert(updErr.message); return; }
       }
     }

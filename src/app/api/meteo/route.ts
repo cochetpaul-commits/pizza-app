@@ -86,11 +86,8 @@ async function fetchAndStore() {
       if (soir) rows.push({ date_service: dateStr, service: "soir", icon: soir.weather[0].icon, emoji: iconToEmoji(soir.weather[0].icon), description: soir.weather[0].description, temp: Math.round(soir.main.temp * 10) / 10 });
     }
 
-    let inserted = 0;
-    for (const row of rows) {
-      const { error } = await supabase.from("meteo_daily").upsert(row, { onConflict: "date_service,service" });
-      if (!error) inserted++;
-    }
+    const { error: upsertErr } = await supabase.from("meteo_daily").upsert(rows, { onConflict: "date_service,service" });
+    const inserted = upsertErr ? 0 : rows.length;
 
     return NextResponse.json({ ok: true, inserted, dates: [...dayMap.keys()] });
   } catch (err) {
