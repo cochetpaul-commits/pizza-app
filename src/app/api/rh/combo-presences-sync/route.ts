@@ -10,13 +10,38 @@ import { getContracts, getPlannings, getLocations, COMBO_LOCATIONS } from "@/lib
  * Fetches plannings from Combo API for all locations, aggregates by employee,
  * and upserts into combo_presences.
  */
+/** Semaines lundi → dimanche couvrant la période (vécu 27/10 : une ligne « mois entier » se cumulait avec les semaines) */
+function semaines(from: string, to: string): { from: string; to: string }[] {
+  const out: { from: string; to: string }[] = [];
+  const d = new Date(`${from}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  while (d.toISOString().slice(0, 10) <= to) {
+    const f = d.toISOString().slice(0, 10); d.setUTCDate(d.getUTCDate() + 6); out.push({ from: f, to: d.toISOString().slice(0, 10) }); d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
+
 export async function POST(req: NextRequest) {
   const refus = await roleDenied(req, ["group_admin"]);
   if (refus) return refus;
   try {
-    const { from, to } = await req.json();
-    if (!from || !to) return NextResponse.json({ error: "from et to requis" }, { status: 400 });
+    const body = await req.json();
+    if (!body?.from || !body?.to) return NextResponse.json({ error: "from et to requis" }, { status: 400 });
+    let totalInserted = 0;
+    for (const s of semaines(String(body.from), String(body.to))) {
+      const r = await syncSemaine(s.from, s.to);
+      if (r instanceof NextResponse) return r;
+      totalInserted += r;
+    }
+    return NextResponse.json({ ok: true, inserted: totalInserted, period: { from: body.from, to: body.to } });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
 
+/** Une semaine : le planning Combo remplace les lignes existantes, sauf si la semaine a été importée depuis le rapport des émargements */
+async function syncSemaine(from: string, to: string): Promise<number | NextResponse> {
+  {
     const locations = await getLocations();
 
     // Map Combo location IDs to our etablissement IDs
@@ -33,6 +58,8 @@ export async function POST(req: NextRequest) {
     for (const loc of locations) {
       const etabId = etabMap[loc.id];
       if (!etabId) continue;
+      const { data: importee } = await supabaseAdmin.from("combo_imports").select("id").eq("etablissement_id", etabId).eq("periode_debut", from).eq("periode_fin", to).ilike("source_file_name", "%.xls%").limit(1);
+      if (importee?.length) continue;
 
       // Load contracts (for contract_time) and plannings
       const [contracts, plannings] = await Promise.all([
@@ -139,9 +166,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, inserted: totalInserted, period: { from, to } });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return totalInserted;
   }
 }

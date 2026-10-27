@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
       ...(v as unknown as VinCave), ingredient_id: ingredientId,
       stock: ingredientId && stock.has(ingredientId) ? Math.round(stock.get(ingredientId)! * 100) / 100 : null,
       achat: a.argent ? { prix_ht: prixHt, coefficient: prixHt && prixB ? Math.round((prixB / 1.2 / prixHt) * 10) / 10 : null } : null,
-      accords: (accords ?? []).filter((x) => x.vin_id === v.id).map((x) => ({ id: x.id, plat_nom: x.plat_nom, plat_popina_id: x.plat_popina_id ?? platPar.get(norm(x.plat_nom))?.id ?? null, raison: x.raison, ordre: x.ordre, source: x.source })),
+      accords: (accords ?? []).filter((x, i, l) => x.vin_id === v.id && l.findIndex((y) => y.vin_id === v.id && norm(y.plat_nom) === norm(x.plat_nom)) === i).map((x) => ({ id: x.id, plat_nom: x.plat_nom, plat_popina_id: x.plat_popina_id ?? platPar.get(norm(x.plat_nom))?.id ?? null, raison: x.raison, ordre: x.ordre, source: x.source })),
     };
   });
   if (plat) {

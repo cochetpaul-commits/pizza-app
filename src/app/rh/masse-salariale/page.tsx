@@ -159,7 +159,12 @@ export default function MasseSalarialePage() {
       if (presData.error || contratData.error) {
         setLoadError(presData.error?.message ?? contratData.error?.message ?? "Erreur de chargement");
       }
-      setPresences((presData.data ?? []) as ComboPresence[]);
+      // Une ligne « mois entier » (ancienne synchro sur le mois) ne doit pas se cumuler avec les semaines
+      // qu'elle recouvre (vécu 27/10/2026 : octobre compté deux fois)
+      const lues = (presData.data ?? []) as ComboPresence[];
+      const jours = (p: ComboPresence) => (new Date(p.periode_fin).getTime() - new Date(p.periode_debut).getTime()) / 86400000;
+      const semaines = lues.filter((p) => jours(p) <= 7);
+      setPresences(lues.filter((p) => jours(p) <= 7 || !semaines.some((w) => w.periode_debut <= p.periode_fin && w.periode_fin >= p.periode_debut)));
       const ct: ContratInfo[] = [];
       for (const c of (contratData.data ?? []) as Record<string, unknown>[]) {
         const emp = c.employes as Record<string, unknown>;
@@ -309,7 +314,7 @@ export default function MasseSalarialePage() {
       });
       const json = await res.json();
       if (json.ok) {
-        setImportMsg(`${json.nb_employes} employes importes`);
+        setImportMsg(json.source === "emargements" ? `${json.semaines.length} semaine${json.semaines.length > 1 ? "s" : ""} importée${json.semaines.length > 1 ? "s" : ""} (heures validées : ${json.heures_travaillees} h)${json.semaines.some((s: { non_relies: string[] }) => s.non_relies.length) ? ` · sans fiche employé : ${[...new Set(json.semaines.flatMap((s: { non_relies: string[] }) => s.non_relies))].join(", ")}` : ""}` : `${json.nb_employes} employes importes`);
         if (etabId && selectedFrom && selectedTo) await loadAllData(etabId, selectedFrom, selectedTo);
       } else { setImportMsg("Erreur : " + (json.error ?? "inconnue")); }
     } catch (e) { setImportMsg("Erreur : " + String(e)); }
@@ -384,8 +389,8 @@ export default function MasseSalarialePage() {
             {/* Import de la feuille de présence Combo (ex-bouton flottant du téléphone, 10/10/2026) */}
             <label style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", borderRadius: 10, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12.5, fontWeight: 600, color: "#1a1a1a", cursor: "pointer" }}>
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-              Importer une feuille Combo (PDF)
-              <input type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void handleImport(f); }} />
+              Importer le rapport Combo (émargements xlsx, ou feuille PDF)
+              <input type="file" accept=".pdf,.xlsx,.xls" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void handleImport(f); }} />
             </label>
           </div>
         )}

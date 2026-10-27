@@ -37,6 +37,9 @@ async function syncPeriod(from: string, to: string) {
   for (const loc of locations) {
     const etabId = etabMap[loc.id];
     if (!etabId) continue;
+    // Semaine importée depuis le rapport des émargements (heures validées) : on ne la remplace pas par le planning
+    const { data: importee } = await supabaseAdmin.from("combo_imports").select("id").eq("etablissement_id", etabId).eq("periode_debut", from).eq("periode_fin", to).ilike("source_file_name", "%.xls%").limit(1);
+    if (importee?.length) continue;
 
     const [contracts, plannings] = await Promise.all([
       getContracts(loc.id, from),
