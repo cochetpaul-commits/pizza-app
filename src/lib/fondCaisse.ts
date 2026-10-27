@@ -57,6 +57,14 @@ export type CompositionFond = {
   incomplet: number;
   /** Ce qui manque au tiroir pour refaire le fond idéal (à prévoir en change) */
   manqueIdeal: Comptage;
+  /** Enveloppe de la banque, coupure par coupure (quand les espèces Popina sont connues) */
+  enveloppe?: Comptage | null;
+  /** Trop perçu du tiroir qui part dans la cagnotte des pourboires, coupure par coupure */
+  cagnotte?: Comptage | null;
+  /** Il manque ce montant (centimes) à l'enveloppe : à compléter avec la cagnotte */
+  enveloppeManque?: number;
+  /** Le trop perçu ne peut pas être isolé avec les coupures du tiroir (il faut casser un billet) */
+  cagnotteImpossible?: boolean;
 };
 
 const lire = (c: Comptage, k: number) => Math.max(0, Math.floor(Number(c[String(k)]) || 0));
@@ -172,6 +180,50 @@ export function appliquerEchange(tiroir: Comptage, e: EchangeCagnotte): Comptage
   const out: Comptage = {};
   for (const k of COUPURES) { const n = lire(tiroir, k) + lire(e.pieces, k) - lire(e.billets, k); if (n > 0) out[String(k)] = n; }
   return out;
+}
+
+const soustraire = (a: Comptage, b: Comptage): Comptage => {
+  const out: Comptage = {};
+  for (const k of COUPURES) { const n = lire(a, k) - lire(b, k); if (n > 0) out[String(k)] = n; }
+  return out;
+};
+
+/**
+ * Les trois tas du soir (vécu 26/10/2026 : 205,50 € comptés, 97 € d'espèces Popina, 8,50 € de trop perçu ;
+ * le fond fait d'abord laissait 105,50 € en deux billets de 50 : impossible d'en tirer l'enveloppe de 97 €).
+ * 1. la cagnotte reçoit le trop perçu, en petite monnaie que le fond idéal n'utilise pas ;
+ * 2. le fond (100 €) est composé avec le reste, fond idéal d'abord ;
+ * 3. l'enveloppe de la banque est ce qui reste : les espèces Popina, en billets autant que possible.
+ * Quand le tiroir manque, l'enveloppe est complétée avec la cagnotte (enveloppeManque).
+ */
+export function composerSoir(comptage: Comptage, fondEuros: number, enveloppeEuros: number | null | undefined, ideal: Record<number, number> = FOND_IDEAL): CompositionFond {
+  if (enveloppeEuros == null) return composerFond(comptage, fondEuros, ideal);
+  const fond = Math.round(fondEuros * 100);
+  const env = Math.round(enveloppeEuros * 100);
+  const compte = totalComptage(comptage);
+  const ecart = compte - fond - env;
+  if (ecart <= 0) {
+    const base = composerFond(comptage, fondEuros, ideal);
+    return { ...base, enveloppe: base.sortir, cagnotte: null, enveloppeManque: Math.max(0, env - base.totalSorti) };
+  }
+  // Trop perçu : d'abord dans ce qui dépasse le fond idéal, petite monnaie en tête ; sinon dans tout le tiroir
+  const surplus: Comptage = {};
+  for (const k of COUPURES) { const n = lire(comptage, k) - (ideal[k] ?? 0); if (n > 0) surplus[String(k)] = n; }
+  const cagnotte = meilleureCombinaison(surplus, ecart, {}, "petites") ?? meilleureCombinaison(comptage, ecart, {}, "petites");
+  if (!cagnotte) {
+    const base = composerFond(comptage, fondEuros, ideal);
+    return { ...base, enveloppe: null, cagnotte: null, cagnotteImpossible: true };
+  }
+  const reste = soustraire(comptage, cagnotte);
+  const base = composerFond(reste, fondEuros, ideal);
+  // Le fond n'est plus faisable au centime sans ces pièces : on laisse le trop perçu dans le tiroir, l'équipe tranche
+  if (base.incomplet > 0) {
+    const brut = composerFond(comptage, fondEuros, ideal);
+    return { ...brut, enveloppe: null, cagnotte: null, cagnotteImpossible: true };
+  }
+  const manqueIdeal: Comptage = {};
+  for (const k of COUPURES) { const n = (ideal[k] ?? 0) - lire(comptage, k); if (n > 0) manqueIdeal[String(k)] = n; }
+  return { ...base, compte, sortir: soustraire(comptage, base.laisser), totalSorti: compte - base.totalLaisse, manqueIdeal, enveloppe: base.sortir, cagnotte, enveloppeManque: 0 };
 }
 
 /** « 2 × 20 €, 3 × 1 € » */

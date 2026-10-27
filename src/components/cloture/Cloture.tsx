@@ -67,7 +67,7 @@ const estLundi = (jour: string) => new Date(`${jour}T12:00:00Z`).getUTCDay() ===
 /** Lundi de la semaine d'un jour (AAAA-MM-JJ) */
 const lundi = (jour: string) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
 const dateCourte = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
-type Historique = { jour: string; statut: string; pourboires_paie?: number | null; pourboires_especes?: number | null; resultat: { enveloppe?: number | null; fondCaisse?: { totalSorti: number; sortir?: Comptage } | null } | null };
+type Historique = { jour: string; statut: string; pourboires_paie?: number | null; pourboires_especes?: number | null; resultat: { enveloppe?: number | null; fondCaisse?: { totalSorti: number; sortir?: Comptage; enveloppe?: Comptage | null } | null } | null };
 const dateLongue = (jour: string) => new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 const decaler = (jour: string, n: number) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
@@ -105,7 +105,8 @@ export function Cloture() {
     (async () => {
       setEtat((e) => ({ ...e, chargement: true, erreur: null, info: null }));
       try {
-        const r = await fetchApi(`/api/cloture?jour=${jour}`);
+        // recalculer : le verdict enregistré est remis à jour avec les règles du moment (bordereau, enveloppes)
+        const r = await fetchApi(`/api/cloture?jour=${jour}&recalculer=1`);
         const j = await r.json();
         if (annule) return;
         if (!r.ok) { setEtat((e) => ({ ...e, chargement: false, erreur: j?.error ?? "Chargement impossible" })); return; }
@@ -233,8 +234,9 @@ export function Cloture() {
     const somme = (l: [string, number][]) => l.reduce((a, [, v]) => a + v, 0);
     // Bordereau de banque : billets et pièces sortis chaque soir (bloc « À sortir »), additionnés sur la semaine
     const sorties = new Map<string, Comptage | undefined>();
-    for (const h of historique) sorties.set(h.jour, h.resultat?.fondCaisse?.sortir);
-    sorties.set(jour, resultat.fondCaisse?.sortir);
+    // Depuis le 27/10 l'enveloppe est détaillée à part (le trop perçu va dans la cagnotte) ; avant, c'était tout ce qui sortait
+    for (const h of historique) sorties.set(h.jour, h.resultat?.fondCaisse?.enveloppe ?? h.resultat?.fondCaisse?.sortir);
+    sorties.set(jour, resultat.fondCaisse?.enveloppe ?? resultat.fondCaisse?.sortir);
     const bordereau = (l: [string, number][]) => {
       const c = additionner(l.map(([j]) => sorties.get(j)));
       return { coupures: c, total: totalComptage(c) / 100, soirsSansComptage: l.filter(([j]) => !sorties.get(j)).map(([j]) => j) };
@@ -293,7 +295,9 @@ export function Cloture() {
               const n = valeurs[String(k)] ?? 0;
               // Ce qu'on garde et ce qu'on sort, ligne par ligne : on sépare le tiroir en le parcourant
               const garder = repartition?.laisser[String(k)] ?? 0;
-              const sortir = repartition?.sortir[String(k)] ?? 0;
+              const banque = repartition?.enveloppe ? repartition.enveloppe[String(k)] ?? 0 : repartition?.sortir[String(k)] ?? 0;
+              const pourboires = repartition?.cagnotte?.[String(k)] ?? 0;
+              const tas = [[garder, "laisser", VERT], [banque, repartition?.enveloppe ? "banque" : "sortir", AMBRE], [pourboires, "cagnotte", ACCENT]].filter(([n]) => (n as number) > 0) as [number, string, string][];
               return (
                 <div key={k} style={{ display: "grid", gridTemplateColumns: "52px 36px minmax(0, 64px) 36px 1fr", alignItems: "center", gap: 6, padding: "3px 0", borderTop: "1px solid #f0ebe2" }}>
                   <span style={{ fontWeight: 700, fontSize: 15 }}>{libelleCoupure(k)}</span>
@@ -303,7 +307,7 @@ export function Cloture() {
                   <button type="button" aria-label={`Ajouter ${libelleCoupure(k)}`} onClick={() => changer(k, n + 1)} style={{ ...BTN, width: 36, height: 36, padding: 0, borderColor: BORD }}>+</button>
                   <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontSize: 13.5, lineHeight: 1.2 }}>
                     {repartition && n > 0
-                      ? <>{garder > 0 && <span style={{ color: VERT, fontWeight: 700, whiteSpace: "nowrap" }}>laisser {garder}</span>}{garder > 0 && sortir > 0 && <br />}{sortir > 0 && <span style={{ color: AMBRE, fontWeight: 700, whiteSpace: "nowrap" }}>sortir {sortir}</span>}</>
+                      ? tas.map(([nb, mot, coul], i) => <span key={mot}>{i > 0 && <br />}<span style={{ color: coul, fontWeight: 700, whiteSpace: "nowrap" }}>{mot} {nb}</span></span>)
                       : <span style={{ color: n ? "#1a1a1a" : FAIBLE }}>{eur((n * k) / 100)}</span>}
                   </span>
                 </div>
@@ -408,13 +412,15 @@ export function Cloture() {
                     {f.incomplet > 0 && <div style={{ fontSize: 13, color: ROUGE, marginTop: 4 }}>Il manque {eur(f.incomplet / 100)} pour faire le fond{f.compte > f.fond ? " au centime : pas la bonne monnaie" : ""}. Prévois du change.</div>}
                   </div>
                   <div style={{ borderRadius: 12, background: "#F7EDD6", padding: "10px 12px" }}>
-                    <div style={{ fontWeight: 700, color: AMBRE, fontSize: 14 }}>À sortir · {eur(f.totalSorti / 100)}</div>
-                    <div style={{ fontSize: 12.5, color: MUTED, marginTop: 2 }}>Le détail est dans la grille : « sortir ».</div>
+                    <div style={{ fontWeight: 700, color: AMBRE, fontSize: 14 }}>{f.enveloppe ? `Enveloppe banque · ${eur(totalComptage(f.enveloppe) / 100)}` : `À sortir · ${eur(f.totalSorti / 100)}`}</div>
+                    <div style={{ fontSize: 12.5, color: MUTED, marginTop: 2 }}>{f.enveloppe ? `Le détail est dans la grille : « banque » (${listerCoupures(f.enveloppe)}).` : "Le détail est dans la grille : « sortir »."}</div>
                     {resultat.enveloppe != null && (
                       <div style={{ fontSize: 13, marginTop: 4, lineHeight: 1.4 }}>
-                        <strong>Enveloppe banque : {eur(resultat.enveloppe)}</strong> (espèces Popina)
-                        {carteJuste && resultat.ecartTiroir != null && resultat.ecartTiroir > 0.005 && <span style={{ color: MUTED }}> · {eur(resultat.ecartTiroir)} pour les pourboires de l&apos;équipe</span>}
-                        {carteJuste && resultat.ecartTiroir != null && resultat.ecartTiroir < -0.005 && <span style={{ color: MUTED }}> · {eur(-resultat.ecartTiroir)} à compléter avec les pourboires</span>}
+                        {!f.enveloppe && <><strong>Enveloppe banque : {eur(resultat.enveloppe)}</strong> (espèces Popina)</>}
+                        {f.cagnotte && totalComptage(f.cagnotte) > 0 && <div><strong style={{ color: ACCENT }}>Cagnotte des pourboires : {eur(totalComptage(f.cagnotte) / 100)}</strong> ({listerCoupures(f.cagnotte)}), le trop perçu du tiroir.</div>}
+                        {(f.enveloppeManque ?? 0) > 0 && <div style={{ color: ROUGE }}>Il manque {eur((f.enveloppeManque ?? 0) / 100)} à l&apos;enveloppe ({eur(resultat.enveloppe)} d&apos;espèces Popina) : complète avec la cagnotte.</div>}
+                        {f.cagnotteImpossible && <div style={{ color: ROUGE }}>Le trop perçu de {eur(resultat.ecartTiroir ?? 0)} ne peut pas être isolé avec ces coupures : fais de la monnaie sur un billet, puis recompte le tiroir.</div>}
+                        {!carteJuste && resultat.ecartTiroir != null && Math.abs(resultat.ecartTiroir) > 0.005 && <div style={{ color: MUTED }}>Règle d&apos;abord la carte : le trop perçu n&apos;est donné aux pourboires que si la carte est juste.</div>}
                       </div>
                     )}
                   </div>
@@ -460,8 +466,8 @@ export function Cloture() {
                     </tbody>
                   </table>
                   <div style={{ fontSize: 12.5, color: MUTED, marginTop: 6, lineHeight: 1.45 }}>
-                    Les billets sont ceux sortis chaque soir en laissant le fond proposé. Les pièces sont indicatives : recompte-les si vous avez fait de la monnaie.
-                    {Math.abs(ecart) >= 0.005 && <> {ecart > 0 ? `${eur(ecart)} de plus que les enveloppes : le trop perçu donné aux pourboires, à retirer des pièces.` : `${eur(-ecart)} de moins que les enveloppes : complété avec les pourboires.`}</>}
+                    Les enveloppes de chaque soir, additionnées. Recompte les pièces si vous avez fait de la monnaie.
+                    {Math.abs(ecart) >= 0.005 && <> {ecart > 0 ? `${eur(ecart)} de plus que les espèces Popina de la semaine : un trop perçu est resté dans une enveloppe, il va aux pourboires.` : `${eur(-ecart)} de moins que les espèces Popina : complété avec la cagnotte.`}</>}
                     {b.soirsSansComptage.length > 0 && <> Soir sans comptage du tiroir : {b.soirsSansComptage.map(dateCourte).join(", ")}, son enveloppe n&apos;est pas détaillée.</>}
                   </div>
                 </details>

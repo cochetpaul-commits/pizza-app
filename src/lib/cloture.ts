@@ -10,7 +10,7 @@
  * comptent pour la paie.
  */
 
-import { appliquerEchange, comptageSaisi, composerFond, echangerCagnotte, FOND_CIBLE, idealPourJour, totalComptage, type Comptage, type CompositionFond, type EchangeCagnotte } from "@/lib/fondCaisse";
+import { appliquerEchange, comptageSaisi, composerSoir, echangerCagnotte, FOND_CIBLE, idealPourJour, totalComptage, type Comptage, type CompositionFond, type EchangeCagnotte } from "@/lib/fondCaisse";
 
 export type SaisieZ = {
   /** Bloc EUR, ligne TOTAL NET (pourboires compris) */
@@ -184,7 +184,7 @@ export function calculerCloture(s: SaisieCloture, jour?: string | null): Resulta
   const ideal = idealPourJour(jour);
   const echange = parCoupures && tiroir.coupures && cagnotteParCoupures && s.cagnotte?.coupures ? echangerCagnotte(s.cagnotte.coupures, tiroir.coupures, ideal) : null;
   // Ce qu'il faut laisser pour retrouver 100 € de fond, d'après le comptage (après la monnaie faite avec la cagnotte)
-  const fondCaisse = parCoupures && tiroir.coupures ? composerFond(echange ? appliquerEchange(tiroir.coupures, echange) : tiroir.coupures, FOND_CIBLE, ideal) : null;
+  const fondCaisse = parCoupures && tiroir.coupures ? composerSoir(echange ? appliquerEchange(tiroir.coupures, echange) : tiroir.coupures, FOND_CIBLE, p.especes, ideal) : null;
   // Règle de Paul (13/10) : l'écart du tiroir se règle avec les pourboires de l'équipe ; la banque reçoit les espèces Popina
   const enveloppe = tiroirCompte != null && p.especes != null ? r2(p.especes) : null;
   const manquePourValider = [

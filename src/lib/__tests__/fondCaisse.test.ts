@@ -66,3 +66,31 @@ describe("fond de caisse", () => {
     expect(totalComptage(b)).toBe(28300);
   });
 });
+
+describe("les trois tas du soir", () => {
+  it("26/10 réel : 205,50 € comptés, 97 € d'espèces, 8,50 € de trop perçu — sans casser un billet de 50", async () => {
+    const { composerSoir, FOND_IDEAL_LUNDI } = await import("@/lib/fondCaisse");
+    const c = { "10": 4, "20": 8, "50": 7, "100": 12, "200": 4, "1000": 4, "2000": 2, "5000": 2 };
+    const r = composerSoir(c, 100, 97, FOND_IDEAL_LUNDI);
+    expect(r.totalLaisse).toBe(10000);
+    expect(totalComptage(r.cagnotte!)).toBe(850);
+    expect(totalComptage(r.enveloppe!)).toBe(9700);
+    expect(r.cagnotte!["5000"]).toBeUndefined();
+    expect(r.enveloppe!["5000"]).toBe(1); // un seul billet de 50 dans l'enveloppe, l'autre reste au fond
+    expect(r.cagnotteImpossible).toBeFalsy();
+  });
+
+  it("tiroir en manque : l'enveloppe est à compléter avec la cagnotte", async () => {
+    const { composerSoir } = await import("@/lib/fondCaisse");
+    const r = composerSoir({ "5000": 2, "2000": 2, "1000": 4, "200": 5 }, 100, 97); // 190 € : il manque 7 €
+    expect(r.totalSorti).toBe(9000);
+    expect(r.enveloppeManque).toBe(700);
+    expect(r.enveloppe).toEqual(r.sortir);
+  });
+
+  it("trop perçu de 8,50 € sans aucune pièce : il faut casser un billet", async () => {
+    const { composerSoir } = await import("@/lib/fondCaisse");
+    const r = composerSoir({ "5000": 2, "2000": 5, "500": 1, "50": 1 }, 100, 97);
+    expect(r.cagnotteImpossible).toBe(true);
+  });
+});

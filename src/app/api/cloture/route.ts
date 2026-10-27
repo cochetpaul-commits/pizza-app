@@ -26,6 +26,14 @@ export async function GET(req: NextRequest) {
   }
   const jour = req.nextUrl.searchParams.get("jour") ?? "";
   if (!JOUR.test(jour)) return NextResponse.json({ error: "jour requis (AAAA-MM-JJ)" }, { status: 400 });
+  // Recalcul du verdict enregistré avec les règles du jour (après une évolution de la logique)
+  if (req.nextUrl.searchParams.get("recalculer")) {
+    const { data: c } = await supabaseAdmin.from("clotures").select("id, saisie").eq("etablissement_id", a.etabId).eq("jour", jour).maybeSingle();
+    if (c?.saisie) {
+      const r = calculerCloture(c.saisie as SaisieCloture, jour);
+      await supabaseAdmin.from("clotures").update({ resultat: r, niveau: r.niveau, pourboires_paie: r.niveau === "vide" ? null : r.pourboiresPaie, pourboires_especes: r.pourboiresEspeces }).eq("id", c.id);
+    }
+  }
   const [{ data: cloture }, { data: tx }] = await Promise.all([
     supabaseAdmin.from("clotures").select("*").eq("etablissement_id", a.etabId).eq("jour", jour).maybeSingle(),
     supabaseAdmin.from("flatpay_transactions").select("horodatage, jour, mode, type_carte, montant_centimes, statut, operation, terminal, emetteur, source")
