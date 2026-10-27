@@ -73,6 +73,12 @@ export type ComboShift = {
   team_name: string | null;
   team_id: string | null;
   label_name: string | null;
+  /** Jour du service (AAAA-MM-JJ) */
+  date?: string;
+  /** Horaires validés par le responsable (identiques au planning tant que le service n'est pas validé) */
+  real_starts_at?: string | null;
+  real_ends_at?: string | null;
+  real_break_duration?: number | null;
 };
 
 // ── Endpoints ──

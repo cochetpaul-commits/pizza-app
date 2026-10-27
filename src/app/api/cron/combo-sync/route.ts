@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cronUnauthorized } from "@/lib/cronAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getContracts, getPlannings, getLocations, COMBO_LOCATIONS } from "@/lib/combo/api";
+import { agregerPlannings, heures, jourParis } from "@/lib/combo/presences";
 import { syncRestsFromCombo } from "@/lib/combo/syncRests";
 
 export const runtime = "nodejs";
@@ -51,31 +52,8 @@ async function syncPeriod(from: string, to: string) {
       if (c.employee_number) contractByEmpNum.set(c.employee_number, c.contract_time);
     }
 
-    const empMap = new Map<string, {
-      firstname: string; lastname: string; employee_number: string | null;
-      team: string | null; totalMinutes: number; totalBreak: number;
-      daysWorked: Set<string>; repas: number;
-    }>();
-
-    for (const p of plannings) {
-      const key = `${p.firstname} ${p.lastname}`.trim();
-      const entry = empMap.get(key) ?? {
-        firstname: p.firstname, lastname: p.lastname,
-        employee_number: p.employee_number,
-        team: p.team_name, totalMinutes: 0, totalBreak: 0,
-        daysWorked: new Set<string>(), repas: 0,
-      };
-
-      const start = new Date(p.starts_at);
-      const end = new Date(p.ends_at);
-      const shiftMin = (end.getTime() - start.getTime()) / 60000;
-      entry.totalMinutes += shiftMin;
-      entry.totalBreak += p.break_duration;
-      entry.daysWorked.add(start.toISOString().slice(0, 10));
-      if ((shiftMin - p.break_duration) >= 300) entry.repas++;
-
-      empMap.set(key, entry);
-    }
+    // Heures : planning et réel validé, jusqu'à la veille (lib/combo/presences)
+    const empMap = agregerPlannings(plannings, jourParis(new Date(Date.now() - 24 * 3600e3)));
 
     // Pre-load employees for matching
     const { data: allEmps } = await supabaseAdmin
@@ -87,8 +65,8 @@ async function syncPeriod(from: string, to: string) {
     const rows: Record<string, unknown>[] = [];
 
     for (const [comboNom, emp] of empMap) {
-      const workMinutes = emp.totalMinutes - emp.totalBreak;
-      const heuresTravaillees = Math.round(workMinutes / 60 * 100) / 100;
+      const heuresTravaillees = heures(emp.minutesTravaillees);
+      const heuresPlanifiees = heures(emp.minutesPlanifiees);
       const heuresContrat = emp.employee_number ? (contractByEmpNum.get(emp.employee_number) ?? 0) : 0;
 
       let employeId: string | null = null;
@@ -109,12 +87,12 @@ async function syncPeriod(from: string, to: string) {
         equipe: emp.team,
         employe_id: employeId,
         matched: !!employeId,
-        heures_planifiees: heuresTravaillees,
+        heures_planifiees: heuresPlanifiees,
         heures_travaillees: heuresTravaillees,
         heures_contrat: heuresContrat,
         nb_repas: emp.repas,
-        nb_jours_travailles: emp.daysWorked.size,
-        ecart_total: heuresTravaillees - heuresContrat,
+        nb_jours_travailles: emp.joursTravailles.size,
+        ecart_total: Math.round((heuresTravaillees - heuresPlanifiees) * 100) / 100,
         periode_debut: from,
         periode_fin: to,
       });
