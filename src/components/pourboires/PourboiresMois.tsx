@@ -12,6 +12,7 @@ export type LignePourboires = {
   employe_id: string; prenom: string; nom: string; poste: string | null; equipe: string | null; contrat: string | null;
   jours: number; jours_absents: number; detail: Record<string, number>; part: number; net: number; moi: boolean;
   exclu: { id: string | null; jours_planning: number } | null;
+  jours_combo: number; jours_force: { id: string; jours: number; motif: string } | null;
   ajustements: { id: string; montant: number; motif: string }[];
 };
 export type DonneesPourboires = {
@@ -107,6 +108,14 @@ export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: 
     const r = await fetchApi(`/api/pourboires?id=${id}`, { method: "DELETE" });
     if (r.ok) void recharger();
   };
+  const [edition, setEdition] = useState<{ employe: string; valeur: string } | null>(null);
+  const forcerJours = async (employe_id: string, valeur: string | null) => {
+    const jours = valeur == null ? null : Number(valeur.replace(",", "."));
+    if (jours != null && (!Number.isFinite(jours) || jours < 0)) { setEnvoi("Nombre de jours invalide."); return; }
+    const r = await fetchApi("/api/pourboires", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employe_id, mois, jours }) });
+    setEdition(null);
+    if (r.ok) void recharger(); else setEnvoi("Correction non enregistrée");
+  };
   const exclure = async (employe_id: string) => {
     const r = await fetchApi("/api/pourboires", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employe_id, mois, exclu: true }) });
     if (r.ok) void recharger();
@@ -164,7 +173,16 @@ export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: 
                       : <button type="button" onClick={() => void exclure(x.employe_id)} title="Ne pas compter ce mois" style={{ border: 0, background: "none", color: MUTED, cursor: "pointer", padding: "0 4px", fontSize: 11 }}>ne pas compter</button>}
                   </td>
                   <td style={{ ...cellule, color: MUTED }}>{x.poste ?? "—"}</td>
-                  <td style={{ ...cellule, textAlign: "right" }} title={Object.entries(x.detail).map(([j, v]) => `${dateCourte(j)} : ${v}`).join("\n")}>{jours(x.jours)}</td>
+                  <td style={{ ...cellule, textAlign: "right", whiteSpace: "nowrap" }} title={x.jours_force ? `Corrigé par la direction (planning Combo : ${jours(x.jours_combo)})` : Object.entries(x.detail).map(([j, v]) => `${dateCourte(j)} : ${v}`).join("\n")}>
+                    {edition?.employe === x.employe_id ? (
+                      <input autoFocus inputMode="decimal" value={edition.valeur} onChange={(e) => setEdition({ employe: x.employe_id, valeur: e.target.value })}
+                        onKeyDown={(e) => { if (e.key === "Enter") void forcerJours(x.employe_id, edition.valeur); if (e.key === "Escape") setEdition(null); }}
+                        onBlur={() => void forcerJours(x.employe_id, edition.valeur)} style={{ ...input, width: 64, textAlign: "right", padding: "4px 6px" }} />
+                    ) : x.exclu ? jours(x.jours) : (
+                      <button type="button" onClick={() => setEdition({ employe: x.employe_id, valeur: String(x.jours).replace(".", ",") })} title="Corriger le compteur" style={{ border: 0, background: "none", font: "inherit", cursor: "pointer", color: x.jours_force ? ACCENT : "#1a1a1a", fontWeight: x.jours_force ? 700 : 400, padding: 0, textDecoration: "underline dotted" }}>{jours(x.jours)}</button>
+                    )}
+                    {x.jours_force && !edition && <button type="button" onClick={() => void forcerJours(x.employe_id, null)} title={`Revenir au planning Combo (${jours(x.jours_combo)})`} style={{ border: 0, background: "none", color: MUTED, cursor: "pointer", padding: "0 0 0 4px", fontSize: 11 }}>↺</button>}
+                  </td>
                   <td style={{ ...cellule, textAlign: "right", color: MUTED }}>{jours(x.jours_absents)}</td>
                   <td style={{ ...cellule, textAlign: "right" }}>{eur(x.part)}</td>
                   <td style={{ ...cellule, fontSize: 12 }}>{x.ajustements.map((a) => (
@@ -213,7 +231,7 @@ export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: 
           <summary style={{ cursor: "pointer", fontWeight: 700, color: "#1a1a1a" }}>Les règles</summary>
           <p>Pot = pourboires carte (ticket Z du TPE, Conecs compris, chaque clôture) + pourboires espèces (cagnotte vidée et comptée le vendredi à la clôture), du 1er au dernier jour du mois.</p>
           <p>Part = pot ÷ jours comptés de l&apos;équipe × jours comptés de la personne. Les jours viennent du planning Combo, jusqu&apos;à la veille. Un jour travaillé compte 1 ; un seul service dans la journée compte 0,5 (deux services, ou un service de 7 h et plus, font la journée). Congés payés, maladie et absence injustifiée ne comptent pas ; formation, visite médicale, RTT et récupération comptent. Les jours d&apos;absence ne créent pas de reliquat : la valeur du jour monte pour les présents.</p>
-          <p>Les ajustements (acompte à déduire, report du mois précédent) s&apos;ajoutent à la part. « Ne pas compter » sort la personne du mois : ni ses jours, ni de part. Versement mensuel avec la paie.</p>
+          <p>Le compteur « Jours présents » se corrige en cliquant dessus (la direction) : le nombre saisi remplace le planning Combo pour le mois, ↺ y revient. Les ajustements (acompte à déduire, report du mois précédent) s&apos;ajoutent à la part. « Ne pas compter » sort la personne du mois : ni ses jours, ni de part. Versement mensuel avec la paie.</p>
         </details>
       </>)}
     </div>

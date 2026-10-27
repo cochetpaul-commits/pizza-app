@@ -90,6 +90,10 @@ export async function GET(req: NextRequest) {
   // « Ne pas compter » : la personne sort du mois (ni jours au dénominateur, ni part), comme Teddy en août dans le fichier de Paul
   const exclus = new Set((ajustements ?? []).filter((x) => x.type === "exclu").map((x) => x.employe_id as string));
   const presences = compterPresences(services.filter((x) => !exclus.has(x.employeId)), abs);
+  // Compteur de présence corrigé par la direction : le nombre de jours forcé pour le mois (type « jours »)
+  const joursForces = new Map((ajustements ?? []).filter((x) => x.type === "jours" && x.employe_id).map((x) => [x.employe_id as string, { id: x.id as string, jours: Number(x.montant) || 0, motif: String(x.motif ?? "") }]));
+  const joursCombo = new Map([...presences.entries()].map(([id, p]) => [id, p.jours]));
+  for (const [id, f] of joursForces) { if (exclus.has(id)) continue; const p = presences.get(id); if (p) p.jours = f.jours; else presences.set(id, { jours: f.jours, detail: {} }); }
   const ajs: Ajustement[] = (ajustements ?? []).filter((x) => x.type === "montant").map((x) => ({ employeId: x.employe_id as string, montant: Number(x.montant) || 0, motif: String(x.motif ?? "") }));
 
   const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -110,9 +114,10 @@ export async function GET(req: NextRequest) {
     return {
       employe_id: p.employeId, prenom: e?.prenom ?? "?", nom: e?.nom ?? "", poste: e?.postes?.nom ?? null, equipe: e?.postes?.equipe ?? null, contrat,
       jours: p.jours, jours_absents: r2(Math.max(0, joursOuverture - p.jours)), detail: presences.get(p.employeId)?.detail ?? {},
+      jours_combo: joursCombo.get(p.employeId) ?? 0, jours_force: joursForces.get(p.employeId) ?? null,
       part: p.part, net: p.net, moi: a.mesIds.has(p.employeId),
       exclu: exclus.has(p.employeId) ? { id: (ajustements ?? []).find((x) => x.type === "exclu" && x.employe_id === p.employeId)?.id ?? null, jours_planning: presencesBrutes.get(p.employeId)?.jours ?? 0 } : null,
-      ajustements: (ajustements ?? []).filter((x) => x.employe_id === p.employeId && x.type !== "exclu").map((x) => ({ id: x.id, montant: Number(x.montant), motif: x.motif })),
+      ajustements: (ajustements ?? []).filter((x) => x.employe_id === p.employeId && x.type === "montant").map((x) => ({ id: x.id, montant: Number(x.montant), motif: x.motif })),
     };
   });
   // Un équipier ne voit que sa ligne (et le pot) ; ses collègues restent anonymes
@@ -131,7 +136,7 @@ export async function POST(req: NextRequest) {
   const a = await acces(req);
   if ("erreur" in a) return a.erreur;
   if (!a.direction) return NextResponse.json({ error: "Réservé à la direction." }, { status: 403 });
-  const body = await req.json().catch(() => null) as { employe_id?: string; mois?: string; montant?: number; motif?: string; exclu?: boolean; pot?: boolean } | null;
+  const body = await req.json().catch(() => null) as { employe_id?: string; mois?: string; montant?: number; motif?: string; exclu?: boolean; pot?: boolean; jours?: number | null } | null;
   if (!body?.mois || !MOIS.test(body.mois)) return NextResponse.json({ error: "mois requis" }, { status: 400 });
   if (body.pot) {
     if (typeof body.montant !== "number" || !Number.isFinite(body.montant) || !body.motif?.trim()) return NextResponse.json({ error: "montant et motif requis" }, { status: 400 });
@@ -141,6 +146,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ id: data.id });
   }
   if (!body.employe_id) return NextResponse.json({ error: "employe_id requis" }, { status: 400 });
+  // Compteur de présence : jours forcés pour le mois (null : retour au planning Combo)
+  if ("jours" in body) {
+    await supabaseAdmin.from("pourboires_ajustements").delete().eq("etablissement_id", a.etabId).eq("employe_id", body.employe_id).eq("mois", `${body.mois}-01`).eq("type", "jours");
+    if (body.jours == null) return NextResponse.json({ ok: true });
+    if (typeof body.jours !== "number" || !Number.isFinite(body.jours) || body.jours < 0) return NextResponse.json({ error: "jours invalide" }, { status: 400 });
+    const { data, error } = await supabaseAdmin.from("pourboires_ajustements")
+      .insert({ etablissement_id: a.etabId, employe_id: body.employe_id, mois: `${body.mois}-01`, montant: Math.round(body.jours * 2) / 2, motif: body.motif?.trim().slice(0, 200) || "Compteur corrigé par la direction", type: "jours", created_by: a.userId }).select("id").single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ id: data.id });
+  }
   if (!body.exclu && (typeof body.montant !== "number" || !Number.isFinite(body.montant) || !body.motif?.trim())) {
     return NextResponse.json({ error: "montant et motif requis" }, { status: 400 });
   }
