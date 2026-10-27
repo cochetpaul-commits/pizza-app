@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
 
   const [{ data: etab }, { data: employes }, { data: clotures }, { data: absences }, { data: ajustements }] = await Promise.all([
     supabaseAdmin.from("etablissements").select("slug").eq("id", a.etabId).maybeSingle(),
-    supabaseAdmin.from("employes").select("id, prenom, nom, matricule, poste_id, postes(nom, equipe), contrats(type, date_fin)")
+    supabaseAdmin.from("employes").select("id, prenom, nom, matricule, poste_id, participe_pourboires, postes(nom, equipe), contrats(type, date_fin)")
       .or(`etablissement_id.eq.${a.etabId},etablissements_ids.cs.{${a.etabId}}`).eq("actif", true),
     supabaseAdmin.from("clotures").select("jour, statut, pourboires_paie, pourboires_especes").eq("etablissement_id", a.etabId).gte("jour", debut).lte("jour", finMois),
     supabaseAdmin.from("absences").select("employe_id, date_debut, date_fin, type").eq("statut", "valide").lte("date_debut", finMois).gte("date_fin", debut),
@@ -62,9 +62,12 @@ export async function GET(req: NextRequest) {
 
   // Présences : le planning Combo, service par service
   const location = String(etab?.slug ?? "").includes("piccola") ? COMBO_LOCATIONS.piccola : COMBO_LOCATIONS.bello_mio;
-  const emps = (employes ?? []) as unknown as { id: string; prenom: string; nom: string; matricule: string | null; postes: { nom: string; equipe: string | null } | null; contrats: { type: string | null; date_fin: string | null }[] | null }[];
-  const parMatricule = new Map(emps.filter((e) => e.matricule).map((e) => [String(e.matricule), e.id]));
-  const parNom = new Map(emps.map((e) => [`${norm(e.prenom)} ${norm(e.nom)}`, e.id]));
+  // La direction (participe_pourboires = faux) n'entre ni dans les jours ni dans la répartition
+  const tous = (employes ?? []) as unknown as { id: string; prenom: string; nom: string; matricule: string | null; participe_pourboires: boolean | null; postes: { nom: string; equipe: string | null } | null; contrats: { type: string | null; date_fin: string | null }[] | null }[];
+  const emps = tous.filter((e) => e.participe_pourboires !== false);
+  const horsPot = new Set(tous.filter((e) => e.participe_pourboires === false).map((e) => e.id));
+  const parMatricule = new Map(tous.filter((e) => e.matricule).map((e) => [String(e.matricule), e.id]));
+  const parNom = new Map(tous.map((e) => [`${norm(e.prenom)} ${norm(e.nom)}`, e.id]));
   const services: Service[] = [];
   const inconnus = new Set<string>();
   let avertissement: string | null = null;
@@ -75,6 +78,7 @@ export async function GET(req: NextRequest) {
         if (date < debut || date > aJour) continue;
         const employeId = (p.employee_number && parMatricule.get(p.employee_number)) || parNom.get(`${norm(p.firstname)} ${norm(p.lastname)}`) || parNom.get(`${norm(p.lastname)} ${norm(p.firstname)}`);
         if (!employeId) { inconnus.add(`${p.firstname} ${p.lastname}`.trim()); continue; }
+        if (horsPot.has(employeId)) continue;
         const minutes = Math.max(0, (new Date(p.ends_at).getTime() - new Date(p.starts_at).getTime()) / 60000 - (p.break_duration || 0));
         services.push({ employeId, date, minutes });
       }

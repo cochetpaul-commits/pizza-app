@@ -17,3 +17,5 @@ alter table pourboires_ajustements add column if not exists type text not null d
 comment on column pourboires_ajustements.type is 'montant : ajustement en euros ; exclu : la personne ne compte pas ce mois (ni ses jours, ni de part)';
 -- Complément du pot (27/10) : pourboires carte des jours sans clôture dans l'app (rapport TPE), employe_id null
 alter table pourboires_ajustements alter column employe_id drop not null;
+-- Direction hors pourboires (27/10) : jamais dans le pot ni dans la répartition
+alter table employes add column if not exists participe_pourboires boolean not null default true;
