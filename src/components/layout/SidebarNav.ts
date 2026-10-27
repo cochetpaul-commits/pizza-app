@@ -35,18 +35,27 @@ const MANAGERS: Role[] = ["group_admin", "manager"];
 
 // ANALYSE : un indicateur par entrée, dans la logique ComandR (10/10/2026).
 // Les ancres (#couverts, #productivite) ouvrent la page sur la section voulue.
-// Une page par question du quotidien (10/10/2026) ; les anciennes pages Ventes, Rentabilité et
-// Masse salariale restent accessibles par les menus Pilotage et RH.
-export const ANALYSE_ITEMS: NavItemV2[] = [
+// Pilotage par question (27/10/2026, à la ComandR) : quatre groupes courts, repliés par défaut.
+export const VENTES_ITEMS: NavItemV2[] = [
   { label: "Chiffre d'affaires", href: "/analyse/chiffre-affaires", icon: "barChart", permission: "performances.view" },
   { label: "Couverts", href: "/analyse/couverts", icon: "users", permission: "performances.view" },
-  { label: "Marge", href: "/analyse/marge", icon: "calculator", permission: "performances.pilotage" },
-  { label: "Masse salariale", href: "/analyse/masse-salariale", icon: "trendingUp", permission: "performances.pilotage" },
-  { label: "CA / personne", href: "/analyse/ca-personne", icon: "clock", permission: "performances.pilotage" },
-  { label: "Rentabilité plats", href: "/analyse/plats", icon: "wallet", permission: "performances.pilotage" },
-  { label: "Simulations", href: "/analyse/simulations", icon: "calculator", permission: "performances.pilotage" },
+  { label: "Par produit", href: "/ventes", icon: "tag", permission: "performances.view" },
 ];
-
+export const RENTABILITE_ITEMS: NavItemV2[] = [
+  { label: "Résultat", href: "/rentabilite", icon: "wallet", permission: "performances.pilotage" },
+  { label: "Marge", href: "/analyse/marge", icon: "calculator", permission: "performances.pilotage" },
+  { label: "Rentabilité des plats", href: "/analyse/plats", icon: "book", permission: "performances.pilotage" },
+  { label: "Simulations", href: "/analyse/simulations", icon: "trendingUp", permission: "performances.pilotage" },
+];
+export const ACHATS_ITEMS: NavItemV2[] = [
+  { label: "Suivi des achats", href: "/achats", icon: "fileText", permission: "achats.view" },
+  { label: "Mercuriale", href: "/mercuriale", icon: "tag", permission: "achats.view" },
+  { label: "Variations de prix", href: "/variations-prix", icon: "trendingUp", permission: "achats.view" },
+];
+export const EQUIPE_COUT_ITEMS: NavItemV2[] = [
+  { label: "Masse salariale", href: "/analyse/masse-salariale", icon: "wallet", permission: "performances.pilotage" },
+  { label: "CA par personne", href: "/analyse/ca-personne", icon: "clock", permission: "performances.pilotage" },
+];
 // HACCP (autocontrôles & conformité)
 export const HACCP_ITEMS: NavItemV2[] = [
   { label: "Tableau HACCP", href: "/haccp",                icon: "clipboard" },
@@ -102,9 +111,10 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     { kind: "page", label: "Congés", href: "/rh/conges", icon: "beach", roles: MANAGERS },
     ...(piccola ? [] : [{ kind: "page", label: "Pourboires", href: "/rh/pourboires", icon: "wallet", permission: "heures.edit_team" } as NavEntry]),
     { kind: "divider", label: "Pilotage" },
-    { kind: "page", label: "Ventes", href: "/ventes", icon: "barChart", permission: "performances.view" },
-    { kind: "page", label: "Achats", href: "/achats", icon: "fileText", permission: "achats.view" },
-    { kind: "group", label: "Analyse", icon: "trendingUp", items: ANALYSE_ITEMS },
+    { kind: "group", label: "Ventes", icon: "barChart", items: VENTES_ITEMS },
+    { kind: "group", label: "Rentabilité", icon: "wallet", items: RENTABILITE_ITEMS },
+    { kind: "group", label: "Achats", icon: "fileText", items: ACHATS_ITEMS },
+    { kind: "group", label: "Coût de l'équipe", icon: "users", items: EQUIPE_COUT_ITEMS },
     { kind: "divider", label: "Configuration" },
     { kind: "group", label: "Paramètres", icon: "settings", items: PARAMETRES_ITEMS },
   ];
@@ -121,8 +131,9 @@ export const NAV_EQUIPIER: NavEntry[] = [
   { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },
   { kind: "page", label: "Fournisseurs", href: "/fournisseurs", icon: "truck", permission: "achats.edit" },
   { kind: "divider", label: "Pilotage" },
-  { kind: "page", label: "Ventes", href: "/ventes", icon: "barChart", permission: "performances.view" },
-  { kind: "group", label: "Analyse", icon: "trendingUp", items: ANALYSE_ITEMS },
+  { kind: "group", label: "Ventes", icon: "barChart", items: VENTES_ITEMS },
+  { kind: "group", label: "Rentabilité", icon: "wallet", items: RENTABILITE_ITEMS },
+  { kind: "group", label: "Coût de l'équipe", icon: "users", items: EQUIPE_COUT_ITEMS },
   { kind: "divider", label: "Configuration" },
   { kind: "page", label: "Mes congés", href: "/mes-conges", icon: "beach" },
   { kind: "page", label: "Mon compte", href: "/settings/account", icon: "settings" },
