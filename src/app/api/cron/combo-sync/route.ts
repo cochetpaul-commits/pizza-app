@@ -105,6 +105,8 @@ async function syncPeriod(from: string, to: string) {
         .eq("etablissement_id", etabId)
         .eq("periode_debut", from)
         .eq("periode_fin", to);
+      // Lignes « mois entier » (ancienne synchro sur le mois) qui recouvrent cette semaine : elles comptaient double (27/10/2026)
+      await supabaseAdmin.from("combo_presences").delete().eq("etablissement_id", etabId).lte("periode_debut", from).gte("periode_fin", to).neq("periode_debut", from);
 
       await supabaseAdmin.from("combo_presences").insert(rows);
       totalInserted += rows.length;
