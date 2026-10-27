@@ -86,10 +86,12 @@ export async function GET(req: NextRequest) {
   // « Ne pas compter » : la personne sort du mois (ni jours au dénominateur, ni part), comme Teddy en août dans le fichier de Paul
   const exclus = new Set((ajustements ?? []).filter((x) => x.type === "exclu").map((x) => x.employe_id as string));
   const presences = compterPresences(services.filter((x) => !exclus.has(x.employeId)), abs);
-  const ajs: Ajustement[] = (ajustements ?? []).filter((x) => x.type !== "exclu").map((x) => ({ employeId: x.employe_id as string, montant: Number(x.montant) || 0, motif: String(x.motif ?? "") }));
+  const ajs: Ajustement[] = (ajustements ?? []).filter((x) => x.type === "montant").map((x) => ({ employeId: x.employe_id as string, montant: Number(x.montant) || 0, motif: String(x.motif ?? "") }));
 
   const r2 = (n: number) => Math.round(n * 100) / 100;
-  const carte = r2((clotures ?? []).reduce((t, c) => t + (Number(c.pourboires_paie) || 0), 0));
+  // Complément du pot : pourboires carte des jours sans clôture dans l'app (relevés sur le rapport du TPE)
+  const complements = (ajustements ?? []).filter((x) => x.type === "pot").map((x) => ({ id: x.id as string, montant: Number(x.montant) || 0, motif: String(x.motif ?? "") }));
+  const carte = r2((clotures ?? []).reduce((t, c) => t + (Number(c.pourboires_paie) || 0), 0) + complements.reduce((t, c) => t + c.montant, 0));
   const especes = r2((clotures ?? []).reduce((t, c) => t + (Number(c.pourboires_especes) || 0), 0));
   const rep = repartir(carte + especes, presences, ajs);
   const joursOuverture = new Set(services.map((s) => s.date)).size;
@@ -113,7 +115,8 @@ export async function GET(req: NextRequest) {
   const visibles = a.direction ? lignes : lignes.filter((l) => l.moi);
   return NextResponse.json({
     mois, a_jour: aJour, direction: a.direction,
-    pot: { carte, especes, total: rep.pot }, jours_ouverture: joursOuverture, total_jours: rep.totalJours, valeur_jour: rep.valeurJour,
+    pot: { carte, especes, total: rep.pot, complements }, jours_ouverture: joursOuverture,
+    jours_sans_cloture: [...new Set(services.map((s) => s.date))].filter((d) => !(clotures ?? []).some((c) => c.jour === d)).sort(), total_jours: rep.totalJours, valeur_jour: rep.valeurJour,
     nb_clotures: (clotures ?? []).length, soirs_cagnotte: (clotures ?? []).filter((c) => c.pourboires_especes != null).map((c) => c.jour).sort(),
     lignes: visibles, nb_personnes: lignes.length,
     inconnus: a.direction ? [...inconnus] : [], avertissement,
@@ -124,8 +127,16 @@ export async function POST(req: NextRequest) {
   const a = await acces(req);
   if ("erreur" in a) return a.erreur;
   if (!a.direction) return NextResponse.json({ error: "Réservé à la direction." }, { status: 403 });
-  const body = await req.json().catch(() => null) as { employe_id?: string; mois?: string; montant?: number; motif?: string; exclu?: boolean } | null;
-  if (!body?.employe_id || !body.mois || !MOIS.test(body.mois)) return NextResponse.json({ error: "employe_id et mois requis" }, { status: 400 });
+  const body = await req.json().catch(() => null) as { employe_id?: string; mois?: string; montant?: number; motif?: string; exclu?: boolean; pot?: boolean } | null;
+  if (!body?.mois || !MOIS.test(body.mois)) return NextResponse.json({ error: "mois requis" }, { status: 400 });
+  if (body.pot) {
+    if (typeof body.montant !== "number" || !Number.isFinite(body.montant) || !body.motif?.trim()) return NextResponse.json({ error: "montant et motif requis" }, { status: 400 });
+    const { data, error } = await supabaseAdmin.from("pourboires_ajustements")
+      .insert({ etablissement_id: a.etabId, employe_id: null, mois: `${body.mois}-01`, montant: Math.round(body.montant * 100) / 100, motif: body.motif.trim().slice(0, 200), type: "pot", created_by: a.userId }).select("id").single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ id: data.id });
+  }
+  if (!body.employe_id) return NextResponse.json({ error: "employe_id requis" }, { status: 400 });
   if (!body.exclu && (typeof body.montant !== "number" || !Number.isFinite(body.montant) || !body.motif?.trim())) {
     return NextResponse.json({ error: "montant et motif requis" }, { status: 400 });
   }

@@ -16,7 +16,7 @@ export type LignePourboires = {
 };
 export type DonneesPourboires = {
   mois: string; a_jour: string; direction: boolean;
-  pot: { carte: number; especes: number; total: number }; jours_ouverture: number; total_jours: number; valeur_jour: number;
+  pot: { carte: number; especes: number; total: number; complements: { id: string; montant: number; motif: string }[] }; jours_ouverture: number; jours_sans_cloture: string[]; total_jours: number; valeur_jour: number;
   nb_clotures: number; soirs_cagnotte: string[]; lignes: LignePourboires[]; nb_personnes: number; inconnus: string[]; avertissement: string | null;
 };
 
@@ -81,6 +81,16 @@ export function MesPourboires() {
 export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: string) => void }) {
   const { data, erreur, chargement, recharger } = usePourboires(mois);
   const [nouveau, setNouveau] = useState<{ employe: string; montant: string; motif: string }>({ employe: "", montant: "", motif: "" });
+  const [complement, setComplement] = useState<{ montant: string; motif: string }>({ montant: "", motif: "" });
+  const ajouterComplement = async () => {
+    const montant = Number(complement.montant.replace(",", "."));
+    if (!Number.isFinite(montant) || !complement.motif.trim()) { setEnvoi("Montant et motif du complément requis."); return; }
+    setEnvoi("Enregistrement…");
+    const r = await fetchApi("/api/pourboires", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pot: true, mois, montant, motif: complement.motif }) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) { setEnvoi(j?.error ?? "Enregistrement impossible"); return; }
+    setEnvoi(null); setComplement({ montant: "", motif: "" }); void recharger();
+  };
   const [envoi, setEnvoi] = useState<string | null>(null);
   const [copie, setCopie] = useState(false);
   const ajouter = async () => {
@@ -134,6 +144,8 @@ export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: 
           ))}
         </div>
         {data.soirs_cagnotte.length > 0 && <div style={{ fontSize: 12.5, color: MUTED }}>Cagnotte vidée le : {data.soirs_cagnotte.map(dateCourte).join(", ")}.</div>}
+        {data.jours_sans_cloture.length > 0 && <div style={{ fontSize: 12.5, color: ROUGE }}>Jours au planning sans clôture dans l&apos;app (leurs pourboires carte manquent au pot) : {data.jours_sans_cloture.map(dateCourte).join(", ")}. Complète le pot avec le rapport du TPE, ci-dessous.</div>}
+        {data.pot.complements.length > 0 && <div style={{ fontSize: 12.5, color: MUTED }}>Compléments du pot : {data.pot.complements.map((c) => <span key={c.id} style={{ marginRight: 8 }}>{c.motif} <b>{eur(c.montant)}</b> <button type="button" onClick={() => void retirer(c.id)} aria-label="Retirer" style={{ border: 0, background: "none", color: MUTED, cursor: "pointer", padding: 0 }}>×</button></span>)}</div>}
         {data.inconnus.length > 0 && <div style={{ fontSize: 12.5, color: ROUGE }}>Dans le planning Combo mais sans fiche employé ici (jours non comptés) : {data.inconnus.join(", ")}.</div>}
         <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 14, padding: "4px 12px", overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 560 }}>
@@ -182,6 +194,13 @@ export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: 
             <input inputMode="decimal" placeholder="Montant (−400 = déduction)" value={nouveau.montant} onChange={(e) => setNouveau((n) => ({ ...n, montant: e.target.value }))} style={{ ...input, width: 200 }} />
             <input placeholder="Motif : acompte, report de juillet…" value={nouveau.motif} onChange={(e) => setNouveau((n) => ({ ...n, motif: e.target.value }))} style={{ ...input, flex: "1 1 200px" }} />
             <button type="button" onClick={() => void ajouter()} style={{ ...btn, background: ACCENT, borderColor: ACCENT, color: "#fff" }}>Ajouter</button>
+          </div>
+          <div style={{ fontWeight: 700, marginTop: 6 }}>Compléter le pot carte</div>
+          <div style={{ fontSize: 12.5, color: MUTED, marginTop: -6 }}>Pour les jours sans clôture dans l&apos;app : le rapport du personnel du TPE donne le total des pourboires du mois, tu ajoutes la différence.</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <input inputMode="decimal" placeholder="Montant" value={complement.montant} onChange={(e) => setComplement((n) => ({ ...n, montant: e.target.value }))} style={{ ...input, width: 140 }} />
+            <input placeholder="Motif : rapport TPE du 1er au 11…" value={complement.motif} onChange={(e) => setComplement((n) => ({ ...n, motif: e.target.value }))} style={{ ...input, flex: "1 1 200px" }} />
+            <button type="button" onClick={() => void ajouterComplement()} style={btn}>Ajouter au pot</button>
           </div>
           {envoi && <div style={{ fontSize: 12.5, color: envoi.startsWith("Enregistrement") ? MUTED : ROUGE }}>{envoi}</div>}
         </div>

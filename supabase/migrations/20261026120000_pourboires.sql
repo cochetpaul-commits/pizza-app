@@ -15,3 +15,5 @@ create index if not exists pourboires_ajustements_mois on pourboires_ajustements
 alter table pourboires_ajustements enable row level security;
 alter table pourboires_ajustements add column if not exists type text not null default 'montant';
 comment on column pourboires_ajustements.type is 'montant : ajustement en euros ; exclu : la personne ne compte pas ce mois (ni ses jours, ni de part)';
+-- Complément du pot (27/10) : pourboires carte des jours sans clôture dans l'app (rapport TPE), employe_id null
+alter table pourboires_ajustements alter column employe_id drop not null;
