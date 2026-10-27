@@ -25,6 +25,7 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/fiche":         "operations.recettes",
   "/catalogue":     "operations.recettes",
   "/carte":         "operations.recettes",
+  "/cave":          "operations.recettes",
   "/recipes":       "operations.recettes",
   "/kitchen":       "operations.recettes",
   "/pizzas":        "operations.recettes",

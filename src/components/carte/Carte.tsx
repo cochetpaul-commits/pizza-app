@@ -232,6 +232,44 @@ function PanneauDose({ article, onFait }: { article: ArticleCarte; onFait: () =>
   );
 }
 
+/* ── Vins conseillés (cave) ──────────────────────────────────────────────── */
+type VinPlat = { id: string; nom: string; couleur: string; pitch: string | null; prix: { b?: number; v?: number; d?: number } | null; stock: number | null; raison: string | null };
+const COULEUR_VIN: Record<string, string> = { rouge: "#8a2f3a", blanc: "#c9a84c", rose: "#e09a9a", bulles: "#8aa8b8", doux: "#b7791f", champagne: "#8aa8b8" };
+function VinsPourPlat({ nom, categorie }: { nom: string; categorie: string }) {
+  const router = useRouter();
+  const [vins, setVins] = useState<VinPlat[] | null>(null);
+  const concerne = ["ANTIPASTI", "PIZZE", "CUCINA", "DOLCI"].includes(categorie);
+  useEffect(() => {
+    let annule = false;
+    if (!concerne) return;
+    (async () => {
+      try {
+        const r = await fetchApi(`/api/cave?plat=${encodeURIComponent(nom.trim())}`);
+        const j = await r.json().catch(() => null);
+        if (!annule) setVins(r.ok ? (j?.vins ?? []) : []);
+      } catch { if (!annule) setVins([]); }
+    })();
+    return () => { annule = true; };
+  }, [nom, concerne]);
+  if (!concerne || !vins || vins.length === 0) return null;
+  return (
+    <>
+      <Titre>Vins conseillés</Titre>
+      <div style={{ display: "grid", gap: 6 }}>
+        {vins.slice(0, 3).map((v) => (
+          <button key={v.id} type="button" onClick={() => router.push("/cave?vue=cave")} style={{ textAlign: "left", border: `1px solid ${BORD}`, borderRadius: 12, background: "#fff", padding: "8px 12px", cursor: "pointer", font: "inherit", color: "#1a1a1a" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <span style={{ fontWeight: 700 }}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: COULEUR_VIN[v.couleur] ?? MUTED, marginRight: 6 }} />{v.nom}</span>
+              <span style={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap" }}>{v.prix?.v != null ? `${v.prix.v} € verre · ` : ""}{v.prix?.b != null ? `${v.prix.b} € btl` : ""}</span>
+            </div>
+            {(v.raison || v.pitch) && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 2 }}>{v.raison ?? v.pitch}</div>}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
 /* ── Volet de lecture ─────────────────────────────────────────────────────── */
 
 const Titre = ({ children }: { children: ReactNode }) => <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: MUTED, marginTop: 8, paddingTop: 14, borderTop: `1px solid ${BORD}` }}>{children}</div>;
@@ -276,6 +314,7 @@ function VoletArticle({ article, peutEcrire, periode, onFermer, onRecharger, rel
           <Kpi l="Marge produit HT" val={article.marge_ht != null ? euros(article.marge_ht) : "—"} s={coeff != null ? `coefficient ${coeff.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}` : "coût inconnu"} />
           <Kpi l="Food cost (HT)" val={article.food_cost != null ? pct(article.food_cost) : "—"} s={v ? `${v.libelle}${v.libelle === "À vérifier" ? " · la fiche semble fausse" : " · coût / prix HT"}` : "coût / prix HT"} couleur={v?.couleur} />
         </div>
+        <VinsPourPlat nom={article.nom} categorie={article.categorie} />
 
         {peutEcrire && (
           <>

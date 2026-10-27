@@ -88,6 +88,7 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     { kind: "divider", label: "Exploitation" },
     { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
     { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
+    ...(piccola ? [] : [{ kind: "page", label: "Cave", href: "/cave", icon: "tag", permission: "operations.recettes" } as NavEntry]),
     // Clôture de caisse : Bello Mio seulement pour l'instant (Popina + TPE Flatpay)
     ...(piccola ? [] : [{ kind: "page", label: "Clôture", href: "/cloture", icon: "calculator", permission: "caisse.cloture" } as NavEntry]),
     // Le stock vit dans la Base produits depuis le 10/10/2026 ; l'inventaire le remet à niveau
@@ -115,6 +116,7 @@ export const NAV_EQUIPIER: NavEntry[] = [
   { kind: "divider", label: "Exploitation" },
   { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
   { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
+  { kind: "page", label: "Cave", href: "/cave", icon: "tag", permission: "operations.recettes" },
   { kind: "page", label: "Clôture", href: "/cloture", icon: "calculator", permission: "caisse.cloture" },
   { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },
   { kind: "page", label: "Fournisseurs", href: "/fournisseurs", icon: "truck", permission: "achats.edit" },

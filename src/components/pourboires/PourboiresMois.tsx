@@ -72,7 +72,8 @@ export function MesPourboires() {
           <div><div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 24 }}>{jours(moi.jours)}<span style={{ fontSize: 14, color: MUTED }}> / {jours(data.total_jours)}</span></div><div style={{ fontSize: 12, color: MUTED }}>mes jours comptés / l&apos;équipe · {eur(data.valeur_jour)} le jour</div></div>
         </>) : <div style={{ fontSize: 13, color: MUTED, alignSelf: "center" }}>Pas encore de jour compté pour toi ce mois-ci.</div>}
       </div>
-      <div style={{ fontSize: 11.5, color: MUTED, marginTop: 8, lineHeight: 1.4 }}>Part = pot ÷ jours de l&apos;équipe × tes jours. Un seul service dans la journée compte 0,5. Le montant final est celui de la fin du mois, versé avec la paie.</div>
+      <div style={{ fontSize: 11.5, color: MUTED, marginTop: 8, lineHeight: 1.4 }}>Part = pot ÷ jours de l&apos;équipe × tes jours. Un seul service dans la journée compte 0,5. Le montant final est celui de la fin du mois, versé avec la paie.
+        {data.direction && <> <a href="/rh/pourboires" style={{ color: ACCENT, fontWeight: 700 }}>Voir la répartition de toute l&apos;équipe →</a></>}</div>
     </div>
   );
 }
