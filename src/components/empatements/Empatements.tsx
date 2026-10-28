@@ -142,23 +142,29 @@ function CarteEmpatement({ recette: r, onReglages }: { recette: Recette; onRegla
 
       {resultat && (
         <div style={{ display: "grid", gap: 10 }}>
-          {resultat.phases.map((ph, i) => (
-            <div key={ph.name} style={{ border: "1px solid #ddd6c8", borderRadius: 12, overflow: "hidden" }}>
-              {resultat.phases.length > 1 && (
-                <div style={{ background: "#f2ede4", padding: "8px 14px", fontFamily: TITRE, fontWeight: 700, fontSize: 15, color: "#D4775A", textTransform: "uppercase", letterSpacing: ".04em" }}>
-                  {nomPhase(ph, r.type, i)}
-                </div>
-              )}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
-                {mix.map((f) => <Pesee key={f.name} libelle={nomFarine(f.name)} grammes={ph.flour_g * f.percent / 100} />)}
+          {/* Les farines se pré-mélangent : une seule pesée de farine par phase (28/10), le détail du mélange en note */}
+          {mix.length > 1 && (
+            <div style={{ fontSize: 13, color: "#8a8378" }}>
+              Mélange de farines du jour : {mix.map((f) => `${g(resultat.flour_total_g * f.percent / 100)} ${nomFarine(f.name)}`).join(" + ")}, soit {kg(resultat.flour_total_g)}.
+            </div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: resultat.phases.length > 1 ? "repeat(auto-fit, minmax(260px, 1fr))" : "1fr", gap: 10 }}>
+            {resultat.phases.map((ph, i) => (
+              <div key={ph.name} style={{ border: "1px solid #ddd6c8", borderRadius: 12, overflow: "hidden", minWidth: 0 }}>
+                {resultat.phases.length > 1 && (
+                  <div style={{ background: "#f2ede4", padding: "8px 14px", fontFamily: TITRE, fontWeight: 700, fontSize: 15, color: "#D4775A", textTransform: "uppercase", letterSpacing: ".04em" }}>
+                    {nomPhase(ph, r.type, i)}
+                  </div>
+                )}
+                <Pesee libelle={mix.length > 1 ? "Farine (mélange)" : nomFarine(mix[0].name)} grammes={ph.flour_g} />
                 <Pesee libelle="Eau" grammes={ph.water_g} />
                 {ph.yeast_g > 0 && <Pesee libelle="Levure" grammes={ph.yeast_g} precis />}
                 {ph.salt_g > 0 && <Pesee libelle="Sel" grammes={ph.salt_g} />}
                 {ph.honey_g > 0 && <Pesee libelle="Miel" grammes={ph.honey_g} />}
                 {ph.oil_g > 0 && <Pesee libelle="Huile" grammes={ph.oil_g} />}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
           {resultat.warnings.map((w) => <div key={w} style={{ fontSize: 13, color: "#b7791f" }}>{w}</div>)}
         </div>
       )}
@@ -183,9 +189,9 @@ function CarteEmpatement({ recette: r, onReglages }: { recette: Recette; onRegla
 function Pesee({ libelle, grammes, precis }: { libelle: string; grammes: number; precis?: boolean }) {
   const txt = precis && grammes < 100 ? `${(Math.round(grammes * 10) / 10).toLocaleString("fr-FR")} g` : g(grammes);
   return (
-    <div style={{ padding: "10px 14px", borderTop: "1px solid #f2ede4", minWidth: 0 }}>
-      <div style={{ fontSize: 12, color: "#8a8378", textTransform: "uppercase", letterSpacing: ".05em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={libelle}>{libelle}</div>
-      <div style={{ fontFamily: TITRE, fontWeight: 700, fontSize: 28, color: "#1a1a1a", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{txt}</div>
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "9px 14px", borderTop: "1px solid #f2ede4" }}>
+      <span style={{ fontSize: 15, color: "#1a1a1a", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{libelle}</span>
+      <span style={{ fontFamily: TITRE, fontWeight: 700, fontSize: 28, color: "#1a1a1a", lineHeight: 1.1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{txt}</span>
     </div>
   );
 }
