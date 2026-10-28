@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
+import { useBureau } from "@/hooks/useBureau";
 import { calculerPate, type EmpatementType, type FlourMixItem, type Phase } from "@/lib/pateEngine";
 
 /**
@@ -43,6 +44,7 @@ function nomPhase(ph: Phase, type: EmpatementType, i: number) {
 export function Empatements() {
   const router = useRouter();
   const { current: etab } = useEtablissement();
+  const bureau = useBureau();
   const [recettes, setRecettes] = useState<Recette[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -73,7 +75,7 @@ export function Empatements() {
   }, [etab?.slug]);
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 0 40px" }}>
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px" }}>
       <h1 style={{ fontFamily: TITRE, fontWeight: 700, fontSize: 30, color: "#1a1a1a", margin: "8px 0 2px", textTransform: "uppercase", letterSpacing: ".01em" }}>Empâtements</h1>
       <p style={{ color: "#8a8378", margin: "0 0 16px", fontSize: 14 }}>Réglez le nombre de pâtons, la recette se recalcule au gramme.</p>
       {erreur && <div style={{ color: "#b3261e", padding: 12 }}>Chargement impossible : {erreur}</div>}
@@ -211,7 +213,7 @@ function Compteur({ libelle, valeur, onChange, pas, grandPas, couleur }: { libel
   return (
     <div style={{ display: "grid", gap: 6, justifyItems: "center" }}>
       <span style={{ fontSize: 12, color: "#8a8378", textTransform: "uppercase", letterSpacing: ".08em" }}>{libelle}</span>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", justifyContent: "center" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", justifyContent: "center", flexWrap: "wrap" }}>
         <BoutonRond onClick={() => regler(-grandPas)} taille={44} couleur={couleur} label={`−${grandPas}`} aria={`Moins ${grandPas}`} clair />
         <BoutonRond onClick={() => regler(-pas)} taille={54} couleur={couleur} label="−" aria="Moins un" />
         <input
@@ -219,7 +221,7 @@ function Compteur({ libelle, valeur, onChange, pas, grandPas, couleur }: { libel
           onChange={(e) => onChange(e.target.value === "" ? "" : Math.max(0, Math.floor(Number(e.target.value))))}
           onFocus={(e) => e.target.select()}
           aria-label={libelle}
-          style={{ width: 110, textAlign: "center", fontFamily: TITRE, fontWeight: 700, fontSize: 42, color: "#1a1a1a", border: "none", borderBottom: "2px solid #ddd6c8", background: "transparent", outline: "none", padding: "0 4px", fontVariantNumeric: "tabular-nums", MozAppearance: "textfield" }}
+          style={{ width: 96, textAlign: "center", fontFamily: TITRE, fontWeight: 700, fontSize: 40, color: "#1a1a1a", border: "none", borderBottom: "2px solid #ddd6c8", background: "transparent", outline: "none", padding: "0 4px", fontVariantNumeric: "tabular-nums", MozAppearance: "textfield" }}
         />
         <BoutonRond onClick={() => regler(pas)} taille={54} couleur={couleur} label="+" aria="Plus un" />
         <BoutonRond onClick={() => regler(grandPas)} taille={44} couleur={couleur} label={`+${grandPas}`} aria={`Plus ${grandPas}`} clair />
@@ -231,7 +233,7 @@ function Compteur({ libelle, valeur, onChange, pas, grandPas, couleur }: { libel
 function BoutonRond({ onClick, taille, couleur, label, aria, clair }: { onClick: () => void; taille: number; couleur: string; label: string; aria: string; clair?: boolean }) {
   return (
     <button type="button" onClick={onClick} aria-label={aria} style={{
-      width: taille, height: taille, borderRadius: "50%", flexShrink: 0, cursor: "pointer", fontFamily: TITRE, fontWeight: 700,
+      width: taille, height: taille, borderRadius: 999, flexShrink: 0, cursor: "pointer", fontFamily: TITRE, fontWeight: 700, appearance: "none", WebkitAppearance: "none", padding: 0,
       fontSize: clair ? 14 : Math.round(taille * 0.5), lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center",
       border: `2px solid ${couleur}`, background: clair ? "transparent" : couleur, color: clair ? couleur : "#fff", touchAction: "manipulation",
     }}>{label}</button>
