@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTopBar } from "@/components/layout/TopBarContext";
 import { supabase } from "@/lib/supabaseClient";
 import { MenuLateral } from "./MenuLateral";
+import { BottomSheet } from "./BottomSheet";
 
 /* ── Helpers ────────────────────────────────────── */
 
@@ -273,36 +274,72 @@ function UserAvatar() {
 /* ── Sub: Sélecteur d'entreprise (Bello Mio / Piccola Mia / Groupe) ── */
 
 function EtabPill() {
-  const { current, etablissements, isGroupView, isGroupAdmin } = useEtablissement();
+  const { current, etablissements, isGroupView, isGroupAdmin, setCurrent, setGroupView } = useEtablissement();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [ouvert, setOuvert] = useState(false);
   const canSwitch = isGroupAdmin || etablissements.length > 1;
   const label = isGroupView ? "iFratelli Group" : (current?.nom ?? "Entreprise");
   const color = isGroupView ? "#b45f57" : (current?.couleur ?? "#b45f57");
-  // Le choix d'entreprise se fait dans le menu latéral (bouton d'établissement en tête)
-  const open = () => { if (canSwitch) window.dispatchEvent(new Event("open-menu-lateral")); };
-  return (
-    <button
-      type="button"
-      onClick={open}
-      aria-label="Changer d'entreprise"
-      disabled={!canSwitch}
-      style={{
-        display: "inline-flex", alignItems: "center", gap: 6,
-        maxWidth: 170, height: 34, padding: "0 10px 0 12px",
-        borderRadius: 17, border: `1px solid ${color}33`,
-        background: `${color}12`, color,
-        cursor: canSwitch ? "pointer" : "default",
-        fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-        fontSize: 13, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase",
-        flexShrink: 0,
-      }}
-    >
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-      {canSwitch && (
-        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      )}
+  // Le choix se fait ici, en un geste (28/10 : il fallait ouvrir le menu, déplier le groupe, puis choisir).
+  const choisirEtab = (e: (typeof etablissements)[number]) => {
+    setOuvert(false);
+    const depuisGroupe = isGroupView || pathname === "/dashboard" || pathname === "/groupe";
+    setGroupView(false);
+    setCurrent(e);
+    if (depuisGroupe) router.push(e.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio");
+  };
+  const choisirGroupe = () => { setOuvert(false); setGroupView(true); router.push("/dashboard"); };
+  const ligne = (actif: boolean, couleur: string, texte: string, onClick: () => void) => (
+    <button type="button" role="option" aria-selected={actif} onClick={onClick} key={texte} style={{
+      display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 10px", border: "none", borderRadius: 12,
+      background: actif ? "rgba(0,0,0,0.05)" : "transparent", color: "#1a1a1a", cursor: "pointer", textAlign: "left",
+      fontFamily: "inherit", fontSize: 16, fontWeight: actif ? 700 : 500,
+    }}>
+      <span style={{ width: 12, height: 12, borderRadius: "50%", background: couleur, flexShrink: 0 }} />
+      <span style={{ flex: 1 }}>{texte}</span>
+      {actif && <span style={{ color: couleur, fontSize: 13, fontWeight: 600 }}>actuel</span>}
     </button>
+  );
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => { if (canSwitch) setOuvert(true); }}
+        aria-label="Changer d'entreprise"
+        aria-haspopup="listbox"
+        aria-expanded={ouvert}
+        disabled={!canSwitch}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          maxWidth: 170, height: 34, padding: "0 10px 0 12px",
+          borderRadius: 17, border: `1px solid ${color}33`,
+          background: `${color}12`, color,
+          cursor: canSwitch ? "pointer" : "default",
+          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
+          fontSize: 13, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase",
+          flexShrink: 0,
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+        {canSwitch && (
+          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        )}
+      </button>
+      <BottomSheet open={ouvert} onClose={() => setOuvert(false)} title="Entreprise">
+        <div role="listbox" aria-label="Entreprise" style={{ display: "grid", gap: 2, padding: "4px 0 8px" }}>
+          {etablissements.map((e) => ligne(!isGroupView && current?.id === e.id, e.couleur ?? "#b45f57", e.nom, () => choisirEtab(e)))}
+          {isGroupAdmin && (
+            <>
+              <div style={{ height: 1, background: "rgba(0,0,0,0.08)", margin: "6px 10px" }} />
+              {ligne(isGroupView, "#b45f57", "iFratelli Group", choisirGroupe)}
+            </>
+          )}
+        </div>
+      </BottomSheet>
+    </>
   );
 }
 

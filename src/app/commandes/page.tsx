@@ -1145,13 +1145,36 @@ function CommandesPage() {
   // ── Pause: quit the current draft without deleting it ───────────────
   // The brouillon stays in DB; user can resume later via the supplier drawer.
 
+  // Relit les commandes en cours (brouillons et en attente). La liste et les tuiles de l'accueil
+  // n'étaient chargées qu'à l'ouverture de la page : après « Mettre en pause », le brouillon créé
+  // n'apparaissait pas (vécu 28/10 : brouillon Maël, tuile « Brouillons 0 », visible seulement par l'équipe).
+  const rechargerActives = useCallback(async () => {
+    if (!etab?.id) return;
+    const { data: actives } = await supabase
+      .from("commande_sessions")
+      .select("id, supplier_id, type, status, created_at, total_ht, commande_lignes(count)")
+      .eq("etablissement_id", etab.id)
+      .in("status", ["brouillon", "en_attente"])
+      .order("created_at", { ascending: false });
+    type Ligne = { id: string; supplier_id: string; type?: string; status: string; created_at: string; total_ht: number; commande_lignes: { count: number }[] };
+    const rows = ((actives ?? []) as Ligne[]).filter((a) => (a.commande_lignes?.[0]?.count ?? 0) > 0);
+    const canonique = (id: string) => suppliers.find((s) => s.id === id || supplierAliases.get(s.id)?.has(id));
+    setActiveSessions(rows.map((a) => ({
+      id: a.id, supplier_id: a.supplier_id,
+      supplier_name: `${canonique(a.supplier_id)?.name ?? "Fournisseur"}${a.type === "precommande" ? " — précommande" : ""}`,
+      status: a.status, created_at: a.created_at, nb_articles: a.commande_lignes?.[0]?.count ?? 0, total_ht: a.total_ht ?? 0,
+    })));
+    setDraftSupplierIds(new Set(rows.filter((a) => a.status === "brouillon").map((a) => canonique(a.supplier_id)?.id ?? a.supplier_id)));
+  }, [etab?.id, suppliers, supplierAliases]);
+
   function pauseSession() {
     setSession(null);
     setSelectedSupplierId(null);
     setQuantities({});
     setNotes("");
-    setConfirmation("Commande mise en pause");
-    setTimeout(() => setConfirmation(null), 3000);
+    setConfirmation("Brouillon enregistré, à reprendre dans la liste");
+    setTimeout(() => setConfirmation(null), 4000);
+    void rechargerActives();
   }
 
   // ── Delete session ──────────────────────────────────────────────────
@@ -2018,7 +2041,7 @@ function CommandesPage() {
           {barreVisible && session && (
             <MenuCommande actions={[
               { label: "Aperçu PDF", onClick: () => downloadPdf(session.id) },
-              { label: "Mettre en pause", onClick: () => pauseSession() },
+              { label: "Garder en brouillon", onClick: () => pauseSession() },
               ...(nbArticlesBarre > 0 && peutEnvoyer(session.supplier_id ?? currentSupplier?.id) ? [{ label: "Valider sans envoyer", onClick: () => validerSession(session.id), disabled: saving }] : []),
               { label: "Supprimer le brouillon", onClick: () => deleteSession(), danger: true, disabled: saving },
             ]} />

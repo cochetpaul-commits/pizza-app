@@ -119,12 +119,9 @@ export function EtablissementProvider({ children }: { children: ReactNode }) {
         setCurrentRaw(picked);
         setGroupViewRaw(false);
         if (picked && picked.id !== savedId) localStorage.setItem(LS_KEY, picked.id);
-      } else if (groupAdmin) {
-        // Default: group view for admins
-        setGroupViewRaw(true);
-        setCurrentRaw(null);
       } else {
-        // Default: first accessible establishment
+        // Default: first accessible establishment, admins included (28/10 : on arrivait sur la
+        // vue groupe à la première connexion, puis trois gestes pour rejoindre son restaurant).
         const first = accessible[0] ?? null;
         setCurrentRaw(first);
         setGroupViewRaw(false);
