@@ -8,7 +8,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useTopBar } from "@/components/layout/TopBarContext";
 import { supabase } from "@/lib/supabaseClient";
 import { MenuLateral } from "./MenuLateral";
-import { BottomSheet } from "./BottomSheet";
+import { createPortal } from "react-dom";
 
 /* ── Helpers ────────────────────────────────────── */
 
@@ -292,7 +292,7 @@ function EtabPill() {
   const choisirGroupe = () => { setOuvert(false); setGroupView(true); router.push("/dashboard"); };
   const ligne = (actif: boolean, couleur: string, texte: string, onClick: () => void) => (
     <button type="button" role="option" aria-selected={actif} onClick={onClick} key={texte} style={{
-      display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 10px", border: "none", borderRadius: 12,
+      display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "12px 10px", border: "none", borderRadius: 10,
       background: actif ? "rgba(0,0,0,0.05)" : "transparent", color: "#1a1a1a", cursor: "pointer", textAlign: "left",
       fontFamily: "inherit", fontSize: 16, fontWeight: actif ? 700 : 500,
     }}>
@@ -328,17 +328,26 @@ function EtabPill() {
           </svg>
         )}
       </button>
-      <BottomSheet open={ouvert} onClose={() => setOuvert(false)} title="Entreprise">
-        <div role="listbox" aria-label="Entreprise" style={{ display: "grid", gap: 2, padding: "4px 0 8px" }}>
-          {etablissements.map((e) => ligne(!isGroupView && current?.id === e.id, e.couleur ?? "#b45f57", e.nom, () => choisirEtab(e)))}
-          {isGroupAdmin && (
-            <>
-              <div style={{ height: 1, background: "rgba(0,0,0,0.08)", margin: "6px 10px" }} />
-              {ligne(isGroupView, "#b45f57", "iFratelli Group", choisirGroupe)}
-            </>
-          )}
-        </div>
-      </BottomSheet>
+      {ouvert && createPortal(
+        // Rendu dans le body : le bandeau a un flou de fond, ce qui piège tout élément fixé à l'intérieur
+        // (28/10 : la feuille s'ouvrait dans les 52 px du bandeau, invisible).
+        <>
+          <div onClick={() => setOuvert(false)} style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(26,26,26,0.25)" }} />
+          <div role="listbox" aria-label="Entreprise" style={{
+            position: "fixed", zIndex: 301, left: 12, top: "calc(env(safe-area-inset-top, 0px) + 58px)", width: "min(300px, calc(100vw - 24px))",
+            background: "#fff", borderRadius: 14, boxShadow: "0 12px 40px rgba(0,0,0,0.22)", padding: 6, display: "grid", gap: 2,
+          }}>
+            {etablissements.map((e) => ligne(!isGroupView && current?.id === e.id, e.couleur ?? "#b45f57", e.nom, () => choisirEtab(e)))}
+            {isGroupAdmin && (
+              <>
+                <div style={{ height: 1, background: "rgba(0,0,0,0.08)", margin: "4px 10px" }} />
+                {ligne(isGroupView, "#b45f57", "iFratelli Group", choisirGroupe)}
+              </>
+            )}
+          </div>
+        </>,
+        document.body,
+      )}
     </>
   );
 }

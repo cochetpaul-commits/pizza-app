@@ -97,6 +97,8 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     { kind: "divider", label: "Exploitation" },
     { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
     { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
+    // Les pâtons et la focaccia de tous les jours (28/10) : un geste au lieu de Carte > Préparations > Empâtements > fiche
+    { kind: "page", label: "Empâtements", href: "/empatements", icon: "chefHat", permission: "operations.recettes" },
     ...(piccola ? [] : [{ kind: "page", label: "Cave", href: "/cave", icon: "tag", permission: "operations.recettes" } as NavEntry]),
     // Clôture de caisse : Bello Mio seulement pour l'instant (Popina + TPE Flatpay)
     ...(piccola ? [] : [{ kind: "page", label: "Clôture", href: "/cloture", icon: "calculator", permission: "caisse.cloture" } as NavEntry]),
@@ -126,6 +128,7 @@ export const NAV_EQUIPIER: NavEntry[] = [
   { kind: "divider", label: "Exploitation" },
   { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
   { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
+  { kind: "page", label: "Empâtements", href: "/empatements", icon: "chefHat", permission: "operations.recettes" },
   { kind: "page", label: "Cave", href: "/cave", icon: "tag", permission: "operations.recettes" },
   { kind: "page", label: "Clôture", href: "/cloture", icon: "calculator", permission: "caisse.cloture" },
   { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },
