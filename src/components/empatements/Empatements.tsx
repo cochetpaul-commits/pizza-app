@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
-import { StepperInput } from "@/components/StepperInput";
 import { calculerPate, type EmpatementType, type FlourMixItem, type Phase } from "@/lib/pateEngine";
 
 /**
@@ -109,36 +108,54 @@ function CarteEmpatement({ recette: r, onReglages }: { recette: Recette; onRegla
 
   const mix = r.flour_mix.length ? r.flour_mix : [{ name: "Farine", percent: 100 }];
   const typeLabel = r.type === "biga" ? "Biga" : r.type === "focaccia" ? "Focaccia" : "Direct";
+  const couleur = r.type === "biga" ? "#b8601f" : r.type === "focaccia" ? "#8a6a3a" : "#4a6741";
+  const params = [
+    `Hydratation ${r.hydration_total.toLocaleString("fr-FR")} %`, `Sel ${r.salt_percent.toLocaleString("fr-FR")} %`,
+    ...(r.honey_percent > 0 ? [`Miel ${r.honey_percent.toLocaleString("fr-FR")} %`] : []),
+    ...(r.oil_percent > 0 ? [`Huile ${r.oil_percent.toLocaleString("fr-FR")} %`] : []),
+    ...(r.type === "biga" ? [`Levure biga ${r.biga_yeast_percent.toLocaleString("fr-FR")} %`] : [`Levure ${r.yeast_percent.toLocaleString("fr-FR")} %`]),
+  ];
+  const pasPoids = r.ball_weight >= 1000 ? 50 : 2;
 
   return (
-    <section style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 16, padding: 16, display: "grid", gap: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-        <div>
-          <div style={{ fontFamily: TITRE, fontWeight: 700, fontSize: 24, color: "#1a1a1a", textTransform: "uppercase", lineHeight: 1.1 }}>{r.name}</div>
-          <div style={{ fontSize: 13, color: "#8a8378", marginTop: 2 }}>
-            {typeLabel} · hydratation {r.hydration_total.toLocaleString("fr-FR")} % · sel {r.salt_percent.toLocaleString("fr-FR")} %
-            {r.honey_percent > 0 ? ` · miel ${r.honey_percent.toLocaleString("fr-FR")} %` : ""}{r.oil_percent > 0 ? ` · huile ${r.oil_percent.toLocaleString("fr-FR")} %` : ""}
+    <section style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 16, overflow: "hidden", display: "grid" }}>
+      {/* Bandeau : nom, type, paramètres ; les réglages en haut à droite */}
+      <div style={{ background: couleur, color: "#fff", padding: "14px 16px 16px", display: "grid", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", opacity: 0.8 }}>Empâtement · {typeLabel}</div>
+            <div style={{ fontFamily: TITRE, fontWeight: 700, fontSize: 30, lineHeight: 1.05, textTransform: "uppercase", letterSpacing: ".01em", marginTop: 2 }}>{r.name}</div>
           </div>
+          <button type="button" onClick={onReglages} aria-label="Réglages de la recette" title="Réglages de la recette" style={{
+            flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.14)",
+            color: "#fff", borderRadius: 20, padding: "6px 12px", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+          }}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
+            Réglages
+          </button>
         </div>
-        <button type="button" onClick={onReglages} style={{ border: "1px solid #ddd6c8", background: "transparent", color: "#8a8378", borderRadius: 20, padding: "6px 14px", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-          Réglages de la recette
-        </button>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {params.map((t) => <span key={t} style={{ fontSize: 12, padding: "3px 9px", borderRadius: 8, background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.25)" }}>{t}</span>)}
+        </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, alignItems: "end" }}>
-        <label style={{ display: "grid", gap: 6, fontSize: 13, color: "#8a8378" }}>
-          Pâtons
-          <StepperInput value={patons} onChange={setPatons} step={1} min={1} placeholder={String(r.balls_count)} />
-        </label>
-        <label style={{ display: "grid", gap: 6, fontSize: 13, color: "#8a8378" }}>
-          Poids d&apos;un pâton (g)
-          <StepperInput value={poids} onChange={setPoids} step={r.ball_weight >= 1000 ? 50 : 2} min={1} placeholder={String(r.ball_weight)} />
-        </label>
-        <div style={{ display: "grid", gap: 2, fontSize: 13, color: "#8a8378" }}>
-          Pâte totale
-          <div style={{ fontFamily: TITRE, fontWeight: 700, fontSize: 26, color: "#1a1a1a", lineHeight: 1.1 }}>{resultat ? kg(resultat.summary.total_dough_g) : "—"}</div>
+      <div style={{ padding: 16, display: "grid", gap: 14 }}>
+        {/* Le réglage du jour : les pâtons, en gros, avec ±1 et ±10 */}
+        <Compteur libelle="Pâtons" valeur={patons} onChange={setPatons} pas={1} grandPas={10} couleur={couleur} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ background: "#f7f3ec", borderRadius: 12, padding: "10px 12px", display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "#8a8378", textTransform: "uppercase", letterSpacing: ".05em" }}>Poids d&apos;un pâton</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <BoutonRond onClick={() => setPoids(Math.max(1, (Number(poids) || r.ball_weight) - pasPoids))} taille={34} couleur={couleur} label="−" aria="Moins" />
+              <span style={{ fontFamily: TITRE, fontWeight: 700, fontSize: Number(poids) >= 1000 ? 20 : 24, color: "#1a1a1a", flex: 1, textAlign: "center", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", minWidth: 0 }}>{poids ? `${Number(poids).toLocaleString("fr-FR")} g` : "—"}</span>
+              <BoutonRond onClick={() => setPoids((Number(poids) || r.ball_weight) + pasPoids)} taille={34} couleur={couleur} label="+" aria="Plus" />
+            </div>
+          </div>
+          <div style={{ background: "#f7f3ec", borderRadius: 12, padding: "10px 12px", display: "grid", gap: 6, alignContent: "start" }}>
+            <span style={{ fontSize: 12, color: "#8a8378", textTransform: "uppercase", letterSpacing: ".05em" }}>Pâte totale</span>
+            <span style={{ fontFamily: TITRE, fontWeight: 700, fontSize: 24, color: "#1a1a1a", lineHeight: "34px" }}>{resultat ? kg(resultat.summary.total_dough_g) : "—"}</span>
+          </div>
         </div>
-      </div>
 
       {resultat && (
         <div style={{ display: "grid", gap: 10 }}>
@@ -182,7 +199,42 @@ function CarteEmpatement({ recette: r, onReglages }: { recette: Recette; onRegla
           )}
         </div>
       )}
+      </div>
     </section>
+  );
+}
+
+/** Gros compteur : ±1 et ±10 en boutons ronds, le chiffre saisissable au centre */
+function Compteur({ libelle, valeur, onChange, pas, grandPas, couleur }: { libelle: string; valeur: number | ""; onChange: (v: number | "") => void; pas: number; grandPas: number; couleur: string }) {
+  const v = Number(valeur) || 0;
+  const regler = (d: number) => onChange(Math.max(1, v + d));
+  return (
+    <div style={{ display: "grid", gap: 6, justifyItems: "center" }}>
+      <span style={{ fontSize: 12, color: "#8a8378", textTransform: "uppercase", letterSpacing: ".08em" }}>{libelle}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", justifyContent: "center" }}>
+        <BoutonRond onClick={() => regler(-grandPas)} taille={44} couleur={couleur} label={`−${grandPas}`} aria={`Moins ${grandPas}`} clair />
+        <BoutonRond onClick={() => regler(-pas)} taille={54} couleur={couleur} label="−" aria="Moins un" />
+        <input
+          type="number" inputMode="numeric" min={1} value={valeur}
+          onChange={(e) => onChange(e.target.value === "" ? "" : Math.max(0, Math.floor(Number(e.target.value))))}
+          onFocus={(e) => e.target.select()}
+          aria-label={libelle}
+          style={{ width: 110, textAlign: "center", fontFamily: TITRE, fontWeight: 700, fontSize: 42, color: "#1a1a1a", border: "none", borderBottom: "2px solid #ddd6c8", background: "transparent", outline: "none", padding: "0 4px", fontVariantNumeric: "tabular-nums", MozAppearance: "textfield" }}
+        />
+        <BoutonRond onClick={() => regler(pas)} taille={54} couleur={couleur} label="+" aria="Plus un" />
+        <BoutonRond onClick={() => regler(grandPas)} taille={44} couleur={couleur} label={`+${grandPas}`} aria={`Plus ${grandPas}`} clair />
+      </div>
+    </div>
+  );
+}
+
+function BoutonRond({ onClick, taille, couleur, label, aria, clair }: { onClick: () => void; taille: number; couleur: string; label: string; aria: string; clair?: boolean }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={aria} style={{
+      width: taille, height: taille, borderRadius: "50%", flexShrink: 0, cursor: "pointer", fontFamily: TITRE, fontWeight: 700,
+      fontSize: clair ? 14 : Math.round(taille * 0.5), lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center",
+      border: `2px solid ${couleur}`, background: clair ? "transparent" : couleur, color: clair ? couleur : "#fff", touchAction: "manipulation",
+    }}>{label}</button>
   );
 }
 
