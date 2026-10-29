@@ -11,7 +11,7 @@ import type { CSSProperties, ReactNode } from "react";
 export type ColonneMobile = { libelle?: ReactNode; largeur?: number | string; align?: "left" | "right" | "center" };
 
 const BORD = "#ddd6c8";
-export const TH_MOBILE: CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 10px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+export const TH_MOBILE: CSSProperties = { background: "#faf7f1", textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 10px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
 export function TableauMobile({ colonnes, enSection, sansCadre, entete = true, children, pied }: {
   colonnes: ColonneMobile[];

@@ -43,7 +43,7 @@ function Chip({ fond, couleur, children, title }: { fond: string; couleur: strin
   );
 }
 
-const TH: CSSProperties = { textAlign: "left", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: MUTED, padding: "10px 14px", borderBottom: `1px solid ${BORD}`, fontWeight: 700, whiteSpace: "nowrap" };
+const TH: CSSProperties = { background: "#faf7f1", textAlign: "left", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: MUTED, padding: "10px 14px", borderBottom: `1px solid ${BORD}`, fontWeight: 700, whiteSpace: "nowrap" };
 const TD: CSSProperties = { padding: "9px 14px", borderBottom: `1px solid #ece6db`, verticalAlign: "middle", fontSize: 13 };
 const BTN: CSSProperties = { height: 36, padding: "0 14px", borderRadius: 10, border: `1px solid ${BORD}`, background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a", whiteSpace: "nowrap" };
 const FILTRE: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 4, height: 36, padding: "0 6px 0 12px", borderRadius: 10, border: `1px solid ${BORD}`, background: "#fff", fontSize: 12.5, color: MUTED };

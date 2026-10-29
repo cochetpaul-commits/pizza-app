@@ -584,7 +584,7 @@ function Feuille() {
   };
 
   const tableau = (ls: Ligne[], couleur: string) => {
-    const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+    const TH: React.CSSProperties = { background: "#faf7f1", textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
     if (!large) return (
       <TableauMobile sansCadre colonnes={[{ libelle: "Produit" }, { libelle: "Comptage", align: "right", largeur: 150 }, { largeur: 34 }]}>
         {ls.map((l) => ligneMobile(l, couleur))}

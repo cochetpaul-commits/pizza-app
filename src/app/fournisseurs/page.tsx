@@ -1025,7 +1025,7 @@ export default function FournisseursPage() {
   }
 
   function tableauFournisseurs(liste: SupplierRow[]) {
-    const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+    const TH: React.CSSProperties = { background: "#faf7f1", textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
     return (
       <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, overflow: "hidden", overflowX: "auto", minWidth: 0 }}>
         <style>{`.fo-ligne:hover td{background:#f7f3ec} .fo-inline{display:none}

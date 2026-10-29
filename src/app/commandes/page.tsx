@@ -1526,7 +1526,7 @@ function CommandesPage() {
   }
 
   function tableauProduits(items: CatalogItem[], fav: boolean, couleur: string) {
-    const THL: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+    const THL: React.CSSProperties = { background: "#faf7f1", textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
     if (!large) return (
       <TableauMobile sansCadre colonnes={[{ libelle: "Produit" }, { libelle: "Quantité", align: "right", largeur: 128 }, { largeur: 34 }]}>
         {items.map((item) => renderLigneProduitMobile(item, fav, couleur))}

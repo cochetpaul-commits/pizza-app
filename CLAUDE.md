@@ -169,7 +169,7 @@ pastille, h1, INTERTITRE, CHAMP). Toute nouvelle page les utilise ; ne pas redé
   cliquables quand elles filtrent (bordure sombre active). Quatre par ligne sur bureau, deux sur téléphone.
 - **Cadres** : blanc, bord 1px BORD, rayon 14 (`CADRE`). Pas d'ombre, pas de bord 1,5 ou 2px, pas de fond coloré :
   un état se montre par un liseré 6px à gauche (`boxShadow: inset 6px 0 0 couleur`) et une pastille.
-- **Tableaux** : en-tête fin capitales (`TH`), cellules `TD`, première cellule = liseré 6px (`liseret(couleur)`)
+- **Tableaux** : en-tête fin capitales sur fond légèrement teinté #faf7f1 (`TH`), cellules `TD`, première cellule = liseré 6px (`liseret(couleur)`)
   à la couleur de la catégorie ou de l'état, survol #f7f3ec, clic sur la ligne. Téléphone : `TableauMobile`.
 - **Barres de catégorie** : `styleBarreCategorie` (dégradé plein, titre blanc Oswald, pastille blanche, chevron) ;
   le contenu s'accroche dessous dans un cadre aux coins du bas arrondis.

@@ -466,7 +466,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   }
 
   function tableau(articles: Article[], couleur: string = ACCENT) {
-    const TH: React.CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
+    const TH: React.CSSProperties = { background: "#faf7f1", textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "#a39d92", padding: "8px 14px", borderBottom: "1px solid #ddd6c8", fontWeight: 600, whiteSpace: "nowrap" };
     if (!large) return (
       <TableauMobile sansCadre colonnes={[{ libelle: "Produit" }, { libelle: "Quantité", align: "right", largeur: 132 }, { largeur: 30 }]}>
         {articles.map((a) => ligneMobile(a, couleur))}

@@ -87,7 +87,7 @@ export function Cadre({ titre, sous, droite, children, sansMarge }: { titre?: Re
   );
 }
 
-export const TH: CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: FAIBLE, padding: "8px 12px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
+export const TH: CSSProperties = { background: "#faf7f1", textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: FAIBLE, padding: "8px 12px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
 export const TD: CSSProperties = { padding: "9px 12px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13 };
 export const TDN: CSSProperties = { ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
 

@@ -36,7 +36,7 @@ const STATUTS: Record<string, { libelle: string; couleur: string }> = {
   publiee: { libelle: "Publiée", couleur: BON }, validee: { libelle: "Validée", couleur: "#2563EB" }, brouillon: { libelle: "Brouillon", couleur: ATTENTION },
 };
 
-const TH: CSSProperties = { textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: FAIBLE, padding: "8px 14px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
+const TH: CSSProperties = { background: "#faf7f1", textAlign: "left", fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: FAIBLE, padding: "8px 14px", borderBottom: `1px solid ${BORD}`, fontWeight: 600, whiteSpace: "nowrap" };
 const TD: CSSProperties = { padding: "10px 14px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13 };
 const SELECT: CSSProperties = { height: 36, padding: "0 10px", borderRadius: 10, border: `1px solid ${BORD}`, background: "#fff", fontSize: 12.5, fontFamily: "inherit", color: "#1a1a1a", cursor: "pointer" };
 const BTN: CSSProperties = { height: 36, padding: "0 14px", borderRadius: 10, border: `1px solid ${BORD}`, background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a", whiteSpace: "nowrap" };

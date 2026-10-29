@@ -21,7 +21,7 @@ export const OSWALD = "var(--font-oswald), Oswald, sans-serif";
 /** Cadre blanc d'un tableau ou d'une liste */
 export const CADRE: CSSProperties = { background: "#fff", border: `1px solid ${BORD}`, borderRadius: 14, overflow: "hidden" };
 /** En-tête de colonne */
-export const TH: CSSProperties = { textAlign: "left", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: MUTED, padding: "10px 14px", borderBottom: `1px solid ${BORD}`, fontWeight: 700, whiteSpace: "nowrap" };
+export const TH: CSSProperties = { background: "#faf7f1", textAlign: "left", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: MUTED, padding: "10px 14px", borderBottom: `1px solid ${BORD}`, fontWeight: 700, whiteSpace: "nowrap" };
 /** Cellule */
 export const TD: CSSProperties = { padding: "9px 14px", borderBottom: `1px solid ${BORD_LIGNE}`, verticalAlign: "middle", fontSize: 13 };
 /** Liseré de couleur à gauche d'une ligne (première cellule, largeur 6) */
