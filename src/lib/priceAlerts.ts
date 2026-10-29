@@ -41,7 +41,9 @@ async function parLots<T>(ids: string[], requete: (lot: string[]) => PromiseLike
 
 export async function fetchPriceAlerts(
   supabase: SupabaseClient,
-  userId: string,
+  // Catalogue unifié (29/10/2026) : les offres sont importées par plusieurs comptes (factures auto, direction),
+  // on ne filtre plus sur l'importateur, sinon la page Variations de prix ne voyait qu'une partie des offres
+  _userId: string,
   threshold = ALERT_THRESHOLD,
   since?: string, // ISO date string — only alerts where the active offer was created after this date
   _etabId?: string, // kept for API compat, no longer used (unified catalog)
@@ -49,7 +51,6 @@ export async function fetchPriceAlerts(
   let q = supabase
     .from("supplier_offers")
     .select("ingredient_id, supplier_id, unit, unit_price, supplier_label, created_at")
-    .eq("user_id", userId)
     .eq("is_active", true)
     .not("unit_price", "is", null);
   if (since) q = q.gte("created_at", since);
@@ -66,7 +67,6 @@ export async function fetchPriceAlerts(
   const previous = await parLots(ingredientIds, (lot) => supabase
     .from("supplier_offers")
     .select("ingredient_id, supplier_id, unit, unit_price, supplier_label, created_at")
-    .eq("user_id", userId)
     .eq("is_active", false)
     .in("ingredient_id", lot)
     .not("unit_price", "is", null)
@@ -81,7 +81,6 @@ export async function fetchPriceAlerts(
   const ingredients = await parLots(ingredientIds, (lot) => supabase
     .from("ingredients")
     .select("id, name, supplier_id, category")
-    .eq("user_id", userId)
     .in("id", lot));
 
   const ingMap = new Map<string, { name: string; supplier_id: string; category?: string }>();

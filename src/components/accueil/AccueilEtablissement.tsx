@@ -290,7 +290,7 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
       {canSeePilotage && (
         <div className="accueil-deux" style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 12 }}>
           <div style={CARD}>
-            <Titre droite={<Link href="/ventes" style={lien}>Ventes →</Link>}>Chiffre d&apos;affaires de la semaine</Titre>
+            <Titre droite={<Link href="/analyse/chiffre-affaires" style={lien}>Ventes →</Link>}>Chiffre d&apos;affaires de la semaine</Titre>
             <GraphSemaine jours={semaine} couleur={couleur} />
           </div>
           <div style={CARD}>

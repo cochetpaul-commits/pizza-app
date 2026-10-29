@@ -1,14 +1,12 @@
 "use client";
 
 import { RequireRole } from "@/components/RequireRole";
-import { StatsAchatsContent } from "@/components/achats/StatsAchatsContent";
+import { VariationsPrix } from "@/components/achats/VariationsPrix";
 
 export default function VariationsPrixPage() {
   return (
     <RequireRole permission="achats.view">
-      <div className="container safe-bottom">
-        <StatsAchatsContent />
-      </div>
+      <VariationsPrix />
     </RequireRole>
   );
 }

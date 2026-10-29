@@ -50,7 +50,6 @@ export const RENTABILITE_ITEMS: NavItemV2[] = [
 ];
 export const ACHATS_ITEMS: NavItemV2[] = [
   { label: "Suivi des achats", href: "/achats", icon: "fileText", permission: "achats.view" },
-  { label: "Mercuriale", href: "/mercuriale", icon: "tag", permission: "achats.view" },
   { label: "Variations de prix", href: "/variations-prix", icon: "trendingUp", permission: "achats.view" },
 ];
 export const EQUIPE_COUT_ITEMS: NavItemV2[] = [

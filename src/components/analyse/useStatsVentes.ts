@@ -21,8 +21,21 @@ export type StatsVentes = {
   services: ServiceJour[];
   food_ttc: number; food_ht: number; drink_ttc: number; drink_ht: number;
   hourly_ttc: number[];
-  pay?: Record<string, number>;
+  /* Produits, attache, encaissements (page Par produit, 29/10/2026) */
+  cat_products?: Record<string, ProduitVendu[]>;
+  top10_names?: string[]; top10_qty?: number[]; top10_ca_ttc?: number[]; top10_ca_ht?: number[];
+  bottom5?: { n: string; qty: number; ca_ttc: number; ca_ht: number }[];
+  mix_labels?: string[]; mix_ttc?: number[]; mix_ht?: number[];
+  ratios?: Record<string, Attache | number>;
+  ratios_by_svc?: Record<string, Record<string, { tables: number; total: number }>>;
+  pay?: { l: string; v: number; pct: number }[];
+  remises_ttc?: number;
+  remises_detail?: { operateur: string; count: number; total: number }[];
+  produits_offerts?: { name: string; qty: number; operateurs: string[] }[];
+  duration?: { avgDurMin: number; byZone: { zone: string; avgDur: number; tables: number; couverts: number }[]; bySvc: { svc: string; avgDur: number; tables: number }[]; avgRotation: number; rotByZone: { zone: string; avgRotation: number; maxRotation: number }[]; totalOrders: number };
 };
+export type ProduitVendu = { n: string; qty: number; ca_ttc: number; ca_ht: number };
+export type Attache = { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
 export type MeteoJour = { emoji: string; desc: string; temp: number };
 /** Ticket moyen TTC par couvert sur place sur la période */
 export const ticketMoyen = (s: StatsVentes | null | undefined) => (s && s.cov_sur > 0 ? s.place_sur_ttc / s.cov_sur : 0);

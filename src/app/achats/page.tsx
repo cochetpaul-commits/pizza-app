@@ -11,7 +11,7 @@ import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { usePilotageRange } from "@/lib/pilotageRange";
 import { useSearchParams } from "next/navigation";
-import { StatsAchatsContent } from "@/components/achats/StatsAchatsContent";
+import { VariationsPrix } from "@/components/achats/VariationsPrix";
 import { useBureau } from "@/hooks/useBureau";
 import { TableauMobile } from "@/components/ui/TableauMobile";
 
@@ -714,7 +714,7 @@ function AchatsContent() {
         </div>
 
         {activeTab === "stats" ? (
-          <StatsAchatsContent />
+          <VariationsPrix enOnglet />
         ) : (<>
 
         {/* ══════════════════════════════════════════════════ */}

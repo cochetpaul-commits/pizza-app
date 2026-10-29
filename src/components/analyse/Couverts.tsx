@@ -150,6 +150,25 @@ export function Couverts() {
               <Note>Une terrasse ou des pergolas à zéro un jour de pluie n&apos;est pas une anomalie de saisie.</Note>
             </Cadre>
           </div>
+          <div style={{ display: "grid", gridTemplateColumns: bureau ? "3fr 2fr" : "1fr", gap: 14, alignItems: "start" }}>
+            <Cadre titre="Heures d'affluence" sous="CA TTC par heure d'ouverture des tickets, sur la période.">
+              <GraphBarres format={(v) => euros(v)} etiquettes={Array.from({ length: 13 }, (_, i) => `${11 + i} h`)} libelleAxe="CA par heure"
+                series={[{ libelle: "CA TTC", couleur: "#1a1a1a", valeurs: Array.from({ length: 13 }, (_, i) => stats.hourly_ttc?.[11 + i] ?? 0) }]} />
+            </Cadre>
+            <Cadre titre="Durée et rotation des tables" sous="Entre l'ouverture et la fermeture du ticket ; rotation : tickets par table et par service." sansMarge>
+              <table style={{ borderCollapse: "collapse", width: "100%", marginTop: 10 }}>
+                <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Zone</th><th style={{ ...TH, textAlign: "right" }}>Durée</th><th style={{ ...TH, textAlign: "right" }}>Rotation</th></tr></thead>
+                <tbody>
+                  {(stats.duration?.byZone ?? []).map((z) => {
+                    const r = stats.duration?.rotByZone.find((x) => x.zone === z.zone);
+                    return <tr key={z.zone}><td style={{ ...TD, width: 6, padding: 0, background: COULEUR_SOIR }} /><td style={{ ...TD, fontWeight: 600 }}>{z.zone}<div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400 }}>{nombre(z.tables)} tables</div></td><td style={TDN}>{z.avgDur} min</td><td style={TDN}>{r ? `×${nombre(r.avgRotation, 1)}` : "—"}</td></tr>;
+                  })}
+                  {(stats.duration?.bySvc ?? []).map((s) => <tr key={s.svc}><td style={{ ...TD, width: 6, padding: 0 }} /><td style={{ ...TD, color: MUTED }}>{s.svc === "midi" ? "Midi" : "Soir"}</td><td style={{ ...TDN, color: MUTED }}>{s.avgDur} min</td><td style={TDN} /></tr>)}
+                </tbody>
+              </table>
+              <div style={{ padding: "8px 16px 14px" }}><Note>En moyenne {stats.duration?.avgDurMin ?? 0} min par table, rotation ×{nombre(stats.duration?.avgRotation ?? 0, 1)} par service.</Note></div>
+            </Cadre>
+          </div>
         </>
       )}
       {chargement && !stats && <Chargement texte="Chargement des ventes…" />}

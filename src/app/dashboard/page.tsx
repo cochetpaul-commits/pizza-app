@@ -635,8 +635,8 @@ function GroupContent() {
    ══════════════════════════════════════════════════════════ */
 
 const SHORTCUTS = [
-  { href: "/ventes", label: "Rapport de vente", color: GROUP_COLOR, icon: <SvgBarChart />, sub: "Pilotage" },
-  { href: "/ventes/marges", label: "Marges produits", color: T.dore, icon: <SvgTag />, sub: "Pilotage" },
+  { href: "/analyse/chiffre-affaires", label: "Chiffre d'affaires", color: GROUP_COLOR, icon: <SvgBarChart />, sub: "Pilotage" },
+  { href: "/ventes", label: "Par produit", color: T.dore, icon: <SvgTag />, sub: "Pilotage" },
   { href: "/rentabilite", label: "Rentabilite", color: T.dore, icon: <SvgWallet />, sub: "Pilotage" },
   { href: "/rh/equipe", label: "Employes", color: T.bleu, icon: <SvgUsers />, sub: "Personnel" },
   { href: "/recettes", label: "Fiches techniques", color: T.terracotta, icon: <SvgBook /> , sub: "Production" },

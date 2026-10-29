@@ -96,6 +96,16 @@ export function ChiffreAffaires() {
               <Note>Ventes Popina de la période, hors lignes annulées. Midi et soir : service de la caisse ; à emporter : ventes sans table.</Note>
             </Cadre>
           </div>
+          <div style={{ display: "grid", gridTemplateColumns: bureau ? "1fr 1fr" : "1fr", gap: 14 }}>
+            <Cadre titre="Encaissements" sous="Par mode de paiement, TTC, d'après les lignes de paiement de la caisse.">
+              {(stats.pay ?? []).length === 0 ? <div style={{ color: FAIBLE, fontSize: 13 }}>Pas de ligne de paiement sur la période.</div>
+                : <Lignes lignes={(stats.pay ?? []).map((p) => [p.l, euros(p.v)] as [string, string])} />}
+            </Cadre>
+            <Cadre titre="Remises et offerts" sous="Remises portées par les tickets, et produits passés à zéro.">
+              <Lignes lignes={[["Remises (TTC)", euros(stats.remises_ttc ?? 0), true], ...(stats.remises_detail ?? []).slice(0, 5).map((r) => [`${r.operateur} · ${r.count} ticket${r.count > 1 ? "s" : ""}`, euros(r.total)] as [string, string])]} />
+              {(stats.produits_offerts ?? []).length > 0 && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>Offerts : {(stats.produits_offerts ?? []).slice(0, 6).map((p) => `${p.name} ×${p.qty}`).join(" · ")}</div>}
+            </Cadre>
+          </div>
         </>
       )}
       {chargement && !stats && <Chargement texte="Chargement des ventes…" />}
