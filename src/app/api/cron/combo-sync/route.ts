@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getContracts, getPlannings, getLocations, COMBO_LOCATIONS } from "@/lib/combo/api";
 import { agregerPlannings, heures, jourParis } from "@/lib/combo/presences";
 import { syncRestsFromCombo } from "@/lib/combo/syncRests";
+import { creerFichesManquantes } from "@/lib/combo/creerFiches";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ function getWeekBounds(d: Date): { from: string; to: string } {
 
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-async function syncPeriod(from: string, to: string) {
+async function syncPeriod(from: string, to: string, fichesCreees: string[] = []) {
   const locations = await getLocations();
 
   const { data: etabs } = await supabaseAdmin.from("etablissements").select("id, slug");
@@ -46,6 +47,9 @@ async function syncPeriod(from: string, to: string) {
       getContracts(loc.id, from),
       getPlannings(loc.id, from, to),
     ]);
+
+    // Nouveau contrat dans Combo sans fiche ici : on crée la fiche (et son contrat) avant de rattacher les présences
+    fichesCreees.push(...await creerFichesManquantes(etabId, contracts));
 
     const contractByEmpNum = new Map<string, number>();
     for (const c of contracts) {
@@ -131,10 +135,9 @@ export async function GET(req: NextRequest) {
     prevWeekDate.setDate(now.getDate() - 7);
     const prevWeek = getWeekBounds(prevWeekDate);
 
-    const [currentCount, prevCount] = await Promise.all([
-      syncPeriod(currentWeek.from, currentWeek.to),
-      syncPeriod(prevWeek.from, prevWeek.to),
-    ]);
+    const fichesCreees: string[] = [];
+    const currentCount = await syncPeriod(currentWeek.from, currentWeek.to, fichesCreees);
+    const prevCount = await syncPeriod(prevWeek.from, prevWeek.to, fichesCreees);
 
     // Conges/absences depuis Combo (source de verite des conges valides)
     let rests: { synced: number; unmatched: number } | { error: string };
@@ -149,6 +152,7 @@ export async function GET(req: NextRequest) {
       current_week: { ...currentWeek, inserted: currentCount },
       prev_week: { ...prevWeek, inserted: prevCount },
       rests,
+      fiches_creees: fichesCreees,
       synced_at: now.toISOString(),
     });
   } catch (err) {
