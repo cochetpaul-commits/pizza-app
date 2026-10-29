@@ -115,11 +115,12 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     { kind: "page", label: "Équipe", href: "/rh/equipe", icon: "users", roles: MANAGERS },
     { kind: "page", label: "Congés", href: "/rh/conges", icon: "beach", roles: MANAGERS },
     ...(piccola ? [] : [{ kind: "page", label: "Pourboires", href: "/rh/pourboires", icon: "wallet", permission: "heures.edit_team" } as NavEntry]),
+    // Dans l'ordre du compte de résultat (29/10/2026) : ventes, achats, équipe, puis ce qu'il reste
     { kind: "divider", label: "Pilotage" },
     { kind: "group", label: "Ventes", icon: "barChart", items: VENTES_ITEMS },
-    { kind: "group", label: "Rentabilité", icon: "wallet", items: RENTABILITE_ITEMS },
     { kind: "group", label: "Achats", icon: "fileText", items: ACHATS_ITEMS },
     { kind: "group", label: "Coût de l'équipe", icon: "users", items: EQUIPE_COUT_ITEMS },
+    { kind: "group", label: "Rentabilité", icon: "wallet", items: RENTABILITE_ITEMS },
     { kind: "divider", label: "Configuration" },
     { kind: "group", label: "Paramètres", icon: "settings", items: PARAMETRES_ITEMS },
   ];
@@ -140,8 +141,8 @@ export const NAV_EQUIPIER: NavEntry[] = [
   { kind: "page", label: "Fournisseurs", href: "/fournisseurs", icon: "truck", permission: "achats.edit" },
   { kind: "divider", label: "Pilotage" },
   { kind: "group", label: "Ventes", icon: "barChart", items: VENTES_ITEMS },
-  { kind: "group", label: "Rentabilité", icon: "wallet", items: RENTABILITE_ITEMS },
   { kind: "group", label: "Coût de l'équipe", icon: "users", items: EQUIPE_COUT_ITEMS },
+  { kind: "group", label: "Rentabilité", icon: "wallet", items: RENTABILITE_ITEMS },
   { kind: "divider", label: "Configuration" },
   { kind: "page", label: "Mes congés", href: "/mes-conges", icon: "beach" },
   { kind: "page", label: "Mon compte", href: "/settings/account", icon: "settings" },
