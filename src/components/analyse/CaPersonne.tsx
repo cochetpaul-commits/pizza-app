@@ -112,7 +112,7 @@ export function CaPersonne() {
 
           <Cadre titre="CA par heure, jour par jour" sous="Barres : CA HT par heure planifiée. Courbe : heures planifiées. Une barre basse avec beaucoup d'heures, c'est un jour sur-staffé ; une barre haute, un jour tendu.">
             <GraphBarres format={(v) => nombre(v, 0)} etiquettes={jours.map((j) => jourCourt(j.date))} libelleAxe="CA HT par heure par jour"
-              series={[{ libelle: "CA HT / heure (€)", couleur: TERRACOTTA, valeurs: jours.map((j) => j.caH ?? 0) }, { libelle: "Heures planifiées", couleur: BLEU, courbe: true, valeurs: jours.map((j) => j.heures) }]} />
+              series={[{ libelle: "CA HT / heure (€)", couleur: TERRACOTTA, valeurs: jours.map((j) => j.caH ?? 0) }, { libelle: "Heures planifiées", couleur: BLEU, courbe: true, aire: true, valeurs: jours.map((j) => j.heures) }]} />
           </Cadre>
 
           <div style={{ display: "grid", gridTemplateColumns: bureau ? "3fr 2fr" : "1fr", gap: 14 }}>

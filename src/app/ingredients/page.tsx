@@ -941,7 +941,7 @@ function IngredientsPageInner() {
     }
 
     const up: Partial<IngredientUpsert> = {
-      name, category: edit.category, sub_category: normaliserSousCategorie(edit.subCategory, sousCategoriesParCategorie[edit.category] ?? []), is_active: edit.is_active,
+      name, category: edit.category, sub_category: normaliserSousCategorie(edit.subCategory, sousCategoriesParCategorie[edit.category] ?? []), is_active: edit.is_active, pour_personnel: edit.pourPersonnel,
       ...(edit.useOffer ? {} : { supplier_id }), // Don't update supplier_id when using offers (managed via supplier_offers table)
       piece_volume_ml: pieceVolumeMl,
       piece_weight_g: pieceWeightG,
