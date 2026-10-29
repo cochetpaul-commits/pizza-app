@@ -5,6 +5,7 @@ import { PilotageRangeBar } from "@/components/ui/PilotageRangeBar";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 import { Tuile, type TuileIcone } from "@/components/ui/Tuile";
 import { useBureau } from "@/hooks/useBureau";
+import { couleurTexteSur, degradeCategorie } from "@/lib/styleCategories";
 import { BORD, FAIBLE, MUTED, OSWALD, VERT, ROUGE, LIBELLE_VS, derniersJours, libelleComparaison, moisEnCours, libellePeriode, texteVariation, variation, type ModeComparaison } from "./gabarit";
 import { usePilotageComparaison } from "@/lib/pilotageRange";
 
@@ -70,10 +71,21 @@ export function TuileVariation({ libelle, valeur, actuel, precedent, icone, coul
 }
 
 /** Cadre blanc d'une section : titre, sous-titre, contenu */
-export function Cadre({ titre, sous, droite, children, sansMarge }: { titre?: ReactNode; sous?: ReactNode; droite?: ReactNode; children: ReactNode; sansMarge?: boolean }) {
+export function Cadre({ titre, sous, droite, children, sansMarge, bande }: { titre?: ReactNode; sous?: ReactNode; droite?: ReactNode; children: ReactNode; sansMarge?: boolean;
+  /** Couleur du bandeau de titre (charte 29/10/2026) : barre pleine en dégradé, titre blanc, comme les barres de catégorie */
+  bande?: string }) {
   return (
     <section style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 14, overflow: "hidden" }}>
-      {(titre || droite) && (
+      {bande && (titre || droite) && (
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "10px 16px", background: degradeCategorie(bande), color: couleurTexteSur(bande) }}>
+          <div>
+            {titre && <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em" }}>{titre}</div>}
+            {sous && <div style={{ fontSize: 12.5, marginTop: 2, opacity: 0.85 }}>{sous}</div>}
+          </div>
+          {droite}
+        </div>
+      )}
+      {!bande && (titre || droite) && (
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 8, padding: "14px 16px 0" }}>
           <div>
             {titre && <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", color: "#1a1a1a" }}>{titre}</div>}

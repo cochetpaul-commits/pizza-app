@@ -19,7 +19,10 @@ export type PresetKey =
   | "last-7-days"
   | "last-30-days"
   | "last-90-days"
-  | "last-12-months";
+  | "last-12-months"
+  | "this-quarter"
+  | "this-fiscal-year"
+  | "last-fiscal-year";
 
 type DateRangePickerProps = {
   value: DateRange;
@@ -130,6 +133,19 @@ function computePreset(key: PresetKey): DateRange {
       const start = new Date(today); start.setMonth(start.getMonth() - 12); start.setDate(today.getDate());
       return { from: toISO(start), to: toISO(today) };
     }
+    case "this-quarter": {
+      const q = Math.floor(today.getMonth() / 3) * 3;
+      return { from: toISO(new Date(today.getFullYear(), q, 1)), to: toISO(new Date(today.getFullYear(), q + 3, 0)) };
+    }
+    // Exercice comptable iFratelli : du 1er octobre au 30 septembre
+    case "this-fiscal-year": {
+      const y = today.getMonth() >= 9 ? today.getFullYear() : today.getFullYear() - 1;
+      return { from: toISO(new Date(y, 9, 1)), to: toISO(new Date(y + 1, 8, 30)) };
+    }
+    case "last-fiscal-year": {
+      const y = (today.getMonth() >= 9 ? today.getFullYear() : today.getFullYear() - 1) - 1;
+      return { from: toISO(new Date(y, 9, 1)), to: toISO(new Date(y + 1, 8, 30)) };
+    }
   }
 }
 
@@ -146,12 +162,15 @@ const PRESET_LABELS: Record<PresetKey, string> = {
   "last-30-days": "30 derniers jours",
   "last-90-days": "90 derniers jours",
   "last-12-months": "12 derniers mois",
+  "this-quarter": "Trimestre en cours",
+  "this-fiscal-year": "Exercice courant",
+  "last-fiscal-year": "Exercice précédent",
 };
 
 const DEFAULT_PRESETS: PresetKey[] = [
-  "today", "this-week", "this-month", "this-year",
-  "yesterday", "last-week", "last-month", "last-year",
-  "last-30-days", "last-90-days", "last-12-months",
+  "today", "this-week", "this-month", "this-quarter", "this-year", "this-fiscal-year",
+  "yesterday", "last-week", "last-month", "last-year", "last-fiscal-year",
+  "last-7-days", "last-30-days", "last-90-days", "last-12-months",
 ];
 
 function formatLabel(range: DateRange, format: "short" | "long" = "short"): string {

@@ -156,7 +156,7 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
         onMouseLeave={() => setHovered(null)}
         style={{
           display: "flex", alignItems: "center", gap: 10,
-          padding: niveau === 0 ? "8px 12px" : "6px 12px 6px 38px",
+          padding: niveau === 0 ? "6px 12px" : "4px 12px 4px 38px",
           margin: "1px 10px", borderRadius: 9,
           textDecoration: "none",
           fontSize: niveau === 0 ? 13.5 : 12.5, fontWeight: active ? 700 : 500,
@@ -180,7 +180,7 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
     const IconComp = group.icon ? ICON_MAP[group.icon] : null;
     const btn: CSSProperties = {
       display: "flex", alignItems: "center", gap: 10,
-      width: "calc(100% - 20px)", padding: "8px 12px", margin: "1px 10px", borderRadius: 9,
+      width: "calc(100% - 20px)", padding: "6px 12px", margin: "1px 10px", borderRadius: 9,
       background: hov ? C.bgItem : "transparent",
       border: "none", cursor: "pointer", textAlign: "left",
       color: hasActiveChild ? C.textActive : hov ? C.textNormal : C.textNormal,
@@ -219,7 +219,7 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
       width: "100%",
     }}>
       {/* Logo */}
-      <div style={{ padding: "18px 18px 10px", display: "flex", alignItems: "center", gap: 9 }}>
+      <div style={{ padding: "14px 18px 8px", display: "flex", alignItems: "center", gap: 9 }}>
         <Image src="/logo-ifratelli.png" alt="iFratelli" width={30} height={30}
           style={{ width: 30, height: 30, objectFit: "contain", borderRadius: 8, flexShrink: 0 }} />
         <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontSize: 17, fontWeight: 700, color: C.textActive, letterSpacing: 0.6, lineHeight: 1 }}>
@@ -299,7 +299,7 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
         {!isManager || isGroupView || current ? entries.map((e, i) => {
           if (e.kind === "divider") {
             return (
-              <div key={`div-${i}`} style={{ padding: "14px 22px 4px", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: C.textMuted }}>
+              <div key={`div-${i}`} style={{ padding: "9px 22px 2px", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: C.textMuted }}>
                 {e.label ?? ""}
               </div>
             );
@@ -312,13 +312,13 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
       </nav>
 
       {/* Pied */}
-      <div style={{ padding: "12px 16px 16px", borderTop: `1px solid ${C.divider}` }}>
+      <div style={{ padding: "10px 16px 12px", borderTop: `1px solid ${C.divider}` }}>
         {role && (
           <div style={{
             background: etabColor,
             color: etabColor === C.piccolaMia ? "#5a4a1a" : "#fff",
             borderRadius: 20, padding: "8px 16px",
-            textAlign: "center", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", marginBottom: 10,
+            textAlign: "center", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", marginBottom: 6,
           }}>
             Session {ROLE_LABELS[role]?.toLowerCase() ?? role}
           </div>

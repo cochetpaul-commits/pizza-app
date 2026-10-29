@@ -73,6 +73,8 @@ export function Produits() {
   const totalQty = useMemo(() => Object.values(stats?.cat_products ?? {}).flat().reduce((t, p) => t + p.qty, 0), [stats]);
   const totalQtyPrec = useMemo(() => Object.values(prec?.cat_products ?? {}).flat().reduce((t, p) => t + p.qty, 0), [prec]);
   const parNomPrec = useMemo(() => new Map(Object.values(prec?.cat_products ?? {}).flat().map((p) => [p.n, p])), [prec]);
+  // Catégorie de chaque produit vendu : le liseré des tableaux Top 10 et dormants prend sa couleur
+  const couleurProduit = useMemo(() => { const m = new Map<string, string>(); for (const [cat, ps] of Object.entries(stats?.cat_products ?? {})) for (const p of ps) m.set(p.n, getCategoryColor(cat)); return (n: string) => m.get(n) ?? "#1a1a1a"; }, [stats]);
   const top10 = useMemo(() => (stats?.top10_names ?? []).map((n, i) => ({ n, qty: stats?.top10_qty?.[i] ?? 0, ca_ttc: stats?.top10_ca_ttc?.[i] ?? 0, ca_ht: stats?.top10_ca_ht?.[i] ?? 0 })), [stats]);
   const tickets = stats?.tickets ?? 0, ticketsPrec = prec?.tickets ?? 0;
   const dolci = attache(stats, "dolci"), vin = attache(stats, "vin");
@@ -103,7 +105,7 @@ export function Produits() {
 
           {/* Les trois blocs côte à côte sur bureau (29/10) */}
           <div style={{ display: "grid", gridTemplateColumns: bureau ? "1.35fr 1fr 1fr" : "1fr", gap: 14, alignItems: "start" }}>
-            <Cadre titre="Taux d'attache" sous="Part des tickets qui prennent au moins un produit de la famille, face à l'objectif." sansMarge>
+            <Cadre titre="Taux d'attache" sous="Part des tickets qui prennent au moins un produit de la famille, face à l'objectif." sansMarge bande="#1a1a1a">
               <div style={{ overflowX: "auto", marginTop: 10 }}>
                 <table style={{ borderCollapse: "collapse", width: "100%" }}>
                   <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Famille</th><th style={{ ...TH, textAlign: "right" }}>Taux</th><th style={{ ...TH, textAlign: "right" }}>Objectif</th>{bureau && <><th style={{ ...TH, textAlign: "right" }}>Midi</th><th style={{ ...TH, textAlign: "right" }}>Soir</th></>}</tr></thead>
@@ -126,21 +128,21 @@ export function Produits() {
               </div>
               <div style={{ padding: "8px 16px 14px" }}><Note>Objectifs : Paramètres › Établissements, clés attache_*. Un ticket = une table ou une commande à emporter.</Note></div>
             </Cadre>
-              <Cadre titre="Top 10" sous="Les produits les plus vendus, en quantité." sansMarge>
+              <Cadre titre="Top 10" sous="Les produits les plus vendus, en quantité." sansMarge bande="#1a1a1a">
                 <table style={{ borderCollapse: "collapse", width: "100%", marginTop: 10 }}>
                   <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
                   <tbody>
                     {top10.map((p) => (
-                      <tr key={p.n} className="pr-ligne"><td style={liseret("#1a1a1a")} /><td style={{ ...TD, fontWeight: 600 }}>{p.n}</td><td style={TDN}>{nombre(p.qty)}</td><td style={TDN}>{euros(p.ca_ht)}</td><td style={TDN}>{delta(p, parNomPrec.get(p.n))}</td></tr>
+                      <tr key={p.n} className="pr-ligne"><td style={liseret(couleurProduit(p.n))} /><td style={{ ...TD, fontWeight: 600 }}>{p.n}</td><td style={TDN}>{nombre(p.qty)}</td><td style={TDN}>{euros(p.ca_ht)}</td><td style={TDN}>{delta(p, parNomPrec.get(p.n))}</td></tr>
                     ))}
                   </tbody>
                 </table>
               </Cadre>
-              <Cadre titre="Plats qui dorment" sous="Les cinq plats les moins vendus de la période." sansMarge>
+              <Cadre titre="Plats qui dorment" sous="Les cinq plats les moins vendus de la période." sansMarge bande={AMBRE}>
                 <table style={{ borderCollapse: "collapse", width: "100%", marginTop: 10 }}>
                   <tbody>
                     {(stats.bottom5 ?? []).map((p) => (
-                      <tr key={p.n} className="pr-ligne"><td style={liseret(AMBRE)} /><td style={{ ...TD, fontWeight: 600 }}>{p.n}</td><td style={TDN}>{nombre(p.qty)} vendu{p.qty > 1 ? "s" : ""}</td><td style={TDN}>{euros(p.ca_ht)}</td></tr>
+                      <tr key={p.n} className="pr-ligne"><td style={liseret(couleurProduit(p.n))} /><td style={{ ...TD, fontWeight: 600 }}>{p.n}</td><td style={TDN}>{nombre(p.qty)} vendu{p.qty > 1 ? "s" : ""}</td><td style={TDN}>{euros(p.ca_ht)}</td></tr>
                     ))}
                     {(stats.bottom5 ?? []).length === 0 && <tr><td style={{ ...TD, color: FAIBLE }} colSpan={4}>Rien à signaler.</td></tr>}
                   </tbody>

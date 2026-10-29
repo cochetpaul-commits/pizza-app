@@ -22,7 +22,7 @@ import { EtatVide } from "@/components/ui/EtatVide";
  * comparaison avec la paie réellement passée (Pennylane) quand le mois est importé.
  * Les calculs sont ceux de l'ancienne page RH › Masse salariale ; les simulations sont dans Analyse › Simulations.
  */
-type Presence = { combo_nom: string; equipe: string | null; employe_id: string | null; matched: boolean; heures_planifiees: number; heures_travaillees: number; heures_contrat: number; nb_repas: number; nb_jours_travailles: number; ecart_total: number };
+type Presence = { periode_debut: string; combo_nom: string; equipe: string | null; employe_id: string | null; matched: boolean; heures_planifiees: number; heures_travaillees: number; heures_contrat: number; nb_repas: number; nb_jours_travailles: number; ecart_total: number };
 type Contrat = { employe_id: string; prenom: string; nom: string; type: string; heures_semaine: number; remuneration: number; emploi: string; equipes_access: string[] };
 type Employe = { nom: string; equipe: string; type: string; emploi: string; hContrat: number; hTrav: number; hs: number; brut: number; coutCharge: number; coutHS: number; repas: number; jours: number; sansContrat: boolean };
 const CHARGES = 0.42;
@@ -63,7 +63,7 @@ export function MasseSalariale() {
   const charger = useCallback(async (annule: () => boolean) => {
     try {
       const [pres, cts, marge, obj] = await Promise.all([
-        supabase.from("combo_presences").select("combo_nom, equipe, employe_id, matched, heures_planifiees, heures_travaillees, heures_contrat, nb_repas, nb_jours_travailles, ecart_total")
+        supabase.from("combo_presences").select("periode_debut, combo_nom, equipe, employe_id, matched, heures_planifiees, heures_travaillees, heures_contrat, nb_repas, nb_jours_travailles, ecart_total")
           .eq("etablissement_id", etabId).gte("periode_debut", selection.from).lte("periode_fin", selection.to),
         supabase.rpc("contrats_admin", { p_etab: etabId }).then(async (r) => {
           if (r.error) return [] as Contrat[];
@@ -141,6 +141,23 @@ export function MasseSalariale() {
     for (const e of employes) { const x = m.get(e.equipe) ?? { equipe: e.equipe, n: 0, hTrav: 0, hContrat: 0, hs: 0, ms: 0 }; x.n++; x.hTrav += e.hTrav; x.hContrat += e.hContrat * (selection.mode === "mois" ? 52 / 12 : 1); x.hs += e.hs; x.ms += e.coutCharge + e.coutHS; m.set(e.equipe, x); }
     return [...m.values()].sort((a, b) => b.ms - a.ms);
   }, [employes, selection.mode]);
+  // Mois : les heures de chaque semaine Combo du mois, par équipe (demande de Paul, 29/10/2026)
+  const semaines = useMemo(() => {
+    if (selection.mode !== "mois") return null;
+    const parSemaine = new Map<string, Map<string, number>>();
+    for (const p of etat.presences) {
+      const eq = p.equipe ?? "Autre";
+      const m = parSemaine.get(p.periode_debut) ?? new Map<string, number>();
+      m.set(eq, (m.get(eq) ?? 0) + p.heures_travaillees);
+      parSemaine.set(p.periode_debut, m);
+    }
+    const debuts = [...parSemaine.keys()].sort();
+    const equipesVues = [...new Set(etat.presences.map((p) => p.equipe ?? "Autre"))].sort((a, b) => a.localeCompare(b, "fr"));
+    return {
+      etiquettes: debuts.map((d) => `sem. du ${new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`),
+      series: equipesVues.map((eq) => ({ libelle: eq, couleur: COULEURS_EQUIPE[eq] ?? "#b0a894", valeurs: debuts.map((d) => parSemaine.get(d)?.get(eq) ?? 0) })),
+    };
+  }, [etat.presences, selection.mode]);
   const caHt = stats?.ca_ht ?? 0, couverts = stats?.couverts ?? 0;
   const msTotale = totaux.ms + totaux.coutHS;
   const ratio = caHt > 0 ? (msTotale / caHt) * 100 : null;
@@ -229,6 +246,12 @@ export function MasseSalariale() {
                   {ajustMsg && <span style={{ fontSize: 12, color: MUTED }}>{ajustMsg}</span>}
                 </div>
               </div>
+            </Cadre>
+          )}
+
+          {semaines && semaines.etiquettes.length > 0 && (
+            <Cadre titre="Semaines du mois" sous="Heures travaillées chaque semaine Combo du mois, par équipe.">
+              <GraphBarres format={(v) => `${nombre(v)} h`} etiquettes={semaines.etiquettes} series={semaines.series} empile libelleAxe="Heures travaillées" />
             </Cadre>
           )}
 
