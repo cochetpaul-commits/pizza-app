@@ -42,6 +42,7 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/ingredients":     "achats.inventaire",
   "/stock":           "achats.inventaire",
   "/commandes/theoriques": "achats.edit",
+  "/commandes/personnel": "achats.edit",
   "/inventaire":      "achats.inventaire",
   "/commandes":       "achats.edit",
   "/fournisseurs":    "achats.edit",

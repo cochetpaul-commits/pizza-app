@@ -107,6 +107,8 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     { kind: "group", label: "HACCP", icon: "clipboard", roles: MANAGERS, items: HACCP_ITEMS },
     { kind: "divider", label: "Achats et stock" },
     { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
+    // Repas du personnel (29/10/2026) : liste de courses et relevé des avantages en nature
+    { kind: "page", label: "Courses du personnel", href: "/commandes/personnel", icon: "users", permission: "achats.edit" },
     // Le stock vit dans la Base produits depuis le 10/10/2026 ; l'inventaire le remet à niveau
     { kind: "page", label: "Base produits", href: "/ingredients", icon: "tag", permission: "achats.inventaire" },
     { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },

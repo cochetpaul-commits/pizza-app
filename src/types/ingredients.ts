@@ -26,7 +26,7 @@ export type Category = (typeof CATEGORIES)[number];
 export type PriceKind = "unit" | "pack_simple" | "pack_composed";
 export type IngredientStatus = "to_check" | "validated";
 /** Vue de la Base produits : tous, à contrôler, validés (statut en base) ou sans prix d'achat (calculé) */
-export type Tab = IngredientStatus | "all" | "sans_prix" | "a_commander";
+export type Tab = IngredientStatus | "all" | "sans_prix" | "a_commander" | "personnel";
 
 export const CAT_LABELS: Record<Category, string> = {
   cremerie_fromage:   "Crémerie / Fromage",
@@ -113,6 +113,8 @@ export type Ingredient = {
   sub_category?: string | null;
     allergens: unknown | null;
   is_active: boolean;
+  /** Repas du personnel (avantage en nature) : pas pour la carte, hors achats matières */
+  pour_personnel?: boolean;
   default_unit: string | null;
 
   purchase_price: number | null;
@@ -199,6 +201,7 @@ export type IngredientUpsert = {
   sub_category?: string | null;
     allergens: unknown | null;
   is_active: boolean;
+  pour_personnel?: boolean;
   default_unit: string | null;
 
   purchase_price: number | null;

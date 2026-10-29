@@ -254,6 +254,8 @@ export type EditState = {
   stockObjectif: string;
   stockMax: string;
   establishments: string[];
+  /** Repas du personnel (avantage en nature) */
+  pourPersonnel: boolean;
 };
 
 // ─── IngredientRow ──────────────────────────────────────────────────────────
@@ -781,6 +783,11 @@ export const IngredientRow = React.memo(function IngredientRow({
               );
             })}
           </div>
+          {/* Courses du personnel (29/10/2026) : le produit garde sa catégorie, mais il est acheté pour l'équipe */}
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 10, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+            <input type="checkbox" checked={edit.pourPersonnel} onChange={(e) => onEditChange({ ...edit, pourPersonnel: e.target.checked })} style={{ margin: 0, accentColor: "#b7791f" }} />
+            Repas du personnel (avantage en nature) : pas pour la carte, hors achats matières
+          </label>
 
           {/* Allergens */}
           <div style={fieldLabel}>Allergènes</div>

@@ -212,6 +212,7 @@ function IngredientsPageInner() {
     let base = visibleItems.filter((x) => { if (seen.has(x.id)) return false; seen.add(x.id); return true; });
     if (tab === "sans_prix") base = base.filter((x) => !(offerHasPrice(offersByIngredientId.get(x.id), { piece_volume_ml: x.piece_volume_ml }) || legacyHasPrice(x)));
     else if (tab === "a_commander") base = base.filter((x) => stockMap.get(x.id)?.alerte);
+    else if (tab === "personnel") base = base.filter((x) => !!x.pour_personnel);
     else if (tab !== "all") base = base.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
     if (filterCategory !== "all") base = base.filter((x) => x.category === filterCategory);
     if (filterSupplier !== "all") {
@@ -777,6 +778,7 @@ function IngredientsPageInner() {
       stockObjectif: x.stock_objectif != null ? String(x.stock_objectif) : "",
       stockMax: x.stock_max != null ? String(x.stock_max) : "",
       establishments: x.establishments ?? ["bellomio", "piccola"],
+      pourPersonnel: !!x.pour_personnel,
     };
 
     // Run auto-calc to fill missing prices (e.g. kgL from base price). Source déduite du champ rempli si inconnue.
@@ -1194,6 +1196,7 @@ function IngredientsPageInner() {
 
   // Compteurs en base (toute la base, pas seulement les pages chargées) : Tous = Validés + À contrôler
   const aCommander = useMemo(() => visibleItems.filter((x) => stockMap.get(x.id)?.alerte).length, [visibleItems, stockMap]);
+  const nbPersonnel = useMemo(() => visibleItems.filter((x) => !!x.pour_personnel).length, [visibleItems]);
   const compteurs = {
     tous: totalCount ?? counts.all,
     aControler: totalCount != null && validatedCount != null ? totalCount - validatedCount : counts.to_check,
@@ -1387,6 +1390,7 @@ function IngredientsPageInner() {
                 stockMap={stockMap}
                 inventaireDate={stock?.inventoryDate ?? null}
                 aCommander={aCommander}
+                nbPersonnel={nbPersonnel}
                 onToggleActif={toggleActif}
                 q={q}
                 setQ={setQ}

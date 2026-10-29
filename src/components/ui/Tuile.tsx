@@ -12,7 +12,7 @@ import { OSWALD } from "@/components/TuileProduit";
 const BORD = "#ddd6c8";
 const MUTED = "#6f6a61";
 
-export type TuileIcone = "euro" | "couverts" | "ticket" | "facture" | "produit" | "alerte" | "sans" | "doublon" | "brouillon" | "attente" | "camion" | "recu" | "lien" | "foodcost" | "fiche";
+export type TuileIcone = "euro" | "couverts" | "ticket" | "facture" | "produit" | "alerte" | "sans" | "doublon" | "brouillon" | "attente" | "camion" | "recu" | "lien" | "foodcost" | "fiche" | "equipe";
 
 function Icone({ nom, couleur }: { nom: TuileIcone; couleur: string }) {
   const p = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: couleur, strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -31,6 +31,7 @@ function Icone({ nom, couleur }: { nom: TuileIcone; couleur: string }) {
     case "recu": return <svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M8 12.5l2.5 2.5L16 9.5" /></svg>;
     case "lien": return <svg {...p}><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>;
     case "foodcost": return <svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5V12l6 3.5" /></svg>;
+    case "equipe": return <svg {...p}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><circle cx="17" cy="9" r="2.5" /><path d="M16 15a5 5 0 0 1 5.5 5" /></svg>;
     case "fiche": return <svg {...p}><path d="M5 4h14v16H5z" /><path d="M9 8h6M9 12h6M9 16h3" /></svg>;
   }
 }

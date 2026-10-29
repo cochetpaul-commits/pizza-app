@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import React, { Suspense, useEffect, useState, useMemo, type CSSProperties } from "react";
 import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie, couleurTexteSur } from "@/lib/styleCategories";
 import dynamic from "next/dynamic";
@@ -7,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
+import { clesPersonnel, estLignePersonnel } from "@/lib/achats/personnel";
 import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { usePilotageRange } from "@/lib/pilotageRange";
@@ -191,6 +194,9 @@ function AchatsContent() {
   const [topProductsLoading, setTopProductsLoading] = useState(false);
   const [topProductsLimit, setTopProductsLimit] = useState(20);
   const [topSupplierFilter, setTopSupplierFilter] = useState("");
+  // Repas du personnel (29/10/2026) : avantages en nature, sortis des achats matières
+  const [personnel, setPersonnel] = useState<{ total: number; nb: number }>({ total: 0, nb: 0 });
+  const [clesPerso, setClesPerso] = useState<Set<string> | null>(null);
 
   // ── Load ALL invoices ──
   useEffect(() => {
@@ -227,12 +233,18 @@ function AchatsContent() {
     });
   }, [allInvoices, rangeDates]);
 
+  useEffect(() => {
+    let annule = false;
+    supabase.from("ingredients").select("id, name, import_name").eq("pour_personnel", true).then(({ data }) => { if (!annule) setClesPerso(clesPersonnel((data ?? []) as { id: string; name: string; import_name: string | null }[])); });
+    return () => { annule = true; };
+  }, []);
+
   // ── Load top products for range ──
   useEffect(() => {
-    if (!etabId || loading) return;
+    if (!etabId || loading || !clesPerso) return;
     const ids = rangeInvoices.map((i) => i.id);
     (async () => {
-      if (ids.length === 0) { setTopProducts([]); return; }
+      if (ids.length === 0) { setTopProducts([]); setPersonnel({ total: 0, nb: 0 }); return; }
       setTopProductsLoading(true);
       const chunkSize = 200;
       const allLines: { name: string | null; quantity: number | null; unit: string | null; unit_price: number | null; total_price: number | null; invoice_id: string }[] = [];
@@ -249,9 +261,12 @@ function AchatsContent() {
         invSupplierMap[inv.id] = inv.suppliers?.name ?? "Inconnu";
       }
       const agg: Record<string, { name: string; supplier: string; totalPrice: number; quantity: number; unit: string; lastUnitPrice: number }> = {};
+      const perso = { total: 0, nb: 0 };
       for (const l of allLines) {
         const pName = (l.name ?? "").trim();
         if (!pName) continue;
+        // Les repas du personnel ne sont pas des achats matières : comptés à part, hors top produits
+        if (estLignePersonnel(pName, clesPerso)) { perso.total += l.total_price ?? 0; perso.nb++; continue; }
         const supplier = invSupplierMap[l.invoice_id] ?? "Inconnu";
         const key = `${pName.toLowerCase()}||${supplier.toLowerCase()}`;
         if (!agg[key]) agg[key] = { name: pName, supplier, totalPrice: 0, quantity: 0, unit: l.unit ?? "", lastUnitPrice: l.unit_price ?? 0 };
@@ -262,9 +277,10 @@ function AchatsContent() {
       }
       const sorted = Object.values(agg).sort((a, b) => b.totalPrice - a.totalPrice);
       setTopProducts(sorted);
+      setPersonnel(perso);
       setTopProductsLoading(false);
     })();
-  }, [rangeInvoices, etabId, loading]);
+  }, [rangeInvoices, etabId, loading, clesPerso]);
 
   // ── Unique supplier names for filter dropdown ──
   const topProductSuppliers = useMemo(() => {
@@ -761,14 +777,26 @@ function AchatsContent() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 32 }}>
               {/* Total achats HT */}
               <div style={{ ...S.card, flex: "1 1 160px", minWidth: 140 }}>
-                <div style={S.kpiLabel}>Total achats (HT)</div>
-                <div style={S.kpiValue}>{fmt(dashKpis.totalHT)}</div>
+                <div style={S.kpiLabel}>Achats matières (HT)</div>
+                <div style={S.kpiValue}>{fmt(dashKpis.totalHT - personnel.total)}</div>
+                {personnel.total > 0 && <div style={{ fontSize: 11, color: "#999", marginTop: 4, fontFamily: "DM Sans, sans-serif" }}>factures {fmt(dashKpis.totalHT)} · repas du personnel déduits</div>}
                 {dashKpis.variationPct !== null && (
                   <div style={{ fontSize: 11, color: dashKpis.variationPct <= 0 ? "#166534" : "#991b1b", marginTop: 4, fontFamily: "DM Sans, sans-serif", fontWeight: 600 }}>
                     {dashKpis.variationPct > 0 ? "+" : ""}{dashKpis.variationPct.toFixed(1)}% vs periode prec.
                   </div>
                 )}
               </div>
+
+              {/* Repas du personnel : avantages en nature (647), hors achats matières */}
+              {personnel.nb > 0 && (
+                <div style={{ ...S.card, flex: "1 1 160px", minWidth: 140 }}>
+                  <div style={S.kpiLabel}>Repas du personnel (HT)</div>
+                  <div style={S.kpiValue}>{fmt(personnel.total)}</div>
+                  <div style={{ fontSize: 11, color: "#999", marginTop: 4, fontFamily: "DM Sans, sans-serif" }}>
+                    avantages en nature · {personnel.nb} ligne{personnel.nb > 1 ? "s" : ""} · <Link href="/commandes/personnel" style={{ color: "#D4775A", fontWeight: 600, textDecoration: "none" }}>relevé du mois →</Link>
+                  </div>
+                </div>
+              )}
 
               {/* Nb factures */}
               <div style={{ ...S.card, flex: "1 1 140px", minWidth: 120 }}>
