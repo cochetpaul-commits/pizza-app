@@ -6,6 +6,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useBureau } from "@/hooks/useBureau";
 import { calculerPate, type EmpatementType, type FlourMixItem, type Phase } from "@/lib/pateEngine";
+import { Tuile } from "@/components/ui/Tuile";
+import { EtatVide } from "@/components/ui/EtatVide";
+import { ACCENT, ATTENTION, BORD, BORD_LIGNE, BTN, CADRE, INTERTITRE, MUTED, OSWALD, TD, TH, h1, liseret, pastille } from "@/components/ui/charte";
 
 /**
  * Empâtements (28/10/2026) : la page du quotidien pour les pâtons et la focaccia. On règle le nombre
@@ -18,7 +21,6 @@ type Recette = {
   yeast_percent: number; biga_yeast_percent: number; flour_mix: FlourMixItem[]; procedure: string[];
 };
 
-const TITRE = "var(--font-oswald), 'Oswald', sans-serif";
 const n2 = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
 const g = (x: number) => `${Math.round(x).toLocaleString("fr-FR")} g`;
 const kg = (x: number) => x >= 1000 ? `${(x / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} kg` : g(x);
@@ -76,11 +78,12 @@ export function Empatements() {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px" }}>
-      <h1 style={{ fontFamily: TITRE, fontWeight: 700, fontSize: 30, color: "#1a1a1a", margin: "8px 0 2px", textTransform: "uppercase", letterSpacing: ".01em" }}>Empâtements</h1>
-      <p style={{ color: "#8a8378", margin: "0 0 16px", fontSize: 14 }}>Réglez le nombre de pâtons, la recette se recalcule au gramme.</p>
+      <style>{`.emp-ligne:hover td{background:#f7f3ec}`}</style>
+      <h1 style={h1(bureau)}>Empâtements</h1>
+      <div style={{ color: MUTED, margin: "2px 0 14px", fontSize: 13 }}>Réglez le nombre de pâtons, la recette se recalcule au gramme.</div>
       {erreur && <div style={{ color: "#b3261e", padding: 12 }}>Chargement impossible : {erreur}</div>}
-      {!recettes && !erreur && <div style={{ textAlign: "center", padding: 60, color: "#999" }}>Chargement…</div>}
-      {recettes && recettes.length === 0 && <div style={{ color: "#8a8378", padding: 12 }}>Aucun empâtement. Créez-en un depuis la Carte, onglet Préparations.</div>}
+      {!recettes && !erreur && <div style={{ textAlign: "center", padding: 60, color: MUTED }}>Chargement…</div>}
+      {recettes && recettes.length === 0 && <div style={CADRE}><EtatVide titre="Aucun empâtement" texte="Créez-en un depuis la Carte, onglet Préparations." /></div>}
       <div style={{ display: "grid", gap: 16 }}>
         {recettes?.map((r) => <CarteEmpatement key={r.id} recette={r} onReglages={() => router.push(`/recettes/empatement/${r.id}`)} />)}
       </div>
@@ -120,78 +123,90 @@ function CarteEmpatement({ recette: r, onReglages }: { recette: Recette; onRegla
   const pasPoids = r.ball_weight >= 1000 ? 50 : 2;
 
   return (
-    <section style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 16, overflow: "hidden", display: "grid" }}>
-      {/* Bandeau : nom, type, paramètres ; les réglages en haut à droite */}
-      <div style={{ background: couleur, color: "#fff", padding: "14px 16px 16px", display: "grid", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", opacity: 0.8 }}>Empâtement · {typeLabel}</div>
-            <div style={{ fontFamily: TITRE, fontWeight: 700, fontSize: 30, lineHeight: 1.05, textTransform: "uppercase", letterSpacing: ".01em", marginTop: 2 }}>{r.name}</div>
+    <section style={{ ...CADRE, display: "grid" }}>
+      {/* En-tête : liseré de couleur, nom en Oswald, type et paramètres en pastilles fines ; les réglages à droite */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 16px 12px", borderBottom: `1px solid ${BORD_LIGNE}`, boxShadow: `inset 6px 0 0 ${couleur}` }}>
+        <div style={{ minWidth: 0, flex: 1, display: "grid", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 20, lineHeight: 1.1, textTransform: "uppercase", letterSpacing: ".02em", color: "#1a1a1a" }}>{r.name}</span>
+            <span style={pastille(couleur)}>{typeLabel}</span>
           </div>
-          <button type="button" onClick={onReglages} aria-label="Réglages de la recette" title="Réglages de la recette" style={{
-            flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.14)",
-            color: "#fff", borderRadius: 20, padding: "6px 12px", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-          }}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
-            Réglages
-          </button>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {params.map((t) => <span key={t} style={{ fontSize: 11.5, color: MUTED, padding: "2px 8px", borderRadius: 8, border: `1px solid ${BORD}` }}>{t}</span>)}
+          </div>
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {params.map((t) => <span key={t} style={{ fontSize: 12, padding: "3px 9px", borderRadius: 8, background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.25)" }}>{t}</span>)}
-        </div>
+        <button type="button" onClick={onReglages} aria-label="Réglages de la recette" title="Réglages de la recette" style={{ ...BTN, display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0, color: MUTED }}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
+          Réglages
+        </button>
       </div>
 
       <div style={{ padding: 16, display: "grid", gap: 14 }}>
         {/* Le réglage du jour : les pâtons, en gros, avec ±1 et ±10 */}
         <Compteur libelle="Pâtons" valeur={patons} onChange={setPatons} pas={1} grandPas={10} couleur={couleur} />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <div style={{ background: "#f7f3ec", borderRadius: 12, padding: "10px 12px", display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 12, color: "#8a8378", textTransform: "uppercase", letterSpacing: ".05em" }}>Poids d&apos;un pâton</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <BoutonRond onClick={() => setPoids(Math.max(1, (Number(poids) || r.ball_weight) - pasPoids))} taille={34} couleur={couleur} label="−" aria="Moins" />
-              <span style={{ fontFamily: TITRE, fontWeight: 700, fontSize: Number(poids) >= 1000 ? 20 : 24, color: "#1a1a1a", flex: 1, textAlign: "center", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", minWidth: 0 }}>{poids ? `${Number(poids).toLocaleString("fr-FR")} g` : "—"}</span>
-              <BoutonRond onClick={() => setPoids((Number(poids) || r.ball_weight) + pasPoids)} taille={34} couleur={couleur} label="+" aria="Plus" />
-            </div>
-          </div>
-          <div style={{ background: "#f7f3ec", borderRadius: 12, padding: "10px 12px", display: "grid", gap: 6, alignContent: "start" }}>
-            <span style={{ fontSize: 12, color: "#8a8378", textTransform: "uppercase", letterSpacing: ".05em" }}>Pâte totale</span>
-            <span style={{ fontFamily: TITRE, fontWeight: 700, fontSize: 24, color: "#1a1a1a", lineHeight: "34px" }}>{resultat ? kg(resultat.summary.total_dough_g) : "—"}</span>
-          </div>
+          <Tuile compacte couleur={couleur} libelle="Poids d'un pâton" valeur={
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <BoutonRond onClick={() => setPoids(Math.max(1, (Number(poids) || r.ball_weight) - pasPoids))} taille={30} couleur={couleur} label="−" aria="Moins" clair />
+              <span style={{ flex: 1, textAlign: "center", fontSize: Number(poids) >= 1000 ? 18 : 22, whiteSpace: "nowrap", minWidth: 0 }}>{poids ? `${Number(poids).toLocaleString("fr-FR")} g` : "—"}</span>
+              <BoutonRond onClick={() => setPoids((Number(poids) || r.ball_weight) + pasPoids)} taille={30} couleur={couleur} label="+" aria="Plus" clair />
+            </span>
+          } />
+          <Tuile compacte couleur={couleur} libelle="Pâte totale" valeur={resultat ? kg(resultat.summary.total_dough_g) : "—"} />
         </div>
 
       {resultat && (
         <div style={{ display: "grid", gap: 10 }}>
           {/* Les farines se pré-mélangent : une seule pesée de farine par phase (28/10), le détail du mélange en note */}
           {mix.length > 1 && (
-            <div style={{ fontSize: 13, color: "#8a8378" }}>
+            <div style={{ fontSize: 13, color: MUTED }}>
               Mélange de farines du jour : {mix.map((f) => `${g(resultat.flour_total_g * f.percent / 100)} ${nomFarine(f.name)}`).join(" + ")}, soit {kg(resultat.flour_total_g)}.
             </div>
           )}
           <div style={{ display: "grid", gridTemplateColumns: resultat.phases.length > 1 ? "repeat(auto-fit, minmax(260px, 1fr))" : "1fr", gap: 10 }}>
-            {resultat.phases.map((ph, i) => (
-              <div key={ph.name} style={{ border: "1px solid #ddd6c8", borderRadius: 12, overflow: "hidden", minWidth: 0 }}>
-                {resultat.phases.length > 1 && (
-                  <div style={{ background: "#f2ede4", padding: "8px 14px", fontFamily: TITRE, fontWeight: 700, fontSize: 15, color: "#D4775A", textTransform: "uppercase", letterSpacing: ".04em" }}>
-                    {nomPhase(ph, r.type, i)}
-                  </div>
-                )}
-                <Pesee libelle={mix.length > 1 ? "Farine (mélange)" : nomFarine(mix[0].name)} grammes={ph.flour_g} />
-                <Pesee libelle="Eau" grammes={ph.water_g} />
-                {ph.yeast_g > 0 && <Pesee libelle="Levure" grammes={ph.yeast_g} precis />}
-                {ph.salt_g > 0 && <Pesee libelle="Sel" grammes={ph.salt_g} />}
-                {ph.honey_g > 0 && <Pesee libelle="Miel" grammes={ph.honey_g} />}
-                {ph.oil_g > 0 && <Pesee libelle="Huile" grammes={ph.oil_g} />}
-              </div>
-            ))}
+            {resultat.phases.map((ph, i) => {
+              const pesees: [string, number, boolean][] = [
+                [mix.length > 1 ? "Farine (mélange)" : nomFarine(mix[0].name), ph.flour_g, false], ["Eau", ph.water_g, false],
+                ...(ph.yeast_g > 0 ? [["Levure", ph.yeast_g, true] as [string, number, boolean]] : []),
+                ...(ph.salt_g > 0 ? [["Sel", ph.salt_g, false] as [string, number, boolean]] : []),
+                ...(ph.honey_g > 0 ? [["Miel", ph.honey_g, false] as [string, number, boolean]] : []),
+                ...(ph.oil_g > 0 ? [["Huile", ph.oil_g, false] as [string, number, boolean]] : []),
+              ];
+              return (
+                <div key={ph.name} style={{ ...CADRE, minWidth: 0 }}>
+                  <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+                    <colgroup><col style={{ width: 6 }} /><col /><col style={{ width: 110 }} /></colgroup>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, padding: 0 }} />
+                        <th style={TH}>{resultat.phases.length > 1 ? nomPhase(ph, r.type, i) : "Pesée"}</th>
+                        <th style={{ ...TH, textAlign: "right" }}>Grammes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pesees.map(([lib, gr, precis], k) => (
+                        <tr key={lib} className="emp-ligne">
+                          <td style={{ ...liseret(couleur), ...(k === pesees.length - 1 ? { borderBottom: 0 } : {}) }} />
+                          <td style={{ ...TD, fontSize: 14, ...(k === pesees.length - 1 ? { borderBottom: 0 } : {}), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lib}</td>
+                          <td style={{ ...TD, textAlign: "right", fontFamily: OSWALD, fontWeight: 700, fontSize: 22, lineHeight: 1.1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", ...(k === pesees.length - 1 ? { borderBottom: 0 } : {}) }}>
+                            {precis && gr < 100 ? `${(Math.round(gr * 10) / 10).toLocaleString("fr-FR")} g` : g(gr)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
           </div>
-          {resultat.warnings.map((w) => <div key={w} style={{ fontSize: 13, color: "#b7791f" }}>{w}</div>)}
+          {resultat.warnings.map((w) => <div key={w} style={{ fontSize: 13, color: ATTENTION }}>{w}</div>)}
         </div>
       )}
 
       {r.procedure.length > 0 && (
         <div>
           <button type="button" onClick={() => setProcedeOuvert((v) => !v)} aria-expanded={procedeOuvert}
-            style={{ border: "none", background: "transparent", color: "#D4775A", fontWeight: 600, fontSize: 14, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+            style={{ border: "none", background: "transparent", color: ACCENT, fontWeight: 600, fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
             {procedeOuvert ? "Masquer le procédé" : "Voir le procédé"}
           </button>
           {procedeOuvert && (
@@ -212,19 +227,19 @@ function Compteur({ libelle, valeur, onChange, pas, grandPas, couleur }: { libel
   const regler = (d: number) => onChange(Math.max(1, v + d));
   return (
     <div style={{ display: "grid", gap: 6, justifyItems: "center" }}>
-      <span style={{ fontSize: 12, color: "#8a8378", textTransform: "uppercase", letterSpacing: ".08em" }}>{libelle}</span>
+      <span style={INTERTITRE}>{libelle}</span>
       <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", justifyContent: "center", flexWrap: "wrap" }}>
-        <BoutonRond onClick={() => regler(-grandPas)} taille={44} couleur={couleur} label={`−${grandPas}`} aria={`Moins ${grandPas}`} clair />
-        <BoutonRond onClick={() => regler(-pas)} taille={54} couleur={couleur} label="−" aria="Moins un" />
+        <BoutonRond onClick={() => regler(-grandPas)} taille={40} couleur={couleur} label={`−${grandPas}`} aria={`Moins ${grandPas}`} clair />
+        <BoutonRond onClick={() => regler(-pas)} taille={50} couleur={couleur} label="−" aria="Moins un" />
         <input
           type="number" inputMode="numeric" min={1} value={valeur}
           onChange={(e) => onChange(e.target.value === "" ? "" : Math.max(0, Math.floor(Number(e.target.value))))}
           onFocus={(e) => e.target.select()}
           aria-label={libelle}
-          style={{ width: 96, textAlign: "center", fontFamily: TITRE, fontWeight: 700, fontSize: 40, color: "#1a1a1a", border: "none", borderBottom: "2px solid #ddd6c8", background: "transparent", outline: "none", padding: "0 4px", fontVariantNumeric: "tabular-nums", MozAppearance: "textfield" }}
+          style={{ width: 96, textAlign: "center", fontFamily: OSWALD, fontWeight: 700, fontSize: 40, color: "#1a1a1a", border: "none", borderBottom: `1px solid ${BORD}`, background: "transparent", outline: "none", padding: "0 4px", fontVariantNumeric: "tabular-nums", MozAppearance: "textfield" }}
         />
-        <BoutonRond onClick={() => regler(pas)} taille={54} couleur={couleur} label="+" aria="Plus un" />
-        <BoutonRond onClick={() => regler(grandPas)} taille={44} couleur={couleur} label={`+${grandPas}`} aria={`Plus ${grandPas}`} clair />
+        <BoutonRond onClick={() => regler(pas)} taille={50} couleur={couleur} label="+" aria="Plus un" />
+        <BoutonRond onClick={() => regler(grandPas)} taille={40} couleur={couleur} label={`+${grandPas}`} aria={`Plus ${grandPas}`} clair />
       </div>
     </div>
   );
@@ -233,19 +248,9 @@ function Compteur({ libelle, valeur, onChange, pas, grandPas, couleur }: { libel
 function BoutonRond({ onClick, taille, couleur, label, aria, clair }: { onClick: () => void; taille: number; couleur: string; label: string; aria: string; clair?: boolean }) {
   return (
     <button type="button" onClick={onClick} aria-label={aria} style={{
-      width: taille, height: taille, borderRadius: 999, flexShrink: 0, cursor: "pointer", fontFamily: TITRE, fontWeight: 700, appearance: "none", WebkitAppearance: "none", padding: 0,
-      fontSize: clair ? 14 : Math.round(taille * 0.5), lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center",
-      border: `2px solid ${couleur}`, background: clair ? "transparent" : couleur, color: clair ? couleur : "#fff", touchAction: "manipulation",
+      width: taille, height: taille, borderRadius: 999, flexShrink: 0, cursor: "pointer", fontFamily: OSWALD, fontWeight: 700, appearance: "none", WebkitAppearance: "none", padding: 0,
+      fontSize: clair ? Math.max(13, Math.round(taille * 0.36)) : Math.round(taille * 0.5), lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center",
+      border: `1.5px solid ${clair ? BORD : couleur}`, background: clair ? "#fff" : couleur, color: clair ? couleur : "#fff", touchAction: "manipulation",
     }}>{label}</button>
-  );
-}
-
-function Pesee({ libelle, grammes, precis }: { libelle: string; grammes: number; precis?: boolean }) {
-  const txt = precis && grammes < 100 ? `${(Math.round(grammes * 10) / 10).toLocaleString("fr-FR")} g` : g(grammes);
-  return (
-    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "9px 14px", borderTop: "1px solid #f2ede4" }}>
-      <span style={{ fontSize: 15, color: "#1a1a1a", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{libelle}</span>
-      <span style={{ fontFamily: TITRE, fontWeight: 700, fontSize: 28, color: "#1a1a1a", lineHeight: 1.1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{txt}</span>
-    </div>
   );
 }

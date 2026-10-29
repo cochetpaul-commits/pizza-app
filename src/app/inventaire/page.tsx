@@ -11,7 +11,11 @@ import { ModalNonComptes } from "@/components/inventaire/ModalNonComptes";
 import { useRouter } from "next/navigation";
 import { fermerOffresActives } from "@/lib/offerClosing";
 import { ZONES_EMBED, appliquerZonesEtab, type ZoneEtabRow } from "@/lib/zonesEtablissement";
-import { couleurTexte } from "@/lib/styleCategories";
+import { couleurTexte, couleurTexteSur as couleurTexteSurBarre, styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
+import { useBureau } from "@/hooks/useBureau";
+import { Tuile } from "@/components/ui/Tuile";
+import { EtatVide } from "@/components/ui/EtatVide";
+import { ACCENT, ATTENTION, BON, BORD, BORD_LIGNE, BTN, CADRE, CHAMP, MAUVAIS, MUTED, TD, TH, filtre as styleFiltre, h1, liseret, pastille } from "@/components/ui/charte";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -133,6 +137,7 @@ function fmtMoney(n: number) {
 export default function InventairePage() {
   const { current: etab } = useEtablissement();
   const [authSession, setAuthSession] = useState<Session | null>(null);
+  const bureau = useBureau();
 
   useEffect(() => {
     (async () => {
@@ -844,77 +849,39 @@ export default function InventairePage() {
   if (!isActive && !isViewing) {
     return (
       <RequireRole permission="achats.inventaire">
-        <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
-          <div style={{
-            background: "#fff", borderRadius: 16, border: "1.5px solid #ddd6c8",
-            padding: "48px 24px", textAlign: "center", marginBottom: 24,
-          }}>
-            <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.8 }}>&#x1F4CB;</div>
-            <div style={{
-              fontFamily: "Oswald, sans-serif", fontSize: 18, fontWeight: 700,
-              color: "#1a1a1a", marginBottom: 6,
-            }}>
-              Inventaire
-            </div>
-            <p style={{ color: "#999", fontSize: 13, marginBottom: 20, maxWidth: 320, margin: "0 auto 20px" }}>
-              Comptez vos articles zone par zone. Les quantites sont enregistrees automatiquement.
-            </p>
-            <button
-              onClick={createSession}
-              disabled={saving || !userId}
-              style={{
-                background: "#D4775A", color: "#fff", border: "none", borderRadius: 12,
-                padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer",
-                fontFamily: "Oswald, sans-serif",
-                boxShadow: "0 4px 16px rgba(212,119,90,0.25)",
-                opacity: saving ? 0.6 : 1,
-              }}
-            >
-              {saving ? "Creation..." : "Nouvel inventaire"}
-            </button>
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px", display: "grid", gap: 14 }}>
+          <style>{`.inv-ligne:hover td{background:#f7f3ec}`}</style>
+          <div>
+            <h1 style={h1(bureau)}>Inventaire</h1>
+            <div style={{ color: MUTED, fontSize: 13, marginTop: 2 }}>Comptez vos articles zone par zone, les quantités s&apos;enregistrent au fur et à mesure.</div>
+          </div>
+          <div style={CADRE}>
+            <EtatVide icone="produit" titre="Aucun inventaire en cours" texte="Un inventaire par zone (chambre froide, réserve, bar…), à plusieurs si besoin."
+              action={<button type="button" onClick={createSession} disabled={saving || !userId} style={{ ...BTN, background: ACCENT, borderColor: ACCENT, color: "#fff", fontWeight: 700, padding: "8px 18px", opacity: saving ? 0.6 : 1 }}>{saving ? "Création…" : "Nouvel inventaire"}</button>} />
           </div>
 
           {etab?.id && userId && <BlocFeuilles etabId={etab.id} userId={userId} feuilles={feuilles} />}
 
           {historique.length > 0 && (
-            <div>
-              <div style={{
-                fontFamily: "Oswald, sans-serif", fontSize: 15, fontWeight: 700,
-                color: "#1a1a1a", marginBottom: 10,
-              }}>
-                Inventaires precedents
-              </div>
-              {historique.map((inv) => (
-                <button
-                  key={inv.id}
-                  type="button"
-                  onClick={() => viewInventaire(inv)}
-                  style={{
-                    width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
-                    background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10,
-                    padding: "12px 16px", marginBottom: 6, cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>
-                      {fmtDate(inv.date)}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#999", marginTop: 2 }}>
-                      Cloture
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: "#D4775A" }}>
-                      {inv.total_valeur != null ? fmtMoney(inv.total_valeur) : "-"}
-                    </span>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); openApiFile(`/api/inventaire/pdf?id=${inv.id}`); }}
-                      style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", color: "#666" }}>
-                      PDF
-                    </button>
-                  </div>
-                </button>
-              ))}
+            <div style={CADRE}>
+              <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+                <colgroup><col style={{ width: 6 }} /><col /><col style={{ width: 110 }} /><col style={{ width: 70 }} /></colgroup>
+                <thead>
+                  <tr><th style={{ ...TH, padding: 0 }} /><th style={TH}>Inventaires précédents</th><th style={{ ...TH, textAlign: "right" }}>Valeur</th><th style={TH} /></tr>
+                </thead>
+                <tbody>
+                  {historique.map((inv) => (
+                    <tr key={inv.id} className="inv-ligne" onClick={() => viewInventaire(inv)} style={{ cursor: "pointer" }}>
+                      <td style={liseret(BON)} />
+                      <td style={TD}><span style={{ fontWeight: 600, fontSize: 13.5 }}>{fmtDate(inv.date)}</span> <span style={{ ...pastille(BON), marginLeft: 6 }}>Clôturé</span></td>
+                      <td style={{ ...TD, textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{inv.total_valeur != null ? fmtMoney(inv.total_valeur) : "-"}</td>
+                      <td style={{ ...TD, textAlign: "right" }}>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); openApiFile(`/api/inventaire/pdf?id=${inv.id}`); }} style={{ ...BTN, padding: "3px 10px", fontSize: 11, color: MUTED }}>PDF</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -932,7 +899,8 @@ export default function InventairePage() {
 
   return (
     <RequireRole permission="achats.inventaire">
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 40px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px" }}>
+        <style>{`.inv-ligne:hover td{background:#f7f3ec} .inv-article:hover{background:#f7f3ec}`}</style>
 
         {/* Header */}
         {isViewing && (
@@ -941,7 +909,7 @@ export default function InventairePage() {
             type="button"
             style={{
               background: "none", border: "none", cursor: "pointer", padding: 0,
-              fontSize: 13, color: "#999", marginBottom: 12, display: "block",
+              fontSize: 13, color: MUTED, marginBottom: 12, display: "block", fontFamily: "inherit",
             }}
           >
             &larr; Retour
@@ -951,26 +919,16 @@ export default function InventairePage() {
         <style>{`@media (max-width: 767px) { .inv-entete { flex-direction: column; align-items: stretch !important; } .inv-entete > div:last-child { flex-wrap: wrap; } }`}</style>
         <div className="inv-entete" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 16 }}>
           <div>
-            <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>
+            <h1 style={h1(bureau)}>
               {isViewing ? `Inventaire du ${fmtDate(currentInv?.date ?? "")}` : "Inventaire en cours"}
-            </div>
+            </h1>
             {isActive && (
-              <div style={{ fontSize: 12, color: "#999", marginTop: 2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 13, color: MUTED, marginTop: 2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span>{fmtDate(session.date)} &middot; {isPaused ? "En pause" : "Sauvegarde auto"}</span>
-                {isPaused && (
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: "#fbf1e0", color: "#D4A03C" }}>
-                    PAUSE
-                  </span>
-                )}
+                {isPaused && <span style={pastille(ATTENTION)}>Pause</span>}
                 {syncActive && (
-                  <span style={{
-                    display: "inline-flex", alignItems: "center", gap: 4,
-                    fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
-                    background: "#eaf4ec", color: "#4a6741",
-                  }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4a6741" }} />
-                    Multi-utilisateurs
-                    {lastSyncEvent && <span style={{ color: "#999", marginLeft: 4 }}>sync {lastSyncEvent}</span>}
+                  <span style={pastille(BON)}>
+                    Multi-utilisateurs{lastSyncEvent && <span style={{ color: MUTED, marginLeft: 4, fontWeight: 500 }}>sync {lastSyncEvent}</span>}
                   </span>
                 )}
               </div>
@@ -981,11 +939,7 @@ export default function InventairePage() {
             {(isActive || isViewing) && currentInv && (
               <button
                 onClick={() => openApiFile(`/api/inventaire/pdf?id=${currentInv.id}`)}
-                style={{
-                  padding: "8px 14px", borderRadius: 20, border: "1.5px solid #ddd6c8",
-                  background: "#fff", color: "#666", fontSize: 12, fontWeight: 600,
-                  cursor: "pointer", whiteSpace: "nowrap",
-                }}
+                style={{ ...BTN, color: MUTED }}
               >
                 PDF
               </button>
@@ -998,11 +952,7 @@ export default function InventairePage() {
                       await supabase.from("inventaires").update({ statut: "en_pause" }).eq("id", session.id);
                       setSession({ ...session, statut: "en_pause" });
                     }}
-                    style={{
-                      padding: "8px 14px", borderRadius: 20, border: "1.5px solid #D4A03C",
-                      background: "#fff", color: "#D4A03C", fontSize: 12, fontWeight: 700,
-                      cursor: "pointer", whiteSpace: "nowrap",
-                    }}
+                    style={{ ...BTN, borderColor: ATTENTION, color: ATTENTION, fontWeight: 700 }}
                   >
                     Pause
                   </button>
@@ -1012,11 +962,7 @@ export default function InventairePage() {
                       await supabase.from("inventaires").update({ statut: "en_cours" }).eq("id", session.id);
                       setSession({ ...session, statut: "en_cours" });
                     }}
-                    style={{
-                      padding: "8px 14px", borderRadius: 20, border: "1.5px solid #D4775A",
-                      background: "#D4775A", color: "#fff", fontSize: 12, fontWeight: 700,
-                      cursor: "pointer", whiteSpace: "nowrap",
-                    }}
+                    style={{ ...BTN, background: ACCENT, borderColor: ACCENT, color: "#fff", fontWeight: 700 }}
                   >
                     Reprendre
                   </button>
@@ -1024,73 +970,34 @@ export default function InventairePage() {
                 <button
                   onClick={cloturerSession}
                   disabled={saving}
-                  style={{
-                    padding: "8px 18px", borderRadius: 20, border: "1.5px solid #4a6741",
-                    background: "#4a6741", color: "#fff", fontSize: 13, fontWeight: 700,
-                    cursor: "pointer", opacity: saving ? 0.6 : 1, whiteSpace: "nowrap",
-                  }}
+                  style={{ ...BTN, background: BON, borderColor: BON, color: "#fff", fontWeight: 700, padding: "6px 16px", opacity: saving ? 0.6 : 1 }}
                 >
-                  {saving ? "..." : "Cloturer"}
+                  {saving ? "…" : "Clôturer"}
                 </button>
               </>
             )}
           </div>
         </div>
 
-        {/* Summary */}
-        <div style={summaryCard}>
-          <div style={summaryItem}>
-            <span style={summaryLabel}>Saisis</span>
-            <span style={summaryValue}>{totalSummary.saisis} / {ingredients.length}</span>
-          </div>
-          <div style={{ width: 1, background: "#ddd6c8", alignSelf: "stretch" }} />
-          <div style={summaryItem}>
-            <span style={summaryLabel}>Valeur</span>
-            <span style={summaryValue}>
-              {totalSummary.value > 0 ? fmtMoney(totalSummary.value) : "-"}
-            </span>
-          </div>
-          {Object.keys(prevQuantities).length > 0 && (
-            <>
-              <div style={{ width: 1, background: "#ddd6c8", alignSelf: "stretch" }} />
-              <div style={summaryItem}>
-                <span style={summaryLabel}>Ecart vs prec.</span>
-                <span style={summaryValue}>
-                  {(() => {
-                    let delta = 0;
-                    for (const ing of ingredients) {
-                      const cur = ingTotals.totals[ing.id] ?? 0;
-                      const prev = prevQuantities[ing.id] ?? 0;
-                      if (cur > 0 && prev > 0 && ing.cost_per_unit) delta += (cur - prev) * ing.cost_per_unit;
-                    }
-                    return (
-                      <span style={{ color: delta >= 0 ? "#4a6741" : "#DC2626" }}>
-                        {delta >= 0 ? "+" : ""}{fmtMoney(delta)}
-                      </span>
-                    );
-                  })()}
-                </span>
-              </div>
-            </>
-          )}
-          {/* Stock alerts count */}
-          {(() => {
-            const alerts = ingredients.filter(ing => {
-              const qty = ingTotals.totals[ing.id] ?? 0;
-              return qty > 0 && ing.stock_min != null && qty < ing.stock_min;
-            });
-            if (alerts.length === 0) return null;
-            return (
-              <>
-                <div style={{ width: 1, background: "#ddd6c8", alignSelf: "stretch" }} />
-                <div style={summaryItem}>
-                  <span style={summaryLabel}>Alertes</span>
-                  <span style={{ ...summaryValue, color: "#DC2626" }}>{alerts.length} sous min</span>
-                </div>
-              </>
-            );
-          })()}
-        </div>
+        {/* Synthèse : tuiles de la charte */}
+        {(() => {
+          let delta = 0; const aPrec = Object.keys(prevQuantities).length > 0;
+          for (const ing of ingredients) {
+            const cur = ingTotals.totals[ing.id] ?? 0;
+            const prev = prevQuantities[ing.id] ?? 0;
+            if (cur > 0 && prev > 0 && ing.cost_per_unit) delta += (cur - prev) * ing.cost_per_unit;
+          }
+          const alertes = ingredients.filter((ing) => { const qty = ingTotals.totals[ing.id] ?? 0; return qty > 0 && ing.stock_min != null && qty < ing.stock_min; }).length;
+          const nb = 2 + (aPrec ? 1 : 0) + (alertes > 0 ? 1 : 0);
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: bureau ? `repeat(${nb}, 1fr)` : "repeat(2, 1fr)", gap: 8, marginBottom: 14 }}>
+              <Tuile compacte icone="produit" libelle="Saisis" valeur={`${totalSummary.saisis} / ${ingredients.length}`} couleur="#1a1a1a" />
+              <Tuile compacte icone="euro" libelle="Valeur comptée" valeur={totalSummary.value > 0 ? fmtMoney(totalSummary.value) : "-"} couleur={ACCENT} />
+              {aPrec && <Tuile compacte libelle="Écart vs précédent" valeur={`${delta >= 0 ? "+" : ""}${fmtMoney(delta)}`} couleur={delta >= 0 ? BON : MAUVAIS} />}
+              {alertes > 0 && <Tuile compacte icone="alerte" libelle="Sous le minimum" valeur={alertes} couleur={MAUVAIS} />}
+            </div>
+          );
+        })()}
 
         {/* Zone tabs */}
         <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -1104,58 +1011,33 @@ export default function InventairePage() {
                 key={z.id}
                 type="button"
                 onClick={() => setActiveZone(z.id)}
-                style={{
-                  padding: "8px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-                  cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                  border: isActiveZone ? "1.5px solid #D4775A" : isDone ? "1.5px solid #4a6741" : "1px solid #ddd6c8",
-                  background: isActiveZone ? "#D4775A" : isDone ? "#eaf4ec" : "#fff",
-                  color: isActiveZone ? "#fff" : isDone ? "#4a6741" : "#1a1a1a",
-                  transition: "all 0.15s",
-                }}
+                style={{ ...styleFiltre(isActiveZone), display: "inline-flex", alignItems: "center", gap: 6, ...(isDone && !isActiveZone ? { borderColor: BON, color: BON } : {}) }}
               >
                 {z.nom}
-                {zs && zs.total > 0 && (
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 8,
-                    background: isActiveZone ? "rgba(255,255,255,0.3)" : isDone ? "#4a6741" : "rgba(0,0,0,0.06)",
-                    color: isActiveZone || isDone ? "#fff" : "#999",
-                  }}>
-                    {pct}%
-                  </span>
-                )}
+                {zs && zs.total > 0 && <span style={pastille(isDone ? BON : MUTED, isDone ? undefined : "rgba(0,0,0,0.06)")}>{pct} %</span>}
               </button>
             );
           })}
           <button
             type="button"
             onClick={() => setShowAddZone(true)}
-            style={{
-              width: 32, height: 32, borderRadius: 20, fontSize: 16, fontWeight: 700,
-              cursor: "pointer", border: "1.5px dashed #ddd6c8", background: "#fff",
-              color: "#999", display: "flex", alignItems: "center", justifyContent: "center",
-            }}
+            style={{ ...BTN, width: 32, height: 32, padding: 0, borderStyle: "dashed", color: MUTED, display: "flex", alignItems: "center", justifyContent: "center" }}
             title="Ajouter une zone"
           >+</button>
           {zones.length > 0 && (
             <button
               type="button"
               onClick={() => setShowManageZones(!showManageZones)}
-              style={{
-                fontSize: 11, color: "#999", background: "none", border: "none",
-                cursor: "pointer", textDecoration: "underline", padding: "4px 0",
-              }}
+              style={{ fontSize: 12, color: MUTED, background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: "4px 0", fontFamily: "inherit" }}
             >
-              {showManageZones ? "Fermer" : "Gérer"}
+              {showManageZones ? "Fermer" : "Gérer les zones"}
             </button>
           )}
         </div>
 
         {/* Add zone inline */}
         {showAddZone && (
-          <div style={{
-            marginBottom: 12, padding: "14px 16px", background: "#fff", borderRadius: 12,
-            border: "1.5px solid #ddd6c8", display: "flex", flexDirection: "column", gap: 10,
-          }}>
+          <div style={{ ...CADRE, marginBottom: 12, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
             <input
               autoFocus
               type="text"
@@ -1163,10 +1045,7 @@ export default function InventairePage() {
               onChange={(e) => setNewZoneName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") addZone(); if (e.key === "Escape") setShowAddZone(false); }}
               placeholder="Nom de la zone (ex: Chambre froide, Reserve)"
-              style={{
-                height: 38, borderRadius: 8, border: "1.5px solid #e5ddd0",
-                padding: "4px 12px", fontSize: 14, background: "#fff", width: "100%",
-              }}
+              style={{ ...CHAMP, width: "100%" }}
             />
             {/* Auto-assign: fournisseurs */}
             <div>
@@ -1221,11 +1100,8 @@ export default function InventairePage() {
 
         {/* Manage zones panel */}
         {showManageZones && (
-          <div style={{
-            marginBottom: 12, padding: "12px 14px", background: "#fff",
-            borderRadius: 10, border: "1.5px solid #ddd6c8",
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: "#1a1a1a" }}>
+          <div style={{ ...CADRE, marginBottom: 12, padding: "12px 14px" }}>
+            <div style={{ ...TH, padding: "0 0 8px", border: 0 }}>
               Zones de stockage
             </div>
             {zones.map((z) => {
@@ -1396,10 +1272,7 @@ export default function InventairePage() {
             value={searchInv}
             onChange={(e) => setSearchInv(e.target.value)}
             placeholder="Rechercher un produit..."
-            style={{
-              width: "100%", height: 38, borderRadius: 10, border: "1.5px solid #e5ddd0",
-              padding: "0 14px 0 36px", fontSize: 13, background: "#fff", outline: "none",
-            }}
+            style={{ ...CHAMP, width: "100%", borderRadius: 20, padding: "0 14px 0 36px", outline: "none" }}
           />
           {searchInv && (
             <button type="button" onClick={() => setSearchInv("")} style={{
@@ -1410,11 +1283,7 @@ export default function InventairePage() {
         </div>
           {activeZone !== SANS_ZONE && (
             <button type="button" onClick={() => { setShowAddProducts(true); setAddProdSearch(""); setAddProdSel(new Set()); }}
-              style={{
-                height: 38, padding: "0 14px", borderRadius: 10, border: "none",
-                background: "#D4775A", color: "#fff", fontSize: 13, fontWeight: 700,
-                cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
-              }}>
+              style={{ ...BTN, height: 36, background: ACCENT, borderColor: ACCENT, color: "#fff", fontWeight: 700, flexShrink: 0 }}>
               + Produits
             </button>
           )}
@@ -1423,12 +1292,12 @@ export default function InventairePage() {
         {/* Progress bar + zone summary */}
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, padding: "0 4px" }}>
-            <span style={{ fontSize: 11, color: "#999" }}>
+            <span style={{ fontSize: 12, color: MUTED }}>
               {zoneSummary.saisis} / {zoneSummary.articles} articles saisis
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {zoneSummary.value > 0 && (
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#D4775A" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT, fontVariantNumeric: "tabular-nums" }}>
                   {fmtMoney(zoneSummary.value)}
                 </span>
               )}
@@ -1436,14 +1305,7 @@ export default function InventairePage() {
                 <button
                   type="button"
                   onClick={() => setFilterNonSaisis(v => !v)}
-                  style={{
-                    fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 8,
-                    cursor: "pointer",
-                    border: filterNonSaisis ? "1.5px solid #D4775A" : "1px solid #ddd6c8",
-                    background: filterNonSaisis ? "#D4775A" : "#fff",
-                    color: filterNonSaisis ? "#fff" : "#999",
-                    transition: "all 0.15s",
-                  }}
+                  style={{ ...styleFiltre(filterNonSaisis), padding: "3px 10px", fontSize: 12 }}
                 >
                   Non saisis
                 </button>
@@ -1452,11 +1314,11 @@ export default function InventairePage() {
           </div>
           {/* Progress bar */}
           <div style={{
-            height: 6, borderRadius: 3, background: "#e5ddd0", overflow: "hidden",
+            height: 4, borderRadius: 2, background: "#e5ddd0", overflow: "hidden",
           }}>
             <div style={{
-              height: "100%", borderRadius: 3,
-              background: progressPct === 100 ? "#4a6741" : "#D4775A",
+              height: "100%", borderRadius: 2,
+              background: progressPct === 100 ? BON : ACCENT,
               width: `${progressPct}%`,
               transition: "width 0.3s ease",
             }} />
@@ -1465,9 +1327,7 @@ export default function InventairePage() {
 
         {/* Category-grouped ingredient list */}
         {categoryGroups.length === 0 ? (
-          <p style={{ color: "#999", fontSize: 13, textAlign: "center", padding: 32 }}>
-            {filterNonSaisis ? "Tous les articles ont été saisis" : "Aucun article dans cette zone"}
-          </p>
+          <div style={CADRE}><EtatVide compact icone="produit" titre={filterNonSaisis ? "Tout est saisi" : "Aucun article dans cette zone"} texte={filterNonSaisis ? "Tous les articles de la zone ont une quantité." : "Ajoute des produits à la zone avec « + Produits »."} /></div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {categoryGroups.map(({ cat, label, color, items }) => {
@@ -1489,34 +1349,13 @@ export default function InventairePage() {
                   <button
                     type="button"
                     onClick={() => toggleCat(cat)}
-                    onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = color; }}
-                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "#ddd6c8"; (e.currentTarget.style as CSSStyleDeclaration).borderLeftColor = color; }}
-                    style={{
-                      width: "100%", display: "flex", alignItems: "center", gap: 10,
-                      padding: "12px 16px", background: "#fff",
-                      border: "1.5px solid #ddd6c8", borderLeft: `3px solid ${color}`,
-                      borderRadius: 12, cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                      marginTop: 12, marginBottom: 6,
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                      transition: "box-shadow 0.2s, border-color 0.2s",
-                    }}
+                    aria-expanded={!isCollapsed}
+                    style={{ ...styleBarreCategorie(color), minHeight: 44, gap: 10, padding: "0 14px", boxShadow: "none", marginTop: 10, borderRadius: isCollapsed ? 14 : "14px 14px 0 0" }}
                   >
-                    {/* Colored dot */}
-                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
-                    {/* UPPERCASE label in category color */}
-                    <span style={{
-                      fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 700,
-                      letterSpacing: "0.14em", textTransform: "uppercase", color,
-                    }}>{label}</span>
-                    {/* Count badge */}
-                    <span style={{
-                      fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
-                      background: `${color}18`, color,
-                    }}>{items.length}</span>
-                    {/* Saisis / value info */}
-                    <span style={{ fontSize: 11, color: "#999", marginLeft: 4 }}>
-                      {catSaisis}/{items.length}
-                      {catValue > 0 && ` · ${fmtMoney(catValue)}`}
+                    <span style={{ ...styleTitreCategorie(color), flex: "0 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+                    <span style={stylePastilleBarre(color)}>{catSaisis}/{items.length}</span>
+                    <span style={{ fontSize: 12, color: couleurTexteSurBarre(color), opacity: 0.85, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {catValue > 0 ? fmtMoney(catValue) : ""}
                     </span>
                     {/* Tout à 0 — span cliquable (un <button> ne peut pas etre imbrique dans le <button> d'en-tete) */}
                     {isActive && catNonSaisis > 0 && (
@@ -1525,23 +1364,19 @@ export default function InventairePage() {
                         tabIndex={0}
                         onClick={(e) => { e.stopPropagation(); markCategoryZero(items); }}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); markCategoryZero(items); } }}
-                        style={{
-                          fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6,
-                          border: "1px solid #ddd6c8", background: "#fff", color: "#999",
-                          cursor: "pointer", whiteSpace: "nowrap", marginLeft: "auto",
-                        }}
+                        style={{ ...stylePastilleBarre(color), fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}
                         title="Confirmer tous les articles non saisis comme 0"
                       >
                         Tout à 0
                       </span>
                     )}
                     {/* Chevron */}
-                    <span style={{ marginLeft: isActive && catNonSaisis > 0 ? 0 : "auto", fontSize: 10, color: "#b0a894", transition: "transform 0.2s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)" }}>&#x25BC;</span>
+                    <span style={styleChevronBarre(color, !isCollapsed)}>&#x25BC;</span>
                   </button>
 
-                  {/* Items */}
+                  {/* Items : cadre blanc accroché sous la barre, liseré de couleur par ligne */}
                   {!isCollapsed && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
+                    <div style={{ ...CADRE, borderTop: 0, borderRadius: "0 0 14px 14px" }}>
                       {items.map((ing) => {
                         const pack = packInfo[ing.id];
                         const rawQty = quantities[qk(ing.id, activeZone)];
@@ -1560,24 +1395,21 @@ export default function InventairePage() {
                         return (
                           <div
                             key={ing.id}
+                            className="inv-article"
                             style={{
                               display: "flex", alignItems: "center", gap: 10,
-                              padding: "10px 14px",
-                              background: "#fff",
-                              borderRadius: 12,
-                              border: "1.5px solid #ddd6c8",
-                              borderLeft: `3px solid ${hasQty ? color : isZeroConfirmed ? "#ccc" : "#ddd6c8"}`,
-                              marginBottom: 4,
-                              transition: "all 0.15s",
+                              padding: "9px 14px 9px 16px",
+                              borderBottom: `1px solid ${BORD_LIGNE}`,
+                              boxShadow: `inset 6px 0 0 ${hasQty ? color : isZeroConfirmed ? "#d6d0c4" : `${color}55`}`,
                               flexWrap: "wrap",
                             }}
                           >
                             {/* Name + unit + delete — affichage produit canonique */}
-                            <div className="produit-main" style={{ flex: 1, minWidth: 0 }}>
+                            <div className="produit-main">
                               <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
                                 <span className="produit-name" style={{
-                                  fontSize: 13, fontWeight: hasQty ? 700 : 500,
-                                  color: hasQty ? "#1a1a1a" : isZeroConfirmed ? "#999" : "#666",
+                                  fontSize: 13.5, fontWeight: hasQty ? 600 : 500,
+                                  color: hasQty ? "#1a1a1a" : isZeroConfirmed ? MUTED : "#1a1a1a",
                                   textDecoration: isZeroConfirmed ? "line-through" : "none",
                                   flex: 1, minWidth: 0,
                                 }}>
@@ -1680,7 +1512,7 @@ export default function InventairePage() {
 
                             {/* Value */}
                             {valeur != null && (
-                              <span style={{ fontSize: 11, color: "#999", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+                              <span style={{ fontSize: 12, color: MUTED, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
                                 {fmtMoney(valeur)}
                               </span>
                             )}
@@ -1688,8 +1520,8 @@ export default function InventairePage() {
                             {/* Qty inputs */}
                             {readOnly ? (
                               <span style={{
-                                fontSize: 15, fontWeight: 700, color: hasQty ? "#D4775A" : "#ccc",
-                                minWidth: 50, textAlign: "right", flexShrink: 0,
+                                fontSize: 15, fontWeight: 700, color: hasQty ? "#1a1a1a" : "#ccc",
+                                minWidth: 50, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums",
                               }}>
                                 {hasQty ? (pack ? `${nbCartons}c + ${nbLoose}` : `${rawQtyNum}`) : "-"}
                               </span>
@@ -1719,9 +1551,9 @@ export default function InventairePage() {
                                   const cur = typeof rawQty === "number" ? rawQty : 0;
                                   handleQtyChange(ing.id, String(Math.max(0, cur - 1)));
                                 }} style={{
-                                  width: 32, height: 36, borderRadius: "8px 0 0 8px",
-                                  border: "1px solid #ddd6c8", borderRight: "none",
-                                  background: "#f9f5ef", color: "#D4775A", fontSize: 18,
+                                  width: 32, height: 36, borderRadius: "10px 0 0 10px",
+                                  border: `1px solid ${BORD}`, borderRight: "none",
+                                  background: "#fff", color: ACCENT, fontSize: 18, fontFamily: "inherit",
                                   fontWeight: 700, cursor: "pointer", display: "flex",
                                   alignItems: "center", justifyContent: "center",
                                 }}>-</button>
@@ -1744,9 +1576,9 @@ export default function InventairePage() {
                                   const cur = typeof rawQty === "number" ? rawQty : 0;
                                   handleQtyChange(ing.id, String(cur + 1));
                                 }} style={{
-                                  width: 32, height: 36, borderRadius: "0 8px 8px 0",
-                                  border: "1px solid #ddd6c8", borderLeft: "none",
-                                  background: "#f9f5ef", color: "#4a6741", fontSize: 18,
+                                  width: 32, height: 36, borderRadius: "0 10px 10px 0",
+                                  border: `1px solid ${BORD}`, borderLeft: "none",
+                                  background: "#fff", color: BON, fontSize: 18, fontFamily: "inherit",
                                   fontWeight: 700, cursor: "pointer", display: "flex",
                                   alignItems: "center", justifyContent: "center",
                                 }}>+</button>
@@ -1780,40 +1612,6 @@ export default function InventairePage() {
   );
 }
 
-// ── Styles ──────────────────────────────────────────────────
-
-const summaryCard: React.CSSProperties = {
-  display: "flex",
-  gap: 24,
-  padding: "14px 18px",
-  background: "#fff",
-  borderRadius: 10,
-  border: "1px solid #ddd6c8",
-  marginBottom: 16,
-};
-
-const summaryItem: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 4,
-  flex: 1,
-};
-
-const summaryLabel: React.CSSProperties = {
-  fontSize: 11,
-  color: "#999",
-  fontWeight: 600,
-  textTransform: "uppercase",
-  letterSpacing: 0.3,
-};
-
-const summaryValue: React.CSSProperties = {
-  fontSize: 20,
-  fontWeight: 700,
-  color: "#1a1a1a",
-  fontFamily: "Oswald, sans-serif",
-};
-
 /**
  * Inventaires « feuille » (fin d'exercice, mensuel) : création (date, type) et liste ;
  * la saisie se fait dans l'ordre de la feuille papier, sur /inventaire/[id].
@@ -1846,11 +1644,11 @@ function BlocFeuilles({ etabId, userId, feuilles }: { etabId: string; userId: st
     if (error || !data) { alert(error?.message ?? "Création impossible"); return; }
     router.push(`/inventaire/${data.id}`);
   };
-  const champ: React.CSSProperties = { height: 42, borderRadius: 10, border: "1px solid #ddd6c8", padding: "0 10px", fontSize: 14, background: "#fff", fontFamily: "inherit" };
+  const champ: React.CSSProperties = { ...CHAMP, height: 38, padding: "0 10px" };
   return (
-    <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #ddd6c8", padding: 16, marginBottom: 24 }}>
-      <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>Inventaire sur feuille</div>
-      <p style={{ fontSize: 12.5, color: "#8a8378", margin: "0 0 10px" }}>Saisie zone par zone, dans l&apos;ordre de la feuille papier, en colis et unités.</p>
+    <div style={{ ...CADRE, padding: 16 }}>
+      <div style={{ ...TH, padding: 0, border: 0, marginBottom: 4 }}>Inventaire sur feuille</div>
+      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 10px" }}>Saisie zone par zone, dans l&apos;ordre de la feuille papier, en colis et unités.</p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={champ} />
         <select value={type} onChange={(e) => setType(e.target.value as "fin_exercice" | "mensuel")} style={champ}>
@@ -1858,7 +1656,7 @@ function BlocFeuilles({ etabId, userId, feuilles }: { etabId: string; userId: st
           <option value="mensuel">Mensuel</option>
         </select>
         <button type="button" onClick={creer} disabled={envoi || !date}
-          style={{ ...champ, border: "none", background: "#D4775A", color: "#fff", fontWeight: 700, padding: "0 16px", cursor: "pointer" }}>
+          style={{ ...BTN, height: 38, background: ACCENT, borderColor: ACCENT, color: "#fff", fontWeight: 700, padding: "0 16px" }}>
           {envoi ? "Création…" : "Créer l'inventaire"}
         </button>
       </div>
@@ -1868,16 +1666,17 @@ function BlocFeuilles({ etabId, userId, feuilles }: { etabId: string; userId: st
             <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
               <button type="button" onClick={() => router.push(`/inventaire/${f.id}`)} style={{
                 flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, textAlign: "left",
-                background: "#faf7f2", border: "1px solid #ece6db", borderRadius: 10, padding: "10px 12px", cursor: "pointer", fontFamily: "inherit",
+                background: "#fff", border: `1px solid ${BORD}`, borderRadius: 12, padding: "9px 12px 9px 14px", cursor: "pointer", fontFamily: "inherit",
+                boxShadow: `inset 6px 0 0 ${f.statut === "cloture" ? BON : ACCENT}`,
               }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: "#1a1a1a" }}>
                   {new Date(f.date + "T12:00:00").toLocaleDateString("fr-FR")} · {f.type === "fin_exercice" ? "Fin d'exercice" : "Mensuel"}
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: f.statut === "cloture" ? "#2D6A4F" : "#D4775A" }}>{f.statut === "cloture" ? "Clôturé" : "En cours"} ›</span>
+                <span style={pastille(f.statut === "cloture" ? BON : ACCENT)}>{f.statut === "cloture" ? "Clôturé" : "En cours"}</span>
               </button>
               {f.statut !== "cloture" && (
                 <button type="button" onClick={() => void supprimer(f)} disabled={suppression === f.id} title="Supprimer cet inventaire et ses lignes"
-                  style={{ flexShrink: 0, height: 40, padding: "0 10px", borderRadius: 10, border: "1px solid #ece6db", background: "#fff", color: "#a12b2b", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  style={{ ...BTN, flexShrink: 0, color: MAUVAIS, fontSize: 12 }}>
                   {suppression === f.id ? "…" : "Supprimer"}
                 </button>
               )}

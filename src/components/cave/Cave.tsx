@@ -5,6 +5,9 @@ import { fetchApi } from "@/lib/fetchApi";
 import { useBureau } from "@/hooks/useBureau";
 import { VoletDroit } from "@/components/produits/BaseProduits";
 import type { VinCave } from "@/app/api/cave/route";
+import { Tuile } from "@/components/ui/Tuile";
+import { EtatVide } from "@/components/ui/EtatVide";
+import { ACCENT, ATTENTION, BON, BORD, BTN, CADRE, CHAMP, MAUVAIS, MUTED, OSWALD, TD, TH, filtre as styleFiltre, h1, liseret, pastille } from "@/components/ui/charte";
 
 /**
  * Cave Bello Mio (phase 1, 27/10/2026) : le sommelier de poche de l'équipe.
@@ -16,17 +19,16 @@ import type { VinCave } from "@/app/api/cave/route";
 type Plat = { id: string; nom: string; categorie: string; prix: number };
 type Donnees = { vins: VinCave[]; edition: boolean; argent: boolean; plats: Plat[] };
 
-const ACCENT = "#D4775A", MUTED = "#999", BORD = "#ddd6c8", VERT = "#2f7d4f", ROUGE = "#b3261e", AMBRE = "#b8641b";
-const OSWALD = "var(--font-oswald), Oswald, sans-serif", SERIF = "var(--font-cormorant), 'Cormorant Garamond', Georgia, serif";
+const VERT = BON, ROUGE = MAUVAIS, AMBRE = ATTENTION;
+const SERIF = "var(--font-cormorant), 'Cormorant Garamond', Georgia, serif";
 const COULEURS: Record<string, { lib: string; c: string }> = { rouge: { lib: "Rouge", c: "#8a2f3a" }, blanc: { lib: "Blanc", c: "#c9a84c" }, rose: { lib: "Rosé", c: "#e09a9a" }, bulles: { lib: "Bulles", c: "#8aa8b8" }, doux: { lib: "Doux", c: "#b7791f" }, champagne: { lib: "Champagne", c: "#8aa8b8" } };
 const ORDRE = ["rouge", "blanc", "rose", "bulles", "doux", "champagne"];
 const CATS: Record<string, string> = { ANTIPASTI: "Antipasti", PIZZE: "Pizze", CUCINA: "Cucina", DOLCI: "Dolci" };
 const eur = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })} €`;
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
-const BTN: CSSProperties = { border: `1px solid ${BORD}`, borderRadius: 20, background: "#fff", padding: "6px 12px", fontSize: 13, cursor: "pointer", color: "#1a1a1a", fontWeight: 600, fontFamily: "inherit" };
 const Point = ({ couleur }: { couleur: string }) => <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: COULEURS[couleur]?.c ?? MUTED, marginRight: 7, verticalAlign: -1 }} />;
 const Chip = ({ on, children, onClick }: { on: boolean; children: React.ReactNode; onClick: () => void }) => (
-  <button type="button" onClick={onClick} style={{ ...BTN, padding: "6px 11px", borderColor: on ? ACCENT : BORD, background: on ? "#f5e9e2" : "#fff", fontWeight: on ? 700 : 500 }}>{children}</button>
+  <button type="button" onClick={onClick} style={{ ...styleFiltre(on), padding: "6px 11px" }}>{children}</button>
 );
 const Cat = ({ children }: { children: React.ReactNode }) => <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".1em", color: MUTED, fontWeight: 700, margin: "12px 0 4px" }}>{children}</div>;
 
@@ -75,7 +77,7 @@ function Fiche({ v, donnees, onFermer, onRecharger }: { v: VinCave; donnees: Don
     if (r.ok) { setAccordPlat(""); setAccordRaison(""); onRecharger(); } else setEtat("Accord non enregistré");
   };
   const retirerAccord = async (id: string) => { const r = await fetchApi(`/api/cave?accord=${id}`, { method: "DELETE" }); if (r.ok) onRecharger(); };
-  const input: CSSProperties = { font: "inherit", fontSize: 14, padding: "7px 10px", border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4", width: "100%", boxSizing: "border-box" };
+  const input: CSSProperties = { ...CHAMP, height: undefined, width: "100%" };
   const platPar = new Map(donnees.plats.map((p) => [p.id, p]));
   const pied = donnees.edition ? (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
@@ -105,10 +107,10 @@ function Fiche({ v, donnees, onFermer, onRecharger }: { v: VinCave; donnees: Don
         </div>
       ) : (
         <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em" }}>
-            <span style={{ color: v.statut === "valide" ? VERT : AMBRE, border: `1px solid ${v.statut === "valide" ? VERT : AMBRE}`, borderRadius: 8, padding: "2px 8px" }}>{v.statut === "valide" ? "Fiche validée" : "À valider"}</span>
-            {v.stock != null && <span style={{ color: v.stock <= 0 ? ROUGE : "#1a1a1a", border: `1px solid ${BORD}`, borderRadius: 8, padding: "2px 8px" }}>{v.stock <= 0 ? "Plus en cave" : `${v.stock.toLocaleString("fr-FR")} en cave`}</span>}
-            {v.stock == null && <span style={{ color: MUTED, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>stock inconnu : produit non relié</span>}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={pastille(v.statut === "valide" ? VERT : AMBRE)}>{v.statut === "valide" ? "Fiche validée" : "À valider"}</span>
+            {v.stock != null && <span style={pastille(v.stock <= 0 ? ROUGE : v.stock <= 3 ? AMBRE : MUTED, v.stock > 3 ? "rgba(0,0,0,0.06)" : undefined)}>{v.stock <= 0 ? "Plus en cave" : `${v.stock.toLocaleString("fr-FR")} en cave`}</span>}
+            {v.stock == null && <span style={{ color: MUTED, fontSize: 12 }}>stock inconnu : produit non relié</span>}
           </div>
           <Profil p={v.profil} />
           {v.pitch && <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.3 }}>{v.pitch}</div>}
@@ -239,42 +241,88 @@ export function Cave({ vueInitiale }: { vueInitiale?: "service" | "cave" }) {
   const vins = useMemo(() => {
     if (!donnees) return [];
     const q = norm(recherche);
-    return donnees.vins.filter((v) => (filtre === "archive" ? !v.sur_carte : v.sur_carte && (filtre === "tous" || v.couleur === filtre)))
+    const garde = (v: VinCave) => {
+      if (filtre === "archive") return !v.sur_carte;
+      if (!v.sur_carte) return false;
+      if (filtre === "tous") return true;
+      if (filtre === "a_valider") return v.statut !== "valide";
+      if (filtre === "stock") return v.stock != null && v.stock <= 3;
+      return v.couleur === filtre;
+    };
+    return donnees.vins.filter(garde)
       .filter((v) => !q || norm(`${v.nom} ${v.domaine ?? ""} ${v.cepages ?? ""} ${v.region ?? ""}`).includes(q))
       .sort((a, b) => ORDRE.indexOf(a.couleur) - ORDRE.indexOf(b.couleur) || (a.prix?.b ?? 0) - (b.prix?.b ?? 0) || a.nom.localeCompare(b.nom, "fr"));
   }, [donnees, filtre, recherche]);
   const vinOuvert = donnees?.vins.find((v) => v.id === ouvert) ?? null;
   const aValider = donnees?.vins.filter((v) => v.sur_carte && v.statut !== "valide").length ?? 0;
+  const surCarte = donnees?.vins.filter((v) => v.sur_carte).length ?? 0;
+  const stockFaible = donnees?.vins.filter((v) => v.sur_carte && v.stock != null && v.stock <= 3).length ?? 0;
+  const basculerFiltre = (f: string) => setFiltre((x) => (x === f ? "tous" : f));
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px" }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
         <div>
-          <h1 style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: bureau ? 28 : 22, textTransform: "uppercase", margin: 0, lineHeight: 1.05 }}>La cave</h1>
+          <h1 style={h1(bureau)}>La cave</h1>
           <div style={{ color: MUTED, fontSize: 13 }}>Le vin de la table, et la phrase pour le vendre.</div>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          {(["service", "cave"] as const).map((t) => <button key={t} type="button" onClick={() => setVue(t)} style={{ ...BTN, borderColor: vue === t ? ACCENT : BORD, background: vue === t ? "#f5e9e2" : "#fff", fontWeight: 700 }}>{t === "service" ? "Service" : "Cave"}</button>)}
+          {(["service", "cave"] as const).map((t) => <button key={t} type="button" onClick={() => setVue(t)} style={styleFiltre(vue === t)}>{t === "service" ? "Service" : "Cave"}</button>)}
         </div>
       </div>
       {erreur && <p style={{ color: ROUGE }}>{erreur}</p>}
       {!donnees && !erreur && <p style={{ color: MUTED, textAlign: "center", padding: 40 }}>Chargement…</p>}
       {donnees && vue === "service" && <Service donnees={donnees} onOuvrir={(v) => setOuvert(v.id)} />}
       {donnees && vue === "cave" && (
-        <div>
-          {donnees.edition && aValider > 0 && <div style={{ fontSize: 12.5, color: AMBRE, marginBottom: 8 }}>{aValider} fiche{aValider > 1 ? "s" : ""} de la carte à valider : ouvre, relis, « Valider la fiche ».</div>}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 8 }}>
-            {["tous", ...ORDRE, "archive"].map((f) => <Chip key={f} on={filtre === f} onClick={() => setFiltre(f)}>{f === "tous" ? "Tous" : f === "archive" ? "Archive" : COULEURS[f].lib}</Chip>)}
-            <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Chercher un vin, un cépage…" style={{ font: "inherit", fontSize: 14, padding: "7px 10px", border: `1.5px solid ${BORD}`, borderRadius: 20, background: "#fff", flex: "1 1 160px", minWidth: 0 }} />
+        <div style={{ display: "grid", gap: 10 }}>
+          <style>{`.cave-ligne:hover td{background:#f7f3ec}`}</style>
+          <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(3, 1fr)" : "repeat(2, 1fr)", gap: 8 }}>
+            <Tuile compacte icone="produit" libelle="À la carte" valeur={surCarte} couleur="#1a1a1a" active={filtre === "tous"} onClick={() => setFiltre("tous")} />
+            <Tuile compacte icone="fiche" libelle="Fiches à valider" valeur={aValider} couleur={aValider ? AMBRE : MUTED} active={filtre === "a_valider"} onClick={() => basculerFiltre("a_valider")} />
+            <Tuile compacte icone="alerte" libelle="Plus que 3 bouteilles" valeur={stockFaible} couleur={stockFaible ? ROUGE : MUTED} active={filtre === "stock"} onClick={() => basculerFiltre("stock")} />
           </div>
-          <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 14, padding: "2px 12px" }}>
-            {vins.map((v) => (
-              <button key={v.id} type="button" onClick={() => setOuvert(v.id)} style={{ display: "grid", gridTemplateColumns: "14px 1fr auto", gap: 10, alignItems: "center", width: "100%", padding: "11px 0", borderTop: `1px solid #f0ebe2`, background: "none", border: 0, borderTopWidth: 1, borderTopStyle: "solid", borderTopColor: "#f0ebe2", textAlign: "left", cursor: "pointer", font: "inherit", color: "#1a1a1a" }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: COULEURS[v.couleur]?.c ?? MUTED }} />
-                <span style={{ minWidth: 0 }}><span style={{ fontWeight: 600 }}>{v.nom}</span>{v.statut !== "valide" && v.sur_carte && <span style={{ color: AMBRE, fontSize: 11, marginLeft: 6 }}>à valider</span>}<br /><span style={{ fontSize: 12, color: MUTED }}>{[v.cepages, v.region].filter(Boolean).join(" · ").slice(0, 80)}</span></span>
-                <span style={{ fontSize: 12, color: MUTED, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{v.prix?.v != null && <>{eur(v.prix.v)}<br /></>}{v.prix?.b != null && <>{eur(v.prix.b)} btl</>}{v.stock != null && <><br /><span style={{ color: v.stock <= 0 ? ROUGE : v.stock <= 3 ? AMBRE : MUTED }}>{v.stock} en cave</span></>}</span>
-              </button>
-            ))}
-            {vins.length === 0 && <div style={{ padding: 16, color: MUTED, fontSize: 13 }}>Aucun vin.</div>}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+            {[...ORDRE, "archive"].map((f) => <Chip key={f} on={filtre === f} onClick={() => basculerFiltre(f)}>{f === "archive" ? "Archive" : COULEURS[f].lib}</Chip>)}
+            <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Chercher un vin, un cépage…" style={{ ...CHAMP, borderRadius: 20, flex: "1 1 160px", minWidth: 0 }} />
+          </div>
+          {donnees.edition && aValider > 0 && filtre === "a_valider" && <div style={{ fontSize: 12.5, color: AMBRE }}>Ouvre, relis, puis « Valider la fiche ».</div>}
+          <div style={CADRE}>
+            <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+              <colgroup><col style={{ width: 6 }} />{bureau && <col style={{ width: 90 }} />}<col />{bureau && <col style={{ width: 90 }} />}<col style={{ width: bureau ? 120 : 96 }} /></colgroup>
+              <thead>
+                <tr>
+                  <th style={{ ...TH, padding: 0 }} />
+                  {bureau && <th style={TH}>Couleur</th>}
+                  <th style={TH}>Vin</th>
+                  {bureau && <th style={{ ...TH, textAlign: "right" }}>Verre</th>}
+                  <th style={{ ...TH, textAlign: "right" }}>{bureau ? "Bouteille · cave" : "Prix · cave"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vins.map((v) => {
+                  const c = COULEURS[v.couleur]?.c ?? MUTED;
+                  const stock = v.stock == null ? null : <span style={pastille(v.stock <= 0 ? ROUGE : v.stock <= 3 ? AMBRE : MUTED, v.stock > 3 ? "rgba(0,0,0,0.06)" : undefined)}>{v.stock <= 0 ? "Plus en cave" : `${v.stock} en cave`}</span>;
+                  return (
+                    <tr key={v.id} className="cave-ligne" onClick={() => setOuvert(v.id)} style={{ cursor: "pointer" }}>
+                      <td style={liseret(c)} />
+                      {bureau && <td style={{ ...TD, color: MUTED, fontSize: 12 }}>{COULEURS[v.couleur]?.lib ?? v.couleur}</td>}
+                      <td style={{ ...TD, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          <span style={{ fontWeight: 600, fontSize: 13.5 }}>{v.nom}</span>
+                          {v.statut !== "valide" && v.sur_carte && <span style={pastille(AMBRE)}>À valider</span>}
+                        </div>
+                        <div style={{ fontSize: 12, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[v.cepages, v.region].filter(Boolean).join(" · ")}</div>
+                      </td>
+                      {bureau && <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", color: MUTED }}>{v.prix?.v != null ? eur(v.prix.v) : ""}</td>}
+                      <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                        <div style={{ fontWeight: 600 }}>{v.prix?.b != null ? eur(v.prix.b) : v.prix?.v != null ? `${eur(v.prix.v)} verre` : ""}</div>
+                        {stock && <div style={{ marginTop: 2 }}>{stock}</div>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {vins.length === 0 && <EtatVide compact icone="recherche" titre="Aucun vin" texte={recherche ? "Essaie un autre mot." : "Rien dans ce filtre."} />}
           </div>
         </div>
       )}
