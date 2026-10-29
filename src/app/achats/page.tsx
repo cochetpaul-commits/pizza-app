@@ -160,7 +160,6 @@ function AchatsContent() {
   // Achats matières comptabilisés dans Pennylane sur la période : c'est le chiffre de Marge et
   // Résultat ; les factures importées ici ne couvrent que les fournisseurs de la mercuriale.
   const [pennylane, setPennylane] = useState<{ total: number; nb: number } | null>(null);
-  const etabId = etab.current?.id;
   useEffect(() => {
     if (!etabId) return;
     let annule = false;
