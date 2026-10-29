@@ -23,6 +23,8 @@ export type MoisMarge = {
   postes: Record<string, number>;
   /** Le mois est-il terminé (sinon ses charges sont partielles) */
   clos: boolean;
+  /** La paie de ce mois est-elle passée en banque (début du mois suivant) ? */
+  paie_connue: boolean;
 };
 
 const POSTES_EXPLOITATION = ["loyer", "energie", "commissions_cb", "entretien", "assurances", "honoraires", "locations", "autres_charges", "a_categoriser"];
@@ -43,6 +45,7 @@ export async function GET(req: NextRequest) {
   const d = new Date(from.slice(0, 7) + "-01T12:00:00");
   const fin = new Date(to.slice(0, 7) + "-01T12:00:00");
   while (d <= fin && moisListe.length < 24) { moisListe.push(d.toISOString().slice(0, 7)); d.setMonth(d.getMonth() + 1); }
+  const moisPlus = (m: string, n: number) => { const x = new Date(m.slice(0, 7) + "-01T12:00:00"); x.setMonth(x.getMonth() + n); return x.toISOString().slice(0, 7); };
   const dernierJour = (m: string) => { const [a, mm] = m.split("-").map(Number); return `${m}-${String(new Date(a, mm, 0).getDate()).padStart(2, "0")}`; };
   const aujourdhui = new Date().toISOString().slice(0, 10);
 
@@ -52,20 +55,24 @@ export async function GET(req: NextRequest) {
       const row = Array.isArray(data) ? data[0] : data;
       return { mois: m, ca_ht: Number(row?.ca_ht ?? 0), ca_ttc: Number(row?.ca_ttc ?? 0) };
     })),
+    // Un mois de plus à la fin : la paie du dernier mois est payée le mois suivant
     supabaseAdmin.from("charges_mensuelles").select("mois, poste, montant_ht").eq("etablissement_id", etabId)
-      .gte("mois", `${moisListe[0]}-01`).lte("mois", `${moisListe[moisListe.length - 1]}-01`),
+      .gte("mois", `${moisListe[0]}-01`).lte("mois", `${moisPlus(moisListe[moisListe.length - 1], 1)}-01`),
     supabaseAdmin.from("objectifs").select("cle, valeur").eq("etablissement_id", etabId).in("cle", ["ratio_masse_sal", "ratio_matiere"]),
   ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const parMois = new Map<string, Record<string, number>>();
   for (const c of charges ?? []) {
-    const m = String(c.mois).slice(0, 7);
+    // Salaires, URSSAF, mutuelle passent en banque le mois suivant le travail (28/10 : octobre
+    // affichait la paie de septembre face à un CA d'octobre inachevé, soit 53 %) : on les rattache
+    // au mois travaillé. Les autres postes restent au mois de leur comptabilisation.
+    const m = c.poste === "masse_salariale" ? moisPlus(String(c.mois).slice(0, 7), -1) : String(c.mois).slice(0, 7);
     const p = parMois.get(m) ?? {};
     p[c.poste as string] = (p[c.poste as string] ?? 0) + Number(c.montant_ht ?? 0);
     parMois.set(m, p);
   }
-  const mois: MoisMarge[] = cas.map((c) => ({ ...c, postes: parMois.get(c.mois) ?? {}, clos: dernierJour(c.mois) < aujourdhui }));
+  const mois: MoisMarge[] = cas.map((c) => ({ ...c, postes: parMois.get(c.mois) ?? {}, clos: dernierJour(c.mois) < aujourdhui, paie_connue: (parMois.get(c.mois)?.masse_salariale ?? 0) > 0 }));
   const obj: Record<string, number> = {};
   for (const o of objectifs ?? []) obj[o.cle as string] = Number(o.valeur);
   return NextResponse.json({ mois, libelles: LIBELLES, postes_exploitation: POSTES_EXPLOITATION, objectifs: obj });

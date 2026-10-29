@@ -99,7 +99,7 @@ export function Marge() {
               ]} />
           </Cadre>
 
-          <Cadre titre="Mois par mois" sous="Ratios sur le CA HT. Objectifs : matière ≤ 32 %, masse salariale ≤ objectif de l'établissement. Le mois en cours est partiel." sansMarge>
+          <Cadre titre="Mois par mois" sous="Ratios sur le CA HT. Objectifs : matière ≤ 32 %, masse salariale ≤ objectif de l'établissement. Le mois en cours est partiel ; sa paie arrive début du mois suivant." sansMarge>
             <div style={{ overflowX: "auto", marginTop: 10 }}>
               <table style={{ borderCollapse: "collapse", width: "100%" }}>
                 <thead><tr>
@@ -116,7 +116,7 @@ export function Marge() {
                         <td style={{ ...TDN, fontWeight: 600 }}>{vide ? "—" : euros(l.ca)}</td>
                         <td style={TDN}>{l.achats ? <>{bureau && euros(l.achats)} <span style={{ color: couleurRatio(rm, 32, 38) ?? MUTED, fontWeight: 600 }}>{pct(rm ?? 0)}</span>{!bureau && l.ms ? <div style={{ fontSize: 11, color: MUTED }}>MS {pct(rs ?? 0)}</div> : null}</> : <span style={{ color: FAIBLE }}>—</span>}</td>
                         {bureau && <td style={TDN}>{l.achats ? <>{euros(l.margeBrute)} <span style={{ color: MUTED }}>{pct(100 - (rm ?? 0))}</span></> : <span style={{ color: FAIBLE }}>—</span>}</td>}
-                        {bureau && <td style={TDN}>{l.ms ? <>{euros(l.ms)} <span style={{ color: couleurRatio(rs, objMs ?? 35, (objMs ?? 35) + 8) ?? MUTED, fontWeight: 600 }}>{pct(rs ?? 0)}</span></> : <span style={{ color: FAIBLE }}>—</span>}</td>}
+                        {bureau && <td style={TDN}>{l.ms ? <>{euros(l.ms)} <span style={{ color: couleurRatio(rs, objMs ?? 35, (objMs ?? 35) + 8) ?? MUTED, fontWeight: 600 }}>{pct(rs ?? 0)}</span></> : <span style={{ color: FAIBLE }}>{l.ca > 0 ? "paie à venir" : "—"}</span>}</td>}
                         {bureau && <td style={TDN}>{l.gerants ? euros(l.gerants) : <span style={{ color: FAIBLE }}>—</span>}</td>}
                         {bureau && <td style={TDN}>{l.exploitation ? euros(l.exploitation) : <span style={{ color: FAIBLE }}>—</span>}</td>}
                         <td style={{ ...TDN, fontWeight: 700, color: vide ? FAIBLE : l.ebe >= 0 ? VERT : ROUGE }}>{vide ? "—" : <>{euros(l.ebe)}{bureau ? " " : <br />}<span style={{ fontWeight: 500 }}>{pct(re ?? 0)}</span></>}</td>
@@ -127,7 +127,7 @@ export function Marge() {
               </table>
             </div>
             <div style={{ padding: "10px 16px 14px" }}>
-              <Note>CA HT : ventes Popina. Charges : Pennylane (achats, paie Silae, loyer, énergie…), passées le mois de leur comptabilisation, d&apos;où des écarts de mois en mois ; la masse salariale réelle est connue quand la paie est importée. L&apos;EBE ne compte ni amortissements, ni impôts, ni variation de stock. Le détail et le coût matière théorique (recettes × ventes) restent dans <Link href="/rentabilite" style={{ color: TERRACOTTA }}>Rentabilité</Link>.</Note>
+              <Note>CA HT : ventes Popina. Charges : Pennylane (achats, loyer, énergie…), passées le mois de leur comptabilisation. La masse salariale (salaires, URSSAF, mutuelle, retraite) est rattachée au mois travaillé : elle passe en banque le mois suivant, donc le dernier mois l&apos;attend encore. L&apos;EBE ne compte ni amortissements, ni impôts, ni variation de stock. Le détail et le coût matière théorique (recettes × ventes) restent dans <Link href="/rentabilite" style={{ color: TERRACOTTA }}>Rentabilité</Link>.</Note>
             </div>
           </Cadre>
 

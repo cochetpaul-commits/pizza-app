@@ -16,7 +16,7 @@ export const maxDuration = 60;
  *  - Coût théorique  : recettes × ventes (/api/ventes/marges)
  *  - Achats matières : charges_mensuelles (Pennylane) sinon supplier_invoices (app, partiel)
  *  - Variation stock : inventaires clôturés valorisés
- *  - Masse salariale : charges_mensuelles (Silae / DSN)
+ *  - Masse salariale : charges_mensuelles (Pennylane), lue un mois plus tard et rattachée au mois travaillé
  *  - Exploitation    : charges_mensuelles (Pennylane)
  *
  * Chaque ligne porte son `statut` : ok | partiel | manquant — l'écran ne
@@ -84,11 +84,16 @@ export async function GET(req: NextRequest) {
 
   // ── 3. Charges saisies / importées sur la période ──────────────
   const moisFrom = from.slice(0, 8) + "01";
-  const { data: charges } = await supabaseAdmin
-    .from("charges_mensuelles")
-    .select("poste, libelle, montant_ht, source")
-    .eq("etablissement_id", etabId)
-    .gte("mois", moisFrom).lte("mois", to);
+  // La paie (salaires, URSSAF, mutuelle, retraite) passe en banque le mois suivant le travail :
+  // on la lit un mois plus tard et on la rattache à la période (28/10/2026).
+  const moisPlus = (iso: string, n: number) => { const x = new Date(iso.slice(0, 7) + "-01T12:00:00"); x.setMonth(x.getMonth() + n); return x.toISOString().slice(0, 10); };
+  const [{ data: chargesHorsPaie }, { data: chargesPaie }] = await Promise.all([
+    supabaseAdmin.from("charges_mensuelles").select("poste, libelle, montant_ht, source").eq("etablissement_id", etabId)
+      .neq("poste", "masse_salariale").gte("mois", moisFrom).lte("mois", to),
+    supabaseAdmin.from("charges_mensuelles").select("poste, libelle, montant_ht, source").eq("etablissement_id", etabId)
+      .eq("poste", "masse_salariale").gte("mois", moisPlus(moisFrom, 1)).lte("mois", moisPlus(to, 1)),
+  ]);
+  const charges = [...(chargesHorsPaie ?? []), ...(chargesPaie ?? [])];
 
   const parPoste = new Map<string, { total: number; sources: Set<string>; detail: { libelle: string; montant: number }[] }>();
   for (const c of charges ?? []) {
@@ -156,9 +161,9 @@ export async function GET(req: NextRequest) {
   // ── 6. Masse salariale + exploitation ──────────────────────────
   const ms = parPoste.get("masse_salariale");
   const masseSalariale: Ligne = ms && ms.total > 0
-    ? { poste: "Masse salariale chargée", montant: ms.total, statut: "ok", source: [...ms.sources].join(", ") }
-    : { poste: "Masse salariale chargée", montant: null, statut: "manquant", source: "Silae / DSN",
-        detail: "Combo donne les heures, pas le coût employeur — import de la paie nécessaire" };
+    ? { poste: "Masse salariale chargée", montant: ms.total, statut: "ok", source: [...ms.sources].join(", "), detail: "Paie du mois travaillé, passée en banque le mois suivant" }
+    : { poste: "Masse salariale chargée", montant: null, statut: "manquant", source: "Pennylane",
+        detail: "Paie à venir : les salaires et l'URSSAF de ce mois passent en banque début du mois suivant" };
 
   const POSTES_EXPLOITATION = ["loyer", "energie", "commissions_cb", "entretien", "assurances", "honoraires", "locations", "autres_charges", "a_categoriser", "remuneration_gerants"];
   const exploitationDetail: { libelle: string; montant: number }[] = [];
@@ -177,12 +182,13 @@ export async function GET(req: NextRequest) {
 
   // ── 6b. Détail Pennylane : poste → catégorie → factures / transactions ──
   type DetailRow = { date: string | null; poste: string; categorie: string; fournisseur: string | null; libelle: string | null; montant_ht: number; type: string };
-  const { data: detailRows } = await supabaseAdmin
-    .from("charges_detail")
-    .select("date, poste, categorie, fournisseur, libelle, montant_ht, type")
-    .eq("etablissement_id", etabId)
-    .gte("mois", moisFrom).lte("mois", to)
-    .order("date", { ascending: false });
+  const [{ data: detailHorsPaie }, { data: detailPaie }] = await Promise.all([
+    supabaseAdmin.from("charges_detail").select("date, poste, categorie, fournisseur, libelle, montant_ht, type").eq("etablissement_id", etabId)
+      .neq("poste", "masse_salariale").gte("mois", moisFrom).lte("mois", to).order("date", { ascending: false }),
+    supabaseAdmin.from("charges_detail").select("date, poste, categorie, fournisseur, libelle, montant_ht, type").eq("etablissement_id", etabId)
+      .eq("poste", "masse_salariale").gte("mois", moisPlus(moisFrom, 1)).lte("mois", moisPlus(to, 1)).order("date", { ascending: false }),
+  ]);
+  const detailRows = [...(detailHorsPaie ?? []), ...(detailPaie ?? [])];
   const postesMap = new Map<string, { poste: string; libelle: string; total: number; cats: Map<string, { categorie: string; total: number; lignes: { date: string | null; fournisseur: string | null; libelle: string | null; montant: number; type: string }[] }> }>();
   for (const r of (detailRows ?? []) as DetailRow[]) {
     let pEntry = postesMap.get(r.poste);
