@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ACCENT, ATTENTION, BON, BORD, BTN as PILULE, CADRE, FAIBLE, INFO, MAUVAIS, MUTED, OSWALD, TH, alpha, pastille } from "@/components/ui/charte";
+import { couleurTexteSur, degradeCategorie, stylePastilleBarre } from "@/lib/styleCategories";
 import { useBureau } from "@/hooks/useBureau";
 import { fetchApi } from "@/lib/fetchApi";
 import { calculerCloture, eur, lireMontant, noteManquante, recapCloture, VIDE, type SaisieCloture } from "@/lib/cloture";
@@ -19,8 +20,9 @@ import { additionner, COUPURES, estBillet, libelleCoupure, listerCoupures, total
 const VERT = BON, ROUGE = MAUVAIS, AMBRE = ATTENTION;
 const TITRE_CADRE: CSSProperties = { fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", color: "#1a1a1a" };
 /** En-tête de cadre nuancé à la couleur de l'étape (29/10) : fond teinté, titre coloré */
-const entete = (c: string): CSSProperties => ({ padding: "12px 16px", background: alpha(c, 0.09), borderBottom: `1px solid ${BORD}` });
-const titre = (c: string): CSSProperties => ({ ...TITRE_CADRE, color: c });
+const entete = (c: string): CSSProperties => ({ padding: "10px 16px", background: degradeCategorie(c), color: couleurTexteSur(c) });
+const titre = (c: string): CSSProperties => ({ ...TITRE_CADRE, color: couleurTexteSur(c) });
+const SOUS_ENTETE: CSSProperties = { fontSize: 12.5, marginTop: 2, opacity: 0.85 };
 /** Champ de saisie de la clôture : chiffre gros et gras, cadre fin */
 const SAISIE: CSSProperties = { font: "inherit", fontSize: 18, fontWeight: 700, textAlign: "right", boxSizing: "border-box", height: 40, padding: "0 10px", border: `1px solid ${BORD}`, borderRadius: 10, background: "#fff", color: "#1a1a1a", fontVariantNumeric: "tabular-nums" };
 /** Panneau neutre avec liseré d'état à gauche (charte : pas de fond coloré) */
@@ -266,7 +268,7 @@ export function Cloture() {
 
   const bloc = (nomBloc: string, source: string, nom: keyof Textes, champs: Champ[], c: string) => (
     <section style={{ ...CADRE, minWidth: 0 }}>
-      <div style={entete(c)}><div style={titre(c)}>{nomBloc}</div><div style={{ color: MUTED, fontSize: 12.5, marginTop: 2 }}>{source}</div></div>
+      <div style={entete(c)}><div style={titre(c)}>{nomBloc}</div><div style={SOUS_ENTETE}>{source}</div></div>
       <div style={{ padding: "4px 16px 8px" }}>
       {champs.filter((c) => !c.siPourboires || (saisie.popina.pourboires ?? 0) > 0 || !!textes[nom][c.cle]).map((c, i) => (
         <label key={c.cle} style={{ display: "grid", gridTemplateColumns: "1fr 128px", alignItems: "center", gap: 10, padding: "7px 0", borderTop: i ? `1px solid #f0ebe2` : "none" }}>
@@ -384,7 +386,7 @@ export function Cloture() {
 
           {/* Tiroir : comptage par coupure, fond à laisser, enveloppe de la banque */}
           <section style={{ ...CADRE, minWidth: 0, display: "grid", gap: 10, paddingBottom: 16 }}>
-            <div style={entete(BON)}><div style={titre(BON)}>Tiroir</div><div style={{ color: MUTED, fontSize: 12.5, marginTop: 2 }}>Compte tout le tiroir, fond compris, sans la cagnotte des pourboires.</div></div>
+            <div style={entete(BON)}><div style={titre(BON)}>Tiroir</div><div style={SOUS_ENTETE}>Compte tout le tiroir, fond compris, sans la cagnotte des pourboires.</div></div>
             <div style={{ padding: "0 16px", display: "grid", gap: 10 }}>
             <label style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 14.5, fontWeight: 600 }}>
               Fond de caisse
@@ -481,7 +483,7 @@ export function Cloture() {
 
           {/* Cagnotte des pourboires espèces : vidée et comptée le vendredi, monnaie faite avec le tiroir */}
           <section style={{ ...CADRE, minWidth: 0, display: "grid", gap: 10, paddingBottom: 16 }}>
-            <div style={{ ...entete(AMBRE), display: "flex", alignItems: "center", gap: 8 }}><div style={titre(AMBRE)}>Cagnotte des pourboires</div>{estVendredi(jour) && <span style={pastille(AMBRE)}>Vendredi</span>}</div>
+            <div style={{ ...entete(AMBRE), display: "flex", alignItems: "center", gap: 8 }}><div style={titre(AMBRE)}>Cagnotte des pourboires</div>{estVendredi(jour) && <span style={stylePastilleBarre(AMBRE)}>Vendredi</span>}</div>
             <div style={{ padding: "0 16px", display: "grid", gap: 10 }}>
             {!cagnotte ? (
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
@@ -519,8 +521,8 @@ export function Cloture() {
             return (
               <section style={{ ...CADRE, display: "grid", gap: 8, paddingBottom: 14 }}>
                 <div style={{ ...entete(c ? coul : MUTED), display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "4px 10px" }}>
-                  <div style={{ ...titre(c ? coul : "#1a1a1a"), flex: "1 1 auto" }}>Contrôle de la nuit</div>
-                  <button type="button" disabled={controleEnCours === "Contrôle en cours…"} onClick={() => void lancerControle()} style={{ border: "none", background: "none", color: ACCENT, fontWeight: 700, fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>{c ? "Relancer" : "Lancer maintenant"}</button>
+                  <div style={{ ...titre(c ? coul : MUTED), flex: "1 1 auto" }}>Contrôle de la nuit</div>
+                  <button type="button" disabled={controleEnCours === "Contrôle en cours…"} onClick={() => void lancerControle()} style={{ ...stylePastilleBarre(c ? coul : MUTED), border: "none", cursor: "pointer", fontFamily: "inherit" }}>{c ? "Relancer" : "Lancer maintenant"}</button>
                 </div>
                 <div style={{ padding: "0 16px", display: "grid", gap: 8 }}>
                 {controleEnCours && <div style={{ fontSize: 13, color: MUTED }}>{controleEnCours}</div>}
@@ -561,8 +563,8 @@ export function Cloture() {
           <section style={{ ...CADRE, display: "grid", gap: 8, paddingBottom: 14 }}>
             <div style={{ ...entete(MUTED), display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <div style={{ flex: "1 1 220px", minWidth: 0 }}>
-                <div style={titre("#1a1a1a")}>Export Flatpay du jour</div>
-                <div style={{ color: MUTED, fontSize: 12.5 }}>En cas d&apos;écart : app Flatpay de l&apos;iPad, transactions du jour, export ; et l&apos;export « titre restaurant » s&apos;il y a des Conecs.</div>
+                <div style={titre(MUTED)}>Export Flatpay du jour</div>
+                <div style={SOUS_ENTETE}>En cas d&apos;écart : app Flatpay de l&apos;iPad, transactions du jour, export ; et l&apos;export « titre restaurant » s&apos;il y a des Conecs.</div>
               </div>
               <button type="button" disabled={import_.enCours} onClick={() => fichierRef.current?.click()} style={{ ...BTN, borderColor: ACCENT, color: ACCENT }}>{import_.enCours ? "Lecture…" : transactions.length ? "Ajouter un export" : "Déposer l'export"}</button>
             </div>
@@ -601,7 +603,7 @@ export function Cloture() {
 
           {/* Corrections et notes */}
           <section style={{ ...CADRE, display: "grid", gap: 8, paddingBottom: 14 }}>
-            <div style={entete(ACCENT)}><div style={titre(ACCENT)}>Corrections faites dans Popina</div><div style={{ color: MUTED, fontSize: 12.5, marginTop: 2 }}>Une ligne par correction : la table, l&apos;heure, ce qui a changé. Le contrôle de la nuit les reconnaîtra.</div></div>
+            <div style={entete(ACCENT)}><div style={titre(ACCENT)}>Corrections faites dans Popina</div><div style={SOUS_ENTETE}>Une ligne par correction : la table, l&apos;heure, ce qui a changé. Le contrôle de la nuit les reconnaîtra.</div></div>
             <div style={{ padding: "0 16px", display: "grid", gap: 8 }}>
             {noteRequise && (
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, background: alpha(ACCENT, 0.08), fontSize: 13.5 }}>

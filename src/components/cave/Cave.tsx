@@ -211,15 +211,13 @@ function Service({ donnees, onOuvrir }: { donnees: Donnees; onOuvrir: (v: VinCav
               </div>
               <div style={{ ...CADRE, borderTop: 0, borderRadius: "0 0 14px 14px" }}>
               <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-                <colgroup><col style={{ width: 6 }} /><col style={{ width: 36 }} /><col /><col style={{ width: 56 }} /></colgroup>
-                <thead><tr><th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={TH}>Plat</th><th style={{ ...TH, textAlign: "right" }}>Prix</th></tr></thead>
+                <colgroup><col style={{ width: 6 }} /><col style={{ width: 36 }} /><col /></colgroup>
                 <tbody>
                   {liste.map((p) => { const on = sel.has(p.id); return (
                     <tr key={p.id} className="cave-ligne" onClick={() => basculer(p.id)} style={{ cursor: "pointer", background: on ? alpha(c, 0.1) : undefined }}>
                       <td style={liseret(c)} />
                       <td style={{ ...TD, padding: "8px 0 8px 10px" }}><input type="checkbox" checked={on} onChange={() => basculer(p.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: c, width: 16, height: 16, cursor: "pointer" }} /></td>
                       <td style={{ ...TD, fontWeight: on ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{joli(p.nom)}</td>
-                      <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", color: MUTED }}>{eur(p.prix)}</td>
                     </tr>
                   ); })}
                 </tbody>

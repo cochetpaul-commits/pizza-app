@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
   const [{ data: vins, error }, { data: accords }, { data: plats }, { data: touches }] = await Promise.all([
     q,
     supabaseAdmin.from("vins_accords").select("id, vin_id, plat_nom, plat_popina_id, raison, ordre, source").order("ordre"),
-    supabaseAdmin.from("popina_products").select("id, name, category, price_ttc").eq("active", true).in("category", ["ANTIPASTI", "PIZZE", "CUCINA", "DOLCI"]).order("category").order("name"),
+    supabaseAdmin.from("popina_products").select("id, name, category, sub_category, price_ttc").eq("active", true).in("category", ["ANTIPASTI", "PIZZE", "CUCINA", "DOLCI"]).order("category").order("name"),
     supabaseAdmin.from("popina_products").select("id, name, ingredient_id").eq("active", true).eq("category", "VINI"),
   ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -103,7 +103,9 @@ export async function GET(req: NextRequest) {
   }
   return NextResponse.json({
     vins: sortie, edition: a.edition, argent: a.argent,
-    plats: (plats ?? []).map((p) => ({ id: p.id, nom: String(p.name).trim(), categorie: p.category, prix: Number(p.price_ttc) || 0 })),
+    // Pas de plats enfants, de contorni ni de glaces dans le choix du service (29/10) : ils n'appellent pas de vin
+    plats: (plats ?? []).filter((p) => !["BAMBINI", "SIDES"].includes(String(p.sub_category ?? "").toUpperCase()) && !/^glace/i.test(String(p.name).trim()))
+      .map((p) => ({ id: p.id, nom: String(p.name).trim(), categorie: p.category, prix: Number(p.price_ttc) || 0 })),
   });
 }
 
