@@ -8,7 +8,8 @@ import { RequireRole } from "@/components/RequireRole";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { supabase } from "@/lib/supabaseClient";
 import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
-import { DateRangePicker, type DateRange } from "@/components/ui/DateRangePicker";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
+import { usePilotageRange } from "@/lib/pilotageRange";
 import { useSearchParams } from "next/navigation";
 import { StatsAchatsContent } from "@/components/achats/StatsAchatsContent";
 import { useBureau } from "@/hooks/useBureau";
@@ -148,13 +149,26 @@ function AchatsContent() {
     return searchParams.get("tab") === "stats" ? "stats" : "factures";
   });
 
-  // ── Date range (default: current month) ──
-  const [range, setRange] = useState<DateRange>(() => {
+  // ── Période : la même que les autres pages Pilotage (29/10), mois en cours par défaut ──
+  const [range, setRange] = usePilotageRange(() => {
     const now = new Date();
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
     const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
   });
+
+  // Achats matières comptabilisés dans Pennylane sur la période : c'est le chiffre de Marge et
+  // Résultat ; les factures importées ici ne couvrent que les fournisseurs de la mercuriale.
+  const [pennylane, setPennylane] = useState<{ total: number; nb: number } | null>(null);
+  const etabId = etab.current?.id;
+  useEffect(() => {
+    if (!etabId) return;
+    let annule = false;
+    supabase.from("charges_detail").select("montant_ht").eq("etablissement_id", etabId).eq("poste", "achats_matieres")
+      .gte("date", range.from).lte("date", range.to)
+      .then(({ data }) => { if (!annule) setPennylane(data ? { total: data.reduce((t, r) => t + Number(r.montant_ht ?? 0), 0), nb: data.length } : null); });
+    return () => { annule = true; };
+  }, [etabId, range.from, range.to]);
 
   // ── All invoices ──
   const [allInvoices, setAllInvoices] = useState<InvoiceRow[]>([]);
@@ -762,6 +776,17 @@ function AchatsContent() {
                 <div style={S.kpiLabel}>Factures</div>
                 <div style={S.kpiValue}>{dashKpis.nbFactures}</div>
               </div>
+
+              {/* Achats Pennylane : le chiffre de Marge et Résultat, tous fournisseurs */}
+              {pennylane && pennylane.nb > 0 && (
+                <div style={{ ...S.card, flex: "1 1 180px", minWidth: 150 }}>
+                  <div style={S.kpiLabel}>Achats Pennylane (HT)</div>
+                  <div style={S.kpiValue}>{fmt(pennylane.total)}</div>
+                  <div style={{ fontSize: 11, color: "#999", marginTop: 4, fontFamily: "DM Sans, sans-serif" }}>
+                    {pennylane.nb} pièce{pennylane.nb > 1 ? "s" : ""} · {fmt(Math.abs(pennylane.total - dashKpis.totalHT))} {pennylane.total >= dashKpis.totalHT ? "de plus" : "de moins"} que les factures importées ici
+                  </div>
+                </div>
+              )}
 
               {/* Moyenne mensuelle */}
               <div style={{ ...S.card, flex: "1 1 160px", minWidth: 140 }}>

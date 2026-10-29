@@ -106,6 +106,7 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
   const [ventesPeriode, setVentesPeriode] = useState<VenteJour[]>([]);
   const [ventesA1, setVentesA1] = useState<VenteJour[]>([]);
   const [compteurs, setCompteurs] = useState<Compteurs | null>(null);
+  const [achatsPennylane, setAchatsPennylane] = useState<{ total: number; nb: number } | null>(null);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [planningIndispo, setPlanningIndispo] = useState(false);
   const [meteo, setMeteo] = useState<Meteo[]>([]);
@@ -137,9 +138,11 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
     if (!etab) return;
     let annule = false;
     (async () => {
-      const [deuxSemaines, cpt, shiftsRes, meteoRes, produits, cmd, evts] = await Promise.all([
+      const [deuxSemaines, cpt, achatsPl, shiftsRes, meteoRes, produits, cmd, evts] = await Promise.all([
         canSeePilotage ? supabase.rpc("accueil_ventes_jour", { p_etab: etab.id, p_from: shift(semaineDebut, -7), p_to: today }) : Promise.resolve({ data: [] }),
         supabase.rpc("accueil_compteurs", { p_etab: etab.id, p_debut_mois: moisDebut }),
+        // Achats matières Pennylane du mois : le même chiffre que Marge et Résultat (29/10)
+        canSeePilotage ? supabase.from("charges_detail").select("montant_ht").eq("etablissement_id", etab.id).eq("poste", "achats_matieres").eq("mois", moisDebut) : Promise.resolve({ data: [] }),
         fetchApi(`/api/combo/planning-jour?date=${today}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
         fetchApi(`/api/meteo?from=${today}&to=${shift(today, 2)}`).then((r) => r.json()).catch(() => null),
         canSeePilotage ? supabase.rpc("ventes_par_produit", { p_etab: etab.id, p_from: semaineDebut, p_to: today }) : Promise.resolve({ data: [] }),
@@ -151,6 +154,8 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
       setVentes((deuxSemaines.data ?? []) as VenteJour[]);
       const c = Array.isArray(cpt.data) ? cpt.data[0] : cpt.data;
       setCompteurs((c ?? null) as Compteurs | null);
+      const pl = (achatsPl.data ?? []) as { montant_ht: number | string | null }[];
+      setAchatsPennylane(pl.length ? { total: pl.reduce((t, r) => t + Number(r.montant_ht ?? 0), 0), nb: pl.length } : null);
 
       // Équipe du jour : le planning Combo du jour (le planning n'est pas tenu dans l'application)
       setShifts(((shiftsRes?.shifts ?? []) as Shift[]).map((r) => ({ employe: r.employe, debut: r.debut, fin: r.fin, poste: r.poste })));
@@ -265,7 +270,9 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
           <Kpi couleur={couleur} icone="euro" label={`CA TTC ${titrePeriode}`} value={fmtEur(total.ca)} delta={delta(total.ca, totalA1.ca)} sub={totalA1.ca > 0 ? `${fmtEur(totalA1.ca)} l'an dernier (${jourCourt(periodeA1.from)}${periodeA1.from !== periodeA1.to ? ` → ${jourCourt(periodeA1.to)}` : ""})` : "pas de comparaison l'an dernier"} loading={loading} href={`/ventes?from=${periode.from}&to=${periode.to}`} />
           <Kpi couleur="#b7791f" icone="couverts" label="Couverts" value={String(total.couverts)} delta={delta(total.couverts, totalA1.couverts)} sub={`${total.midi.couverts} midi · ${total.soir.couverts} soir`} loading={loading} />
           <Kpi couleur="#5F4B8B" icone="ticket" label="Ticket moyen" value={fmtDec(ticket)} delta={delta(ticket, ticketA1)} sub={ticketA1 > 0 ? `par couvert · ${fmtDec(ticketA1)} l'an dernier` : "par couvert"} loading={loading} />
-          <Kpi couleur="#4a6741" icone="facture" label="Achats HT du mois" value={fmtEur(num(compteurs?.factures_mois_ht))} badge={compteurs ? `${compteurs.factures_mois} facture${compteurs.factures_mois > 1 ? "s" : ""}` : undefined} sub="importées depuis le 1er" loading={!compteurs} href="/achats" />
+          {achatsPennylane
+            ? <Kpi couleur="#4a6741" icone="facture" label="Achats HT du mois" value={fmtEur(achatsPennylane.total)} badge={`${achatsPennylane.nb} pièce${achatsPennylane.nb > 1 ? "s" : ""}`} sub="achats matières Pennylane depuis le 1er" loading={!compteurs} href="/achats" />
+            : <Kpi couleur="#4a6741" icone="facture" label="Achats HT du mois" value={fmtEur(num(compteurs?.factures_mois_ht))} badge={compteurs ? `${compteurs.factures_mois} facture${compteurs.factures_mois > 1 ? "s" : ""}` : undefined} sub="importées depuis le 1er" loading={!compteurs} href="/achats" />}
         </div>
       )}
 
