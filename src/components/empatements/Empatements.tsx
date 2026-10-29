@@ -8,7 +8,8 @@ import { useBureau } from "@/hooks/useBureau";
 import { calculerPate, type EmpatementType, type FlourMixItem, type Phase } from "@/lib/pateEngine";
 import { Tuile } from "@/components/ui/Tuile";
 import { EtatVide } from "@/components/ui/EtatVide";
-import { ACCENT, ATTENTION, BORD, BORD_LIGNE, BTN, CADRE, INTERTITRE, MUTED, OSWALD, TD, TH, h1, liseret, pastille } from "@/components/ui/charte";
+import { ACCENT, ATTENTION, BORD, BTN, CADRE, INTERTITRE, MUTED, OSWALD, TD, TH, h1, liseret } from "@/components/ui/charte";
+import { degradeCategorie, stylePastilleBarre } from "@/lib/styleCategories";
 
 /**
  * Empâtements (28/10/2026) : la page du quotidien pour les pâtons et la focaccia. On règle le nombre
@@ -85,13 +86,13 @@ export function Empatements() {
       {!recettes && !erreur && <div style={{ textAlign: "center", padding: 60, color: MUTED }}>Chargement…</div>}
       {recettes && recettes.length === 0 && <div style={CADRE}><EtatVide titre="Aucun empâtement" texte="Créez-en un depuis la Carte, onglet Préparations." /></div>}
       <div style={{ display: "grid", gap: 16 }}>
-        {recettes?.map((r) => <CarteEmpatement key={r.id} recette={r} onReglages={() => router.push(`/recettes/empatement/${r.id}`)} />)}
+        {recettes?.map((r) => <CarteEmpatement key={r.id} recette={r} bureau={bureau} onReglages={() => router.push(`/recettes/empatement/${r.id}`)} />)}
       </div>
     </div>
   );
 }
 
-function CarteEmpatement({ recette: r, onReglages }: { recette: Recette; onReglages: () => void }) {
+function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: Recette; onReglages: () => void; bureau: boolean }) {
   const [patons, setPatons] = useState<number | "">(() => {
     try { const v = Number(localStorage.getItem(cle(r.id))); if (v > 0) return v; } catch { /* stockage indisponible */ }
     return r.balls_count;
@@ -125,26 +126,37 @@ function CarteEmpatement({ recette: r, onReglages }: { recette: Recette; onRegla
   return (
     <section style={{ ...CADRE, display: "grid" }}>
       {/* En-tête : liseré de couleur, nom en Oswald, type et paramètres en pastilles fines ; les réglages à droite */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 16px 12px", borderBottom: `1px solid ${BORD_LIGNE}`, boxShadow: `inset 6px 0 0 ${couleur}` }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 16px", background: degradeCategorie(couleur), color: "#fff" }}>
         <div style={{ minWidth: 0, flex: 1, display: "grid", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 20, lineHeight: 1.1, textTransform: "uppercase", letterSpacing: ".02em", color: "#1a1a1a" }}>{r.name}</span>
-            <span style={pastille(couleur)}>{typeLabel}</span>
+            <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 20, lineHeight: 1.1, textTransform: "uppercase", letterSpacing: ".04em" }}>{r.name}</span>
+            <span style={{ ...stylePastilleBarre(couleur), fontSize: 11 }}>{typeLabel}</span>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {params.map((t) => <span key={t} style={{ fontSize: 11.5, color: MUTED, padding: "2px 8px", borderRadius: 8, border: `1px solid ${BORD}` }}>{t}</span>)}
+            {params.map((t) => <span key={t} style={{ fontSize: 11.5, padding: "2px 8px", borderRadius: 8, background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.3)" }}>{t}</span>)}
           </div>
         </div>
-        <button type="button" onClick={onReglages} aria-label="Réglages de la recette" title="Réglages de la recette" style={{ ...BTN, display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0, color: MUTED }}>
+        <button type="button" onClick={onReglages} aria-label="Réglages de la recette" title="Réglages de la recette" style={{ ...BTN, display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.4)", color: "#fff" }}>
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
           Réglages
         </button>
       </div>
 
       <div style={{ padding: 16, display: "grid", gap: 14 }}>
-        {/* Le réglage du jour : les pâtons, en gros, avec ±1 et ±10 */}
-        <Compteur libelle="Pâtons" valeur={patons} onChange={setPatons} pas={1} grandPas={10} couleur={couleur} />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {/* Le réglage du jour : les pâtons, en gros, avec ±1 et ±10 ; sur bureau, le compteur est la première des quatre tuiles */}
+        {!bureau && <Compteur libelle="Pâtons" valeur={patons} onChange={setPatons} pas={1} grandPas={10} couleur={couleur} />}
+        <div style={{ display: "grid", gridTemplateColumns: bureau ? "1.4fr 1fr 1fr 1fr" : "1fr 1fr", gap: 10 }}>
+          {bureau && <Tuile compacte couleur={couleur} libelle="Pâtons" valeur={
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 10))} taille={26} couleur={couleur} label="−10" aria="Moins dix" clair />
+              <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 1))} taille={30} couleur={couleur} label="−" aria="Moins un" />
+              <input type="number" inputMode="numeric" min={1} value={patons} aria-label="Pâtons"
+                onChange={(e) => setPatons(e.target.value === "" ? "" : Math.max(0, Math.floor(Number(e.target.value))))} onFocus={(e) => e.target.select()}
+                style={{ flex: 1, minWidth: 0, width: 56, textAlign: "center", fontFamily: OSWALD, fontWeight: 700, fontSize: 24, color: "#1a1a1a", border: "none", borderBottom: `1px solid ${BORD}`, background: "transparent", outline: "none", padding: 0, fontVariantNumeric: "tabular-nums", MozAppearance: "textfield" }} />
+              <BoutonRond onClick={() => setPatons((Number(patons) || 0) + 1)} taille={30} couleur={couleur} label="+" aria="Plus un" />
+              <BoutonRond onClick={() => setPatons((Number(patons) || 0) + 10)} taille={26} couleur={couleur} label="+10" aria="Plus dix" clair />
+            </span>
+          } />}
           <Tuile compacte couleur={couleur} libelle="Poids d'un pâton" valeur={
             <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <BoutonRond onClick={() => setPoids(Math.max(1, (Number(poids) || r.ball_weight) - pasPoids))} taille={30} couleur={couleur} label="−" aria="Moins" clair />
@@ -153,6 +165,7 @@ function CarteEmpatement({ recette: r, onReglages }: { recette: Recette; onRegla
             </span>
           } />
           <Tuile compacte couleur={couleur} libelle="Pâte totale" valeur={resultat ? kg(resultat.summary.total_dough_g) : "—"} />
+          {bureau && <Tuile compacte couleur={couleur} libelle="Farine" valeur={resultat ? kg(resultat.flour_total_g) : "—"} />}
         </div>
 
       {resultat && (
