@@ -127,7 +127,7 @@ export function Plats() {
               const liste = (donnees.products ?? []).filter((p) => classes.m.get(p.name) === g).sort((a, b) => (b.marge_brute ?? 0) - (a.marge_brute ?? 0));
               const actif = groupe === g;
               return (
-                <button key={g} type="button" onClick={() => setGroupe(actif ? "tous" : g)} style={{ textAlign: "left", background: "#fff", border: `${actif ? 2 : 1}px solid ${actif ? GROUPES[g].couleur : "#ddd6c8"}`, borderRadius: 14, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit" }}>
+                <button key={g} type="button" onClick={() => setGroupe(actif ? "tous" : g)} style={{ textAlign: "left", background: "#fff", border: `${actif ? 2 : 1}px solid ${actif ? GROUPES[g].couleur : "#ddd6c8"}`, borderRadius: 14, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit", display: "grid", alignContent: "start", gap: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                     <span style={{ fontWeight: 700, color: GROUPES[g].couleur, fontSize: 14 }}>{GROUPES[g].libelle}</span>
                     <span style={{ fontWeight: 700, color: GROUPES[g].couleur }}>{liste.length}</span>

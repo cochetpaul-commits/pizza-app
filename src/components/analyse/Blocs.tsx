@@ -5,7 +5,8 @@ import { PilotageRangeBar } from "@/components/ui/PilotageRangeBar";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 import { Tuile, type TuileIcone } from "@/components/ui/Tuile";
 import { useBureau } from "@/hooks/useBureau";
-import { BORD, FAIBLE, MUTED, OSWALD, VERT, ROUGE, derniersJours, moisEnCours, nbJours, libellePeriode, texteVariation, variation } from "./gabarit";
+import { BORD, FAIBLE, MUTED, OSWALD, VERT, ROUGE, LIBELLE_VS, derniersJours, libelleComparaison, moisEnCours, libellePeriode, texteVariation, variation, type ModeComparaison } from "./gabarit";
+import { usePilotageComparaison } from "@/lib/pilotageRange";
 
 /** En-tête d'une page Analyse : titre, la question à laquelle elle répond, période (raccourcis + sélecteur) */
 export function EnteteAnalyse({ titre, question, range, onRange, droite, raccourcis: raccourcisProp, comparaison }: {
@@ -16,8 +17,7 @@ export function EnteteAnalyse({ titre, question, range, onRange, droite, raccour
   comparaison?: string;
 }) {
   const bureau = useBureau();
-  const n = nbJours(range);
-  const hier = derniersJours(1).to;
+  const [mode, setMode] = usePilotageComparaison();
   const raccourcis: { libelle: string; r: DateRange }[] = raccourcisProp ?? [
     { libelle: "7 j", r: derniersJours(7) }, { libelle: "30 j", r: derniersJours(30) }, { libelle: "90 j", r: derniersJours(90) }, { libelle: "Ce mois", r: moisEnCours() },
   ];
@@ -39,7 +39,17 @@ export function EnteteAnalyse({ titre, question, range, onRange, droite, raccour
           ))}
         </span>
         <PilotageRangeBar value={range} onChange={onRange} center={false} />
-        <span style={{ fontSize: 12, color: FAIBLE, whiteSpace: "nowrap" }} title={libellePeriode(range)}>{comparaison ?? <>{n} jour{n > 1 ? "s" : ""} · comparé aux {n} jours d&apos;avant{range.to > hier ? " · journée en cours incluse" : ""}</>}</span>
+        {comparaison == null && (
+          <span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3 }}>
+            {(["precedente", "an_dernier"] as ModeComparaison[]).map((m) => (
+              <button key={m} type="button" onClick={() => setMode(m)} aria-pressed={mode === m} title={m === "precedente" ? "Les mêmes jours juste avant" : "Les mêmes dates l'an dernier"} style={{
+                border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+                background: mode === m ? "#fff" : "transparent", color: mode === m ? "#1a1a1a" : MUTED, boxShadow: mode === m ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+              }}>{m === "precedente" ? "vs avant" : "vs N−1"}</button>
+            ))}
+          </span>
+        )}
+        <span style={{ fontSize: 12, color: FAIBLE, whiteSpace: "nowrap" }} title={libellePeriode(range)}>{comparaison ?? libelleComparaison(range, mode)}</span>
       </div>
     </div>
   );
@@ -52,8 +62,9 @@ export function TuileVariation({ libelle, valeur, actuel, precedent, icone, coul
   inverse?: boolean; compacte?: boolean; active?: boolean; onClick?: () => void;
 }) {
   const v = variation(actuel, precedent);
+  const [mode] = usePilotageComparaison();
   const bon = v == null ? null : inverse ? v <= 0 : v >= 0;
-  const detail = v == null ? (sous ?? "pas de période de comparaison") : <><b style={{ color: bon ? VERT : ROUGE }}>{texteVariation(v)}</b> vs période précédente{sous ? ` · ${sous}` : ""}</>;
+  const detail = v == null ? (sous ?? "pas de période de comparaison") : <><b style={{ color: bon ? VERT : ROUGE }}>{texteVariation(v)}</b> {LIBELLE_VS[mode]}{sous ? ` · ${sous}` : ""}</>;
   return <Tuile libelle={libelle} valeur={valeur} icone={icone} couleur={couleur ?? "#1a1a1a"} sous={detail} compacte={compacte} active={active} onClick={onClick}
     droite={compacte && v != null ? <span style={{ fontSize: 11.5, fontWeight: 700, color: bon ? VERT : ROUGE, whiteSpace: "nowrap" }}>{texteVariation(v)}</span> : undefined} />;
 }

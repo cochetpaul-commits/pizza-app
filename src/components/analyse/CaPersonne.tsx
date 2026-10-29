@@ -10,7 +10,8 @@ import { EnteteAnalyse, TuileVariation, Cadre, Note, Chargement, TH, TD, TDN } f
 import { GraphBarres } from "@/components/analyse/GraphBarres";
 import { useStatsVentes } from "@/components/analyse/useStatsVentes";
 import { parJour } from "@/components/analyse/parJour";
-import { BLEU, FAIBLE, JOURS, MUTED, ROUGE, TERRACOTTA, VERT, derniersJours, euros, jourCourt, nombre, periodePrecedente, dateCourte } from "@/components/analyse/gabarit";
+import { BLEU, FAIBLE, JOURS, MUTED, ROUGE, TERRACOTTA, VERT, derniersJours, euros, jourCourt, nombre, periodeAnDernier, periodeEffective, periodePrecedente, dateCourte } from "@/components/analyse/gabarit";
+import { usePilotageComparaison } from "@/lib/pilotageRange";
 import type { HeuresJour } from "@/app/api/analyse/heures/route";
 import { EtatVide } from "@/components/ui/EtatVide";
 
@@ -29,7 +30,8 @@ export function CaPersonne() {
   const { stats, prec, chargement: chargementVentes, erreur: erreurVentes } = useStatsVentes(range);
   const etabId = etab?.id ?? "";
   const [etat, setEtat] = useState<{ cle: string; jours: HeuresJour[]; joursPrec: HeuresJour[]; erreur: string | null }>({ cle: "", jours: [], joursPrec: [], erreur: null });
-  const cle = `${etabId}|${range.from}|${range.to}`;
+  const [mode] = usePilotageComparaison();
+  const cle = `${etabId}|${range.from}|${range.to}|${mode}`;
   useEffect(() => {
     if (!etabId) return;
     let annule = false;
@@ -41,8 +43,9 @@ export function CaPersonne() {
         return (j.jours ?? []) as HeuresJour[];
       };
       try {
-        const p = periodePrecedente(range);
-        const [jours, joursPrec] = await Promise.all([charge(range.from, range.to), charge(p.from, p.to).catch(() => [])]);
+        const p = mode === "an_dernier" ? periodeAnDernier(range) : periodePrecedente(range);
+        const e = periodeEffective(range);
+        const [jours, joursPrec] = await Promise.all([charge(e.from, e.to), charge(p.from, p.to).catch(() => [])]);
         if (!annule) setEtat({ cle, jours, joursPrec, erreur: null });
       } catch (e) { if (!annule) setEtat({ cle, jours: [], joursPrec: [], erreur: e instanceof Error ? e.message : "Chargement impossible" }); }
     })();

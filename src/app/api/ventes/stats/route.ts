@@ -119,10 +119,12 @@ export async function GET(req: NextRequest) {
   // Pages Analyse (`comparer=precedente`) : la période et les N jours d'avant, rien d'autre.
   // Vécu 09/10 : deux appels (période puis précédente) × trois périodes = six agrégations en
   // parallèle, le pool PostgREST saturait et les pages restaient 2 à 3 minutes sur « Chargement ».
-  if (searchParams.get("comparer") === "precedente") {
+  const comparer = searchParams.get("comparer");
+  if (comparer === "precedente" || comparer === "an_dernier") {
     const nbJours = Math.round((Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10)) - Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10))) / 86_400_000) + 1;
     const stats = await statsPeriode(etabId, from, to);
-    const prec = await statsPeriode(etabId, shiftDays(from, -nbJours), shiftDays(to, -nbJours));
+    // « an_dernier » : les mêmes dates un an plus tôt (29/10/2026)
+    const prec = comparer === "an_dernier" ? await statsPeriode(etabId, fromA1, toA1) : await statsPeriode(etabId, shiftDays(from, -nbJours), shiftDays(to, -nbJours));
     return NextResponse.json({ empty: !stats, stats, prec, prev: null, prevWeek: null });
   }
 

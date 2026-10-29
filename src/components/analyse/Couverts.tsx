@@ -9,17 +9,17 @@ import { fetchApi } from "@/lib/fetchApi";
 import { EnteteAnalyse, TuileVariation, Cadre, Note, Chargement, TH, TD, TDN } from "@/components/analyse/Blocs";
 import { GraphBarres } from "@/components/analyse/GraphBarres";
 import { ticketMoyen, totalZones, useStatsVentes } from "@/components/analyse/useStatsVentes";
-import { parJour, parJourSemaine } from "@/components/analyse/parJour";
+import { capacitesParJour, parJour, parJourSemaine, type Capacites } from "@/components/analyse/parJour";
 import { COULEUR_MIDI, COULEUR_SOIR, AMBRE, FAIBLE, MUTED, ROUGE, VERT, derniersJours, euros, jourCourt, nombre, pct } from "@/components/analyse/gabarit";
 import { EtatVide } from "@/components/ui/EtatVide";
 import Link from "next/link";
 
 /**
  * Analyse › Couverts (10/10/2026) : « Qui vient, quand ? »
- * Couverts par service et par jour avec la météo, taux de remplissage face aux capacités
- * (objectifs capacite_midi / capacite_soir), jours forts et faibles, ce que rapportent les salles.
+ * Couverts par service et par jour avec la météo, taux de remplissage face aux places disponibles
+ * (objectifs capacite_salle, plus capacite_jardin quand le jardin a servi), jours forts et faibles,
+ * ce que rapportent les salles.
  */
-type Capacites = { midi: number | null; soir: number | null };
 
 export function Couverts() {
   useEtabAuto();
@@ -27,7 +27,7 @@ export function Couverts() {
   const { current: etab } = useEtablissement();
   const [range, setRange] = usePilotageRange(() => derniersJours(30));
   const { stats, prec, meteo, chargement, erreur } = useStatsVentes(range, true);
-  const [capacites, setCapacites] = useState<Capacites & { pour: string }>({ pour: "", midi: null, soir: null });
+  const [capacites, setCapacites] = useState<Capacites & { pour: string }>({ pour: "", salle: null, jardin: null });
   const etabId = etab?.id ?? "";
   useEffect(() => {
     if (!etabId) return;
@@ -37,19 +37,32 @@ export function Couverts() {
       const j = res && res.ok ? await res.json().catch(() => null) : null;
       if (annule) return;
       const o = (j?.objectifs ?? {}) as Record<string, { valeur: number }>;
-      setCapacites({ pour: etabId, midi: o.capacite_midi?.valeur ?? null, soir: o.capacite_soir?.valeur ?? null });
+      setCapacites({ pour: etabId, salle: o.capacite_salle?.valeur ?? o.capacite_midi?.valeur ?? null, jardin: o.capacite_jardin?.valeur ?? null });
     })();
     return () => { annule = true; };
   }, [etabId]);
-  const cap = capacites.pour === etabId ? capacites : { midi: null, soir: null };
+  const cap = useMemo<Capacites>(() => (capacites.pour === etabId ? { salle: capacites.salle, jardin: capacites.jardin } : { salle: null, jardin: null }), [capacites, etabId]);
 
   const jours = useMemo(() => parJour(stats), [stats]);
   const semaine = useMemo(() => parJourSemaine(jours), [jours]);
   const nMidi = jours.filter((j) => j.covMidi > 0).length, nSoir = jours.filter((j) => j.covSoir > 0).length;
-  const remplissage = (cov: number, n: number, capacite: number | null) => (capacite && n ? (cov / (n * capacite)) * 100 : null);
-  const rMidi = stats ? remplissage(stats.cov_midi, nMidi, cap.midi) : null;
-  const rSoir = stats ? remplissage(stats.cov_soir, nSoir, cap.soir) : null;
-  const rGlobal = rMidi != null && rSoir != null ? (rMidi * nMidi + rSoir * nSoir) / Math.max(1, nMidi + nSoir) : rMidi ?? rSoir;
+  // Places disponibles : la salle à chaque service, le jardin en plus quand il a servi (zone Terrasse de la caisse)
+  const capJour = useMemo(() => capacitesParJour(stats, cap), [stats, cap]);
+  const places = useMemo(() => {
+    let midi = 0, soir = 0, jardinMidi = 0, jardinSoir = 0;
+    for (const j of jours) {
+      const c = capJour.get(j.date);
+      if (!c) continue;
+      if (j.covMidi > 0) { midi += c.midi; if (c.jardinMidi) jardinMidi++; }
+      if (j.covSoir > 0) { soir += c.soir; if (c.jardinSoir) jardinSoir++; }
+    }
+    return { midi, soir, jardinMidi, jardinSoir };
+  }, [jours, capJour]);
+  const remplissage = (cov: number, placesDispo: number) => (placesDispo > 0 ? (cov / placesDispo) * 100 : null);
+  const rMidi = stats ? remplissage(stats.cov_midi, places.midi) : null;
+  const rSoir = stats ? remplissage(stats.cov_soir, places.soir) : null;
+  const rGlobal = stats ? remplissage(stats.cov_midi + stats.cov_soir, places.midi + places.soir) : null;
+  const nbJardin = places.jardinMidi + places.jardinSoir;
   const parService = useMemo(() => {
     const liste = semaine.flatMap((j) => [{ libelle: `${j.jour} midi`, cov: j.covMidi, n: j.nMidi }, { libelle: `${j.jour} soir`, cov: j.covSoir, n: j.nSoir }]).filter((s) => s.n > 0);
     liste.sort((a, b) => b.cov - a.cov);
@@ -77,7 +90,7 @@ export function Couverts() {
             <TuileVariation compacte={!bureau} icone="couverts" couleur={COULEUR_MIDI} libelle="Midi" valeur={nombre(stats.cov_midi)} actuel={stats.cov_midi} precedent={prec?.cov_midi} sous={nMidi ? `${nombre(stats.cov_midi / nMidi)} par service` : undefined} />
             <TuileVariation compacte={!bureau} icone="couverts" couleur={COULEUR_SOIR} libelle="Soir" valeur={nombre(stats.cov_soir)} actuel={stats.cov_soir} precedent={prec?.cov_soir} sous={nSoir ? `${nombre(stats.cov_soir / nSoir)} par service` : undefined} />
             <TuileVariation compacte={!bureau} icone="produit" couleur={couleurRemplissage(rGlobal)} libelle="Remplissage" valeur={rGlobal != null ? pct(rGlobal) : "—"} actuel={rGlobal ?? 0} precedent={null}
-              sous={cap.midi || cap.soir ? `midi ${rMidi != null ? pct(rMidi) : "—"} sur ${cap.midi ?? "?"} · soir ${rSoir != null ? pct(rSoir) : "—"} sur ${cap.soir ?? "?"}` : "capacités à renseigner dans Objectifs"} />
+              sous={cap.salle ? `midi ${rMidi != null ? pct(rMidi) : "—"} · soir ${rSoir != null ? pct(rSoir) : "—"} · ${cap.salle} places${cap.jardin ? `, +${cap.jardin} au jardin (ouvert ${nbJardin} service${nbJardin > 1 ? "s" : ""})` : ""}` : "capacités à renseigner dans Objectifs"} />
             <TuileVariation compacte={!bureau} icone="euro" libelle="Ticket moyen" valeur={euros(ticketMoyen(stats), 1)} actuel={ticketMoyen(stats)} precedent={prec ? ticketMoyen(prec) : null} sous="TTC par couvert sur place" />
           </div>
 
@@ -96,8 +109,11 @@ export function Couverts() {
                   <thead><tr><th style={TH}>Jour</th><th style={{ ...TH, textAlign: "right" }}>Midi</th><th style={{ ...TH, textAlign: "right" }}>Rempl.</th><th style={{ ...TH, textAlign: "right" }}>Soir</th><th style={{ ...TH, textAlign: "right" }}>Rempl.</th>{bureau && <th style={{ ...TH, textAlign: "right" }}>Jour</th>}</tr></thead>
                   <tbody>
                     {semaine.map((j) => {
-                      const rm = cap.midi && j.nMidi ? (j.covMidi * j.n / j.nMidi / cap.midi) * 100 : null;
-                      const rs = cap.soir && j.nSoir ? (j.covSoir * j.n / j.nSoir / cap.soir) * 100 : null;
+                      const joursDuNom = jours.filter((x) => x.jour.toLowerCase() === j.jour.toLowerCase());
+                      const placesMidi = joursDuNom.reduce((t, x) => t + (x.covMidi > 0 ? capJour.get(x.date)?.midi ?? 0 : 0), 0);
+                      const placesSoir = joursDuNom.reduce((t, x) => t + (x.covSoir > 0 ? capJour.get(x.date)?.soir ?? 0 : 0), 0);
+                      const rm = remplissage(j.covMidi * j.n, placesMidi);
+                      const rs = remplissage(j.covSoir * j.n, placesSoir);
                       return (
                         <tr key={j.jour}>
                           <td style={{ ...TD, fontWeight: 700 }}>{j.jour} <span style={{ color: FAIBLE, fontWeight: 500 }}>×{j.n}</span></td>
@@ -118,7 +134,7 @@ export function Couverts() {
                     Service le plus fort : <b style={{ color: VERT }}>{parService[0].libelle}</b> ({nombre(parService[0].cov)} couverts en moyenne) · le plus faible : <b style={{ color: ROUGE }}>{parService[parService.length - 1].libelle}</b> ({nombre(parService[parService.length - 1].cov)}).
                   </div>
                 )}
-                <Note>Remplissage = couverts ÷ (capacité × nombre de services). Capacités : <Link href="/settings/etablissements" style={{ color: "#D4775A" }}>Paramètres › Établissements</Link>, clés capacite_midi et capacite_soir. Vert ≥ 80 %, ambre ≥ 55 %.</Note>
+                <Note>Remplissage = couverts ÷ places disponibles. Places : la salle à chaque service (clé capacite_salle, {cap.salle ?? "?"}), plus le jardin (capacite_jardin, {cap.jardin ?? "?"}) sur les services où la zone Terrasse de la caisse a servi. Réglage : <Link href="/settings/etablissements" style={{ color: "#D4775A" }}>Paramètres › Établissements</Link>. Vert ≥ 80 %, ambre ≥ 55 %.</Note>
               </div>
             </Cadre>
             <Cadre titre="Ce que rapportent les salles" sous="CA TTC par zone de la caisse sur la période.">

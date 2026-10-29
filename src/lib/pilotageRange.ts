@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { DateRange } from "@/components/ui/DateRangePicker";
 
 /**
@@ -61,4 +61,16 @@ export function usePilotageRange(initial: () => DateRange, force = false): [Date
   }, []);
 
   return [range, setRange];
+}
+
+/* ── Mode de comparaison partagé (29/10/2026) : période précédente ou même période l'an dernier ── */
+export type ModeComparaison = "precedente" | "an_dernier";
+const KEY_CMP = "pilotage:comparaison";
+const EVT_CMP = "pilotage-comparaison-change";
+const lireComparaison = (): ModeComparaison => { try { return localStorage.getItem(KEY_CMP) === "an_dernier" ? "an_dernier" : "precedente"; } catch { return "precedente"; } };
+const abonnerComparaison = (f: () => void) => { window.addEventListener(EVT_CMP, f); window.addEventListener("storage", f); return () => { window.removeEventListener(EVT_CMP, f); window.removeEventListener("storage", f); }; };
+export function usePilotageComparaison(): [ModeComparaison, (m: ModeComparaison) => void] {
+  const mode = useSyncExternalStore(abonnerComparaison, lireComparaison, () => "precedente" as ModeComparaison);
+  const setMode = useCallback((m: ModeComparaison) => { try { localStorage.setItem(KEY_CMP, m); } catch { /* navigation privée */ } window.dispatchEvent(new Event(EVT_CMP)); }, []);
+  return [mode, setMode];
 }

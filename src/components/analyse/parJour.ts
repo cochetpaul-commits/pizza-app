@@ -30,3 +30,31 @@ export function parJourSemaine(jours: Jour[]): JourSemaine[] {
     };
   }).filter((j) => j.n > 0);
 }
+
+/* ── Capacité par service (29/10/2026) ───────────────────────────────────
+ * 67 places en salle (pergolas comprises) midi et soir ; le jardin (zone « Terrasse » de la caisse)
+ * n'ouvre que s'il fait beau et ajoute 50 places. On le compte ouvert sur un service dès qu'il y a
+ * une vente dans sa zone. */
+export const ZONES_JARDIN = ["jardin", "terrasse"];
+export type Capacites = { salle: number | null; jardin: number | null };
+
+export const jardinOuvert = (zones: Record<string, number> | undefined) =>
+  Object.entries(zones ?? {}).some(([z, ttc]) => ZONES_JARDIN.includes(z.trim().toLowerCase()) && ttc > 0);
+
+/** Places disponibles sur un service, ou null si la capacité de salle n'est pas réglée */
+export const capaciteService = (zones: Record<string, number> | undefined, cap: Capacites): number | null =>
+  cap.salle == null ? null : cap.salle + (cap.jardin && jardinOuvert(zones) ? cap.jardin : 0);
+
+export type CapaciteJour = { midi: number; soir: number; jardinMidi: boolean; jardinSoir: boolean };
+/** Capacité par date, d'après les services de la période */
+export function capacitesParJour(stats: StatsVentes | null, cap: Capacites): Map<string, CapaciteJour> {
+  const m = new Map<string, CapaciteJour>();
+  if (!stats || cap.salle == null) return m;
+  for (const s of stats.services) {
+    const c = capaciteService(s.z_ttc, cap) ?? 0;
+    const j = m.get(s.date) ?? { midi: 0, soir: 0, jardinMidi: false, jardinSoir: false };
+    if (s.svc === "midi") { j.midi = c; j.jardinMidi = jardinOuvert(s.z_ttc); } else { j.soir = c; j.jardinSoir = jardinOuvert(s.z_ttc); }
+    m.set(s.date, j);
+  }
+  return m;
+}
