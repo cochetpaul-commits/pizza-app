@@ -50,7 +50,12 @@ export function MasseSalariale() {
   const { stats, chargement: chargementVentes } = useStatsVentes(periode);
   const etabId = etab?.id ?? "";
   const cle = `${etabId}|${selection.from}|${selection.to}`;
-  const [etat, setEtat] = useState<{ cle: string; presences: Presence[]; contrats: Contrat[]; paie: number | null; objectif: number | null; erreur: string | null }>({ cle: "", presences: [], contrats: [], paie: null, objectif: null, erreur: null });
+  const [etat, setEtat] = useState<{ cle: string; presences: Presence[]; contrats: Contrat[]; paie: number | null; paieExc: number; pourboires: number; objectif: number | null; erreur: string | null }>({ cle: "", presences: [], contrats: [], paie: null, paieExc: 0, pourboires: 0, objectif: null, erreur: null });
+  // Paie exceptionnelle et pourboires du mois (PPV, soldes, pourboires centralisés), saisis ici
+  const [ajustements, setAjustements] = useState<{ id: string; type: string; montant: number; libelle: string | null }[]>([]);
+  const [versionAjust, setVersionAjust] = useState(0);
+  const [formAjust, setFormAjust] = useState<{ type: string; montant: string; libelle: string }>({ type: "ppv", montant: "", libelle: "" });
+  const [ajustMsg, setAjustMsg] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [occupe, setOccupe] = useState<"sync" | "import" | null>(null);
   const [tick, setTick] = useState(0);
@@ -74,8 +79,8 @@ export function MasseSalariale() {
       if (annule()) return;
       const mois = (marge?.mois ?? []) as MoisMarge[];
       const paie = mois.length ? mois[0].postes.masse_salariale ?? null : null;
-      setEtat({ cle, presences: (pres.data ?? []) as Presence[], contrats: cts, paie: paie && paie > 0 ? paie : null, objectif: obj?.objectifs?.ratio_masse_sal?.valeur ?? null, erreur: pres.error?.message ?? null });
-    } catch (e) { if (!annule()) setEtat({ cle, presences: [], contrats: [], paie: null, objectif: null, erreur: e instanceof Error ? e.message : "Chargement impossible" }); }
+      setEtat({ cle, presences: (pres.data ?? []) as Presence[], contrats: cts, paie: paie && paie > 0 ? paie : null, paieExc: mois[0]?.paie_exceptionnelle ?? 0, pourboires: mois[0]?.pourboires_paie ?? 0, objectif: obj?.objectifs?.ratio_masse_sal?.valeur ?? null, erreur: pres.error?.message ?? null });
+    } catch (e) { if (!annule()) setEtat({ cle, presences: [], contrats: [], paie: null, paieExc: 0, pourboires: 0, objectif: null, erreur: e instanceof Error ? e.message : "Chargement impossible" }); }
   }, [cle, etabId, selection.from, selection.to, selection.mode]);
   useEffect(() => {
     if (!etabId) return;
@@ -107,6 +112,29 @@ export function MasseSalariale() {
       return { nom, equipe, type, emploi: contrat?.emploi ?? "", hContrat, hTrav: p.heures_travaillees, hs, brut: brutPeriode, coutCharge: brutPeriode * (1 + CHARGES), coutHS, repas: p.nb_repas, jours: p.nb_jours_travailles, sansContrat: !contrat };
     }).sort((a, b) => b.coutCharge - a.coutCharge);
   }, [etat.presences, etat.contrats, selection.mode]);
+  useEffect(() => {
+    if (!etabId || selection.mode !== "mois") return;
+    let annule = false;
+    fetchApi(`/api/analyse/paie-ajustements?etablissement_id=${etabId}&mois=${selection.from}`).then(async (r) => {
+      if (annule || !r.ok) return;
+      const j = await r.json();
+      setAjustements((j.ajustements ?? []).map((a: { id: string; type: string; montant: number | string; libelle: string | null }) => ({ id: a.id, type: a.type, montant: Number(a.montant), libelle: a.libelle })));
+    }).catch(() => undefined);
+    return () => { annule = true; };
+  }, [etabId, selection.mode, selection.from, versionAjust]);
+  const enregistrerAjust = async () => {
+    const montant = parseFloat(formAjust.montant.replace(",", "."));
+    if (!etabId || !(montant > 0)) { setAjustMsg("Montant requis"); return; }
+    const r = await fetchApi("/api/analyse/paie-ajustements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ etablissement_id: etabId, mois: selection.from, type: formAjust.type, montant, libelle: formAjust.libelle }) });
+    if (!r.ok) { setAjustMsg((await r.json().catch(() => ({})))?.error ?? "Erreur"); return; }
+    setFormAjust({ type: "ppv", montant: "", libelle: "" }); setAjustMsg("Enregistré"); setVersionAjust((v) => v + 1); setTick((v) => v + 1);
+  };
+  const retirerAjust = async (id: string) => {
+    if (!etabId) return;
+    const r = await fetchApi(`/api/analyse/paie-ajustements?etablissement_id=${etabId}&id=${id}`, { method: "DELETE" });
+    if (r.ok) { setVersionAjust((v) => v + 1); setTick((v) => v + 1); }
+  };
+
   const totaux = useMemo(() => employes.reduce((t, e) => ({ hTrav: t.hTrav + e.hTrav, hContrat: t.hContrat + e.hContrat * (selection.mode === "mois" ? 52 / 12 : 1), hs: t.hs + e.hs, coutHS: t.coutHS + e.coutHS, ms: t.ms + e.coutCharge, brut: t.brut + e.brut, sansContrat: t.sansContrat + (e.sansContrat ? 1 : 0) }), { hTrav: 0, hContrat: 0, hs: 0, coutHS: 0, ms: 0, brut: 0, sansContrat: 0 }), [employes, selection.mode]);
   const equipes = useMemo(() => {
     const m = new Map<string, { equipe: string; n: number; hTrav: number; hContrat: number; hs: number; ms: number }>();
@@ -177,7 +205,30 @@ export function MasseSalariale() {
                   {caHt > 0 && <span>Ratio réel <b style={{ color: (etat.paie / caHt) * 100 <= objectif ? VERT : ROUGE }}>{pct((etat.paie / caHt) * 100, 1)}</b></span>}
                 </div>
               ) : <div style={{ fontSize: 13, color: MUTED }}>La paie de ce mois n&apos;est pas encore passée en banque (salaires début du mois suivant, URSSAF vers le 15) : l&apos;estimation fait foi en attendant.</div>}
-              <Note>Paie réelle = salaires nets, URSSAF, retraite et mutuelle du mois travaillé. L&apos;estimation ne compte ni primes, ni congés payés, ni indemnités de fin de contrat : l&apos;écart vient surtout de là.</Note>
+              {(etat.paieExc > 0 || etat.pourboires > 0) && (
+                <div style={{ fontSize: 13, color: MUTED, marginTop: 8 }}>Non comptés dans la paie courante : {etat.paieExc > 0 ? `${euros(etat.paieExc)} de paie exceptionnelle (PPV, soldes de tout compte)` : ""}{etat.paieExc > 0 && etat.pourboires > 0 ? " et " : ""}{etat.pourboires > 0 ? `${euros(etat.pourboires)} de pourboires passés en paie` : ""}.</div>
+              )}
+              <Note>Paie réelle = salaires nets, URSSAF, retraite et mutuelle du mois travaillé, hors PPV, soldes de tout compte et pourboires centralisés. L&apos;estimation ne compte ni primes, ni congés payés : l&apos;écart vient surtout de là.</Note>
+              <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".05em" }}>Paie exceptionnelle et pourboires du mois</div>
+                {ajustements.map((a) => (
+                  <div key={a.id} style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
+                    <span style={{ minWidth: 90, fontWeight: 600 }}>{a.type === "ppv" ? "PPV" : a.type === "solde" ? "Solde de tout compte" : a.type === "pourboires" ? "Pourboires" : "Autre"}</span>
+                    <span style={{ fontVariantNumeric: "tabular-nums" }}>{euros(a.montant)}</span>
+                    <span style={{ color: MUTED, flex: 1, minWidth: 0 }}>{a.libelle}</span>
+                    <button type="button" onClick={() => retirerAjust(a.id)} style={{ border: "none", background: "transparent", color: ROUGE, cursor: "pointer", fontSize: 12 }}>Retirer</button>
+                  </div>
+                ))}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <select value={formAjust.type} onChange={(e) => setFormAjust({ ...formAjust, type: e.target.value })} style={{ font: "inherit", fontSize: 13, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff" }}>
+                    <option value="ppv">PPV</option><option value="solde">Solde de tout compte</option><option value="pourboires">Pourboires</option><option value="autre">Autre</option>
+                  </select>
+                  <input value={formAjust.montant} onChange={(e) => setFormAjust({ ...formAjust, montant: e.target.value })} placeholder="Montant €" inputMode="decimal" style={{ font: "inherit", fontSize: 13, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd6c8", width: 110 }} />
+                  <input value={formAjust.libelle} onChange={(e) => setFormAjust({ ...formAjust, libelle: e.target.value })} placeholder="Libellé (optionnel)" style={{ font: "inherit", fontSize: 13, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd6c8", flex: 1, minWidth: 160 }} />
+                  <button type="button" onClick={enregistrerAjust} style={{ font: "inherit", fontSize: 13, fontWeight: 600, padding: "6px 14px", borderRadius: 20, border: "1px solid #D4775A", background: "#D4775A", color: "#fff", cursor: "pointer" }}>Ajouter</button>
+                  {ajustMsg && <span style={{ fontSize: 12, color: MUTED }}>{ajustMsg}</span>}
+                </div>
+              </div>
             </Cadre>
           )}
 

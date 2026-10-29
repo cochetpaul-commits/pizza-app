@@ -20,7 +20,7 @@ import Link from "next/link";
  * d'exploitation (Pennylane), marge brute et EBE avec leurs ratios face aux objectifs.
  */
 type Reponse = { mois: MoisMarge[]; libelles: Record<string, string>; postes_exploitation: string[]; objectifs: Record<string, number> };
-type Ligne = { mois: string; clos: boolean; ca: number; achats: number; ms: number; gerants: number; exploitation: number; margeBrute: number; ebe: number; postes: Record<string, number> };
+type Ligne = { mois: string; clos: boolean; ca: number; achats: number; ms: number; msExc: number; gerants: number; exploitation: number; margeBrute: number; ebe: number; postes: Record<string, number> };
 
 export function Marge() {
   useEtabAuto();
@@ -56,7 +56,8 @@ export function Marge() {
       const achats = p.achats_matieres ?? 0, ms = p.masse_salariale ?? 0, gerants = p.remuneration_gerants ?? 0;
       const exploitation = Object.entries(p).filter(([k]) => expl.has(k)).reduce((t, [, v]) => t + v, 0);
       const margeBrute = m.ca_ht - achats;
-      return { mois: m.mois, clos: m.clos, ca: m.ca_ht, achats, ms, gerants, exploitation, margeBrute, ebe: margeBrute - ms - gerants - exploitation, postes: p };
+      const msExc = m.paie_exceptionnelle ?? 0; // PPV, soldes : coût réel, hors ratio courant
+      return { mois: m.mois, clos: m.clos, ca: m.ca_ht, achats, ms, msExc, gerants, exploitation, margeBrute, ebe: margeBrute - ms - msExc - gerants - exploitation, postes: p };
     });
   }, [donnees]);
   // Mois de référence : le dernier mois clos avec du CA et des charges (le mois en cours est partiel)
@@ -84,7 +85,7 @@ export function Marge() {
             <TuileVariation compacte={!bureau} icone="foodcost" couleur={couleurRatio(ratio(reference.achats, reference.ca), 32, 38)} libelle="Marge brute" valeur={reference.achats > 0 ? pct(100 - (ratio(reference.achats, reference.ca) ?? 0)) : "—"} actuel={reference.margeBrute} precedent={precedent?.margeBrute}
               sous={reference.achats > 0 ? `${euros(reference.margeBrute)} · matière ${pct(ratio(reference.achats, reference.ca) ?? 0)} du CA` : "achats matières non importés"} />
             <TuileVariation compacte={!bureau} icone="couverts" couleur={couleurRatio(ratio(reference.ms, reference.ca), objMs ?? 35, (objMs ?? 35) + 8)} libelle="Masse salariale" valeur={reference.ms > 0 ? pct(ratio(reference.ms, reference.ca) ?? 0) : "—"} actuel={reference.ms} precedent={precedent?.ms} inverse
-              sous={`${euros(reference.ms)}${objMs ? ` · objectif ≤ ${pct(objMs)}` : ""}${reference.gerants ? ` · gérants ${euros(reference.gerants)}` : ""}`} />
+              sous={`${euros(reference.ms)}${reference.msExc ? ` + ${euros(reference.msExc)} exceptionnel` : ""}${objMs ? ` · objectif ≤ ${pct(objMs)}` : ""}${reference.gerants ? ` · gérants ${euros(reference.gerants)}` : ""}`} />
             <TuileVariation compacte={!bureau} icone="ticket" couleur={reference.ebe >= 0 ? VERT : ROUGE} libelle="EBE estimé" valeur={euros(reference.ebe)} actuel={reference.ebe} precedent={precedent?.ebe} sous={`${pct(ratio(reference.ebe, reference.ca) ?? 0)} du CA · avant amortissements et impôts`} />
           </div>
 
@@ -93,6 +94,7 @@ export function Marge() {
               series={[
                 { libelle: "Achats matières", couleur: TERRACOTTA, valeurs: lignes.map((l) => l.achats) },
                 { libelle: "Masse salariale", couleur: BLEU, valeurs: lignes.map((l) => l.ms) },
+                { libelle: "Paie exceptionnelle", couleur: "#93b4f5", valeurs: lignes.map((l) => l.msExc) },
                 { libelle: "Gérants", couleur: "#7c8fb8", valeurs: lignes.map((l) => l.gerants) },
                 { libelle: "Exploitation", couleur: "#b8b0a3", valeurs: lignes.map((l) => l.exploitation) },
                 { libelle: "CA HT", couleur: "#1a1a1a", courbe: true, valeurs: lignes.map((l) => l.ca) },
@@ -116,7 +118,7 @@ export function Marge() {
                         <td style={{ ...TDN, fontWeight: 600 }}>{vide ? "—" : euros(l.ca)}</td>
                         <td style={TDN}>{l.achats ? <>{bureau && euros(l.achats)} <span style={{ color: couleurRatio(rm, 32, 38) ?? MUTED, fontWeight: 600 }}>{pct(rm ?? 0)}</span>{!bureau && l.ms ? <div style={{ fontSize: 11, color: MUTED }}>MS {pct(rs ?? 0)}</div> : null}</> : <span style={{ color: FAIBLE }}>—</span>}</td>
                         {bureau && <td style={TDN}>{l.achats ? <>{euros(l.margeBrute)} <span style={{ color: MUTED }}>{pct(100 - (rm ?? 0))}</span></> : <span style={{ color: FAIBLE }}>—</span>}</td>}
-                        {bureau && <td style={TDN}>{l.ms ? <>{euros(l.ms)} <span style={{ color: couleurRatio(rs, objMs ?? 35, (objMs ?? 35) + 8) ?? MUTED, fontWeight: 600 }}>{pct(rs ?? 0)}</span></> : <span style={{ color: FAIBLE }}>{l.ca > 0 ? "paie à venir" : "—"}</span>}</td>}
+                        {bureau && <td style={TDN}>{l.ms ? <>{euros(l.ms)} <span style={{ color: couleurRatio(rs, objMs ?? 35, (objMs ?? 35) + 8) ?? MUTED, fontWeight: 600 }}>{pct(rs ?? 0)}</span>{l.msExc > 0 && <div style={{ fontSize: 11, color: MUTED }}>+ {euros(l.msExc)} exceptionnel</div>}</> : <span style={{ color: FAIBLE }}>{l.ca > 0 ? "paie à venir" : "—"}</span>}</td>}
                         {bureau && <td style={TDN}>{l.gerants ? euros(l.gerants) : <span style={{ color: FAIBLE }}>—</span>}</td>}
                         {bureau && <td style={TDN}>{l.exploitation ? euros(l.exploitation) : <span style={{ color: FAIBLE }}>—</span>}</td>}
                         <td style={{ ...TDN, fontWeight: 700, color: vide ? FAIBLE : l.ebe >= 0 ? VERT : ROUGE }}>{vide ? "—" : <>{euros(l.ebe)}{bureau ? " " : <br />}<span style={{ fontWeight: 500 }}>{pct(re ?? 0)}</span></>}</td>
@@ -127,7 +129,7 @@ export function Marge() {
               </table>
             </div>
             <div style={{ padding: "10px 16px 14px" }}>
-              <Note>CA HT : ventes Popina. Charges : Pennylane (achats, loyer, énergie…), passées le mois de leur comptabilisation. La masse salariale (salaires, URSSAF, mutuelle, retraite) est rattachée au mois travaillé : elle passe en banque le mois suivant, donc le dernier mois l&apos;attend encore. L&apos;EBE ne compte ni amortissements, ni impôts, ni variation de stock. Le détail et le coût matière théorique (recettes × ventes) restent dans <Link href="/rentabilite" style={{ color: TERRACOTTA }}>Rentabilité</Link>.</Note>
+              <Note>CA HT : ventes Popina. Charges : Pennylane (achats, loyer, énergie…), passées le mois de leur comptabilisation. La masse salariale (salaires, URSSAF, mutuelle, retraite) est rattachée au mois travaillé : elle passe en banque le mois suivant, donc le dernier mois l&apos;attend encore. Les pourboires passés en paie en sont retirés (argent des clients), la PPV et les soldes de tout compte sont comptés à part dans l&apos;EBE mais pas dans le ratio. L&apos;EBE ne compte ni amortissements, ni impôts, ni variation de stock. Le détail et le coût matière théorique (recettes × ventes) restent dans <Link href="/rentabilite" style={{ color: TERRACOTTA }}>Rentabilité</Link>.</Note>
             </div>
           </Cadre>
 

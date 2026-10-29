@@ -25,6 +25,10 @@ export type MoisMarge = {
   clos: boolean;
   /** La paie de ce mois est-elle passée en banque (début du mois suivant) ? */
   paie_connue: boolean;
+  /** PPV, soldes de tout compte : coût réel mais hors rythme de croisière (sorti de postes.masse_salariale) */
+  paie_exceptionnelle: number;
+  /** Pourboires centralisés passés en paie : argent des clients, sorti de postes.masse_salariale */
+  pourboires_paie: number;
 };
 
 const POSTES_EXPLOITATION = ["loyer", "energie", "commissions_cb", "entretien", "assurances", "honoraires", "locations", "autres_charges", "a_categoriser"];
@@ -49,7 +53,7 @@ export async function GET(req: NextRequest) {
   const dernierJour = (m: string) => { const [a, mm] = m.split("-").map(Number); return `${m}-${String(new Date(a, mm, 0).getDate()).padStart(2, "0")}`; };
   const aujourdhui = new Date().toISOString().slice(0, 10);
 
-  const [cas, { data: charges, error }, { data: objectifs }] = await Promise.all([
+  const [cas, { data: charges, error }, { data: objectifs }, { data: ajustements }] = await Promise.all([
     Promise.all(moisListe.map(async (m) => {
       const { data } = await supabaseAdmin.rpc("ventes_ca_periode", { p_etab: etabId, p_from: `${m}-01`, p_to: dernierJour(m) });
       const row = Array.isArray(data) ? data[0] : data;
@@ -59,6 +63,8 @@ export async function GET(req: NextRequest) {
     supabaseAdmin.from("charges_mensuelles").select("mois, poste, montant_ht").eq("etablissement_id", etabId)
       .gte("mois", `${moisListe[0]}-01`).lte("mois", `${moisPlus(moisListe[moisListe.length - 1], 1)}-01`),
     supabaseAdmin.from("objectifs").select("cle, valeur").eq("etablissement_id", etabId).in("cle", ["ratio_masse_sal", "ratio_matiere"]),
+    supabaseAdmin.from("paie_ajustements").select("mois, type, montant").eq("etablissement_id", etabId)
+      .gte("mois", `${moisListe[0]}-01`).lte("mois", `${moisListe[moisListe.length - 1]}-01`),
   ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -72,7 +78,20 @@ export async function GET(req: NextRequest) {
     p[c.poste as string] = (p[c.poste as string] ?? 0) + Number(c.montant_ht ?? 0);
     parMois.set(m, p);
   }
-  const mois: MoisMarge[] = cas.map((c) => ({ ...c, postes: parMois.get(c.mois) ?? {}, clos: dernierJour(c.mois) < aujourdhui, paie_connue: (parMois.get(c.mois)?.masse_salariale ?? 0) > 0 }));
+  // Paie exceptionnelle (PPV, soldes) et pourboires centralisés : sortis de la masse salariale courante
+  // quand la paie du mois est connue (29/10/2026, bulletins de septembre).
+  const exc = new Map<string, number>(), pourb = new Map<string, number>();
+  for (const a of ajustements ?? []) {
+    const m = String(a.mois).slice(0, 7), v = Number(a.montant ?? 0);
+    if (a.type === "pourboires") pourb.set(m, (pourb.get(m) ?? 0) + v); else exc.set(m, (exc.get(m) ?? 0) + v);
+  }
+  const mois: MoisMarge[] = cas.map((c) => {
+    const p = { ...(parMois.get(c.mois) ?? {}) };
+    const connue = (p.masse_salariale ?? 0) > 0;
+    const e = connue ? exc.get(c.mois) ?? 0 : 0, pb = connue ? pourb.get(c.mois) ?? 0 : 0;
+    if (connue) p.masse_salariale = Math.max(0, p.masse_salariale - e - pb);
+    return { ...c, postes: p, clos: dernierJour(c.mois) < aujourdhui, paie_connue: connue, paie_exceptionnelle: e, pourboires_paie: pb };
+  });
   const obj: Record<string, number> = {};
   for (const o of objectifs ?? []) obj[o.cle as string] = Number(o.valeur);
   return NextResponse.json({ mois, libelles: LIBELLES, postes_exploitation: POSTES_EXPLOITATION, objectifs: obj });

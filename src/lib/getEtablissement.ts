@@ -139,7 +139,7 @@ export class EtabError extends Error {
 
 // ── Contrôles d'accès pour les routes qui reçoivent un etablissement_id ──
 
-async function callerProfile(req: NextRequest | Request): Promise<{ userId: string; role: string | null; accessIds: string[] } | null> {
+export async function callerProfile(req: NextRequest | Request): Promise<{ userId: string; role: string | null; accessIds: string[] } | null> {
   const authHeader = req.headers.get("authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "");
   if (!token) return null;

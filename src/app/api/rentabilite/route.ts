@@ -87,13 +87,17 @@ export async function GET(req: NextRequest) {
   // La paie (salaires, URSSAF, mutuelle, retraite) passe en banque le mois suivant le travail :
   // on la lit un mois plus tard et on la rattache à la période (28/10/2026).
   const moisPlus = (iso: string, n: number) => { const x = new Date(iso.slice(0, 7) + "-01T12:00:00"); x.setMonth(x.getMonth() + n); return x.toISOString().slice(0, 10); };
-  const [{ data: chargesHorsPaie }, { data: chargesPaie }] = await Promise.all([
+  const [{ data: chargesHorsPaie }, { data: chargesPaie }, { data: ajustementsPaie }] = await Promise.all([
     supabaseAdmin.from("charges_mensuelles").select("poste, libelle, montant_ht, source").eq("etablissement_id", etabId)
       .neq("poste", "masse_salariale").gte("mois", moisFrom).lte("mois", to),
     supabaseAdmin.from("charges_mensuelles").select("poste, libelle, montant_ht, source").eq("etablissement_id", etabId)
       .eq("poste", "masse_salariale").gte("mois", moisPlus(moisFrom, 1)).lte("mois", moisPlus(to, 1)),
+    // PPV, soldes de tout compte, pourboires centralisés : saisis sur le mois travaillé
+    supabaseAdmin.from("paie_ajustements").select("type, montant").eq("etablissement_id", etabId).gte("mois", moisFrom).lte("mois", to),
   ]);
   const charges = [...(chargesHorsPaie ?? []), ...(chargesPaie ?? [])];
+  const paieExc = (ajustementsPaie ?? []).filter((a) => a.type !== "pourboires").reduce((t, a) => t + Number(a.montant ?? 0), 0);
+  const paiePourboires = (ajustementsPaie ?? []).filter((a) => a.type === "pourboires").reduce((t, a) => t + Number(a.montant ?? 0), 0);
 
   const parPoste = new Map<string, { total: number; sources: Set<string>; detail: { libelle: string; montant: number }[] }>();
   for (const c of charges ?? []) {
@@ -160,10 +164,15 @@ export async function GET(req: NextRequest) {
 
   // ── 6. Masse salariale + exploitation ──────────────────────────
   const ms = parPoste.get("masse_salariale");
-  const masseSalariale: Ligne = ms && ms.total > 0
-    ? { poste: "Masse salariale chargée", montant: ms.total, statut: "ok", source: [...ms.sources].join(", "), detail: "Paie du mois travaillé, passée en banque le mois suivant" }
+  const paieConnue = !!ms && ms.total > 0;
+  const masseSalariale: Ligne = paieConnue
+    ? { poste: "Masse salariale chargée", montant: Math.max(0, ms.total - paieExc - paiePourboires), statut: "ok", source: [...ms.sources].join(", "),
+        detail: `Paie du mois travaillé, passée en banque le mois suivant${paiePourboires ? `, hors ${Math.round(paiePourboires)} € de pourboires passés en paie` : ""}` }
     : { poste: "Masse salariale chargée", montant: null, statut: "manquant", source: "Pennylane",
         detail: "Paie à venir : les salaires et l'URSSAF de ce mois passent en banque début du mois suivant" };
+  const paieExceptionnelle: Ligne | null = paieConnue && paieExc > 0
+    ? { poste: "Paie exceptionnelle (PPV, soldes de tout compte)", montant: paieExc, statut: "ok", source: "bulletins", detail: "Coût réel du mois, hors rythme de croisière" }
+    : null;
 
   const POSTES_EXPLOITATION = ["loyer", "energie", "commissions_cb", "entretien", "assurances", "honoraires", "locations", "autres_charges", "a_categoriser", "remuneration_gerants"];
   const exploitationDetail: { libelle: string; montant: number }[] = [];
@@ -215,14 +224,14 @@ export async function GET(req: NextRequest) {
   const coutMatiere = (achats.montant ?? 0) + (variationStock.montant ?? 0);
   const margeBrute = achats.montant != null ? caHt - coutMatiere : null;
   const ebe = margeBrute != null && masseSalariale.montant != null && exploitation.montant != null
-    ? margeBrute - masseSalariale.montant - exploitation.montant
+    ? margeBrute - masseSalariale.montant - (paieExceptionnelle?.montant ?? 0) - exploitation.montant
     : null;
 
   return NextResponse.json({
     periode: { from, to },
     ca: { ht: caHt, ttc: caTtc },
     theorique,
-    lignes: [achats, variationStock, masseSalariale, exploitation],
+    lignes: [achats, variationStock, masseSalariale, ...(paieExceptionnelle ? [paieExceptionnelle] : []), exploitation],
     margeBrute: margeBrute != null ? {
       montant: margeBrute,
       pct: caHt > 0 ? (margeBrute / caHt) * 100 : 0,
