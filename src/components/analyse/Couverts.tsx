@@ -153,7 +153,7 @@ export function Couverts() {
           <div style={{ display: "grid", gridTemplateColumns: bureau ? "3fr 2fr" : "1fr", gap: 14, alignItems: "start" }}>
             <Cadre titre="Heures d'affluence" sous="CA TTC par heure d'ouverture des tickets, sur la période.">
               <GraphBarres format={(v) => euros(v)} etiquettes={Array.from({ length: 13 }, (_, i) => `${11 + i} h`)} libelleAxe="CA par heure"
-                series={[{ libelle: "CA TTC", couleur: "#1a1a1a", valeurs: Array.from({ length: 13 }, (_, i) => stats.hourly_ttc?.[11 + i] ?? 0) }]} />
+                series={[{ libelle: "CA TTC", couleur: COULEUR_SOIR, valeurs: Array.from({ length: 13 }, (_, i) => stats.hourly_ttc?.[11 + i] ?? 0) }]} />
             </Cadre>
             <Cadre titre="Durée et rotation des tables" sous="Entre l'ouverture et la fermeture du ticket ; rotation : tickets par table et par service." sansMarge>
               <table style={{ borderCollapse: "collapse", width: "100%", marginTop: 10 }}>

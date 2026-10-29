@@ -1,20 +1,17 @@
-/** Unified category color map — verts, jaunes, terracotta (palette iFratelli) */
+/** Couleurs des catégories de la caisse, communes à la Carte, Par produit, la Cave et l'analyse */
 const CAT_COLORS: Record<string, string> = {
-  PIZZE: "#D4775A",              // terracotta
-  CUCINA: "#4a6741",             // vert forêt
-  CUISINE: "#4a6741",            // vert forêt (alias)
-  DOLCI: "#c9952c",              // doré chaud
-  DESSERTS: "#c9952c",           // doré chaud (alias)
-  ALCOOL: "#b85c3a",             // terracotta foncé
-  VINI: "#8a6b3e",               // brun doré
-  ANTIPASTI: "#d4a03c",          // jaune miel
-  BEVANDE: "#6b8f71",            // vert sauge
-  BOISSONS: "#6b8f71",           // vert sauge (alias)
-  "BEVANDE CALDE": "#a8976b",    // sable chaud
-  "BOISSONS CHAUDES": "#a8976b", // sable chaud (alias)
-  DIGESTIVI: "#7c5c3a",          // brun tabac
-  SPIRITUEUX: "#7c5c3a",         // brun tabac (alias)
-  MESSAGES: "#b0a894",           // gris sable
+  // Palette des catégories de la caisse Popina, celle de la Carte (29/10/2026) : une seule source pour toute l'app
+  PIZZE: "#DD4124",
+  ANTIPASTI: "#E2583E",
+  CUCINA: "#0F4C81", CUISINE: "#0F4C81", PLATS: "#0F4C81",
+  DOLCI: "#FFBE98", DESSERTS: "#FFBE98",
+  VINI: "#955251", VINS: "#955251",
+  DIGESTIVI: "#5F4B8B", DIGESTIFS: "#5F4B8B", SPIRITUEUX: "#5F4B8B",
+  ALCOOL: "#B163A3",
+  BEVANDE: "#7BC4C4", BOISSONS: "#7BC4C4",
+  "BEVANDE CALDE": "#A47864", "BOISSONS CHAUDES": "#A47864",
+  "MENU ANNIVERSAIRE": "#C9952C",
+  MESSAGES: "#939597",
 };
 
 const FALLBACK_COLORS = [

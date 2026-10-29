@@ -3,7 +3,7 @@
 import { Cadre, Note } from "@/components/analyse/Blocs";
 import { GraphBarres } from "@/components/analyse/GraphBarres";
 import { Tuile } from "@/components/ui/Tuile";
-import { CADRE, TD, TH, liseret, MUTED, BON, MAUVAIS } from "@/components/ui/charte";
+import { ACCENT, CADRE, TD, TH, liseret, MUTED, BON, MAUVAIS } from "@/components/ui/charte";
 import { useBureau } from "@/hooks/useBureau";
 import type { ReponseObjectifs } from "@/app/api/objectifs/route";
 import { plancherHebdoTtc, plancherMensuelHt, servicesType } from "@/lib/objectifs";
@@ -34,7 +34,7 @@ export function Rythme({ d }: { d: ReponseObjectifs }) {
 
       <Cadre titre="Chiffre d'affaires HT par mois" sous="Ventes Popina, hors annulations. Le trait est le plancher du rythme de croisière.">
         <GraphBarres etiquettes={mois.map((m) => libMois(m.mois))} format={(v) => eur(v)}
-          series={[{ libelle: "CA HT réalisé", couleur: "#1a1a1a", valeurs: mois.map((m) => m.ca_ht) }, { libelle: "Plancher", couleur: MUTED, valeurs: mois.map(() => plancherMois), courbe: true }]} />
+          series={[{ libelle: "CA HT réalisé", couleur: ACCENT, valeurs: mois.map((m) => m.ca_ht) }, { libelle: "Plancher", couleur: "#1a1a1a", valeurs: mois.map(() => plancherMois), courbe: true }]} />
         <Note>Le mois en cours est partiel. Objectif : chaque mois au-dessus du plancher, et un été qui finance l&apos;hiver.</Note>
       </Cadre>
 

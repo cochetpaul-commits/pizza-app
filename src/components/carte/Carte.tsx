@@ -1,5 +1,7 @@
 "use client";
 
+import { getCategoryColor } from "@/lib/categoryColors";
+
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
@@ -48,17 +50,18 @@ const ATTENTION = "#b7791f";
 const MAUVAIS = "#b4443a";
 const ACCENT = "#D4775A";
 
+// Couleurs : src/lib/categoryColors.ts (une seule palette pour toute l'app, 29/10/2026)
 const CATEGORIES: { cle: string; libelle: string; couleur: string; cuisine: boolean }[] = [
-  { cle: "PIZZE", libelle: "Pizze", couleur: "#DD4124", cuisine: true },
-  { cle: "ANTIPASTI", libelle: "Antipasti", couleur: "#E2583E", cuisine: true },
-  { cle: "CUCINA", libelle: "Cucina", couleur: "#0F4C81", cuisine: true },
-  { cle: "DOLCI", libelle: "Dolci", couleur: "#FFBE98", cuisine: true },
-  { cle: "VINI", libelle: "Vini", couleur: "#955251", cuisine: false },
-  { cle: "DIGESTIVI", libelle: "Digestivi", couleur: "#5F4B8B", cuisine: false },
-  { cle: "ALCOOL", libelle: "Alcool", couleur: "#B163A3", cuisine: false },
-  { cle: "BEVANDE", libelle: "Bevande", couleur: "#7BC4C4", cuisine: false },
-  { cle: "BEVANDE CALDE", libelle: "Bevande calde", couleur: "#A47864", cuisine: false },
-  { cle: "MESSAGES", libelle: "Messages", couleur: "#939597", cuisine: false },
+  { cle: "PIZZE", libelle: "Pizze", couleur: getCategoryColor("PIZZE"), cuisine: true },
+  { cle: "ANTIPASTI", libelle: "Antipasti", couleur: getCategoryColor("ANTIPASTI"), cuisine: true },
+  { cle: "CUCINA", libelle: "Cucina", couleur: getCategoryColor("CUCINA"), cuisine: true },
+  { cle: "DOLCI", libelle: "Dolci", couleur: getCategoryColor("DOLCI"), cuisine: true },
+  { cle: "VINI", libelle: "Vini", couleur: getCategoryColor("VINI"), cuisine: false },
+  { cle: "DIGESTIVI", libelle: "Digestivi", couleur: getCategoryColor("DIGESTIVI"), cuisine: false },
+  { cle: "ALCOOL", libelle: "Alcool", couleur: getCategoryColor("ALCOOL"), cuisine: false },
+  { cle: "BEVANDE", libelle: "Bevande", couleur: getCategoryColor("BEVANDE"), cuisine: false },
+  { cle: "BEVANDE CALDE", libelle: "Bevande calde", couleur: getCategoryColor("BEVANDE CALDE"), cuisine: false },
+  { cle: "MESSAGES", libelle: "Messages", couleur: getCategoryColor("MESSAGES"), cuisine: false },
 ];
 const CAT_PAR_CLE = new Map(CATEGORIES.map((c) => [c.cle, c]));
 const infoCategorie = (cle: string) => CAT_PAR_CLE.get(cle) ?? { cle, libelle: cle.charAt(0) + cle.slice(1).toLowerCase(), couleur: "#939597", cuisine: false };

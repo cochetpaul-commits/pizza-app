@@ -201,18 +201,18 @@ function Service({ donnees, onOuvrir }: { donnees: Donnees; onOuvrir: (v: VinCav
           <colgroup><col style={{ width: 6 }} /><col style={{ width: 40 }} /><col /><col style={{ width: 110 }} /><col style={{ width: 70 }} /></colgroup>
           <thead><tr><th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={TH}>Plat</th><th style={TH}>Catégorie</th><th style={{ ...TH, textAlign: "right" }}>Prix</th></tr></thead>
           <tbody>
-            {Object.keys(CATS).flatMap((cat) => plats.filter((p) => p.categorie === cat).map((p) => {
-              const c = getCategoryColor(cat), on = sel.has(p.id);
+            {[...plats].sort((a, b) => joli(a.nom).localeCompare(joli(b.nom), "fr")).map((p) => {
+              const cat = p.categorie, c = getCategoryColor(cat), on = sel.has(p.id);
               return (
                 <tr key={p.id} className="cave-ligne" onClick={() => basculer(p.id)} style={{ cursor: "pointer", background: on ? "#f4f6f1" : undefined }}>
                   <td style={liseret(c)} />
                   <td style={{ ...TD, padding: "8px 0 8px 12px" }}><input type="checkbox" checked={on} onChange={() => basculer(p.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: c, width: 16, height: 16, cursor: "pointer" }} /></td>
                   <td style={{ ...TD, fontWeight: on ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{joli(p.nom)}</td>
-                  <td style={TD}><span style={pastille(couleurTexteCat(c), alpha(c, 0.14))}>{CATS[cat]}</span></td>
+                  <td style={TD}><span style={pastille(couleurTexteCat(c), alpha(c, 0.14))}>{CATS[cat] ?? cat}</span></td>
                   <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", color: MUTED }}>{eur(p.prix)}</td>
                 </tr>
               );
-            }))}
+            })}
           </tbody>
         </table>
       </div>
@@ -279,7 +279,7 @@ export function Cave({ vueInitiale }: { vueInitiale?: "service" | "cave" }) {
     };
     return donnees.vins.filter(garde)
       .filter((v) => !q || norm(`${v.nom} ${v.domaine ?? ""} ${v.cepages ?? ""} ${v.region ?? ""}`).includes(q))
-      .sort((a, b) => ORDRE.indexOf(a.couleur) - ORDRE.indexOf(b.couleur) || (a.prix?.b ?? 0) - (b.prix?.b ?? 0) || a.nom.localeCompare(b.nom, "fr"));
+      .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
   }, [donnees, filtre, recherche]);
   const vinOuvert = donnees?.vins.find((v) => v.id === ouvert) ?? null;
   /** Vin archivé remis en cave active (sur la carte) ; le retour en archive se fait depuis la fiche */

@@ -181,6 +181,8 @@ pastille, h1, INTERTITRE, CHAMP). Toute nouvelle page les utilise ; ne pas redé
 - **Volets** : `VoletDroit` à droite sur bureau, feuille plein écran sur téléphone. Modals : rayon 16.
 - **États vides** : `EtatVide` (icône ronde, titre, phrase, action). Chargement : texte MUTED centré.
 - **Responsive** : `useBureau()` ; page max-width 900 (1100 pour l'analyse), padding 18/28 bureau, 12/14 téléphone.
+- Listes et catégories toujours en ordre alphabétique (sauf classements explicites : top 10, par montant).
+- Couleurs des catégories de la caisse : `src/lib/categoryColors.ts` (palette de la Carte), une seule source.
 - Pas d'emoji, pas de dégradés hors barres de catégorie, pas de couleur par page.
 
 ## Patterns UI (rappels)

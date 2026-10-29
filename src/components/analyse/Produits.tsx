@@ -65,10 +65,10 @@ export function Produits() {
     const precParCat = prec?.cat_products ?? {};
     return Object.entries(stats.cat_products).map(([cat, produits]) => {
       const avant = new Map((precParCat[cat] ?? []).map((p) => [p.n, p]));
-      const lignes = produits.map((p) => ({ ...p, avant: avant.get(p.n) ?? null }));
+      const lignes = produits.map((p) => ({ ...p, avant: avant.get(p.n) ?? null })).sort((a, b) => a.n.localeCompare(b.n, "fr"));
       const qty = lignes.reduce((t, p) => t + p.qty, 0), ht = lignes.reduce((t, p) => t + p.ca_ht, 0), ttc = lignes.reduce((t, p) => t + p.ca_ttc, 0);
       return { cat, couleur: getCategoryColor(cat), qty, ht, ttc, lignes: q ? lignes.filter((p) => norm(p.n).includes(q)) : lignes };
-    }).filter((c) => c.lignes.length > 0).sort((a, b) => b.ht - a.ht);
+    }).filter((c) => c.lignes.length > 0).sort((a, b) => a.cat.localeCompare(b.cat, "fr"));
   }, [stats, prec, q]);
   const totalQty = useMemo(() => Object.values(stats?.cat_products ?? {}).flat().reduce((t, p) => t + p.qty, 0), [stats]);
   const totalQtyPrec = useMemo(() => Object.values(prec?.cat_products ?? {}).flat().reduce((t, p) => t + p.qty, 0), [prec]);
