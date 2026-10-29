@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { posteParCompte } from "@/lib/pennylane/posteParCompte";
 import { getSupplierInvoices, getInvoiceCategories, getSuppliers, getTransactions, type PlDossier } from "@/lib/pennylane/api";
 
 /**
@@ -126,7 +127,7 @@ const MAPPING: Record<string, string | null> = {
 export const LIBELLES: Record<string, string> = {
   achats_matieres: "Achats matières",
   masse_salariale: "Masse salariale chargée",
-  remuneration_gerants: "Rémunération des gérants",
+  remuneration_gerants: "Direction (gérants, holding)",
   loyer: "Loyer & redevances",
   energie: "Énergie (électricité, gaz, eau)",
   commissions_cb: "Commissions & frais bancaires",
@@ -144,8 +145,11 @@ const norm = (s: string) =>
 // Les libellés Pennylane arrivent parfois avec un espace final ou une casse
 // différente d'un dossier à l'autre : on compare en forme normalisée.
 const MAPPING_NORM = new Map<string, string | null>(Object.entries(MAPPING).map(([k, v]) => [norm(k), v]));
-/** Poste EBE d'un libellé de catégorie ; `undefined` = libellé inconnu. */
+/** Poste EBE d'un libellé de catégorie : par le compte en préfixe (plan du 29/10/2026), sinon par
+ *  le nom historique ; `undefined` = libellé inconnu. */
 function posteDe(label: string): string | null | undefined {
+  const parCompte = posteParCompte(label);
+  if (parCompte !== undefined) return parCompte;
   return MAPPING_NORM.has(norm(label)) ? MAPPING_NORM.get(norm(label)) : undefined;
 }
 
