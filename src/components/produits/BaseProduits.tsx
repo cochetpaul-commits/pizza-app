@@ -594,7 +594,7 @@ export function BaseProduits(p: BaseProduitsProps) {
         <Tuile icone="alerte" libelle="À contrôler" valeur={nombre(p.aControler)} sous="unité, contenance ou prix à vérifier" active={p.tab === "to_check"} couleur={ATTENTION} onClick={() => p.setTab("to_check")} />
         <Tuile icone="sans" libelle="Sans prix d'achat" valeur={nombre(p.sansPrix)} sous="aucune offre fournisseur active" active={p.tab === "sans_prix"} couleur={MAUVAIS} onClick={() => p.setTab("sans_prix")} />
         {tuileCommander(false)}
-        <Tuile icone="doublon" libelle="Doublons probables" valeur={nombre(p.nbDoublons)} sous="paires détectées dans les fiches chargées" couleur={ATTENTION} onClick={p.onDoublons} />
+        <Tuile icone="doublon" libelle="Doublons probables" valeur={nombre(p.nbDoublons)} sous="paires de fiches aux noms proches" couleur={ATTENTION} onClick={p.onDoublons} />
       </div>
 
       {/* Filtres : recherche + menus déroulants, pas de pastilles */}

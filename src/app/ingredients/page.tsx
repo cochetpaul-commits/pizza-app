@@ -49,7 +49,8 @@ import { useProfile } from "@/lib/ProfileContext";
 import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import DuplicatePanel from "@/components/DuplicatePanel";
-import { detectDuplicates, similarity, type DuplicatePair } from "@/lib/duplicateDetection";
+import { similarity } from "@/lib/duplicateDetection";
+import { useDoublons } from "@/lib/useDoublons";
 import { normaliserSousCategorie } from "@/lib/styleCategories";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { dateFermeture, fermerOffresActives } from "@/lib/offerClosing";
@@ -372,10 +373,8 @@ function IngredientsPageInner() {
     catch { return new Set(); }
   });
 
-  const duplicatePairs = useMemo<DuplicatePair[]>(
-    () => detectDuplicates(items, offersByIngredientId, ignoreKeys),
-    [items, offersByIngredientId, ignoreKeys]
-  );
+  // Même source que la page Doublons (29/10) : toutes les fiches actives, pas seulement celles chargées ici
+  const { paires: duplicatePairs } = useDoublons(ignoreKeys);
 
   // ─── Stable callbacks ────────────────────────────────────────────────────
   const setIngredientStatus = useCallback(async (id: string, next: IngredientStatus) => {
