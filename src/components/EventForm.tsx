@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
@@ -514,7 +515,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
             <div>
               <label style={labelStyle}>Type</label>
               <select style={inputStyle} value={type} onChange={(e) => setType(e.target.value)}>
-                {EVENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {triParLibelle(EVENT_TYPES, (t) => t.label).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div>
@@ -849,7 +850,7 @@ export default function EventForm({ eventId }: { eventId?: string }) {
                 value={uploadDocType}
                 onChange={(e) => setUploadDocType(e.target.value)}
               >
-                {DOC_TYPES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                {triParLibelle(DOC_TYPES, (d) => d.label).map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
               </select>
               <input
                 ref={fileRef}

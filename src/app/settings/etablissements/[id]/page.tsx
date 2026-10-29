@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { RequireRole } from "@/components/RequireRole";
@@ -1471,7 +1472,7 @@ export default function EtablissementDetailPage() {
               <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 6 }}>Selectionnez un etablissement :</div>
               <select style={INPUT} value={importEtabId} onChange={e => setImportEtabId(e.target.value)}>
                 <option value="">Rechercher</option>
-                {allEtabs.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+                {triParLibelle(allEtabs, (e) => e.nom).map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
               </select>
             </div>
             {importEtabId && (
@@ -1613,7 +1614,7 @@ export default function EtablissementDetailPage() {
                   <div style={{ ...LABEL, marginBottom: 6 }}>Selectionner les modeles d&apos;un autre etablissement <span style={{ color: "#DC2626" }}>*</span></div>
                   <select style={INPUT} value={primeDupEtabId} onChange={e => setPrimeDupEtabId(e.target.value)}>
                     <option value="">Rechercher</option>
-                    {allEtabs.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+                    {triParLibelle(allEtabs, (e) => e.nom).map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
                   </select>
                 </div>
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>

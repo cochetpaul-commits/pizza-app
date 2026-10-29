@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { TYPES_COLISAGE, libelleType, libelleColisage, libelleElement, type UniteCommande, type ElementCommande, estUniteCommande } from "@/lib/commandeArticles";
 
 import type { CSSProperties } from "react";
@@ -206,7 +207,7 @@ function SousCategorieChoix({ valeur, existantes, onChange }: { valeur: string; 
       onChange(e.target.value);
     }}>
       <option value="">— aucune —</option>
-      {options.map((s) => <option key={s} value={s}>{s}</option>)}
+      {triParLibelle(options, (s) => s).map((s) => <option key={s} value={s}>{s}</option>)}
       <option value="__nouvelle__">+ Nouvelle sous-catégorie…</option>
     </select>
   );

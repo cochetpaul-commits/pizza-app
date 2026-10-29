@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 
@@ -459,7 +460,7 @@ export default function MesCongesPage() {
           <div style={{ marginBottom: 10 }}>
             <label style={labelSt}>Type</label>
             <select style={inputSt} value={fType} onChange={e => setFType(e.target.value)}>
-              {TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+              {triParLibelle(TYPES, (t) => t.label).map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
           </div>
           <div style={{ marginBottom: 12 }}>

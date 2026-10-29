@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { triParLibelle } from "@/lib/tri";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
@@ -1232,7 +1233,7 @@ export default function InventairePage() {
                       <span style={{ flex: 1, fontSize: 12.5 }}>Créer « <b>{addProdSearch.trim()}</b> » dans</span>
                       <select value={quickCreateCat} onChange={e => setQuickCreateCat(e.target.value)}
                         style={{ fontSize: 12, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff" }}>
-                        {CATEGORIES.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+                        {triParLibelle(CATEGORIES, (c) => CAT_LABELS[c]).map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
                       </select>
                       <button type="button" disabled={addingProducts} onClick={quickCreateProduct}
                         style={{ padding: "7px 12px", borderRadius: 8, border: "none", background: "#2D6A4F", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>

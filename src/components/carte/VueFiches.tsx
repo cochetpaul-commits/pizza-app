@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { useRouter } from "next/navigation";
 import { VoletDroit } from "@/components/produits/BaseProduits";
 import { OSWALD } from "@/components/TuileProduit";
@@ -324,7 +325,7 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
           style={{ flex: "1 1 220px", height: 36, padding: "0 12px", borderRadius: 10, border: `1px solid ${BORD}`, fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fff", minWidth: 0 }} />
         <select value={groupeFiltre} onChange={(e) => setGroupeFiltre(e.target.value)} style={SELECT}>
           <option value="tous">Catégorie : toutes</option>
-          {groupes.map((g) => <option key={g.cle} value={g.cle}>{g.libelle}</option>)}
+          {triParLibelle(groupes, (g) => g.libelle).map((g) => <option key={g.cle} value={g.cle}>{g.libelle}</option>)}
         </select>
         <select value={statut} onChange={(e) => setStatut(e.target.value)} style={SELECT}>
           <option value="tous">Statut : tous</option><option value="publiee">Publiées</option><option value="validee">Validées</option><option value="brouillon">Brouillons</option><option value="sans_cout">Sans coût</option>{mode === "fiches" && <option value="sans_prix">Sans prix de vente</option>}

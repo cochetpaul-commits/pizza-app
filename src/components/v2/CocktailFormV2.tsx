@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { useRecipeDraft } from "@/lib/useRecipeDraft";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -721,14 +722,14 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                         <label className="label">Verrerie</label>
                         <select className="input" value={glass} onChange={e => setGlass(e.target.value)}>
                           <option value="">— verre —</option>
-                          {GLASS_OPTIONS.map(g => <option key={g} value={g.toLowerCase()}>{g}</option>)}
+                          {[...triParLibelle(GLASS_OPTIONS.filter((g) => g !== "Autre"), (g) => g), "Autre"].map(g => <option key={g} value={g.toLowerCase()}>{g}</option>)}
                         </select>
                       </div>
                       <div style={{ flex: "1 1 140px" }}>
                         <label className="label">Méthode</label>
                         <select className="input" value={method} onChange={e => setMethod(e.target.value)}>
                           <option value="">— méthode —</option>
-                          {METHOD_OPTIONS.map(m => <option key={m} value={m.toLowerCase()}>{m}</option>)}
+                          {triParLibelle(METHOD_OPTIONS, (m) => m).map(m => <option key={m} value={m.toLowerCase()}>{m}</option>)}
                         </select>
                       </div>
                     </div>

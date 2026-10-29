@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { fetchApi } from "@/lib/fetchApi";
 
 /**
@@ -206,7 +207,7 @@ export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <select value={nouveau.employe} onChange={(e) => setNouveau((n) => ({ ...n, employe: e.target.value }))} style={{ ...input, minWidth: 160 }}>
               <option value="">Personne…</option>
-              {data.lignes.map((x) => <option key={x.employe_id} value={x.employe_id}>{x.nom} {x.prenom}</option>)}
+              {triParLibelle(data.lignes, (x) => `${x.nom} ${x.prenom}`).map((x) => <option key={x.employe_id} value={x.employe_id}>{x.nom} {x.prenom}</option>)}
             </select>
             <input inputMode="decimal" placeholder="Montant (−400 = déduction)" value={nouveau.montant} onChange={(e) => setNouveau((n) => ({ ...n, montant: e.target.value }))} style={{ ...input, width: 200 }} />
             <input placeholder="Motif : acompte, report de juillet…" value={nouveau.motif} onChange={(e) => setNouveau((n) => ({ ...n, motif: e.target.value }))} style={{ ...input, flex: "1 1 200px" }} />

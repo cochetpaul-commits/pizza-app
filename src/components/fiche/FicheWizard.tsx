@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -827,7 +828,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
                 }}>
                   {!fiche.categorie_slug && <option value="" disabled>Choisir…</option>}
                   {fiche.categorie_slug && !categories.some(c => c.slug === fiche.categorie_slug) && <option value={fiche.categorie_slug}>{fiche.categorie_slug}</option>}
-                  {categories.map(c => <option key={c.slug} value={c.slug}>{c.nom}</option>)}
+                  {triParLibelle(categories, (c) => c.nom).map(c => <option key={c.slug} value={c.slug}>{c.nom}</option>)}
                   <option value="__new__">+ Créer une catégorie</option>
                 </select>
               )}
@@ -847,7 +848,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
               ) : (
                 <select value={fiche.sous_categorie} style={SELECT} onChange={e => { const v = e.target.value; if (v === "__new__") { setShowNewSubCat(true); return; } update({ sous_categorie: v }); }}>
                   <option value="">Aucune</option>
-                  {(existingSubCats[fiche.categorie_slug] ?? []).map(s => <option key={s} value={s}>{s}</option>)}
+                  {triParLibelle(existingSubCats[fiche.categorie_slug] ?? [], (s) => s).map(s => <option key={s} value={s}>{s}</option>)}
                   <option value="__new__">+ Créer une sous-catégorie</option>
                 </select>
               )}
@@ -883,7 +884,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
               <div>
                 <label style={LBL}>Empâtement</label>
                 <select value={fiche.empatement} onChange={e => update({ empatement: e.target.value })} style={SELECT}>
-                  {empatements.length > 0 ? empatements.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>) : <option>FOCACCIA</option>}
+                  {empatements.length > 0 ? triParLibelle(empatements, (e) => e.name).map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>) : <option>FOCACCIA</option>}
                 </select>
               </div>
               <div>

@@ -79,7 +79,9 @@ export function Plats() {
     const ordre = (donnees?.categories ?? []).map((c) => c.cat);
     const m = new Map<string, Set<string>>();
     for (const p of donnees?.products ?? []) { if (!m.has(p.categorie)) m.set(p.categorie, new Set()); const sc = sousCat(p); if (sc) m.get(p.categorie)!.add(sc); }
-    return [...m.entries()].map(([cat, set]) => ({ cat, sous: [...set].sort() })).sort((a, b) => (ordre.indexOf(a.cat) + 1 || 999) - (ordre.indexOf(b.cat) + 1 || 999));
+    // Menu déroulant A → Z (29/10/2026) ; l'ordre de la caisse (ordre) ne sert plus ici
+    void ordre;
+    return [...m.entries()].map(([cat, set]) => ({ cat, sous: [...set].sort((x, y) => x.localeCompare(y, "fr")) })).sort((a, b) => a.cat.localeCompare(b.cat, "fr"));
   }, [donnees]);
   const [catFiltre, sousFiltre] = categorie === "toutes" ? [null, null] : categorie.split("|");
   const lignes = useMemo(() => {

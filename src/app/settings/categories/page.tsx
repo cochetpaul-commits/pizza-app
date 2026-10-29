@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
@@ -21,7 +22,7 @@ const FAMILLE_LABELS: Record<string, string> = {
   soft: "Soft", vin: "Vin", autre: "Autre",
 };
 
-const FAMILLE_OPTIONS = Object.entries(FAMILLE_LABELS);
+const FAMILLE_OPTIONS = triParLibelle(Object.entries(FAMILLE_LABELS), ([, v]) => v);
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);

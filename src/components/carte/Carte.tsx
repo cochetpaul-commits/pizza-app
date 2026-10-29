@@ -1,6 +1,7 @@
 "use client";
 
 import { getCategoryColor } from "@/lib/categoryColors";
+import { triParLibelle } from "@/lib/tri";
 
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -535,9 +536,10 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un article, une fiche…"
           style={{ flex: "1 1 220px", height: 36, padding: "0 12px", borderRadius: 10, border: `1px solid ${BORD}`, fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fff", minWidth: 0 }} />
-        <select value={categorie} onChange={(e) => setCategorie(e.target.value)} style={SELECT}>
+        {/* Choisir une catégorie ouvre directement son tableau (29/10/2026) */}
+        <select value={categorie} onChange={(e) => { const v = e.target.value; setCategorie(v); if (v !== "toutes") setSectionsOuvertes((s) => new Set(s).add(v)); }} style={SELECT}>
           <option value="toutes">Catégorie caisse : toutes</option>
-          {CATEGORIES.map((c) => <option key={c.cle} value={c.cle}>{c.libelle}</option>)}
+          {triParLibelle(CATEGORIES, (c) => c.libelle).map((c) => <option key={c.cle} value={c.cle}>{c.libelle}</option>)}
         </select>
         <select value={lien} onChange={(e) => setLien(e.target.value as FiltreLien)} style={SELECT}>
           <option value="tous">Lien : tous</option><option value="fiche">Reliés à une fiche</option><option value="produit">Reliés à un produit</option><option value="aucun">Non reliés</option>

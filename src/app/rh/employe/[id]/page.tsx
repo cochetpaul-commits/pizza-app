@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { RequireRole } from "@/components/RequireRole";
@@ -706,7 +707,7 @@ export default function EmployeDetailPage() {
             style={{ display: "none" }}
           >
             <option value="">--</option>
-            {etablissements.map((e) => (<option key={e.id} value={e.id}>{e.nom}</option>))}
+            {triParLibelle(etablissements, (e) => e.nom).map((e) => (<option key={e.id} value={e.id}>{e.nom}</option>))}
           </select>
 
           {/* Equipe + Poste */}
@@ -758,7 +759,7 @@ export default function EmployeDetailPage() {
               value={cType}
               onChange={setCType}
               disabled={!canWrite}
-              options={Object.entries(CONTRAT_LABELS).map(([k, v]) => [k, v])}
+              options={triParLibelle(Object.entries(CONTRAT_LABELS), ([, v]) => v).map(([k, v]) => [k, v])}
             />
             {isGroupAdmin ? (
               <Field
@@ -978,7 +979,7 @@ export default function EmployeDetailPage() {
               <div style={fieldRow}>
                 <label style={labelSt}>Type de contrat *</label>
                 <select style={inputSt} value={cType} onChange={(e) => setCType(e.target.value)}>
-                  {Object.entries(CONTRAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  {triParLibelle(Object.entries(CONTRAT_LABELS), ([, v]) => v).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               </div>
 
@@ -1097,7 +1098,7 @@ export default function EmployeDetailPage() {
                   if (eqRes.data) setContratEquipes(eqRes.data.map((eq: { nom: string }) => eq.nom));
                   if (mgrRes.data) setContratManagers(mgrRes.data.map((m: { id: string; prenom: string; nom: string }) => ({ id: m.id, label: `${m.prenom} ${m.nom}` })));
                 }}>
-                  {etablissements.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+                  {triParLibelle(etablissements, (e) => e.nom).map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
                 </select>
               </div>
 
@@ -1194,7 +1195,7 @@ export default function EmployeDetailPage() {
             <div style={fieldRow}>
               <label style={labelSt}>Type</label>
               <select style={inputSt} value={aType} onChange={(e) => setAType(e.target.value)}>
-                {Object.entries(ABSENCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {triParLibelle(Object.entries(ABSENCE_LABELS), ([, v]) => v).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
 
@@ -1650,7 +1651,7 @@ function FieldSelect({ label, value, onChange, options, disabled = false, tag }:
         {tag && <span style={tagStyle(tag)}>{tag}</span>}
       </label>
       <select style={{ ...inputSt, opacity: disabled ? 0.6 : 1 }} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
-        {options.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        {triParLibelle(options, ([, v]) => v).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </select>
     </div>
   );

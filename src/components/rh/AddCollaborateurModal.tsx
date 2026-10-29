@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { supabase } from "@/lib/supabaseClient";
 
 type Props = {
@@ -109,7 +110,7 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
             <label style={{ fontSize: 12, fontWeight: 600, color: "#666", marginBottom: 4, display: "block" }}>Etablissement</label>
             <select value={selectedEtab} onChange={e => { setSelectedEtab(e.target.value); setSelectedEquipe(""); }}
               style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, boxSizing: "border-box", fontFamily: "inherit" }}>
-              {allEtabs.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+              {triParLibelle(allEtabs, (e) => e.nom).map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
             </select>
           </div>
 
@@ -119,7 +120,7 @@ export function AddCollaborateurModal({ etablissementId, onClose, onCreated }: P
               <select value={selectedEquipe} onChange={e => setSelectedEquipe(e.target.value)}
                 style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 14, boxSizing: "border-box", fontFamily: "inherit" }}>
                 <option value="">Aucune</option>
-                {equipes.map(eq => <option key={eq.id} value={eq.nom}>{eq.nom}</option>)}
+                {triParLibelle(equipes, (eq) => eq.nom).map(eq => <option key={eq.id} value={eq.nom}>{eq.nom}</option>)}
               </select>
             </div>
           )}

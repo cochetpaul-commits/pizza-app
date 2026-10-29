@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef, Suspense } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { RecoverProductsModal } from "@/components/RecoverProductsModal";
 import { ImportExportModal } from "@/components/ImportExportModal";
 import type { CSSProperties } from "react";
@@ -1684,7 +1685,7 @@ function IngredientsPageInner() {
             background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 12,
           }}>
             <option value="">Categorie...</option>
-            {CATEGORIES.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+            {triParLibelle(CATEGORIES, (c) => CAT_LABELS[c]).map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
           </select>
           {bulkCatTarget && (
             <input

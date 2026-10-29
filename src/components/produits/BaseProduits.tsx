@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { CAT_COLORS, CAT_LABELS, type Category, type Ingredient, type IngredientStatus, type LatestOffer, type Supplier, type Tab } from "@/types/ingredients";
 import type { StorageZoneOption } from "@/components/IngredientRow";
 import type { PriceAlert } from "@/lib/priceAlerts";
@@ -318,21 +319,21 @@ export function BaseProduits(p: BaseProduitsProps) {
   const compteur = `${nombre(tries.length)} produit${tries.length > 1 ? "s" : ""}${p.hasMore ? " chargés" : filtresActifs ? " trouvés" : ""}`;
 
   const selectCategorie = (style: CSSProperties) => (
-    <select value={p.categorie} onChange={(e) => p.setCategorie(e.target.value as "all" | Category)} style={style} aria-label="Catégorie">
+    <select value={p.categorie} onChange={(e) => { const v = e.target.value as "all" | Category; p.setCategorie(v); if (v !== "all") setOuvertes((prev) => new Set(prev).add(v)); }} style={style} aria-label="Catégorie">
       <option value="all">{p.bureau ? "Toutes" : "Toutes catégories"}</option>
-      {p.categories.map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+      {triParLibelle(p.categories, (c) => CAT_LABELS[c]).map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
     </select>
   );
   const selectFournisseur = (style: CSSProperties) => (
     <select value={p.fournisseur} onChange={(e) => p.setFournisseur(e.target.value)} style={style} aria-label="Fournisseur">
       <option value="all">{p.bureau ? "Tous" : "Tous fournisseurs"}</option>
-      {p.suppliers.filter((s) => s.is_active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+      {triParLibelle(p.suppliers.filter((s) => s.is_active), (s) => s.name).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
     </select>
   );
   const selectZone = (style: CSSProperties) => (
     <select value={p.zone} onChange={(e) => p.setZone(e.target.value)} style={style} aria-label="Zone de stockage">
       <option value="all">{p.bureau ? "Toutes" : "Toutes zones"}</option>
-      {p.zones.map((z) => <option key={z.id} value={z.name}>{z.name}</option>)}
+      {triParLibelle(p.zones, (z) => z.name).map((z) => <option key={z.id} value={z.name}>{z.name}</option>)}
     </select>
   );
   const caseInactives = (

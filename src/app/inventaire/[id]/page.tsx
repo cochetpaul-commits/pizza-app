@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { triParLibelle } from "@/lib/tri";
 import { useParams, useRouter } from "next/navigation";
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
@@ -721,7 +722,7 @@ function Feuille() {
               flexShrink: 0, padding: "0 12px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 700, border: "1px dashed #b0a894", background: "#fff", color: "#6f6656", alignSelf: "stretch", fontFamily: "inherit",
             }}>
             <option value="">+ zone</option>
-            {zones.filter((z) => z !== zone && (parZone.get(z) ?? []).length === 0).map((z) => <option key={z} value={z}>{libelleZone(z)} (vide)</option>)}
+            {triParLibelle(zones.filter((z) => z !== zone && (parZone.get(z) ?? []).length === 0), (z) => libelleZone(z)).map((z) => <option key={z} value={z}>{libelleZone(z)} (vide)</option>)}
             <option value="__nouvelle__">+ Nouvelle zone…</option>
           </select>
         )}
@@ -992,7 +993,7 @@ function ModaleAjout({ zone, etabId, etabCle, dejaLa, enCours, onClose, onAjoute
           {mode === "fournisseur" && (
             <select value={fournisseurId} onChange={(e) => setFournisseurId(e.target.value)} style={{ width: "100%", height: 42, borderRadius: 10, border: "1px solid #ddd6c8", padding: "0 10px", fontSize: 15, background: "#fff", marginTop: 8 }}>
               <option value="">— Choisir un fournisseur —</option>
-              {fournisseurs.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              {triParLibelle(fournisseurs, (f) => f.name).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           )}
         </div>
@@ -1099,7 +1100,7 @@ function MiniFiche({ creation: c, onChange, fournisseurs, sousCategories, enCour
         <div style={bloc}>
           <div style={etiquette}>Catégorie</div>
           <select value={c.categorie} onChange={(e) => maj({ categorie: e.target.value, sous_categorie: null })} style={champ}>
-            {CATEGORIES.map((k) => <option key={k} value={k}>{CAT_LABELS[k]}</option>)}
+            {triParLibelle(CATEGORIES, (k) => CAT_LABELS[k]).map((k) => <option key={k} value={k}>{CAT_LABELS[k]}</option>)}
           </select>
         </div>
         <div style={bloc}>
@@ -1111,7 +1112,7 @@ function MiniFiche({ creation: c, onChange, fournisseurs, sousCategories, enCour
           <div style={etiquette}>Fournisseur</div>
           <select value={c.supplier_id ?? ""} onChange={(e) => maj({ supplier_id: e.target.value || null })} style={champ}>
             <option value="">— pas encore connu —</option>
-            {fournisseurs.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+            {triParLibelle(fournisseurs, (f) => f.name).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
         </div>
         <div style={{ ...bloc, flexBasis: "100%" }}>

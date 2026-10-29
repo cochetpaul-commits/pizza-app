@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { triParLibelle } from "@/lib/tri";
 
 import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
@@ -219,11 +220,11 @@ export default function EpiceriePage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
               <select style={{ ...sel, width: "100%" }} value={filterSupplier} onChange={e => setFilterSupplier(e.target.value)}>
                 <option value="all">Tous fournisseurs</option>
-                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {triParLibelle(suppliers, (s) => s.name).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
               <select style={{ ...sel, width: "100%" }} value={filterCat} onChange={e => setFilterCat(e.target.value as "all" | Category)}>
                 <option value="all">Toutes catégories</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+                {triParLibelle(CATEGORIES, (c) => CAT_LABELS[c]).map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
               </select>
             </div>
 
