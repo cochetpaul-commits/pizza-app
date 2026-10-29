@@ -7,7 +7,7 @@ import { VoletDroit } from "@/components/produits/BaseProduits";
 import type { VinCave } from "@/app/api/cave/route";
 import { Tuile } from "@/components/ui/Tuile";
 import { getCategoryColor } from "@/lib/categoryColors";
-import { couleurTexte as couleurTexteCat } from "@/lib/styleCategories";
+import { styleBarreCategorie, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
 import Link from "next/link";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { ACCENT, ATTENTION, BON, BORD, BTN, CADRE, CHAMP, MAUVAIS, MUTED, OSWALD, TD, TH, alpha, filtre as styleFiltre, h1, liseret, pastille } from "@/components/ui/charte";
@@ -203,10 +203,16 @@ function Service({ donnees, onOuvrir }: { donnees: Donnees; onOuvrir: (v: VinCav
           if (!liste.length) return null;
           const c = getCategoryColor(cat), nb = liste.filter((p) => sel.has(p.id)).length;
           return (
-            <div key={cat} style={{ ...CADRE, alignSelf: "start" }}>
+            <div key={cat} style={{ alignSelf: "start" }}>
+              {/* Barre de catégorie pleine, comme la Carte, puis l'en-tête de colonnes */}
+              <div style={{ ...styleBarreCategorie(c), minHeight: 40, gap: 10, padding: "0 14px", boxShadow: "none", borderRadius: "14px 14px 0 0", cursor: "default" }}>
+                <span style={styleTitreCategorie(c)}>{CATS[cat]}</span>
+                <span style={stylePastilleBarre(c)}>{nb > 0 ? `${nb} / ${liste.length}` : liste.length}</span>
+              </div>
+              <div style={{ ...CADRE, borderTop: 0, borderRadius: "0 0 14px 14px" }}>
               <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
                 <colgroup><col style={{ width: 6 }} /><col style={{ width: 36 }} /><col /><col style={{ width: 56 }} /></colgroup>
-                <thead><tr><th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, color: couleurTexteCat(c) }}>{CATS[cat]}{nb > 0 && <span style={{ ...pastille(couleurTexteCat(c), alpha(c, 0.14)), marginLeft: 8 }}>{nb}</span>}</th><th style={{ ...TH, textAlign: "right" }}>Prix</th></tr></thead>
+                <thead><tr><th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={TH}>Plat</th><th style={{ ...TH, textAlign: "right" }}>Prix</th></tr></thead>
                 <tbody>
                   {liste.map((p) => { const on = sel.has(p.id); return (
                     <tr key={p.id} className="cave-ligne" onClick={() => basculer(p.id)} style={{ cursor: "pointer", background: on ? alpha(c, 0.1) : undefined }}>
@@ -218,6 +224,7 @@ function Service({ donnees, onOuvrir }: { donnees: Donnees; onOuvrir: (v: VinCav
                   ); })}
                 </tbody>
               </table>
+              </div>
             </div>
           );
         })}
