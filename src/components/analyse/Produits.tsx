@@ -101,11 +101,12 @@ export function Produits() {
             <TuileVariation compacte={!bureau} icone="foodcost" libelle="Part des boissons" valeur={stats.ca_ht ? pct((stats.drink_ht / stats.ca_ht) * 100) : "—"} actuel={stats.ca_ht ? (stats.drink_ht / stats.ca_ht) * 100 : 0} precedent={prec?.ca_ht ? (prec.drink_ht / prec.ca_ht) * 100 : null} sous={`${euros(stats.drink_ht)} HT de boissons`} />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: bureau ? "3fr 2fr" : "1fr", gap: 14, alignItems: "start" }}>
+          {/* Les trois blocs côte à côte sur bureau (29/10) */}
+          <div style={{ display: "grid", gridTemplateColumns: bureau ? "1.35fr 1fr 1fr" : "1fr", gap: 14, alignItems: "start" }}>
             <Cadre titre="Taux d'attache" sous="Part des tickets qui prennent au moins un produit de la famille, face à l'objectif." sansMarge>
               <div style={{ overflowX: "auto", marginTop: 10 }}>
                 <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                  <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Famille</th><th style={{ ...TH, textAlign: "right" }}>Taux</th><th style={{ ...TH, textAlign: "right" }}>Objectif</th>{bureau && <><th style={{ ...TH, textAlign: "right" }}>Midi</th><th style={{ ...TH, textAlign: "right" }}>Soir</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th></>}</tr></thead>
+                  <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Famille</th><th style={{ ...TH, textAlign: "right" }}>Taux</th><th style={{ ...TH, textAlign: "right" }}>Objectif</th>{bureau && <><th style={{ ...TH, textAlign: "right" }}>Midi</th><th style={{ ...TH, textAlign: "right" }}>Soir</th></>}</tr></thead>
                   <tbody>
                     {FAMILLES.map((f) => {
                       const a = attache(stats, f.cle), t = taux(a, tickets), o = obj(f), c = couleurTaux(t, o);
@@ -113,10 +114,10 @@ export function Produits() {
                       return (
                         <tr key={f.cle} className="pr-ligne">
                           <td style={liseret(c)} />
-                          <td style={{ ...TD, fontWeight: 600 }}>{f.libelle}</td>
+                          <td style={{ ...TD, fontWeight: 600 }}>{f.libelle}{a && <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400 }}>{euros(a.ca_ht)} HT</div>}</td>
                           <td style={TDN}><span style={pastille(c)}>{t != null ? pct(t) : "—"}</span></td>
                           <td style={{ ...TDN, color: MUTED }}>{pct(o, 0)}</td>
-                          {bureau && <><td style={TDN}>{svc("midi")}</td><td style={TDN}>{svc("soir")}</td><td style={TDN}>{a ? euros(a.ca_ht) : "—"}</td></>}
+                          {bureau && <><td style={TDN}>{svc("midi")}</td><td style={TDN}>{svc("soir")}</td></>}
                         </tr>
                       );
                     })}
@@ -125,7 +126,6 @@ export function Produits() {
               </div>
               <div style={{ padding: "8px 16px 14px" }}><Note>Objectifs : Paramètres › Établissements, clés attache_*. Un ticket = une table ou une commande à emporter.</Note></div>
             </Cadre>
-            <div style={{ display: "grid", gap: 14 }}>
               <Cadre titre="Top 10" sous="Les produits les plus vendus, en quantité." sansMarge>
                 <table style={{ borderCollapse: "collapse", width: "100%", marginTop: 10 }}>
                   <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
@@ -146,7 +146,6 @@ export function Produits() {
                   </tbody>
                 </table>
               </Cadre>
-            </div>
           </div>
 
           <div>
