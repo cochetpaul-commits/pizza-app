@@ -44,8 +44,8 @@ export function EtSi({ d, onMemoriser }: { d: ReponseObjectifs; onMemoriser: (s:
         <Tuile libelle="Capacité d'investissement par an" valeur={eur(res.invest * 12)} couleur={res.invest >= 0 ? BON : MAUVAIS} icone="recu" sous="après emprunts et impôt" />
         <Tuile libelle="Seuil de rentabilité HT par mois" valeur={eur(res.seuil)} couleur="#1a1a1a" icone="alerte" sous="charges fixes ÷ marge sur coûts variables" />
       </div>
-      <div style={{ ...CADRE, padding: "10px 16px", display: "flex", flexWrap: "wrap", gap: "4px 16px", alignItems: "baseline", boxShadow: `inset 6px 0 0 ${plus.invest >= res.invest ? BON : MAUVAIS}` }}>
-        <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22 }}>{eur((plus.invest - res.invest) * 12)}</span>
+      <div style={{ ...CADRE, padding: "10px 16px", display: "flex", flexWrap: "wrap", gap: "4px 16px", alignItems: "baseline" }}>
+        <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22, color: plus.invest >= res.invest ? BON : MAUVAIS }}>{eur((plus.invest - res.invest) * 12)}</span>
         <span style={{ fontSize: 13.5, color: MUTED }}>d&apos;investissement en plus par an avec 10 couverts de plus par service, à équipe égale.</span>
       </div>
 

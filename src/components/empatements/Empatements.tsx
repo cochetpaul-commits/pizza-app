@@ -78,14 +78,15 @@ export function Empatements() {
   }, [etab?.slug]);
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px" }}>
+    <div style={{ maxWidth: 1100, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px" }}>
       <style>{`.emp-ligne:hover td{background:#f7f3ec}`}</style>
       <h1 style={h1(bureau)}>Empâtements</h1>
       <div style={{ color: MUTED, margin: "2px 0 14px", fontSize: 13 }}>Réglez le nombre de pâtons, la recette se recalcule au gramme.</div>
       {erreur && <div style={{ color: "#b3261e", padding: 12 }}>Chargement impossible : {erreur}</div>}
       {!recettes && !erreur && <div style={{ textAlign: "center", padding: 60, color: MUTED }}>Chargement…</div>}
       {recettes && recettes.length === 0 && <div style={CADRE}><EtatVide titre="Aucun empâtement" texte="Créez-en un depuis la Carte, onglet Préparations." /></div>}
-      <div style={{ display: "grid", gap: 16 }}>
+      {/* Bureau et tablette : deux empâtements par ligne, les quatre tiennent sur l'écran sans défiler (29/10) */}
+      <div style={{ display: "grid", gap: 16, gridTemplateColumns: bureau ? "repeat(2, minmax(0, 1fr))" : "1fr" }}>
         {recettes?.map((r) => <CarteEmpatement key={r.id} recette={r} bureau={bureau} onReglages={() => router.push(`/recettes/empatement/${r.id}`)} />)}
       </div>
     </div>
@@ -145,8 +146,8 @@ function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: Recette;
       <div style={{ padding: 16, display: "grid", gap: 14 }}>
         {/* Le réglage du jour : les pâtons, en gros, avec ±1 et ±10 ; sur bureau, le compteur est la première des quatre tuiles */}
         {!bureau && <Compteur libelle="Pâtons" valeur={patons} onChange={setPatons} pas={1} grandPas={10} couleur={couleur} />}
-        <div style={{ display: "grid", gridTemplateColumns: bureau ? "1.4fr 1fr 1fr 1fr" : "1fr 1fr", gap: 10 }}>
-          {bureau && <Tuile compacte couleur={couleur} libelle="Pâtons" valeur={
+        <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(3, 1fr)" : "1fr 1fr", gap: 10 }}>
+          {bureau && <div style={{ gridColumn: "1 / -1" }}><Tuile compacte couleur={couleur} libelle="Pâtons" valeur={
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 10))} taille={26} couleur={couleur} label="−10" aria="Moins dix" clair />
               <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 1))} taille={30} couleur={couleur} label="−" aria="Moins un" />
@@ -156,7 +157,7 @@ function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: Recette;
               <BoutonRond onClick={() => setPatons((Number(patons) || 0) + 1)} taille={30} couleur={couleur} label="+" aria="Plus un" />
               <BoutonRond onClick={() => setPatons((Number(patons) || 0) + 10)} taille={26} couleur={couleur} label="+10" aria="Plus dix" clair />
             </span>
-          } />}
+          } /></div>}
           <Tuile compacte couleur={couleur} libelle="Poids d'un pâton" valeur={
             <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <BoutonRond onClick={() => setPoids(Math.max(1, (Number(poids) || r.ball_weight) - pasPoids))} taille={30} couleur={couleur} label="−" aria="Moins" clair />
@@ -176,7 +177,7 @@ function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: Recette;
               Mélange de farines du jour : {mix.map((f) => `${g(resultat.flour_total_g * f.percent / 100)} ${nomFarine(f.name)}`).join(" + ")}, soit {kg(resultat.flour_total_g)}.
             </div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: resultat.phases.length > 1 ? "repeat(auto-fit, minmax(260px, 1fr))" : "1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
             {resultat.phases.map((ph, i) => {
               const pesees: [string, number, boolean][] = [
                 [mix.length > 1 ? "Farine (mélange)" : nomFarine(mix[0].name), ph.flour_g, false], ["Eau", ph.water_g, false],

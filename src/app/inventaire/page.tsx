@@ -1667,7 +1667,6 @@ function BlocFeuilles({ etabId, userId, feuilles }: { etabId: string; userId: st
               <button type="button" onClick={() => router.push(`/inventaire/${f.id}`)} style={{
                 flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, textAlign: "left",
                 background: "#fff", border: `1px solid ${BORD}`, borderRadius: 12, padding: "9px 12px 9px 14px", cursor: "pointer", fontFamily: "inherit",
-                boxShadow: `inset 6px 0 0 ${f.statut === "cloture" ? BON : ACCENT}`,
               }}>
                 <span style={{ fontSize: 13.5, fontWeight: 600, color: "#1a1a1a" }}>
                   {new Date(f.date + "T12:00:00").toLocaleDateString("fr-FR")} · {f.type === "fin_exercice" ? "Fin d'exercice" : "Mensuel"}

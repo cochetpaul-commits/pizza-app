@@ -6,6 +6,8 @@ import { useBureau } from "@/hooks/useBureau";
 import { VoletDroit } from "@/components/produits/BaseProduits";
 import type { VinCave } from "@/app/api/cave/route";
 import { Tuile } from "@/components/ui/Tuile";
+import { getCategoryColor } from "@/lib/categoryColors";
+import Link from "next/link";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { ACCENT, ATTENTION, BON, BORD, BTN, CADRE, CHAMP, MAUVAIS, MUTED, OSWALD, TD, TH, filtre as styleFiltre, h1, liseret, pastille } from "@/components/ui/charte";
 
@@ -31,6 +33,8 @@ const Chip = ({ on, children, onClick }: { on: boolean; children: React.ReactNod
   <button type="button" onClick={onClick} style={{ ...styleFiltre(on), padding: "6px 11px" }}>{children}</button>
 );
 const Cat = ({ children }: { children: React.ReactNode }) => <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".1em", color: MUTED, fontWeight: 700, margin: "12px 0 4px" }}>{children}</div>;
+/** « BURRATA » → « Burrata » : la caisse écrit certains plats en capitales */
+const joli = (s: string) => (s === s.toUpperCase() ? s.toLowerCase().replace(/(^|[\s'’-])\S/g, (c) => c.toUpperCase()) : s);
 
 function Prix({ v }: { v: VinCave }) {
   const p = v.prix ?? {};
@@ -88,6 +92,9 @@ function Fiche({ v, donnees, onFermer, onRecharger }: { v: VinCave; donnees: Don
         <button type="button" onClick={() => void envoyer()} style={{ ...BTN, background: "#1a1a1a", color: "#f2ede4", border: "none", fontWeight: 700 }}>Enregistrer</button>
       </>) : (<>
         <button type="button" onClick={commencer} style={BTN}>Modifier</button>
+        {v.sur_carte
+          ? <button type="button" onClick={() => void envoyer({ sur_carte: false })} style={{ ...BTN, color: MUTED }}>Archiver</button>
+          : <button type="button" onClick={() => void envoyer({ sur_carte: true })} style={{ ...BTN, color: VERT, borderColor: VERT }}>Remettre en cave</button>}
         {v.statut === "valide"
           ? <button type="button" onClick={() => void envoyer({ valider: false })} style={BTN}>Remettre à valider</button>
           : <button type="button" onClick={() => void envoyer({ valider: true })} style={{ ...BTN, background: VERT, borderColor: VERT, color: "#fff", fontWeight: 700 }}>Valider la fiche</button>}
@@ -111,6 +118,9 @@ function Fiche({ v, donnees, onFermer, onRecharger }: { v: VinCave; donnees: Don
             <span style={pastille(v.statut === "valide" ? VERT : AMBRE)}>{v.statut === "valide" ? "Fiche validée" : "À valider"}</span>
             {v.stock != null && <span style={pastille(v.stock <= 0 ? ROUGE : v.stock <= 3 ? AMBRE : MUTED, v.stock > 3 ? "rgba(0,0,0,0.06)" : undefined)}>{v.stock <= 0 ? "Plus en cave" : `${v.stock.toLocaleString("fr-FR")} en cave`}</span>}
             {v.stock == null && <span style={{ color: MUTED, fontSize: 12 }}>stock inconnu : produit non relié</span>}
+            {!v.sur_carte && <span style={pastille(MUTED, "rgba(0,0,0,0.06)")}>Archivé</span>}
+            <span style={{ flex: 1 }} />
+            {v.ingredient_id && <Link href={`/ingredients?edit=${v.ingredient_id}&back=${encodeURIComponent("/cave")}`} style={{ fontSize: 12.5, color: ACCENT, fontWeight: 700, textDecoration: "none" }}>Voir le produit →</Link>}
           </div>
           <Profil p={v.profil} />
           {v.pitch && <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.3 }}>{v.pitch}</div>}
@@ -185,9 +195,26 @@ function Service({ donnees, onOuvrir }: { donnees: Donnees; onOuvrir: (v: VinCav
         <h2 style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 20, margin: 0 }}>La table a pris…</h2>
         {sel.size > 0 && <button type="button" onClick={() => setSel(new Set())} style={{ border: 0, background: "none", color: ACCENT, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Effacer</button>}
       </div>
-      {Object.keys(CATS).map((cat) => plats.some((p) => p.categorie === cat) && (
-        <div key={cat}><Cat>{CATS[cat]}</Cat><div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{plats.filter((p) => p.categorie === cat).map((p) => <Chip key={p.id} on={sel.has(p.id)} onClick={() => basculer(p.id)}>{p.nom}</Chip>)}</div></div>
-      ))}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 10, marginTop: 6 }}>
+        {Object.keys(CATS).map((cat) => {
+          const liste = plats.filter((p) => p.categorie === cat);
+          if (!liste.length) return null;
+          const c = getCategoryColor(cat), nb = liste.filter((p) => sel.has(p.id)).length;
+          return (
+            <div key={cat} style={{ ...CADRE, padding: "12px 14px", display: "grid", gap: 10, alignContent: "start" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", color: c }}>{CATS[cat]}</span>
+                {nb > 0 && <span style={pastille(c)}>{nb}</span>}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {liste.map((p) => { const on = sel.has(p.id); return (
+                  <button key={p.id} type="button" onClick={() => basculer(p.id)} aria-pressed={on} style={{ ...BTN, padding: "5px 12px", fontSize: 13, fontWeight: on ? 700 : 500, background: on ? c : "#fff", borderColor: on ? c : BORD, color: on ? "#fff" : "#1a1a1a" }}>{joli(p.nom)}</button>
+                ); })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
       {!sel.size && <p style={{ color: MUTED, fontSize: 14, margin: "12px 0" }}>Coche un ou plusieurs plats : trois vins à proposer, avec la phrase à dire.</p>}
       {sel.size > 0 && (
         <div style={{ marginTop: 12 }}>
@@ -254,6 +281,8 @@ export function Cave({ vueInitiale }: { vueInitiale?: "service" | "cave" }) {
       .sort((a, b) => ORDRE.indexOf(a.couleur) - ORDRE.indexOf(b.couleur) || (a.prix?.b ?? 0) - (b.prix?.b ?? 0) || a.nom.localeCompare(b.nom, "fr"));
   }, [donnees, filtre, recherche]);
   const vinOuvert = donnees?.vins.find((v) => v.id === ouvert) ?? null;
+  /** Vin archivé remis en cave active (sur la carte) ; le retour en archive se fait depuis la fiche */
+  const remettre = async (v: VinCave) => { const r = await fetchApi("/api/cave", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: v.id, sur_carte: true }) }); if (r.ok) recharger(); };
   const aValider = donnees?.vins.filter((v) => v.sur_carte && v.statut !== "valide").length ?? 0;
   const surCarte = donnees?.vins.filter((v) => v.sur_carte).length ?? 0;
   const stockFaible = donnees?.vins.filter((v) => v.sur_carte && v.stock != null && v.stock <= 3).length ?? 0;
@@ -287,7 +316,7 @@ export function Cave({ vueInitiale }: { vueInitiale?: "service" | "cave" }) {
           {donnees.edition && aValider > 0 && filtre === "a_valider" && <div style={{ fontSize: 12.5, color: AMBRE }}>Ouvre, relis, puis « Valider la fiche ».</div>}
           <div style={CADRE}>
             <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-              <colgroup><col style={{ width: 6 }} />{bureau && <col style={{ width: 90 }} />}<col />{bureau && <col style={{ width: 90 }} />}<col style={{ width: bureau ? 120 : 96 }} /></colgroup>
+              <colgroup><col style={{ width: 6 }} />{bureau && <col style={{ width: 90 }} />}<col />{bureau && <col style={{ width: 90 }} />}<col style={{ width: bureau ? 120 : 96 }} />{bureau && <col style={{ width: 196 }} />}</colgroup>
               <thead>
                 <tr>
                   <th style={{ ...TH, padding: 0 }} />
@@ -295,6 +324,7 @@ export function Cave({ vueInitiale }: { vueInitiale?: "service" | "cave" }) {
                   <th style={TH}>Vin</th>
                   {bureau && <th style={{ ...TH, textAlign: "right" }}>Verre</th>}
                   <th style={{ ...TH, textAlign: "right" }}>{bureau ? "Bouteille · cave" : "Prix · cave"}</th>
+                  {bureau && <th style={{ ...TH, textAlign: "right" }} />}
                 </tr>
               </thead>
               <tbody>
@@ -317,6 +347,12 @@ export function Cave({ vueInitiale }: { vueInitiale?: "service" | "cave" }) {
                         <div style={{ fontWeight: 600 }}>{v.prix?.b != null ? eur(v.prix.b) : v.prix?.v != null ? `${eur(v.prix.v)} verre` : ""}</div>
                         {stock && <div style={{ marginTop: 2 }}>{stock}</div>}
                       </td>
+                      {bureau && (
+                        <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
+                          {v.ingredient_id && <Link href={`/ingredients?edit=${v.ingredient_id}&back=${encodeURIComponent("/cave")}`} style={{ ...BTN, padding: "3px 10px", fontSize: 11.5, color: MUTED, textDecoration: "none", display: "inline-block" }}>Produit</Link>}
+                          {donnees.edition && !v.sur_carte && <button type="button" onClick={() => void remettre(v)} style={{ ...BTN, padding: "3px 10px", fontSize: 11.5, marginLeft: 6, color: VERT, borderColor: VERT }}>Remettre</button>}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
