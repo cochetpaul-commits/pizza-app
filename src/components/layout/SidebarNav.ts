@@ -94,20 +94,23 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
   // puis l'équipe, puis le bloc direction (ventes, achats, analyse), la configuration en bas.
   return [
     { kind: "page", label: "Accueil", href: accueil, icon: "dashboard" },
-    { kind: "divider", label: "Exploitation" },
-    { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
+    // Exploitation scindée en trois (29/10/2026) : la salle, la cuisine, les achats et le stock
+    { kind: "divider", label: "Service" },
     { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
-    // Les pâtons et la focaccia de tous les jours (28/10) : un geste au lieu de Carte > Préparations > Empâtements > fiche
-    { kind: "page", label: "Empâtements", href: "/empatements", icon: "chefHat", permission: "operations.recettes" },
     ...(piccola ? [] : [{ kind: "page", label: "Cave", href: "/cave", icon: "tag", permission: "operations.recettes" } as NavEntry]),
     // Clôture de caisse : Bello Mio seulement pour l'instant (Popina + TPE Flatpay)
     ...(piccola ? [] : [{ kind: "page", label: "Clôture", href: "/cloture", icon: "calculator", permission: "caisse.cloture" } as NavEntry]),
+    ...(piccola ? [{ kind: "group", label: "Événementiel", icon: "calendarEvent", roles: MANAGERS, items: EVENEMENTIEL_ITEMS } as NavEntry] : []),
+    { kind: "divider", label: "Cuisine" },
+    // Les pâtons et la focaccia de tous les jours (28/10) : un geste au lieu de Carte > Préparations > Empâtements > fiche
+    { kind: "page", label: "Empâtements", href: "/empatements", icon: "chefHat", permission: "operations.recettes" },
+    { kind: "group", label: "HACCP", icon: "clipboard", roles: MANAGERS, items: HACCP_ITEMS },
+    { kind: "divider", label: "Achats et stock" },
+    { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
     // Le stock vit dans la Base produits depuis le 10/10/2026 ; l'inventaire le remet à niveau
     { kind: "page", label: "Base produits", href: "/ingredients", icon: "tag", permission: "achats.inventaire" },
     { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },
     { kind: "page", label: "Fournisseurs", href: "/fournisseurs", icon: "truck", permission: "achats.edit" },
-    { kind: "group", label: "HACCP", icon: "clipboard", roles: MANAGERS, items: HACCP_ITEMS },
-    ...(piccola ? [{ kind: "group", label: "Événementiel", icon: "calendarEvent", roles: MANAGERS, items: EVENEMENTIEL_ITEMS } as NavEntry] : []),
     { kind: "divider", label: "Équipe" },
     { kind: "page", label: "Équipe", href: "/rh/equipe", icon: "users", roles: MANAGERS },
     { kind: "page", label: "Congés", href: "/rh/conges", icon: "beach", roles: MANAGERS },
@@ -125,12 +128,14 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
 /** Équipiers : leur tableau, la production, les achats, et leurs pages perso */
 export const NAV_EQUIPIER: NavEntry[] = [
   { kind: "page", label: "Mon tableau", href: "/mon-tableau", icon: "dashboard" },
-  { kind: "divider", label: "Exploitation" },
-  { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
+  { kind: "divider", label: "Service" },
   { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
-  { kind: "page", label: "Empâtements", href: "/empatements", icon: "chefHat", permission: "operations.recettes" },
   { kind: "page", label: "Cave", href: "/cave", icon: "tag", permission: "operations.recettes" },
   { kind: "page", label: "Clôture", href: "/cloture", icon: "calculator", permission: "caisse.cloture" },
+  { kind: "divider", label: "Cuisine" },
+  { kind: "page", label: "Empâtements", href: "/empatements", icon: "chefHat", permission: "operations.recettes" },
+  { kind: "divider", label: "Achats et stock" },
+  { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },
   { kind: "page", label: "Inventaire", href: "/inventaire", icon: "package", permission: "achats.inventaire" },
   { kind: "page", label: "Fournisseurs", href: "/fournisseurs", icon: "truck", permission: "achats.edit" },
   { kind: "divider", label: "Pilotage" },
