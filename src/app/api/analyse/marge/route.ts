@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { etabAccessDenied } from "@/lib/getEtablissement";
 import { LIBELLES } from "@/lib/pennylane/syncCharges";
+import { chargesParMois, dernierJourMois } from "@/lib/analyse/chargesParMois";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,48 +50,23 @@ export async function GET(req: NextRequest) {
   const d = new Date(from.slice(0, 7) + "-01T12:00:00");
   const fin = new Date(to.slice(0, 7) + "-01T12:00:00");
   while (d <= fin && moisListe.length < 24) { moisListe.push(d.toISOString().slice(0, 7)); d.setMonth(d.getMonth() + 1); }
-  const moisPlus = (m: string, n: number) => { const x = new Date(m.slice(0, 7) + "-01T12:00:00"); x.setMonth(x.getMonth() + n); return x.toISOString().slice(0, 7); };
-  const dernierJour = (m: string) => { const [a, mm] = m.split("-").map(Number); return `${m}-${String(new Date(a, mm, 0).getDate()).padStart(2, "0")}`; };
+  const dernierJour = dernierJourMois;
   const aujourdhui = new Date().toISOString().slice(0, 10);
 
-  const [cas, { data: charges, error }, { data: objectifs }, { data: ajustements }] = await Promise.all([
+  const [cas, { parMois, error }, { data: objectifs }] = await Promise.all([
     Promise.all(moisListe.map(async (m) => {
       const { data } = await supabaseAdmin.rpc("ventes_ca_periode", { p_etab: etabId, p_from: `${m}-01`, p_to: dernierJour(m) });
       const row = Array.isArray(data) ? data[0] : data;
       return { mois: m, ca_ht: Number(row?.ca_ht ?? 0), ca_ttc: Number(row?.ca_ttc ?? 0) };
     })),
-    // Un mois de plus à la fin : la paie du dernier mois est payée le mois suivant
-    supabaseAdmin.from("charges_mensuelles").select("mois, poste, montant_ht").eq("etablissement_id", etabId)
-      .gte("mois", `${moisListe[0]}-01`).lte("mois", `${moisPlus(moisListe[moisListe.length - 1], 1)}-01`),
+    chargesParMois(etabId, moisListe),
     supabaseAdmin.from("objectifs").select("cle, valeur").eq("etablissement_id", etabId).in("cle", ["ratio_masse_sal", "ratio_matiere"]),
-    supabaseAdmin.from("paie_ajustements").select("mois, type, montant").eq("etablissement_id", etabId)
-      .gte("mois", `${moisListe[0]}-01`).lte("mois", `${moisListe[moisListe.length - 1]}-01`),
   ]);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error }, { status: 500 });
 
-  const parMois = new Map<string, Record<string, number>>();
-  for (const c of charges ?? []) {
-    // Salaires, URSSAF, mutuelle passent en banque le mois suivant le travail (28/10 : octobre
-    // affichait la paie de septembre face à un CA d'octobre inachevé, soit 53 %) : on les rattache
-    // au mois travaillé. Les autres postes restent au mois de leur comptabilisation.
-    const m = c.poste === "masse_salariale" ? moisPlus(String(c.mois).slice(0, 7), -1) : String(c.mois).slice(0, 7);
-    const p = parMois.get(m) ?? {};
-    p[c.poste as string] = (p[c.poste as string] ?? 0) + Number(c.montant_ht ?? 0);
-    parMois.set(m, p);
-  }
-  // Paie exceptionnelle (PPV, soldes) et pourboires centralisés : sortis de la masse salariale courante
-  // quand la paie du mois est connue (29/10/2026, bulletins de septembre).
-  const exc = new Map<string, number>(), pourb = new Map<string, number>();
-  for (const a of ajustements ?? []) {
-    const m = String(a.mois).slice(0, 7), v = Number(a.montant ?? 0);
-    if (a.type === "pourboires") pourb.set(m, (pourb.get(m) ?? 0) + v); else exc.set(m, (exc.get(m) ?? 0) + v);
-  }
   const mois: MoisMarge[] = cas.map((c) => {
-    const p = { ...(parMois.get(c.mois) ?? {}) };
-    const connue = (p.masse_salariale ?? 0) > 0;
-    const e = connue ? exc.get(c.mois) ?? 0 : 0, pb = connue ? pourb.get(c.mois) ?? 0 : 0;
-    if (connue) p.masse_salariale = Math.max(0, p.masse_salariale - e - pb);
-    return { ...c, postes: p, clos: dernierJour(c.mois) < aujourdhui, paie_connue: connue, paie_exceptionnelle: e, pourboires_paie: pb };
+    const ch = parMois.get(c.mois) ?? { postes: {}, paie_connue: false, paie_exceptionnelle: 0, pourboires_paie: 0 };
+    return { ...c, postes: ch.postes, clos: dernierJour(c.mois) < aujourdhui, paie_connue: ch.paie_connue, paie_exceptionnelle: ch.paie_exceptionnelle, pourboires_paie: ch.pourboires_paie };
   });
   const obj: Record<string, number> = {};
   for (const o of objectifs ?? []) obj[o.cle as string] = Number(o.valeur);

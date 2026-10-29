@@ -55,6 +55,7 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/analyse/ca-personne": "performances.pilotage",
   "/analyse/plats":   "performances.pilotage",
   "/analyse/simulations": "performances.pilotage",
+  "/objectifs":       "performances.pilotage",
   "/ventes":          "performances.view",
   "/ventes/marges":   "performances.pilotage",
   "/rentabilite":     "performances.pilotage",
