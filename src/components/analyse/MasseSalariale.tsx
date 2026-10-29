@@ -168,7 +168,7 @@ export function MasseSalariale() {
           </div>
 
           {selection.mode === "mois" && (
-            <Cadre titre={`Paie réelle · ${selection.libelle}`} sous="Ce que Pennylane a enregistré en masse salariale ce mois-ci, face à l'estimation.">
+            <Cadre titre={`Paie réelle · ${selection.libelle}`} sous="La paie de ce mois travaillé, passée en banque le mois suivant (Pennylane), face à l'estimation.">
               {etat.paie != null ? (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 20, fontSize: 13 }}>
                   <span>Paie passée (Pennylane) <b>{euros(etat.paie)}</b></span>
@@ -176,8 +176,8 @@ export function MasseSalariale() {
                   <span>Écart <b style={{ color: Math.abs(etat.paie - msTotale) / Math.max(1, etat.paie) > 0.15 ? AMBRE : VERT }}>{euros(etat.paie - msTotale)}</b></span>
                   {caHt > 0 && <span>Ratio réel <b style={{ color: (etat.paie / caHt) * 100 <= objectif ? VERT : ROUGE }}>{pct((etat.paie / caHt) * 100, 1)}</b></span>}
                 </div>
-              ) : <div style={{ fontSize: 13, color: MUTED }}>Pas encore de paie importée dans Pennylane pour ce mois : l&apos;estimation fait foi en attendant.</div>}
-              <Note>La paie est comptabilisée le mois de son règlement : un écart d&apos;un mois est normal. L&apos;estimation ne compte ni primes, ni congés payés, ni indemnités.</Note>
+              ) : <div style={{ fontSize: 13, color: MUTED }}>La paie de ce mois n&apos;est pas encore passée en banque (salaires début du mois suivant, URSSAF vers le 15) : l&apos;estimation fait foi en attendant.</div>}
+              <Note>Paie réelle = salaires nets, URSSAF, retraite et mutuelle du mois travaillé. L&apos;estimation ne compte ni primes, ni congés payés, ni indemnités de fin de contrat : l&apos;écart vient surtout de là.</Note>
             </Cadre>
           )}
 

@@ -354,15 +354,23 @@ export function CroisiereSimulateur({ etabId, etabColor }: { etabId: string; eta
       const from = new Date(to); from.setDate(from.getDate() - semaines * 7 + 1);
       const m0 = new Date(); m0.setDate(1); m0.setMonth(m0.getMonth() - 1);
       const m1 = new Date(); m1.setDate(0);
-      const [s, r, st, sv] = await Promise.all([
+      // La paie du mois dernier passe en banque début de ce mois : tant qu'elle n'y est pas,
+      // la structure de charges vient du mois d'avant (29/10/2026).
+      const p0 = new Date(m0); p0.setMonth(p0.getMonth() - 1);
+      const p1 = new Date(m0); p1.setDate(0);
+      const lireRenta = (a: Date, b: Date) => fetchApi(`/api/rentabilite?etablissement_id=${etabId}&from=${iso(a)}&to=${iso(b)}`).then(x => x.json()).catch(() => null);
+      const [s, r, rPrec, st, sv] = await Promise.all([
         fetchApi(`/api/ventes/stats?etablissement_id=${etabId}&from=${iso(from)}&to=${iso(to)}`).then(x => x.json()).catch(() => null),
-        fetchApi(`/api/rentabilite?etablissement_id=${etabId}&from=${iso(m0)}&to=${iso(m1)}`).then(x => x.json()).catch(() => null),
+        lireRenta(m0, m1),
+        lireRenta(p0, p1),
         loadEtabParam<Structure>(etabId, "croisiere_structure"),
         loadEtabParam<Partial<Sim>>(etabId, "croisiere_sim"),
       ]);
       if (cancelled) return;
       setStats(s?.stats ?? null);
-      setRenta(r && !r.error ? r : null);
+      const paieConnue = (x: Renta | null) => !!x && (x.lignes.find((l) => l.poste.startsWith("Masse salariale"))?.montant ?? null) != null;
+      const choisi = r && !r.error ? (paieConnue(r) || !(rPrec && !rPrec.error) ? r : rPrec) : rPrec && !rPrec.error ? rPrec : null;
+      setRenta(choisi);
       setStructure(st ?? {});
       // Ancienne mémoire locale (avant la table etablissement_params) : reprise une fois
       const legacy = sv == null ? localStorage.getItem(`croisiere:${etabId}`) : null;
