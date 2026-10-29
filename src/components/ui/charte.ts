@@ -14,6 +14,8 @@ export const ACCENT = "#D4775A";
 export const BON = "#4a6741";
 export const ATTENTION = "#b7791f";
 export const MAUVAIS = "#b4443a";
+export const INFO = "#2563EB";
+export const SOMBRE = "#1a1a1a";
 export const OSWALD = "var(--font-oswald), Oswald, sans-serif";
 
 /** Cadre blanc d'un tableau ou d'une liste */

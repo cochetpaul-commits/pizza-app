@@ -153,16 +153,42 @@ return new NextResponse(new Uint8Array(buffer), {
 - Pages UI : `src/app/invoices/{nom}/page.tsx`
 - Flux : FormData → pdfToText → parser → importEngine → Supabase
 
-## Patterns UI
+## Direction artistique (charte, 29/10/2026)
 
-- Pages : `"use client"`, inline CSS, max-width 900px
-- Navigation : `<NavBar backHref="/" backLabel="Accueil" primaryAction={...} menuItems={[...]} />`
-- Guard : `<RequireRole allowedRoles={["admin", "direction"]}>`
-- Listes : table HTML, hover #f5f0e8, clic → router.push
-- Modals : overlay fixed + div centree, border-radius 16, box-shadow
-- Boutons : border-radius 20 (pills) ou 8 (rectangles), accent #D4775A
-- Badges : border-radius 8, background transparente + couleur
-- Filtres : pills toggle avec border active #D4775A
+Référence : Base produits et Carte. Tokens et styles partagés dans `src/components/ui/charte.ts`
+(BORD, MUTED, FAIBLE, ACCENT, BON, ATTENTION, MAUVAIS, INFO, CADRE, TH, TD, liseret, BTN, filtre,
+pastille, h1, INTERTITRE, CHAMP). Toute nouvelle page les utilise ; ne pas redéfinir des couleurs locales.
+
+- **Couleurs** : fond crème #f2ede4, cartes blanches, texte #1a1a1a. Les couleurs vives sont réservées
+  aux **catégories** (CAT_COLORS, barres `styleBarreCategorie`) et aux **fournisseurs** (couleur de la fiche).
+  Partout ailleurs, code neutre : sombre #1a1a1a (chiffre principal), BON #4a6741, ATTENTION #b7791f,
+  MAUVAIS #b4443a, INFO #2563EB, terracotta #D4775A seulement pour l'action principale et le filtre actif.
+- **Titres** : h1 Oswald 700 capitales, 28 bureau / 22 téléphone (`h1(bureau)`), sous-titre MUTED 13.
+  Intertitres fins en capitales 11px espacées (`INTERTITRE`, `TH`). Titre de cadre : `Cadre` (analyse/Blocs).
+- **Tuiles** : `Tuile` (`@/components/ui/Tuile`), fond fondu à la couleur de l'indicateur, chiffre Oswald ;
+  cliquables quand elles filtrent (bordure sombre active). Quatre par ligne sur bureau, deux sur téléphone.
+- **Cadres** : blanc, bord 1px BORD, rayon 14 (`CADRE`). Pas d'ombre, pas de bord 1,5 ou 2px, pas de fond coloré :
+  un état se montre par un liseré 6px à gauche (`boxShadow: inset 6px 0 0 couleur`) et une pastille.
+- **Tableaux** : en-tête fin capitales (`TH`), cellules `TD`, première cellule = liseré 6px (`liseret(couleur)`)
+  à la couleur de la catégorie ou de l'état, survol #f7f3ec, clic sur la ligne. Téléphone : `TableauMobile`.
+- **Barres de catégorie** : `styleBarreCategorie` (dégradé plein, titre blanc Oswald, pastille blanche, chevron) ;
+  le contenu s'accroche dessous dans un cadre aux coins du bas arrondis.
+- **Pastilles** : pleines, 11px gras, rayon 8, fond teinté 12 % + texte couleur (`pastille(couleur)`) ;
+  blanches sur une barre (`stylePastilleBarre`). Seulement pour les exceptions et les états.
+- **Boutons** : pilules (`BTN`, rayon 20, bord BORD), action principale terracotta pleine, validation BON pleine,
+  danger texte MAUVAIS. Filtres : `filtre(actif)` (bord terracotta, fond #f5e9e2 quand actif).
+- **Champs** : `CHAMP` (36px, rayon 10, bord 1px) ; recherche en pilule (rayon 20).
+- **Volets** : `VoletDroit` à droite sur bureau, feuille plein écran sur téléphone. Modals : rayon 16.
+- **États vides** : `EtatVide` (icône ronde, titre, phrase, action). Chargement : texte MUTED centré.
+- **Responsive** : `useBureau()` ; page max-width 900 (1100 pour l'analyse), padding 18/28 bureau, 12/14 téléphone.
+- Pas d'emoji, pas de dégradés hors barres de catégorie, pas de couleur par page.
+
+## Patterns UI (rappels)
+
+- Pages : `"use client"`, inline CSS
+- Guard : `<RequireRole permission="…">` ou `allowedRoles`
+- Listes : clic sur la ligne → volet ou `router.push`
+- Modals : overlay fixed + div centrée, border-radius 16, box-shadow
 
 ## StepperInput component
 ```tsx
