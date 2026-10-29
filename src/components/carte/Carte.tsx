@@ -296,7 +296,7 @@ function VoletArticle({ article, peutEcrire, periode, onFermer, onRecharger, rel
   const pied = (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
       {article.fiche && <button type="button" onClick={() => openApiFile(`/api/recettes/pdf?id=${article.fiche!.id}`)} style={BTN}>Imprimer la fiche</button>}
-      {bureau && <button type="button" onClick={() => router.push("/ventes/marges")} style={BTN}>Voir les ventes</button>}
+      {bureau && <button type="button" onClick={() => router.push("/analyse/plats")} style={BTN}>Rentabilité des plats</button>}
       <span style={{ flex: 1 }} />
       {article.produit && <button type="button" onClick={() => router.push(`/ingredients/${article.produit!.id}`)} style={BTN}>Ouvrir le produit</button>}
       {article.fiche

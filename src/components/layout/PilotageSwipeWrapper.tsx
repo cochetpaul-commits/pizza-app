@@ -5,8 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 
 /* ── Page order for swipe navigation ── */
 const PILOTAGE_PAGES = [
-  { href: "/ventes", label: "Ventes" },
-  { href: "/ventes/marges", label: "Produits" },
+  { href: "/analyse/chiffre-affaires", label: "CA" },
+  { href: "/ventes", label: "Produits" },
   { href: "/rh/masse-salariale", label: "Masse sal." },
 ];
 
