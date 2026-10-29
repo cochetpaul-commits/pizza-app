@@ -1,3 +1,4 @@
+import { estHorsAccords } from "@/lib/cave/horsAccords";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
@@ -103,8 +104,9 @@ export async function GET(req: NextRequest) {
   }
   return NextResponse.json({
     vins: sortie, edition: a.edition, argent: a.argent,
-    // Pas de plats enfants, de contorni ni de glaces dans le choix du service (29/10) : ils n'appellent pas de vin
-    plats: (plats ?? []).filter((p) => !["BAMBINI", "SIDES"].includes(String(p.sub_category ?? "").toUpperCase()) && !/^glace/i.test(String(p.name).trim()))
+    // Pas de plats enfants, de contorni ni de glaces dans le choix du service (29/10) : ils n'appellent pas de vin.
+    // La caisse ne renseigne pas de sous-catégorie : on reconnaît ces touches à leur nom.
+    plats: (plats ?? []).filter((p) => !["BAMBINI", "SIDES"].includes(String(p.sub_category ?? "").toUpperCase()) && !estHorsAccords(String(p.name)))
       .map((p) => ({ id: p.id, nom: String(p.name).trim(), categorie: p.category, prix: Number(p.price_ttc) || 0 })),
   });
 }

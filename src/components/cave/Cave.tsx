@@ -211,13 +211,13 @@ function Service({ donnees, onOuvrir }: { donnees: Donnees; onOuvrir: (v: VinCav
               </div>
               <div style={{ ...CADRE, borderTop: 0, borderRadius: "0 0 14px 14px" }}>
               <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-                <colgroup><col style={{ width: 6 }} /><col style={{ width: 36 }} /><col /></colgroup>
+                <colgroup><col style={{ width: 6 }} /><col /></colgroup>
                 <tbody>
                   {liste.map((p) => { const on = sel.has(p.id); return (
-                    <tr key={p.id} className="cave-ligne" onClick={() => basculer(p.id)} style={{ cursor: "pointer", background: on ? alpha(c, 0.1) : undefined }}>
+                    <tr key={p.id} className="cave-ligne" onClick={() => basculer(p.id)} style={{ cursor: "pointer", background: on ? alpha(c, 0.16) : undefined }}>
                       <td style={liseret(c)} />
-                      <td style={{ ...TD, padding: "8px 0 8px 10px" }}><input type="checkbox" checked={on} onChange={() => basculer(p.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: c, width: 16, height: 16, cursor: "pointer" }} /></td>
-                      <td style={{ ...TD, fontWeight: on ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{joli(p.nom)}</td>
+                      {/* Pas de case : la couleur de la ligne suffit à montrer le choix (29/10/2026) */}
+                      <td role="checkbox" aria-checked={on} style={{ ...TD, fontWeight: on ? 700 : 500, color: on ? c : "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{joli(p.nom)}</td>
                     </tr>
                   ); })}
                 </tbody>
