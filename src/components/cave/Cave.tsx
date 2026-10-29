@@ -196,25 +196,31 @@ function Service({ donnees, onOuvrir }: { donnees: Donnees; onOuvrir: (v: VinCav
         <h2 style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 20, margin: 0 }}>La table a pris…</h2>
         {sel.size > 0 && <button type="button" onClick={() => setSel(new Set())} style={{ border: 0, background: "none", color: ACCENT, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Effacer</button>}
       </div>
-      <div style={{ ...CADRE, marginTop: 6 }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-          <colgroup><col style={{ width: 6 }} /><col style={{ width: 40 }} /><col /><col style={{ width: 110 }} /><col style={{ width: 70 }} /></colgroup>
-          <thead><tr><th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={TH}>Plat</th><th style={TH}>Catégorie</th><th style={{ ...TH, textAlign: "right" }}>Prix</th></tr></thead>
-          <tbody>
-            {[...plats].sort((a, b) => joli(a.nom).localeCompare(joli(b.nom), "fr")).map((p) => {
-              const cat = p.categorie, c = getCategoryColor(cat), on = sel.has(p.id);
-              return (
-                <tr key={p.id} className="cave-ligne" onClick={() => basculer(p.id)} style={{ cursor: "pointer", background: on ? "#f4f6f1" : undefined }}>
-                  <td style={liseret(c)} />
-                  <td style={{ ...TD, padding: "8px 0 8px 12px" }}><input type="checkbox" checked={on} onChange={() => basculer(p.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: c, width: 16, height: 16, cursor: "pointer" }} /></td>
-                  <td style={{ ...TD, fontWeight: on ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{joli(p.nom)}</td>
-                  <td style={TD}><span style={pastille(couleurTexteCat(c), alpha(c, 0.14))}>{CATS[cat] ?? cat}</span></td>
-                  <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", color: MUTED }}>{eur(p.prix)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {/* Un tableau par catégorie : quatre côte à côte sur bureau, deux sur tablette, un sur téléphone (29/10) */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10, marginTop: 6 }}>
+        {Object.keys(CATS).map((cat) => {
+          const liste = plats.filter((p) => p.categorie === cat).sort((a, b) => joli(a.nom).localeCompare(joli(b.nom), "fr"));
+          if (!liste.length) return null;
+          const c = getCategoryColor(cat), nb = liste.filter((p) => sel.has(p.id)).length;
+          return (
+            <div key={cat} style={{ ...CADRE, alignSelf: "start" }}>
+              <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+                <colgroup><col style={{ width: 6 }} /><col style={{ width: 36 }} /><col /><col style={{ width: 56 }} /></colgroup>
+                <thead><tr><th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, color: couleurTexteCat(c) }}>{CATS[cat]}{nb > 0 && <span style={{ ...pastille(couleurTexteCat(c), alpha(c, 0.14)), marginLeft: 8 }}>{nb}</span>}</th><th style={{ ...TH, textAlign: "right" }}>Prix</th></tr></thead>
+                <tbody>
+                  {liste.map((p) => { const on = sel.has(p.id); return (
+                    <tr key={p.id} className="cave-ligne" onClick={() => basculer(p.id)} style={{ cursor: "pointer", background: on ? alpha(c, 0.1) : undefined }}>
+                      <td style={liseret(c)} />
+                      <td style={{ ...TD, padding: "8px 0 8px 10px" }}><input type="checkbox" checked={on} onChange={() => basculer(p.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: c, width: 16, height: 16, cursor: "pointer" }} /></td>
+                      <td style={{ ...TD, fontWeight: on ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{joli(p.nom)}</td>
+                      <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", color: MUTED }}>{eur(p.prix)}</td>
+                    </tr>
+                  ); })}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
       </div>
       {!sel.size && <p style={{ color: MUTED, fontSize: 14, margin: "12px 0" }}>Coche un ou plusieurs plats : trois vins à proposer, avec la phrase à dire.</p>}
       {sel.size > 0 && (

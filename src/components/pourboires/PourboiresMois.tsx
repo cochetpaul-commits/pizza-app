@@ -21,8 +21,9 @@ export type DonneesPourboires = {
   nb_clotures: number; soirs_cagnotte: string[]; lignes: LignePourboires[]; nb_personnes: number; inconnus: string[]; avertissement: string | null;
 };
 
-const ACCENT = "#D4775A", MUTED = "#999", BORD = "#ddd6c8", VERT = "#2f7d4f", ROUGE = "#b3261e";
-const OSWALD = "var(--font-oswald), Oswald, sans-serif";
+import { Tuile } from "@/components/ui/Tuile";
+import { ACCENT, BON, BORD, BTN, CADRE, CHAMP, MAUVAIS, MUTED, OSWALD, TD, TH, liseret, pastille } from "@/components/ui/charte";
+const VERT = BON, ROUGE = MAUVAIS;
 export const eur = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 const eur0 = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
 const jours = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
@@ -126,48 +127,44 @@ export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: 
       "Nom\tPoste\tJours\tPart\tAjustements\tNet", ...data.lignes.map((x) => `${x.nom} ${x.prenom}\t${x.poste ?? ""}\t${jours(x.jours)}\t${eur(x.part)}\t${x.ajustements.map((a) => `${a.motif} ${eur(a.montant)}`).join(" ; ")}\t${eur(x.net)}`)];
     void navigator.clipboard?.writeText(l.join("\n")).then(() => { setCopie(true); setTimeout(() => setCopie(false), 1600); });
   };
-  const cellule = { padding: "8px 6px", borderBottom: "1px solid #f0ebe2", fontVariantNumeric: "tabular-nums" as const };
-  const entete = { ...cellule, fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase" as const, letterSpacing: ".06em", borderBottom: `2px solid ${BORD}` };
-  const btn = { border: `1px solid ${BORD}`, borderRadius: 8, background: "#fff", padding: "6px 12px", fontSize: 13, cursor: "pointer", color: "#1a1a1a", fontWeight: 600 } as const;
-  const input = { font: "inherit", fontSize: 14, padding: "7px 10px", border: `1.5px solid ${BORD}`, borderRadius: 9, background: "#faf8f4" } as const;
+  const cellule = { ...TD, fontVariantNumeric: "tabular-nums" as const };
+  const entete = TH;
+  const btn = BTN;
+  const input = { ...CHAMP, height: undefined, padding: "7px 10px" } as const;
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f5f3f0", borderRadius: 12, padding: "10px 16px" }}>
-        <button type="button" onClick={() => onMois(decalerMois(mois, -1))} style={btn}>←</button>
-        <strong style={{ fontFamily: OSWALD, fontSize: 18, textTransform: "capitalize" }}>{moisLong(mois)}</strong>
-        <button type="button" onClick={() => onMois(decalerMois(mois, 1))} disabled={mois >= moisCourant()} style={{ ...btn, opacity: mois >= moisCourant() ? 0.4 : 1 }}>→</button>
+      <style>{`.pb-ligne:hover td{background:#f7f3ec}`}</style>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button type="button" onClick={() => onMois(decalerMois(mois, -1))} aria-label="Mois précédent" style={{ ...btn, width: 36, padding: 0 }}>‹</button>
+        <strong style={{ fontFamily: OSWALD, fontSize: 18, textTransform: "capitalize", minWidth: 150, textAlign: "center" }}>{moisLong(mois)}</strong>
+        <button type="button" onClick={() => onMois(decalerMois(mois, 1))} disabled={mois >= moisCourant()} aria-label="Mois suivant" style={{ ...btn, width: 36, padding: 0, opacity: mois >= moisCourant() ? 0.4 : 1 }}>›</button>
       </div>
       {chargement && <p style={{ color: MUTED, textAlign: "center", padding: 24 }}>Chargement…</p>}
       {erreur && <p style={{ color: ROUGE }}>{erreur}</p>}
       {data && (<>
-        {data.avertissement && <div style={{ background: "#F8E5E2", color: ROUGE, borderRadius: 10, padding: "8px 12px", fontSize: 13 }}>{data.avertissement}</div>}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-          {[["Pot du mois", eur(data.pot.total), `carte ${eur(data.pot.carte)} · espèces ${eur(data.pot.especes)}`],
-            ["Jours d'ouverture", String(data.jours_ouverture), `${data.nb_clotures} clôture${data.nb_clotures > 1 ? "s" : ""} · à jour au ${dateCourte(data.a_jour)}`],
-            ["Jours comptés", jours(data.total_jours), `${data.nb_personnes} personne${data.nb_personnes > 1 ? "s" : ""}`],
-            ["Valeur d'un jour", eur(data.valeur_jour), "pot ÷ jours comptés"]].map(([l, v, s]) => (
-            <div key={l} style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 12, padding: "12px 14px" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: MUTED }}>{l}</div>
-              <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 24, marginTop: 2 }}>{v}</div>
-              <div style={{ fontSize: 12, color: MUTED }}>{s}</div>
-            </div>
-          ))}
+        {data.avertissement && <div style={{ background: "#f7f3ec", color: ROUGE, borderRadius: 12, padding: "10px 12px", fontSize: 13 }}>{data.avertissement}</div>}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 8 }}>
+          <Tuile icone="euro" libelle="Pot du mois" valeur={eur(data.pot.total)} couleur={ACCENT} sous={`carte ${eur(data.pot.carte)} · espèces ${eur(data.pot.especes)}`} />
+          <Tuile icone="attente" libelle="Jours d'ouverture" valeur={String(data.jours_ouverture)} couleur="#1a1a1a" sous={`${data.nb_clotures} clôture${data.nb_clotures > 1 ? "s" : ""} · à jour au ${dateCourte(data.a_jour)}`} />
+          <Tuile icone="couverts" libelle="Jours comptés" valeur={jours(data.total_jours)} couleur="#1a1a1a" sous={`${data.nb_personnes} personne${data.nb_personnes > 1 ? "s" : ""}`} />
+          <Tuile icone="ticket" libelle="Valeur d'un jour" valeur={eur(data.valeur_jour)} couleur={BON} sous="pot ÷ jours comptés" />
         </div>
         {data.soirs_cagnotte.length > 0 && <div style={{ fontSize: 12.5, color: MUTED }}>Cagnotte vidée le : {data.soirs_cagnotte.map(dateCourte).join(", ")}.</div>}
         {data.jours_sans_cloture.length > 0 && <div style={{ fontSize: 12.5, color: ROUGE }}>Jours au planning sans clôture dans l&apos;app (leurs pourboires carte manquent au pot) : {data.jours_sans_cloture.map(dateCourte).join(", ")}. Complète le pot avec le rapport du TPE, ci-dessous.</div>}
         {data.pot.complements.length > 0 && <div style={{ fontSize: 12.5, color: MUTED }}>Compléments du pot : {data.pot.complements.map((c) => <span key={c.id} style={{ marginRight: 8 }}>{c.motif} <b>{eur(c.montant)}</b> <button type="button" onClick={() => void retirer(c.id)} aria-label="Retirer" style={{ border: 0, background: "none", color: MUTED, cursor: "pointer", padding: 0 }}>×</button></span>)}</div>}
         {data.inconnus.length > 0 && <div style={{ fontSize: 12.5, color: ROUGE }}>Dans le planning Combo mais sans fiche employé ici (jours non comptés) : {data.inconnus.join(", ")}.</div>}
-        <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 14, padding: "4px 12px", overflowX: "auto" }}>
+        <div style={{ ...CADRE, overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 560 }}>
             <thead><tr>
-              <th style={{ ...entete, textAlign: "left" }}>Nom</th><th style={{ ...entete, textAlign: "left" }}>Poste</th>
+              <th style={{ ...entete, padding: 0, width: 6 }} /><th style={{ ...entete, textAlign: "left" }}>Nom</th><th style={{ ...entete, textAlign: "left" }}>Poste</th>
               <th style={{ ...entete, textAlign: "right" }}>Jours présents</th><th style={{ ...entete, textAlign: "right" }}>Absents</th>
               <th style={{ ...entete, textAlign: "right" }}>Part</th><th style={{ ...entete, textAlign: "left" }}>Ajustements</th><th style={{ ...entete, textAlign: "right" }}>Net</th>
             </tr></thead>
             <tbody>
               {data.lignes.map((x) => (
-                <tr key={x.employe_id}>
-                  <td style={{ ...cellule, fontWeight: 600, color: x.exclu ? MUTED : "#1a1a1a" }}>{x.nom} {x.prenom}{x.contrat === "extra" ? <span style={{ color: MUTED, fontWeight: 400 }}> · extra</span> : ""}
+                <tr key={x.employe_id} className="pb-ligne">
+                  <td style={liseret(x.exclu ? "#d6d0c4" : x.contrat === "extra" ? "#b7791f" : BON)} />
+                  <td style={{ ...cellule, fontWeight: 600, color: x.exclu ? MUTED : "#1a1a1a" }}>{x.nom} {x.prenom}{x.contrat === "extra" ? <span style={{ ...pastille("#b7791f"), marginLeft: 6 }}>extra</span> : ""}
                     {x.exclu
                       ? <span style={{ fontWeight: 400, fontSize: 12 }}> · pas compté ce mois ({jours(x.exclu.jours_planning)} j au planning) {x.exclu.id && <button type="button" onClick={() => void retirer(x.exclu!.id!)} style={{ border: 0, background: "none", color: ACCENT, cursor: "pointer", padding: 0, font: "inherit", textDecoration: "underline" }}>recompter</button>}</span>
                       : <button type="button" onClick={() => void exclure(x.employe_id)} title="Ne pas compter ce mois" style={{ border: 0, background: "none", color: MUTED, cursor: "pointer", padding: "0 4px", fontSize: 11 }}>ne pas compter</button>}
@@ -193,6 +190,7 @@ export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: 
                 </tr>
               ))}
               <tr>
+                <td style={{ ...cellule, padding: 0, borderTop: `1.5px solid ${BORD}` }} />
                 <td style={{ ...cellule, fontWeight: 700, borderTop: `1.5px solid ${BORD}` }} colSpan={2}>Total</td>
                 <td style={{ ...cellule, textAlign: "right", fontWeight: 700, borderTop: `1.5px solid ${BORD}` }}>{jours(data.total_jours)}</td>
                 <td style={{ ...cellule, borderTop: `1.5px solid ${BORD}` }} />
@@ -203,8 +201,8 @@ export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: 
             </tbody>
           </table>
         </div>
-        <div style={{ background: "#fff", border: `1px solid ${BORD}`, borderRadius: 14, padding: "12px 14px", display: "grid", gap: 8 }}>
-          <div style={{ fontWeight: 700 }}>Ajouter un ajustement</div>
+        <div style={{ ...CADRE, padding: "14px 16px", display: "grid", gap: 8 }}>
+          <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em" }}>Ajouter un ajustement</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <select value={nouveau.employe} onChange={(e) => setNouveau((n) => ({ ...n, employe: e.target.value }))} style={{ ...input, minWidth: 160 }}>
               <option value="">Personne…</option>
@@ -214,7 +212,7 @@ export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: 
             <input placeholder="Motif : acompte, report de juillet…" value={nouveau.motif} onChange={(e) => setNouveau((n) => ({ ...n, motif: e.target.value }))} style={{ ...input, flex: "1 1 200px" }} />
             <button type="button" onClick={() => void ajouter()} style={{ ...btn, background: ACCENT, borderColor: ACCENT, color: "#fff" }}>Ajouter</button>
           </div>
-          <div style={{ fontWeight: 700, marginTop: 6 }}>Compléter le pot carte</div>
+          <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", marginTop: 6 }}>Compléter le pot carte</div>
           <div style={{ fontSize: 12.5, color: MUTED, marginTop: -6 }}>Pour les jours sans clôture dans l&apos;app : le rapport du personnel du TPE donne le total des pourboires du mois, tu ajoutes la différence.</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <input inputMode="decimal" placeholder="Montant" value={complement.montant} onChange={(e) => setComplement((n) => ({ ...n, montant: e.target.value }))} style={{ ...input, width: 140 }} />

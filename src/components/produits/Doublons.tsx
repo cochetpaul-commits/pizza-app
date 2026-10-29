@@ -2,112 +2,109 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useBureau } from "@/hooks/useBureau";
-import { CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
-import { couleurTexte } from "@/lib/styleCategories";
-import { EtatVide } from "@/components/ui/EtatVide";
-import { BON, BORD, BTN, CADRE, CHAMP, FAIBLE, MAUVAIS, MUTED, TD, TH, alpha, h1, liseret, pastille } from "@/components/ui/charte";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
+import { useBureau } from "@/hooks/useBureau";
+import { detectDuplicates, type DuplicatePair } from "@/lib/duplicateDetection";
+import { CAT_COLORS, CAT_LABELS, type Category, type Ingredient, type LatestOffer } from "@/types/ingredients";
+import { couleurTexte } from "@/lib/styleCategories";
+import { EtatVide } from "@/components/ui/EtatVide";
+import { Chargement } from "@/components/analyse/Blocs";
+import { BON, BORD, BTN, CADRE, CHAMP, FAIBLE, MAUVAIS, MUTED, TD, TH, alpha, h1, liseret, pastille } from "@/components/ui/charte";
 
 /**
- * Base produits › Doublons probables (page à part depuis le 29/10/2026) : produits dont le nom est identique une fois
- * normalisé (accents, casse, espaces). Pour chaque groupe on choisit le
- * produit à garder ; les autres sont fusionnés dedans via /api/ingredients/merge
- * (offres, lignes de recettes, mouvements… réaffectés, puis suppression).
+ * Base produits › Doublons probables (page à part, 29/10/2026). Même détection que la tuile de la Base
+ * produits : deux fiches actives du même fournisseur dont les noms se ressemblent à 80 % ou plus
+ * (accents, casse et ponctuation ignorés). Pour chaque paire on garde une fiche ; l'autre est fusionnée
+ * dedans par /api/ingredients/merge (prix, lignes de recettes, mouvements réaffectés, puis suppression).
  */
-
-type Row = {
-  cle: string; id: string; name: string; category: string | null; is_active: boolean;
-  nb_offres: number; derniere_offre: string | null; nb_recettes: number; fournisseurs: string | null;
-};
-type Group = { cle: string; rows: Row[] };
-
-const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("fr-FR") : "jamais");
+const CLE_IGNORES = "ingredient-duplicate-ignores";
+const lireIgnores = (): Set<string> => { try { return new Set(JSON.parse(localStorage.getItem(CLE_IGNORES) ?? "[]") as string[]); } catch { return new Set(); } };
 
 export function Doublons() {
   const bureau = useBureau();
-  const onDone = () => {};
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+  const [etat, setEtat] = useState<{ chargement: boolean; erreur: string | null; produits: Ingredient[]; offres: Map<string, LatestOffer>; fournisseurs: Map<string, string> }>({ chargement: true, erreur: null, produits: [], offres: new Map(), fournisseurs: new Map() });
+  const [ignores, setIgnores] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
-  const [keep, setKeep] = useState<Record<string, string>>({});
+  const [garde, setGarde] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
-  const [done, setDone] = useState<Set<string>>(new Set());
-  const [ignored, setIgnored] = useState<Set<string>>(new Set());
-  const [merged, setMerged] = useState(0);
+  const [faits, setFaits] = useState<Set<string>>(new Set());
+  const [supprimes, setSupprimes] = useState<Set<string>>(new Set());
+  const [fusionnes, setFusionnes] = useState(0);
+  const [tout, setTout] = useState<{ fait: number; total: number } | null>(null);
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
+    let annule = false;
     (async () => {
-      const { data, error } = await supabase.rpc("ingredients_doublons");
-      if (error) setErr(error.message);
-      setRows((data ?? []) as Row[]);
-      setLoading(false);
+      setEtat((e) => ({ ...e, chargement: true, erreur: null }));
+      try {
+        setIgnores(lireIgnores());
+        const [{ data: produits, error: e1 }, { data: offres, error: e2 }, { data: fournisseurs }] = await Promise.all([
+          supabase.from("ingredients").select("id, name, category, sub_category, is_active, supplier_id").eq("is_active", true).order("name"),
+          supabase.from("supplier_offers").select("ingredient_id, supplier_id, created_at, unit_price, unit").eq("is_active", true).order("created_at", { ascending: false }),
+          supabase.from("suppliers").select("id, name"),
+        ]);
+        if (e1) throw new Error(e1.message);
+        if (e2) throw new Error(e2.message);
+        const parProduit = new Map<string, LatestOffer>();
+        for (const o of (offres ?? []) as unknown as LatestOffer[]) if (!parProduit.has(o.ingredient_id)) parProduit.set(o.ingredient_id, o);
+        if (!annule) setEtat({ chargement: false, erreur: null, produits: (produits ?? []) as unknown as Ingredient[], offres: parProduit, fournisseurs: new Map((fournisseurs ?? []).map((f) => [f.id as string, f.name as string])) });
+      } catch (e) { if (!annule) setEtat((s) => ({ ...s, chargement: false, erreur: e instanceof Error ? e.message : "Chargement impossible" })); }
     })();
-  }, []);
+    return () => { annule = true; };
+  }, [version]);
 
-  const groups = useMemo((): Group[] => {
-    const map = new Map<string, Row[]>();
-    for (const r of rows) { const arr = map.get(r.cle) ?? []; arr.push(r); map.set(r.cle, arr); }
+  const paires = useMemo(() => {
+    const vivants = etat.produits.filter((p) => !supprimes.has(p.id));
     const low = q.trim().toLowerCase();
-    return [...map.entries()]
-      .map(([cle, rs]) => ({ cle, rows: rs }))
-      .filter(g => !done.has(g.cle) && !ignored.has(g.cle))
-      .filter(g => !low || g.rows.some(r => r.name.toLowerCase().includes(low)))
-      .sort((a, b) => a.rows[0].name.localeCompare(b.rows[0].name, "fr"));
-  }, [rows, q, done, ignored]);
+    return detectDuplicates(vivants, etat.offres, ignores)
+      .filter((p) => !faits.has(p.pairKey))
+      .filter((p) => !low || p.a.name.toLowerCase().includes(low) || p.b.name.toLowerCase().includes(low))
+      .sort((x, y) => x.a.name.localeCompare(y.a.name, "fr"));
+  }, [etat.produits, etat.offres, ignores, faits, supprimes, q]);
 
-  // Choix par défaut : actif, puis le plus d'offres, puis le plus de recettes, puis l'offre la plus récente
-  const defaultKeep = (g: Group) => {
-    const sorted = [...g.rows].sort((a, b) =>
-      Number(b.is_active) - Number(a.is_active) || b.nb_offres - a.nb_offres || b.nb_recettes - a.nb_recettes
-      || (b.derniere_offre ?? "").localeCompare(a.derniere_offre ?? ""));
-    return sorted[0].id;
+  const ignorer = (p: DuplicatePair) => {
+    const n = new Set(ignores); n.add(p.pairKey);
+    try { localStorage.setItem(CLE_IGNORES, JSON.stringify([...n])); } catch { /* navigation privée */ }
+    setIgnores(n);
   };
-
-  const fusionner = async (g: Group, sansConfirmation = false) => {
-    const keepId = keep[g.cle] ?? defaultKeep(g);
-    const others = g.rows.filter(r => r.id !== keepId);
-    const keepRow = g.rows.find(r => r.id === keepId)!;
-    if (!sansConfirmation && !confirm(`Fusionner ${others.length} produit(s) dans « ${keepRow.name} » ?\nLes prix, lignes de recettes et mouvements sont réaffectés, les doublons supprimés.`)) return false;
-    setBusy(g.cle);
+  const fusionner = async (p: DuplicatePair, sansConfirmation = false): Promise<boolean> => {
+    const keepId = garde[p.pairKey] ?? p.a.id;
+    const deleteId = keepId === p.a.id ? p.b.id : p.a.id;
+    const gardeNom = keepId === p.a.id ? p.a.name : p.b.name;
+    if (!sansConfirmation && !confirm(`Fusionner dans « ${gardeNom} » ?\nLes prix, lignes de recettes et mouvements sont réaffectés, le doublon supprimé.`)) return false;
+    setBusy(p.pairKey);
     try {
-      for (const o of others) {
-        const res = await fetchApi("/api/ingredients/merge", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keepId, deleteId: o.id }),
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok || json.ok === false) throw new Error(json.error ?? `Erreur ${res.status}`);
-      }
-      setDone(prev => new Set(prev).add(g.cle));
-      setMerged(m => m + others.length);
-      onDone();
+      const res = await fetchApi("/api/ingredients/merge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keepId, deleteId }) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.ok === false) throw new Error(json.error ?? `Erreur ${res.status}`);
+      setFaits((s) => new Set(s).add(p.pairKey));
+      setSupprimes((s) => new Set(s).add(deleteId));
+      setFusionnes((n) => n + 1);
       return true;
-    } catch (e) {
-      alert(`Fusion interrompue : ${e instanceof Error ? e.message : "erreur"}`);
-      return false;
-    } finally {
-      setBusy(null);
-    }
+    } catch (e) { alert(`Fusion interrompue : ${e instanceof Error ? e.message : "erreur"}`); return false; }
+    finally { setBusy(null); }
   };
-  /** Tout fusionner d'un coup (29/10/2026) : chaque groupe dans le produit coché, dans l'ordre affiché ; arrêt au premier échec */
-  const [tout, setTout] = useState<{ fait: number; total: number } | null>(null);
   const fusionnerTout = async () => {
-    const liste = groups;
-    const nb = liste.reduce((t, g) => t + g.rows.length - 1, 0);
-    if (!confirm(`Fusionner ${liste.length} groupe(s), soit ${nb} doublon(s), chacun dans le produit coché ?\nLes prix, lignes de recettes et mouvements sont réaffectés, les doublons supprimés.`)) return;
+    const liste = paires;
+    if (!confirm(`Fusionner ${liste.length} paire${liste.length > 1 ? "s" : ""}, chacune dans le produit coché ?\nLes prix, lignes de recettes et mouvements sont réaffectés, les doublons supprimés.`)) return;
     setTout({ fait: 0, total: liste.length });
+    const deja = new Set<string>();
     for (let i = 0; i < liste.length; i++) {
-      const ok = await fusionner(liste[i], true);
+      const p = liste[i];
+      if (deja.has(p.a.id) || deja.has(p.b.id)) { setTout({ fait: i + 1, total: liste.length }); continue; }
+      const ok = await fusionner(p, true);
       if (!ok) break;
+      deja.add((garde[p.pairKey] ?? p.a.id) === p.a.id ? p.b.id : p.a.id);
       setTout({ fait: i + 1, total: liste.length });
     }
     setTout(null);
+    setVersion((v) => v + 1);
   };
+  const cat = (p: Ingredient) => { const c = CAT_COLORS[(p.category ?? "") as Category] ?? FAIBLE; return <span style={pastille(couleurTexte(c), alpha(c, 0.14))}>{CAT_LABELS[p.category as Category] ?? p.category ?? "—"}</span>; };
+  const fournisseur = (p: Ingredient) => etat.fournisseurs.get(etat.offres.get(p.id)?.supplier_id ?? p.supplier_id ?? "") ?? "—";
 
-  const nbDoublons = groups.reduce((t, g) => t + g.rows.length - 1, 0);
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px", display: "grid", gap: 14, alignContent: "start" }}>
       <style>{`.dbl-ligne:hover td{background:#f7f3ec}`}</style>
@@ -115,74 +112,69 @@ export function Doublons() {
         <div>
           <h1 style={h1(bureau)}>Doublons probables</h1>
           <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>
-            {loading ? "Recherche…" : `${groups.length} groupe${groups.length > 1 ? "s" : ""} · ${nbDoublons} doublon${nbDoublons > 1 ? "s" : ""}${merged ? ` · ${merged} fusionné${merged > 1 ? "s" : ""}` : ""}`} · même nom à l&apos;accent ou à l&apos;espace près
+            {etat.chargement ? "Recherche…" : `${paires.length} paire${paires.length > 1 ? "s" : ""}${fusionnes ? ` · ${fusionnes} fusionnée${fusionnes > 1 ? "s" : ""}` : ""}`} · deux fiches actives du même fournisseur aux noms proches
           </div>
         </div>
         <Link href="/ingredients" style={{ ...BTN, textDecoration: "none", display: "inline-block" }}>← Base produits</Link>
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Filtrer par nom…" style={{ ...CHAMP, borderRadius: 20, flex: "1 1 200px", minWidth: 0, maxWidth: 420 }} />
-        {groups.length > 1 && (
-          <button type="button" onClick={() => void fusionnerTout()} disabled={busy !== null || tout !== null}
-            style={{ ...BTN, background: BON, borderColor: BON, color: "#fff", fontWeight: 700, opacity: busy !== null || tout !== null ? 0.6 : 1 }}>
-            {tout ? `Fusion ${tout.fait} / ${tout.total}…` : `Tout fusionner (${groups.length})`}
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filtrer par nom…" style={{ ...CHAMP, borderRadius: 20, flex: "1 1 200px", minWidth: 0, maxWidth: 420 }} />
+        {paires.length > 1 && (
+          <button type="button" onClick={() => void fusionnerTout()} disabled={busy !== null || tout !== null} style={{ ...BTN, background: BON, borderColor: BON, color: "#fff", fontWeight: 700, opacity: busy !== null || tout !== null ? 0.6 : 1 }}>
+            {tout ? `Fusion ${tout.fait} / ${tout.total}…` : `Tout fusionner (${paires.length})`}
           </button>
         )}
       </div>
-      <div>
-          {err && <div style={{ color: MAUVAIS, fontSize: 13, marginBottom: 10 }}>{err}</div>}
-          <div style={CADRE}>
-            {!loading && groups.length === 0 && !err && <EtatVide icone="produit" titre="Aucun doublon probable" texte="Tous les noms de produits sont distincts." />}
-            {groups.length > 0 && (
-              <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-                <colgroup><col style={{ width: 6 }} /><col style={{ width: 40 }} /><col /><col style={{ width: 150 }} /><col style={{ width: 150 }} /><col style={{ width: 90 }} /><col style={{ width: 110 }} /></colgroup>
-                <thead><tr>
-                  <th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={TH}>Produit</th><th style={TH}>Catégorie</th><th style={TH}>Prix actif</th><th style={{ ...TH, textAlign: "right" }}>Recettes</th><th style={{ ...TH, textAlign: "right" }}>Dernier prix</th>
-                </tr></thead>
-                <tbody>
-                  {groups.map((g) => {
-                    const keepId = keep[g.cle] ?? defaultKeep(g);
-                    const couleur = CAT_COLORS[(g.rows[0].category ?? "") as Category] ?? FAIBLE;
-                    return (
-                      <Fragment key={g.cle}>
-                        {g.rows.map((r) => {
-                          const garde = r.id === keepId;
-                          return (
-                            <tr key={r.id} className="dbl-ligne" onClick={() => setKeep(prev => ({ ...prev, [g.cle]: r.id }))} style={{ cursor: "pointer", background: garde ? "#f4f6f1" : undefined }}>
-                              <td style={liseret(couleur)} />
-                              <td style={{ ...TD, padding: "9px 0 9px 12px" }}><input type="radio" name={`keep-${g.cle}`} checked={garde} onChange={() => setKeep(prev => ({ ...prev, [g.cle]: r.id }))} style={{ accentColor: BON, width: 16, height: 16, cursor: "pointer" }} /></td>
-                              <td style={{ ...TD, minWidth: 0 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                                  <span style={{ fontWeight: garde ? 700 : 600, color: r.is_active ? "#1a1a1a" : MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
-                                  {garde && <span style={pastille(BON)}>à garder</span>}
-                                  {!r.is_active && <span style={pastille(MUTED, "rgba(0,0,0,0.06)")}>Désactivé</span>}
-                                </div>
-                              </td>
-                              <td style={TD}>{r.category ? <span style={pastille(couleurTexte(couleur), alpha(couleur, 0.14))}>{CAT_LABELS[r.category as Category] ?? r.category}</span> : <span style={{ color: FAIBLE }}>—</span>}</td>
-                              <td style={{ ...TD, color: r.nb_offres ? "#1a1a1a" : FAIBLE, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.nb_offres ? `${r.nb_offres}${r.fournisseurs ? ` · ${r.fournisseurs}` : ""}` : "aucun"}</td>
-                              <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", color: r.nb_recettes ? "#1a1a1a" : FAIBLE }}>{r.nb_recettes}</td>
-                              <td style={{ ...TD, textAlign: "right", color: MUTED, whiteSpace: "nowrap" }}>{fmtDate(r.derniere_offre)}</td>
-                            </tr>
-                          );
-                        })}
-                        <tr>
-                          <td style={{ ...liseret("transparent"), borderBottom: `1px solid ${BORD}` }} />
-                          <td colSpan={6} style={{ ...TD, borderBottom: `1px solid ${BORD}`, padding: "8px 14px 12px", background: "#faf7f1" }}>
-                            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-                              <button type="button" onClick={() => setIgnored(prev => new Set(prev).add(g.cle))} disabled={busy === g.cle} style={{ ...BTN, color: MUTED }}>Ce ne sont pas des doublons</button>
-                              <button type="button" onClick={() => void fusionner(g)} disabled={busy !== null || tout !== null} style={{ ...BTN, background: BON, borderColor: BON, color: "#fff", fontWeight: 700, opacity: busy && busy !== g.cle ? 0.5 : 1 }}>
-                                {busy === g.cle ? "Fusion…" : "Fusionner dans le produit coché"}
-                              </button>
+      {etat.erreur && <div style={{ color: MAUVAIS, fontSize: 13 }}>{etat.erreur}</div>}
+      <div style={CADRE}>
+        {etat.chargement ? <Chargement texte="Comparaison des noms…" /> : paires.length === 0 ? <EtatVide icone="produit" titre="Aucun doublon probable" texte={q ? "Rien ne correspond à ce filtre." : "Tous les noms de produits sont distincts, ou les paires ont été écartées."} /> : (
+          <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+            <colgroup><col style={{ width: 6 }} /><col style={{ width: 40 }} /><col />{bureau && <col style={{ width: 150 }} />}{bureau && <col style={{ width: 140 }} />}<col style={{ width: 90 }} /></colgroup>
+            <thead><tr>
+              <th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={TH}>Produit</th>{bureau && <th style={TH}>Catégorie</th>}{bureau && <th style={TH}>Fournisseur</th>}<th style={{ ...TH, textAlign: "right" }}>Proximité</th>
+            </tr></thead>
+            <tbody>
+              {paires.map((p) => {
+                const keepId = garde[p.pairKey] ?? p.a.id;
+                const c = CAT_COLORS[(p.a.category ?? "") as Category] ?? FAIBLE;
+                return (
+                  <Fragment key={p.pairKey}>
+                    {[p.a, p.b].map((x) => {
+                      const on = x.id === keepId;
+                      return (
+                        <tr key={x.id} className="dbl-ligne" onClick={() => setGarde((g) => ({ ...g, [p.pairKey]: x.id }))} style={{ cursor: "pointer", background: on ? "#f4f6f1" : undefined }}>
+                          <td style={liseret(c)} />
+                          <td style={{ ...TD, padding: "9px 0 9px 12px" }}><input type="radio" name={`garde-${p.pairKey}`} checked={on} onChange={() => setGarde((g) => ({ ...g, [p.pairKey]: x.id }))} style={{ accentColor: BON, width: 16, height: 16, cursor: "pointer" }} /></td>
+                          <td style={{ ...TD, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                              <span style={{ fontWeight: on ? 700 : 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.name}</span>
+                              {on && <span style={pastille(BON)}>à garder</span>}
                             </div>
+                            {!bureau && <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{fournisseur(x)}</div>}
                           </td>
+                          {bureau && <td style={TD}>{cat(x)}</td>}
+                          {bureau && <td style={{ ...TD, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fournisseur(x)}</td>}
+                          <td style={{ ...TD, textAlign: "right" }}>{x.id === p.a.id && <span style={pastille(p.score >= 0.95 ? MAUVAIS : p.score >= 0.88 ? "#b7791f" : MUTED, p.score < 0.88 ? "rgba(0,0,0,0.06)" : undefined)}>{Math.round(p.score * 100)} %</span>}</td>
                         </tr>
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
+                      );
+                    })}
+                    <tr>
+                      <td style={{ ...liseret("transparent"), borderBottom: `1px solid ${BORD}` }} />
+                      <td colSpan={bureau ? 5 : 3} style={{ ...TD, borderBottom: `1px solid ${BORD}`, padding: "8px 14px 12px", background: "#faf7f1" }}>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                          <button type="button" onClick={() => ignorer(p)} disabled={busy === p.pairKey} style={{ ...BTN, color: MUTED }}>Ce ne sont pas des doublons</button>
+                          <button type="button" onClick={() => void fusionner(p)} disabled={busy !== null || tout !== null} style={{ ...BTN, background: BON, borderColor: BON, color: "#fff", fontWeight: 700, opacity: busy && busy !== p.pairKey ? 0.5 : 1 }}>
+                            {busy === p.pairKey ? "Fusion…" : "Fusionner dans le produit coché"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

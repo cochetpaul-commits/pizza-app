@@ -65,7 +65,6 @@ const CATEGORIES: { cle: string; libelle: string; couleur: string; cuisine: bool
 ];
 const CAT_PAR_CLE = new Map(CATEGORIES.map((c) => [c.cle, c]));
 const infoCategorie = (cle: string) => CAT_PAR_CLE.get(cle) ?? { cle, libelle: cle.charAt(0) + cle.slice(1).toLowerCase(), couleur: "#939597", cuisine: false };
-const ordreCategorie = (cle: string) => { const i = CATEGORIES.findIndex((c) => c.cle === cle); return i < 0 ? CATEGORIES.length : i; };
 /** Catégorie de caisse → catégorie de fiche pré-remplie quand on crée la fiche depuis la touche */
 const CAT_FICHE: Record<string, string> = { PIZZE: "pizza", ANTIPASTI: "antipasti", CUCINA: "plat_cuisine", DOLCI: "dessert" };
 
@@ -396,7 +395,8 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
   const [fc, setFc] = useState<FiltreFc>("tous");
   const [ouvertId, setOuvertId] = useState<string | null>(null);
   const [relierOuvert, setRelierOuvert] = useState(false);
-  const [sectionsOuvertes, setSectionsOuvertes] = useState<Set<string>>(() => new Set(["PIZZE", "ANTIPASTI", "CUCINA", "DOLCI"]));
+  // Accordéons fermés par défaut (29/10/2026) ; une recherche les ouvre
+  const [sectionsOuvertes, setSectionsOuvertes] = useState<Set<string>>(() => new Set());
   const [synchro, setSynchro] = useState(false);
 
 
@@ -437,7 +437,8 @@ export function VueArticles({ bureau, peutEcrire, estAdmin, onEditer, editionOuv
   const parCategorie = useMemo(() => {
     const m = new Map<string, ArticleCarte[]>();
     for (const a of tries) { const l = m.get(a.categorie) ?? []; l.push(a); m.set(a.categorie, l); }
-    return [...m.entries()].sort((x, y) => ordreCategorie(x[0]) - ordreCategorie(y[0]));
+    // Catégories de A à Z (29/10/2026), comme partout
+    return [...m.entries()].sort((x, y) => infoCategorie(x[0]).libelle.localeCompare(infoCategorie(y[0]).libelle, "fr"));
   }, [tries]);
   const enRecherche = q.trim().length > 0;
 

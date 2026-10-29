@@ -149,21 +149,21 @@ function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: Recette;
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           {bureau && <div style={{ gridColumn: "1 / -1" }}><Tuile compacte couleur={couleur} libelle="Pâtons" valeur={
             <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 10))} taille={26} couleur={couleur} label="−10" aria="Moins dix" clair />
-              <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 1))} taille={30} couleur={couleur} label="−" aria="Moins un" />
+              <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 10))} taille={32} couleur={couleur} label="−10" aria="Moins dix" clair />
+              <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 1))} taille={32} couleur={couleur} label="−" aria="Moins un" />
               <input type="number" inputMode="numeric" min={1} value={patons} aria-label="Pâtons"
                 onChange={(e) => setPatons(e.target.value === "" ? "" : Math.max(0, Math.floor(Number(e.target.value))))} onFocus={(e) => e.target.select()}
                 style={{ width: 76, textAlign: "center", fontFamily: OSWALD, fontWeight: 700, fontSize: 26, color: "#1a1a1a", border: "none", borderBottom: `1px solid ${BORD}`, background: "transparent", outline: "none", padding: 0, fontVariantNumeric: "tabular-nums", MozAppearance: "textfield" }} />
-              <BoutonRond onClick={() => setPatons((Number(patons) || 0) + 1)} taille={30} couleur={couleur} label="+" aria="Plus un" />
-              <BoutonRond onClick={() => setPatons((Number(patons) || 0) + 10)} taille={26} couleur={couleur} label="+10" aria="Plus dix" clair />
+              <BoutonRond onClick={() => setPatons((Number(patons) || 0) + 1)} taille={32} couleur={couleur} label="+" aria="Plus un" />
+              <BoutonRond onClick={() => setPatons((Number(patons) || 0) + 10)} taille={32} couleur={couleur} label="+10" aria="Plus dix" clair />
             </span>
           } /></div>}
           {/* Sur bureau le poids prend toute la ligne, comme le compteur : les boutons ne se chevauchent plus (29/10) */}
           <div style={bureau ? { gridColumn: "1 / -1" } : undefined}><Tuile compacte couleur={couleur} libelle="Poids d'un pâton" valeur={
             <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-              <BoutonRond onClick={() => setPoids(Math.max(1, (Number(poids) || r.ball_weight) - pasPoids))} taille={30} couleur={couleur} label="−" aria="Moins" clair />
+              <BoutonRond onClick={() => setPoids(Math.max(1, (Number(poids) || r.ball_weight) - pasPoids))} taille={32} couleur={couleur} label="−" aria="Moins" clair />
               <span style={{ textAlign: "center", fontSize: Number(poids) >= 1000 ? 20 : 24, whiteSpace: "nowrap", minWidth: 76 }}>{poids ? `${Number(poids).toLocaleString("fr-FR")} g` : "—"}</span>
-              <BoutonRond onClick={() => setPoids((Number(poids) || r.ball_weight) + pasPoids)} taille={30} couleur={couleur} label="+" aria="Plus" clair />
+              <BoutonRond onClick={() => setPoids((Number(poids) || r.ball_weight) + pasPoids)} taille={32} couleur={couleur} label="+" aria="Plus" clair />
             </span>
           } /></div>
           <Tuile compacte couleur={couleur} libelle="Pâte totale" valeur={resultat ? kg(resultat.summary.total_dough_g) : "—"} />
@@ -244,8 +244,8 @@ function Compteur({ libelle, valeur, onChange, pas, grandPas, couleur }: { libel
     <div style={{ display: "grid", gap: 6, justifyItems: "center" }}>
       <span style={INTERTITRE}>{libelle}</span>
       <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", justifyContent: "center", flexWrap: "wrap" }}>
-        <BoutonRond onClick={() => regler(-grandPas)} taille={40} couleur={couleur} label={`−${grandPas}`} aria={`Moins ${grandPas}`} clair />
-        <BoutonRond onClick={() => regler(-pas)} taille={50} couleur={couleur} label="−" aria="Moins un" />
+        <BoutonRond onClick={() => regler(-grandPas)} taille={46} couleur={couleur} label={`−${grandPas}`} aria={`Moins ${grandPas}`} clair />
+        <BoutonRond onClick={() => regler(-pas)} taille={46} couleur={couleur} label="−" aria="Moins un" />
         <input
           type="number" inputMode="numeric" min={1} value={valeur}
           onChange={(e) => onChange(e.target.value === "" ? "" : Math.max(0, Math.floor(Number(e.target.value))))}
@@ -253,8 +253,8 @@ function Compteur({ libelle, valeur, onChange, pas, grandPas, couleur }: { libel
           aria-label={libelle}
           style={{ width: 96, textAlign: "center", fontFamily: OSWALD, fontWeight: 700, fontSize: 40, color: "#1a1a1a", border: "none", borderBottom: `1px solid ${BORD}`, background: "transparent", outline: "none", padding: "0 4px", fontVariantNumeric: "tabular-nums", MozAppearance: "textfield" }}
         />
-        <BoutonRond onClick={() => regler(pas)} taille={50} couleur={couleur} label="+" aria="Plus un" />
-        <BoutonRond onClick={() => regler(grandPas)} taille={40} couleur={couleur} label={`+${grandPas}`} aria={`Plus ${grandPas}`} clair />
+        <BoutonRond onClick={() => regler(pas)} taille={46} couleur={couleur} label="+" aria="Plus un" />
+        <BoutonRond onClick={() => regler(grandPas)} taille={46} couleur={couleur} label={`+${grandPas}`} aria={`Plus ${grandPas}`} clair />
       </div>
     </div>
   );
@@ -264,7 +264,7 @@ function BoutonRond({ onClick, taille, couleur, label, aria, clair }: { onClick:
   return (
     <button type="button" onClick={onClick} aria-label={aria} style={{
       width: taille, height: taille, borderRadius: 999, flexShrink: 0, cursor: "pointer", fontFamily: OSWALD, fontWeight: 700, appearance: "none", WebkitAppearance: "none", padding: 0,
-      fontSize: clair ? Math.max(13, Math.round(taille * 0.36)) : Math.round(taille * 0.5), lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center",
+      fontSize: clair ? 13 : Math.round(taille * 0.5), lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center",
       border: `1.5px solid ${clair ? BORD : couleur}`, background: clair ? "#fff" : couleur, color: clair ? couleur : "#fff", touchAction: "manipulation",
     }}>{label}</button>
   );
