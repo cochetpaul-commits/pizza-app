@@ -965,7 +965,6 @@ export default function FournisseursPage() {
           <td style={{ ...TD, padding: 0, width: 4, background: sColor }} />
           <td style={{ ...TD, whiteSpace: "normal", minWidth: 150 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: sColor, flexShrink: 0 }} />
               <span style={{ fontWeight: 700, color: s.is_active ? "#1a1a1a" : "#999" }}>{s.name}</span>
               <EtabBadge etablissementId={s.etablissement_id} />
               {!s.is_active && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 6, background: "rgba(0,0,0,0.08)", color: "#999" }}>inactif</span>}

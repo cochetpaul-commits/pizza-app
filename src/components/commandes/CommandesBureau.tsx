@@ -126,10 +126,7 @@ export function CommandesBureau(p: CommandesBureauProps) {
   const ligne = (c: CommandeLigne, enSection = false) => { const TD = enSection ? TD_SEC : TD_PLAT; return (
     <tr key={c.id} className={`cb-ligne${ouverte?.id === c.id ? " on" : ""}`} onClick={() => setOuverteId(c.id)} style={{ cursor: "pointer" }}>
       <td style={TD}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 600 }}>
-          <span style={{ width: 10, height: 10, borderRadius: "50%", background: p.couleurFournisseur(c.supplier_name), flexShrink: 0 }} />
-          {c.supplier_name}
-        </span>
+        <span style={{ fontWeight: 600 }}>{c.supplier_name}</span>
       </td>
       <td style={TD}>{statut(c)}</td>
       <td style={{ ...TD, color: MUTED }}>{p.fmtDate(c.created_at)}</td>
