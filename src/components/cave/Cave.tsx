@@ -7,9 +7,10 @@ import { VoletDroit } from "@/components/produits/BaseProduits";
 import type { VinCave } from "@/app/api/cave/route";
 import { Tuile } from "@/components/ui/Tuile";
 import { getCategoryColor } from "@/lib/categoryColors";
+import { couleurTexte as couleurTexteCat } from "@/lib/styleCategories";
 import Link from "next/link";
 import { EtatVide } from "@/components/ui/EtatVide";
-import { ACCENT, ATTENTION, BON, BORD, BTN, CADRE, CHAMP, MAUVAIS, MUTED, OSWALD, TD, TH, filtre as styleFiltre, h1, liseret, pastille } from "@/components/ui/charte";
+import { ACCENT, ATTENTION, BON, BORD, BTN, CADRE, CHAMP, MAUVAIS, MUTED, OSWALD, TD, TH, alpha, filtre as styleFiltre, h1, liseret, pastille } from "@/components/ui/charte";
 
 /**
  * Cave Bello Mio (phase 1, 27/10/2026) : le sommelier de poche de l'équipe.
@@ -195,25 +196,25 @@ function Service({ donnees, onOuvrir }: { donnees: Donnees; onOuvrir: (v: VinCav
         <h2 style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 20, margin: 0 }}>La table a pris…</h2>
         {sel.size > 0 && <button type="button" onClick={() => setSel(new Set())} style={{ border: 0, background: "none", color: ACCENT, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Effacer</button>}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 10, marginTop: 6 }}>
-        {Object.keys(CATS).map((cat) => {
-          const liste = plats.filter((p) => p.categorie === cat);
-          if (!liste.length) return null;
-          const c = getCategoryColor(cat), nb = liste.filter((p) => sel.has(p.id)).length;
-          return (
-            <div key={cat} style={{ ...CADRE, padding: "12px 14px", display: "grid", gap: 10, alignContent: "start" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", color: c }}>{CATS[cat]}</span>
-                {nb > 0 && <span style={pastille(c)}>{nb}</span>}
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {liste.map((p) => { const on = sel.has(p.id); return (
-                  <button key={p.id} type="button" onClick={() => basculer(p.id)} aria-pressed={on} style={{ ...BTN, padding: "5px 12px", fontSize: 13, fontWeight: on ? 700 : 500, background: on ? c : "#fff", borderColor: on ? c : BORD, color: on ? "#fff" : "#1a1a1a" }}>{joli(p.nom)}</button>
-                ); })}
-              </div>
-            </div>
-          );
-        })}
+      <div style={{ ...CADRE, marginTop: 6 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+          <colgroup><col style={{ width: 6 }} /><col style={{ width: 40 }} /><col /><col style={{ width: 110 }} /><col style={{ width: 70 }} /></colgroup>
+          <thead><tr><th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={TH}>Plat</th><th style={TH}>Catégorie</th><th style={{ ...TH, textAlign: "right" }}>Prix</th></tr></thead>
+          <tbody>
+            {Object.keys(CATS).flatMap((cat) => plats.filter((p) => p.categorie === cat).map((p) => {
+              const c = getCategoryColor(cat), on = sel.has(p.id);
+              return (
+                <tr key={p.id} className="cave-ligne" onClick={() => basculer(p.id)} style={{ cursor: "pointer", background: on ? "#f4f6f1" : undefined }}>
+                  <td style={liseret(c)} />
+                  <td style={{ ...TD, padding: "8px 0 8px 12px" }}><input type="checkbox" checked={on} onChange={() => basculer(p.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: c, width: 16, height: 16, cursor: "pointer" }} /></td>
+                  <td style={{ ...TD, fontWeight: on ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{joli(p.nom)}</td>
+                  <td style={TD}><span style={pastille(couleurTexteCat(c), alpha(c, 0.14))}>{CATS[cat]}</span></td>
+                  <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", color: MUTED }}>{eur(p.prix)}</td>
+                </tr>
+              );
+            }))}
+          </tbody>
+        </table>
       </div>
       {!sel.size && <p style={{ color: MUTED, fontSize: 14, margin: "12px 0" }}>Coche un ou plusieurs plats : trois vins à proposer, avec la phrase à dire.</p>}
       {sel.size > 0 && (

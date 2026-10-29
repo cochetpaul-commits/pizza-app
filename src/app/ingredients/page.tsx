@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef, Suspense } from "react";
 import { RecoverProductsModal } from "@/components/RecoverProductsModal";
-import { DuplicatesModal } from "@/components/DuplicatesModal";
 import { ImportExportModal } from "@/components/ImportExportModal";
 import type { CSSProperties } from "react";
 import Link from "next/link";
@@ -354,7 +353,6 @@ function IngredientsPageInner() {
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showRecover, setShowRecover] = useState(false);
-  const [showDoublons, setShowDoublons] = useState(false);
   const [showImportExport, setShowImportExport] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
 
@@ -1290,12 +1288,9 @@ function IngredientsPageInner() {
             <>{showRecover && (
               <RecoverProductsModal etabId={etab?.id} onClose={() => setShowRecover(false)} onDone={() => { void mutate(); }} />
             )}</>
-            <>{showDoublons && (
-              <DuplicatesModal onClose={() => { setShowDoublons(false); void mutate(); }} onDone={() => { void mutate(); }} />
-            )}
             {showImportExport && (
               <ImportExportModal etabSlug={etab?.slug ?? "bello_mio"} onClose={() => { setShowImportExport(false); void mutate(); }} onDone={() => { void mutate(); }} />
-            )}</>
+            )}
             {bureau && showCreateForm && (
               <VoletDroit titre="Nouveau produit" sousTitre="Nom, catégorie, fournisseur et prix : le reste se complète dans la fiche." onFermer={() => setShowCreateForm(false)} largeur={560}>
                 <form onSubmit={(e) => { void addIngredient(e).then((ok) => { if (ok) setShowCreateForm(false); }); }} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1389,7 +1384,7 @@ function IngredientsPageInner() {
                 aControler={compteurs.aControler}
                 sansPrix={compteurs.sansPrix}
                 nbDoublons={duplicatePairs.length}
-                onDoublons={() => setShowDoublons(true)}
+                onDoublons={() => router.push("/ingredients/doublons")}
                 stockMap={stockMap}
                 inventaireDate={stock?.inventoryDate ?? null}
                 aCommander={aCommander}

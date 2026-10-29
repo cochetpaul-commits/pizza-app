@@ -1,6 +1,8 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useBureau } from "@/hooks/useBureau";
 import { CAT_COLORS, CAT_LABELS, type Category } from "@/types/ingredients";
 import { couleurTexte } from "@/lib/styleCategories";
 import { EtatVide } from "@/components/ui/EtatVide";
@@ -9,7 +11,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 
 /**
- * « Doublons probables » : produits dont le nom est identique une fois
+ * Base produits › Doublons probables (page à part depuis le 29/10/2026) : produits dont le nom est identique une fois
  * normalisé (accents, casse, espaces). Pour chaque groupe on choisit le
  * produit à garder ; les autres sont fusionnés dedans via /api/ingredients/merge
  * (offres, lignes de recettes, mouvements… réaffectés, puis suppression).
@@ -23,7 +25,9 @@ type Group = { cle: string; rows: Row[] };
 
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("fr-FR") : "jamais");
 
-export function DuplicatesModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+export function Doublons() {
+  const bureau = useBureau();
+  const onDone = () => {};
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -105,33 +109,27 @@ export function DuplicatesModal({ onClose, onDone }: { onClose: () => void; onDo
 
   const nbDoublons = groups.reduce((t, g) => t + g.rows.length - 1, 0);
   return (
-    <>
+    <div style={{ maxWidth: 1100, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px", display: "grid", gap: 14, alignContent: "start" }}>
       <style>{`.dbl-ligne:hover td{background:#f7f3ec}`}</style>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 9998 }} />
-      <div role="dialog" aria-label="Doublons probables" style={{
-        position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)",
-        width: "min(960px, 94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column",
-        background: "#f2ede4", borderRadius: 16, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", zIndex: 9999, overflow: "hidden",
-      }}>
-        <div style={{ padding: "16px 20px 12px", display: "flex", alignItems: "flex-start", gap: 12 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ ...h1(false), fontSize: 22 }}>Doublons probables</div>
-            <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>
-              {loading ? "Recherche…" : `${groups.length} groupe${groups.length > 1 ? "s" : ""} · ${nbDoublons} doublon${nbDoublons > 1 ? "s" : ""}${merged ? ` · ${merged} fusionné${merged > 1 ? "s" : ""}` : ""}`} · même nom à l&apos;accent ou à l&apos;espace près
-            </div>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
+        <div>
+          <h1 style={h1(bureau)}>Doublons probables</h1>
+          <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>
+            {loading ? "Recherche…" : `${groups.length} groupe${groups.length > 1 ? "s" : ""} · ${nbDoublons} doublon${nbDoublons > 1 ? "s" : ""}${merged ? ` · ${merged} fusionné${merged > 1 ? "s" : ""}` : ""}`} · même nom à l&apos;accent ou à l&apos;espace près
           </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" style={{ ...BTN, width: 32, height: 32, padding: 0, borderRadius: 999, fontSize: 16 }}>×</button>
         </div>
-        <div style={{ padding: "0 20px 10px", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Filtrer par nom…" style={{ ...CHAMP, borderRadius: 20, flex: "1 1 200px", minWidth: 0 }} />
-          {groups.length > 1 && (
-            <button type="button" onClick={() => void fusionnerTout()} disabled={busy !== null || tout !== null}
-              style={{ ...BTN, background: BON, borderColor: BON, color: "#fff", fontWeight: 700, opacity: busy !== null || tout !== null ? 0.6 : 1 }}>
-              {tout ? `Fusion ${tout.fait} / ${tout.total}…` : `Tout fusionner (${groups.length})`}
-            </button>
-          )}
-        </div>
-        <div style={{ overflowY: "auto", padding: "0 20px 20px" }}>
+        <Link href="/ingredients" style={{ ...BTN, textDecoration: "none", display: "inline-block" }}>← Base produits</Link>
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Filtrer par nom…" style={{ ...CHAMP, borderRadius: 20, flex: "1 1 200px", minWidth: 0, maxWidth: 420 }} />
+        {groups.length > 1 && (
+          <button type="button" onClick={() => void fusionnerTout()} disabled={busy !== null || tout !== null}
+            style={{ ...BTN, background: BON, borderColor: BON, color: "#fff", fontWeight: 700, opacity: busy !== null || tout !== null ? 0.6 : 1 }}>
+            {tout ? `Fusion ${tout.fait} / ${tout.total}…` : `Tout fusionner (${groups.length})`}
+          </button>
+        )}
+      </div>
+      <div>
           {err && <div style={{ color: MAUVAIS, fontSize: 13, marginBottom: 10 }}>{err}</div>}
           <div style={CADRE}>
             {!loading && groups.length === 0 && !err && <EtatVide icone="produit" titre="Aucun doublon probable" texte="Tous les noms de produits sont distincts." />}
@@ -185,8 +183,7 @@ export function DuplicatesModal({ onClose, onDone }: { onClose: () => void; onDo
               </table>
             )}
           </div>
-        </div>
       </div>
-    </>
+    </div>
   );
 }

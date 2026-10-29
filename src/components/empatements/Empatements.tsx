@@ -146,25 +146,26 @@ function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: Recette;
       <div style={{ padding: 16, display: "grid", gap: 14 }}>
         {/* Le réglage du jour : les pâtons, en gros, avec ±1 et ±10 ; sur bureau, le compteur est la première des quatre tuiles */}
         {!bureau && <Compteur libelle="Pâtons" valeur={patons} onChange={setPatons} pas={1} grandPas={10} couleur={couleur} />}
-        <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(3, 1fr)" : "1fr 1fr", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           {bureau && <div style={{ gridColumn: "1 / -1" }}><Tuile compacte couleur={couleur} libelle="Pâtons" valeur={
-            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 10))} taille={26} couleur={couleur} label="−10" aria="Moins dix" clair />
               <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 1))} taille={30} couleur={couleur} label="−" aria="Moins un" />
               <input type="number" inputMode="numeric" min={1} value={patons} aria-label="Pâtons"
                 onChange={(e) => setPatons(e.target.value === "" ? "" : Math.max(0, Math.floor(Number(e.target.value))))} onFocus={(e) => e.target.select()}
-                style={{ flex: 1, minWidth: 0, width: 56, textAlign: "center", fontFamily: OSWALD, fontWeight: 700, fontSize: 24, color: "#1a1a1a", border: "none", borderBottom: `1px solid ${BORD}`, background: "transparent", outline: "none", padding: 0, fontVariantNumeric: "tabular-nums", MozAppearance: "textfield" }} />
+                style={{ width: 76, textAlign: "center", fontFamily: OSWALD, fontWeight: 700, fontSize: 26, color: "#1a1a1a", border: "none", borderBottom: `1px solid ${BORD}`, background: "transparent", outline: "none", padding: 0, fontVariantNumeric: "tabular-nums", MozAppearance: "textfield" }} />
               <BoutonRond onClick={() => setPatons((Number(patons) || 0) + 1)} taille={30} couleur={couleur} label="+" aria="Plus un" />
               <BoutonRond onClick={() => setPatons((Number(patons) || 0) + 10)} taille={26} couleur={couleur} label="+10" aria="Plus dix" clair />
             </span>
           } /></div>}
-          <Tuile compacte couleur={couleur} libelle="Poids d'un pâton" valeur={
-            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Sur bureau le poids prend toute la ligne, comme le compteur : les boutons ne se chevauchent plus (29/10) */}
+          <div style={bureau ? { gridColumn: "1 / -1" } : undefined}><Tuile compacte couleur={couleur} libelle="Poids d'un pâton" valeur={
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
               <BoutonRond onClick={() => setPoids(Math.max(1, (Number(poids) || r.ball_weight) - pasPoids))} taille={30} couleur={couleur} label="−" aria="Moins" clair />
-              <span style={{ flex: 1, textAlign: "center", fontSize: Number(poids) >= 1000 ? 18 : 22, whiteSpace: "nowrap", minWidth: 0 }}>{poids ? `${Number(poids).toLocaleString("fr-FR")} g` : "—"}</span>
+              <span style={{ textAlign: "center", fontSize: Number(poids) >= 1000 ? 20 : 24, whiteSpace: "nowrap", minWidth: 76 }}>{poids ? `${Number(poids).toLocaleString("fr-FR")} g` : "—"}</span>
               <BoutonRond onClick={() => setPoids((Number(poids) || r.ball_weight) + pasPoids)} taille={30} couleur={couleur} label="+" aria="Plus" clair />
             </span>
-          } />
+          } /></div>
           <Tuile compacte couleur={couleur} libelle="Pâte totale" valeur={resultat ? kg(resultat.summary.total_dough_g) : "—"} />
           {bureau && <Tuile compacte couleur={couleur} libelle="Farine" valeur={resultat ? kg(resultat.flour_total_g) : "—"} />}
         </div>

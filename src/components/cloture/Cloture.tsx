@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ACCENT, ATTENTION, BON, BORD, BTN as PILULE, CADRE, FAIBLE, MAUVAIS, MUTED, OSWALD, TH, alpha, pastille } from "@/components/ui/charte";
+import { ACCENT, ATTENTION, BON, BORD, BTN as PILULE, CADRE, FAIBLE, INFO, MAUVAIS, MUTED, OSWALD, TH, alpha, pastille } from "@/components/ui/charte";
 import { useBureau } from "@/hooks/useBureau";
 import { fetchApi } from "@/lib/fetchApi";
 import { calculerCloture, eur, lireMontant, noteManquante, recapCloture, VIDE, type SaisieCloture } from "@/lib/cloture";
@@ -18,6 +18,9 @@ import { additionner, COUPURES, estBillet, libelleCoupure, listerCoupures, total
  */
 const VERT = BON, ROUGE = MAUVAIS, AMBRE = ATTENTION;
 const TITRE_CADRE: CSSProperties = { fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", color: "#1a1a1a" };
+/** En-tête de cadre nuancé à la couleur de l'étape (29/10) : fond teinté, titre coloré */
+const entete = (c: string): CSSProperties => ({ padding: "12px 16px", background: alpha(c, 0.09), borderBottom: `1px solid ${BORD}` });
+const titre = (c: string): CSSProperties => ({ ...TITRE_CADRE, color: c });
 /** Champ de saisie de la clôture : chiffre gros et gras, cadre fin */
 const SAISIE: CSSProperties = { font: "inherit", fontSize: 18, fontWeight: 700, textAlign: "right", boxSizing: "border-box", height: 40, padding: "0 10px", border: `1px solid ${BORD}`, borderRadius: 10, background: "#fff", color: "#1a1a1a", fontVariantNumeric: "tabular-nums" };
 /** Panneau neutre avec liseré d'état à gauche (charte : pas de fond coloré) */
@@ -261,10 +264,10 @@ export function Cloture() {
   const zSaisi = saisie.z.total != null;
   const exportVsZ = zSaisi && transactions.length > 0 ? Math.round((aide.totalExport.cb + aide.totalExport.amex - (saisie.z.total ?? 0)) * 100) / 100 : null;
 
-  const bloc = (titre: string, source: string, nom: keyof Textes, champs: Champ[]) => (
-    <section style={{ ...CADRE, padding: "14px 16px 8px", minWidth: 0 }}>
-      <div style={TITRE_CADRE}>{titre}</div>
-      <div style={{ color: MUTED, fontSize: 12.5, margin: "2px 0 8px" }}>{source}</div>
+  const bloc = (nomBloc: string, source: string, nom: keyof Textes, champs: Champ[], c: string) => (
+    <section style={{ ...CADRE, minWidth: 0 }}>
+      <div style={entete(c)}><div style={titre(c)}>{nomBloc}</div><div style={{ color: MUTED, fontSize: 12.5, marginTop: 2 }}>{source}</div></div>
+      <div style={{ padding: "4px 16px 8px" }}>
       {champs.filter((c) => !c.siPourboires || (saisie.popina.pourboires ?? 0) > 0 || !!textes[nom][c.cle]).map((c, i) => (
         <label key={c.cle} style={{ display: "grid", gridTemplateColumns: "1fr 128px", alignItems: "center", gap: 10, padding: "7px 0", borderTop: i ? `1px solid #f0ebe2` : "none" }}>
           <span style={{ fontSize: 14.5, fontWeight: 600, minWidth: 0 }}>{c.libelle}{c.aide && <small style={{ display: "block", color: MUTED, fontSize: 11.5, fontWeight: 400, lineHeight: 1.3 }}>{c.aide}</small>}</span>
@@ -273,6 +276,7 @@ export function Cloture() {
             style={{ ...SAISIE, width: "100%" }} />
         </label>
       ))}
+      </div>
     </section>
   );
 
@@ -345,11 +349,11 @@ export function Cloture() {
         <>
           {statut === "validee" && <div style={{ ...panneau(VERT), color: VERT, fontSize: 13.5, fontWeight: 700 }}>Clôture validée{resultat.niveau !== "ok" ? " — mais la saisie a changé depuis : revérifie." : "."}</div>}
           <div style={{ display: "grid", gridTemplateColumns: bureau ? "1fr 1fr" : "minmax(0, 1fr)", gap: 14 }}>
-            {bloc("Ticket Z du TPE", "Le ticket Flatpay imprimé à la clôture du TPE.", "z", CHAMPS_Z)}
-            {bloc("Écran Popina", "Avant d'arrêter la caisse, sans rien corriger.", "popina", CHAMPS_POPINA)}
+            {bloc("Ticket Z du TPE", "Le ticket Flatpay imprimé à la clôture du TPE.", "z", CHAMPS_Z, ACCENT)}
+            {bloc("Écran Popina", "Avant d'arrêter la caisse, sans rien corriger.", "popina", CHAMPS_POPINA, INFO)}
           </div>
           {/* Verdict */}
-          <section aria-live="polite" style={{ ...CADRE, padding: bureau ? "18px 20px" : "14px 16px" }}>
+          <section aria-live="polite" style={{ ...CADRE, padding: bureau ? "18px 20px" : "14px 16px", background: `linear-gradient(135deg, ${alpha(couleur, 0.12)} 0%, ${alpha(couleur, 0.03)} 50%, #fff 100%)` }}>
             <span style={pastille(couleur)}>{resultat.niveau === "ok" ? "Caisse juste" : resultat.niveau === "mode" ? "Erreur de mode" : resultat.niveau === "vide" ? "À remplir" : "Écart"}</span>
             <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: bureau ? 26 : 21, lineHeight: 1.1, color: "#1a1a1a", marginTop: 6 }}>{resultat.titre}</div>
             {resultat.etapes.length > 0 && <ol style={{ margin: "10px 0 0", paddingLeft: 22, fontSize: 15, lineHeight: 1.45 }}>{resultat.etapes.map((e, i) => <li key={i} style={{ margin: "6px 0" }}>{e}</li>)}</ol>}
@@ -379,8 +383,9 @@ export function Cloture() {
           </section>
 
           {/* Tiroir : comptage par coupure, fond à laisser, enveloppe de la banque */}
-          <section style={{ ...CADRE, padding: "14px 16px 16px", minWidth: 0, display: "grid", gap: 10 }}>
-            <div><div style={TITRE_CADRE}>Tiroir</div><div style={{ color: MUTED, fontSize: 12.5, marginTop: 2 }}>Compte tout le tiroir, fond compris, sans la cagnotte des pourboires.</div></div>
+          <section style={{ ...CADRE, minWidth: 0, display: "grid", gap: 10, paddingBottom: 16 }}>
+            <div style={entete(BON)}><div style={titre(BON)}>Tiroir</div><div style={{ color: MUTED, fontSize: 12.5, marginTop: 2 }}>Compte tout le tiroir, fond compris, sans la cagnotte des pourboires.</div></div>
+            <div style={{ padding: "0 16px", display: "grid", gap: 10 }}>
             <label style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 14.5, fontWeight: 600 }}>
               Fond de caisse
               <input inputMode="decimal" autoComplete="off" value={textes.tiroir.fond ?? ""} onChange={(e) => changer("tiroir", "fond", e.target.value)} placeholder="100"
@@ -471,11 +476,13 @@ export function Cloture() {
                 </details>
               );
             })()}
+            </div>
           </section>
 
           {/* Cagnotte des pourboires espèces : vidée et comptée le vendredi, monnaie faite avec le tiroir */}
-          <section style={{ ...CADRE, padding: "14px 16px 16px", minWidth: 0, display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={TITRE_CADRE}>Cagnotte des pourboires</div>{estVendredi(jour) && <span style={pastille(AMBRE)}>Vendredi</span>}</div>
+          <section style={{ ...CADRE, minWidth: 0, display: "grid", gap: 10, paddingBottom: 16 }}>
+            <div style={{ ...entete(AMBRE), display: "flex", alignItems: "center", gap: 8 }}><div style={titre(AMBRE)}>Cagnotte des pourboires</div>{estVendredi(jour) && <span style={pastille(AMBRE)}>Vendredi</span>}</div>
+            <div style={{ padding: "0 16px", display: "grid", gap: 10 }}>
             {!cagnotte ? (
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
                 <span style={{ color: estVendredi(jour) ? AMBRE : MUTED, fontSize: 13.5, fontWeight: estVendredi(jour) ? 700 : 400 }}>
@@ -502,6 +509,7 @@ export function Cloture() {
                 <div style={{ fontSize: 12.5, color: MUTED }}>Pas de monnaie à faire : il faut au moins 5 € de pièces dans la cagnotte et autant en billets dans le tiroir.</div>
               ) : null}
             </>)}
+            </div>
           </section>
 
           {/* Contrôle de la nuit : le vrai Z Popina relu vers 1 h */}
@@ -509,11 +517,12 @@ export function Cloture() {
             const c = controle?.c;
             const coul = !c ? MUTED : c.niveau === "ok" ? VERT : c.niveau === "absent" ? AMBRE : ROUGE;
             return (
-              <section style={{ ...CADRE, padding: "14px 16px", display: "grid", gap: 8 }}>
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "4px 10px" }}>
-                  <div style={{ ...TITRE_CADRE, flex: "1 1 auto" }}>Contrôle de la nuit</div>
+              <section style={{ ...CADRE, display: "grid", gap: 8, paddingBottom: 14 }}>
+                <div style={{ ...entete(c ? coul : MUTED), display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "4px 10px" }}>
+                  <div style={{ ...titre(c ? coul : "#1a1a1a"), flex: "1 1 auto" }}>Contrôle de la nuit</div>
                   <button type="button" disabled={controleEnCours === "Contrôle en cours…"} onClick={() => void lancerControle()} style={{ border: "none", background: "none", color: ACCENT, fontWeight: 700, fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>{c ? "Relancer" : "Lancer maintenant"}</button>
                 </div>
+                <div style={{ padding: "0 16px", display: "grid", gap: 8 }}>
                 {controleEnCours && <div style={{ fontSize: 13, color: MUTED }}>{controleEnCours}</div>}
                 {!c ? <div style={{ fontSize: 13.5, color: MUTED }}>Pas encore fait : il passe vers 1 h, une fois le Z Popina publié.</div> : (
                   <>
@@ -536,6 +545,7 @@ export function Cloture() {
                     {controle && <div style={{ fontSize: 12, color: FAIBLE }}>Contrôlé le {new Date(controle.at).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>}
                   </>
                 )}
+                </div>
               </section>
             );
           })()}
@@ -548,14 +558,15 @@ export function Cloture() {
               <button type="button" onClick={() => fichierRef.current?.click()} style={{ border: "none", background: "none", padding: 0, color: ACCENT, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Déposer quand même</button>
             </div>
           ) : (
-          <section style={{ ...CADRE, padding: "14px 16px", display: "grid", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <section style={{ ...CADRE, display: "grid", gap: 8, paddingBottom: 14 }}>
+            <div style={{ ...entete(MUTED), display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <div style={{ flex: "1 1 220px", minWidth: 0 }}>
-                <div style={TITRE_CADRE}>Export Flatpay du jour</div>
+                <div style={titre("#1a1a1a")}>Export Flatpay du jour</div>
                 <div style={{ color: MUTED, fontSize: 12.5 }}>En cas d&apos;écart : app Flatpay de l&apos;iPad, transactions du jour, export ; et l&apos;export « titre restaurant » s&apos;il y a des Conecs.</div>
               </div>
               <button type="button" disabled={import_.enCours} onClick={() => fichierRef.current?.click()} style={{ ...BTN, borderColor: ACCENT, color: ACCENT }}>{import_.enCours ? "Lecture…" : transactions.length ? "Ajouter un export" : "Déposer l'export"}</button>
             </div>
+            <div style={{ padding: "0 16px", display: "grid", gap: 8 }}>
             {import_.message && <div style={{ fontSize: 12.5, color: MUTED }}>{import_.message}</div>}
             {transactions.length > 0 && (
               <div style={{ display: "grid", gap: 10 }}>
@@ -584,12 +595,14 @@ export function Cloture() {
                 {aide.refusees.length > 0 && <div><div style={{ fontWeight: 700, fontSize: 14, color: ROUGE }}>Paiements refusés · {aide.refusees.length}</div>{aide.refusees.map((t) => ligneTx(t, "vérifie que la table a été repayée"))}</div>}
               </div>
             )}
+            </div>
           </section>
           )}
 
           {/* Corrections et notes */}
-          <section style={{ ...CADRE, padding: "14px 16px", display: "grid", gap: 8 }}>
-            <div style={TITRE_CADRE}>Corrections faites dans Popina</div>
+          <section style={{ ...CADRE, display: "grid", gap: 8, paddingBottom: 14 }}>
+            <div style={entete(ACCENT)}><div style={titre(ACCENT)}>Corrections faites dans Popina</div><div style={{ color: MUTED, fontSize: 12.5, marginTop: 2 }}>Une ligne par correction : la table, l&apos;heure, ce qui a changé. Le contrôle de la nuit les reconnaîtra.</div></div>
+            <div style={{ padding: "0 16px", display: "grid", gap: 8 }}>
             {noteRequise && (
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, background: alpha(ACCENT, 0.08), fontSize: 13.5 }}>
                 <span style={{ flex: "1 1 220px" }}>Ajustement en prix sur mesure de <strong>{eur(Math.abs(resultat.ajustement ?? 0))}</strong> : note la table et le montant, c&apos;est obligatoire pour valider.
@@ -597,7 +610,6 @@ export function Cloture() {
                 <button type="button" onClick={() => preparerNote()} style={{ ...BTN, height: 36, borderColor: ACCENT, color: ACCENT }}>Préparer la note</button>
               </div>
             )}
-            <div style={{ color: MUTED, fontSize: 12.5 }}>Une ligne par correction : la table, l&apos;heure, ce qui a changé. Le contrôle de la nuit les reconnaîtra.</div>
             {corrections.map((c, i) => (
               <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, padding: "4px 0", borderTop: "1px solid #f0ebe2" }}>
                 <span style={{ flex: 1 }}>{c}</span>
@@ -610,6 +622,7 @@ export function Cloture() {
               <button type="button" onClick={ajouterCorrection} style={{ ...BTN, borderColor: BORD }}>Ajouter</button>
             </div>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes (facultatif)" style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${BORD}`, fontSize: 14, fontFamily: "inherit", resize: "vertical" }} />
+            </div>
           </section>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
