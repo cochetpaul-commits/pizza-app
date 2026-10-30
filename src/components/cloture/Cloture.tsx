@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSPrope
 import { ACCENT, ATTENTION, BON, BORD, BTN as PILULE, CADRE, FAIBLE, INFO, MAUVAIS, MUTED, OSWALD, TH, alpha, pastille } from "@/components/ui/charte";
 import { couleurTexteSur, degradeCategorie, stylePastilleBarre } from "@/lib/styleCategories";
 import { useBureau } from "@/hooks/useBureau";
+import { useProfile } from "@/lib/ProfileContext";
 import { fetchApi } from "@/lib/fetchApi";
 import { calculerCloture, eur, lireMontant, noteManquante, recapCloture, VIDE, type SaisieCloture } from "@/lib/cloture";
 import { aideCloture, heureParis, jourService, lireExportFlatpay, type TransactionFlatpay } from "@/lib/flatpay";
@@ -77,6 +78,8 @@ const decaler = (jour: string, n: number) => { const d = new Date(`${jour}T12:00
 
 export function Cloture() {
   const bureau = useBureau();
+  // Les enveloppes de la semaine et le bordereau de banque : managers et admins seulement (30/10/2026)
+  const { canWrite: voitBanque } = useProfile();
   const [jour, setJour] = useState(() => jourService(new Date()));
   const [textes, setTextes] = useState<Textes>(() => versTextes(VIDE));
   const [coupures, setCoupures] = useState<Comptage>({});
@@ -435,14 +438,14 @@ export function Cloture() {
                 </div>
               );
             })()}
-            {(enveloppes.cette.length > 0 || enveloppes.precedente.length > 0) && (
+            {voitBanque && (enveloppes.cette.length > 0 || enveloppes.precedente.length > 0) && (
               <div style={{ fontSize: 13.5, display: "grid", gap: 4, borderTop: "1px solid #f0ebe2", paddingTop: 8 }}>
                 <div><strong>Enveloppes de la semaine du {dateCourte(enveloppes.lundi)} : {eur(enveloppes.totalCette)}</strong>
                   {enveloppes.cette.length > 0 && <span style={{ color: MUTED }}> ({enveloppes.cette.map(([j, v]) => `${dateCourte(j)} ${eur(v)}`).join(" · ")})</span>}</div>
                 {enveloppes.precedente.length > 0 && <div style={{ color: AMBRE, fontWeight: 700 }}>Semaine précédente, à déposer à la banque : {eur(enveloppes.totalPrecedente)}</div>}
               </div>
             )}
-            {(() => {
+            {voitBanque && (() => {
               // Bordereau de la semaine à déposer (la précédente), sinon celui de la semaine en cours
               const avecPrec = enveloppes.precedente.length > 0;
               const b = avecPrec ? enveloppes.bordereauPrecedente : enveloppes.bordereauCette;
