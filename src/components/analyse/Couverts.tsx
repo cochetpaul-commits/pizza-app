@@ -12,6 +12,7 @@ import { ticketMoyen, totalZones, useStatsVentes } from "@/components/analyse/us
 import { capacitesParJour, parJour, parJourSemaine, type Capacites } from "@/components/analyse/parJour";
 import { COULEUR_MIDI, COULEUR_SOIR, AMBRE, FAIBLE, MUTED, ROUGE, VERT, derniersJours, euros, jourCourt, nombre, pct } from "@/components/analyse/gabarit";
 import { EtatVide } from "@/components/ui/EtatVide";
+import { ResumeServices } from "@/components/analyse/ResumeServices";
 import Link from "next/link";
 
 /**
@@ -93,6 +94,9 @@ export function Couverts() {
               sous={cap.salle ? `midi ${rMidi != null ? pct(rMidi) : "—"} · soir ${rSoir != null ? pct(rSoir) : "—"} · ${cap.salle} places${cap.jardin ? `, +${cap.jardin} au jardin (ouvert ${nbJardin} service${nbJardin > 1 ? "s" : ""})` : ""}` : "capacités à renseigner dans Objectifs"} />
             <TuileVariation compacte={!bureau} icone="euro" libelle="Ticket moyen" valeur={euros(ticketMoyen(stats), 1)} actuel={ticketMoyen(stats)} precedent={prec ? ticketMoyen(prec) : null} sous="TTC par couvert sur place" />
           </div>
+
+          {/* Midi, soir, à emporter en un coup d'œil (30/10/2026) */}
+          <ResumeServices stats={stats} prec={prec} />
 
           <Cadre titre="Couverts par jour" sous="Midi et soir empilés ; la météo du service du soir sous chaque jour.">
             {chargement ? <Chargement /> : (

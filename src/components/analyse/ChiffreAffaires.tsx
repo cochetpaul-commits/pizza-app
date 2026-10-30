@@ -10,6 +10,7 @@ import { ticketMoyen, useStatsVentes } from "@/components/analyse/useStatsVentes
 import { parJour, parJourSemaine } from "@/components/analyse/parJour";
 import { COULEUR_EMPORTER, COULEUR_MIDI, COULEUR_SOIR, FAIBLE, MUTED, ROUGE, VERT, derniersJours, euros, jourCourt, nombre, pct } from "@/components/analyse/gabarit";
 import { EtatVide } from "@/components/ui/EtatVide";
+import { ResumeServices } from "@/components/analyse/ResumeServices";
 import { useEvenementiel } from "@/components/evenementiel/useEvenementiel";
 import Link from "next/link";
 
@@ -56,6 +57,9 @@ export function ChiffreAffaires() {
             <TuileVariation compacte={!bureau} icone="camion" couleur={COULEUR_EMPORTER} libelle="À emporter" valeur={euros(stats.place_emp_ht)} actuel={stats.place_emp_ht} precedent={prec?.place_emp_ht} sous={stats.ca_ht ? `${pct((stats.place_emp_ht / stats.ca_ht) * 100)} du CA` : undefined} />
             <TuileVariation compacte={!bureau} icone="couverts" libelle="Ticket moyen" valeur={euros(ticketMoyen(stats), 1)} actuel={ticketMoyen(stats)} precedent={prec ? ticketMoyen(prec) : null} sous="TTC par couvert sur place" />
           </div>
+
+          {/* Midi, soir, à emporter en un coup d'œil (30/10/2026) */}
+          <ResumeServices stats={stats} prec={prec} />
 
           <Cadre titre="CA par jour" sous="Hors taxes : midi, soir et à emporter empilés ; la courbe grise est la période précédente, jour pour jour.">
             {chargement ? <Chargement /> : (
