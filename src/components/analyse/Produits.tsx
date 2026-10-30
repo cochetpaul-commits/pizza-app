@@ -13,6 +13,9 @@ import { EtatVide } from "@/components/ui/EtatVide";
 import { getCategoryColor } from "@/lib/categoryColors";
 import { couleurTexteSur, styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
 import { CADRE, CHAMP, liseret, pastille } from "@/components/ui/charte";
+import { GraphBarres } from "@/components/analyse/GraphBarres";
+import { COULEUR_MIDI, COULEUR_SOIR, periodeEffective } from "@/components/analyse/gabarit";
+import type { ProduitsPeriode } from "@/lib/analyse/produitsPeriode";
 
 /**
  * Ventes › Par produit (29/10/2026) : « Qu'est-ce qui se vend ? »
@@ -58,6 +61,23 @@ export function Produits() {
   const obj = (f: typeof FAMILLES[number]) => (objectifs.pour === etabId ? objectifs.valeurs[f.objectif] : undefined) ?? f.defaut;
   const [recherche, setRecherche] = useState("");
   const [ouvertes, setOuvertes] = useState<Set<string>>(new Set());
+  // Tendance et midi / soir (30/10/2026) : la même période effective que les statistiques
+  const eff = periodeEffective(range);
+  const [periode, setPeriode] = useState<{ cle: string; d: ProduitsPeriode | null }>({ cle: "", d: null });
+  const [mesure, setMesure] = useState<"qty" | "ht">("qty");
+  const clePeriode = `${etabId}|${eff.from}|${eff.to}`;
+  useEffect(() => {
+    if (!etabId) return;
+    let annule = false;
+    fetchApi(`/api/ventes/produits?etablissement_id=${etabId}&from=${eff.from}&to=${eff.to}`).then(async (r) => {
+      const j = r.ok ? ((await r.json()) as ProduitsPeriode) : null;
+      if (!annule) setPeriode({ cle: clePeriode, d: j });
+    }).catch(() => { if (!annule) setPeriode({ cle: clePeriode, d: null }); });
+    return () => { annule = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clePeriode]);
+  const pp = periode.cle === clePeriode ? periode.d : null;
+  const svcProduit = (n: string) => pp?.produits[n] ?? null;
   const q = norm(recherche.trim());
 
   const categories = useMemo(() => {
@@ -102,6 +122,42 @@ export function Produits() {
             <TuileVariation compacte={!bureau} icone="ticket" couleur={couleurTaux(taux(vin, tickets), obj(FAMILLES[4]))} libelle="Tables avec vin" valeur={taux(vin, tickets) != null ? pct(taux(vin, tickets)!) : "—"} actuel={taux(vin, tickets) ?? 0} precedent={taux(attache(prec, "vin"), ticketsPrec)} sous={`objectif ${pct(obj(FAMILLES[4]), 0)}`} />
             <TuileVariation compacte={!bureau} icone="foodcost" libelle="Part des boissons" valeur={stats.ca_ht ? pct((stats.drink_ht / stats.ca_ht) * 100) : "—"} actuel={stats.ca_ht ? (stats.drink_ht / stats.ca_ht) * 100 : 0} precedent={prec?.ca_ht ? (prec.drink_ht / prec.ca_ht) * 100 : null} sous={`${euros(stats.drink_ht)} HT de boissons`} />
           </div>
+
+          {/* Tendance des ventes et midi / soir (30/10/2026, retour de l'ancienne page Produits) */}
+          {pp && pp.tendance.categories.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: bureau ? "2fr 1fr" : "1fr", gap: 14, alignItems: "start" }}>
+              <Cadre titre="Tendance des ventes" sous={`Par ${pp.pas === "jour" ? "jour" : pp.pas === "semaine" ? "semaine" : "mois"}, empilé par catégorie de la carte.`}
+                droite={<span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3 }}>
+                  {(["qty", "ht"] as const).map((m) => <button key={m} type="button" onClick={() => setMesure(m)} aria-pressed={mesure === m} style={{ border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: mesure === m ? "#fff" : "transparent", color: mesure === m ? "#1a1a1a" : MUTED }}>{m === "qty" ? "Quantités" : "CA HT"}</button>)}
+                </span>}>
+                <GraphBarres empile sansValeurs={pp.tendance.cles.length > 12} format={(v) => (mesure === "qty" ? nombre(v) : euros(v))} etiquettes={pp.tendance.etiquettes} libelleAxe="Ventes par catégorie"
+                  series={pp.tendance.categories.map((c) => ({ libelle: c, couleur: getCategoryColor(c), valeurs: (mesure === "qty" ? pp.tendance.qty[c] : pp.tendance.ht[c]) ?? [] }))} />
+              </Cadre>
+              <Cadre titre="Midi et soir" sous="Ce qui part à chaque service, par catégorie." sansMarge>
+                <div style={{ overflowX: "auto", marginTop: 10 }}>
+                  <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                    <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Catégorie</th><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Soir</th></tr></thead>
+                    <tbody>
+                      {pp.categories.map((c) => {
+                        const tot = c.midi_qty + c.soir_qty;
+                        const part = tot ? (c.midi_qty / tot) * 100 : 0;
+                        return (
+                          <tr key={c.cat} className="pr-ligne">
+                            <td style={liseret(getCategoryColor(c.cat))} />
+                            <td style={{ ...TD, fontWeight: 600 }}>{c.cat}
+                              <div style={{ height: 5, borderRadius: 3, background: COULEUR_SOIR, marginTop: 5, overflow: "hidden" }}><div style={{ width: `${part}%`, height: "100%", background: COULEUR_MIDI }} /></div>
+                            </td>
+                            <td style={TDN}>{nombre(c.midi_qty)}<div style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>{pct(part)}</div></td>
+                            <td style={TDN}>{nombre(c.soir_qty)}<div style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>{pct(100 - part)}</div></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Cadre>
+            </div>
+          )}
 
           {/* Les trois blocs côte à côte sur bureau (29/10) */}
           <div style={{ display: "grid", gridTemplateColumns: bureau ? "1.35fr 1fr 1fr" : "1fr", gap: 14, alignItems: "start" }}>
@@ -168,13 +224,14 @@ export function Produits() {
                   {ouverte && (
                     <div style={{ ...CADRE, borderTop: 0, borderRadius: "0 0 14px 14px", overflowX: "auto" }}>
                       <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                        <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th>{bureau && <th style={{ ...TH, textAlign: "right" }}>CA TTC</th>}<th style={{ ...TH, textAlign: "right" }}>Part</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
+                        <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th>{bureau && pp && <><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Soir</th></>}<th style={{ ...TH, textAlign: "right" }}>CA HT</th>{bureau && <th style={{ ...TH, textAlign: "right" }}>CA TTC</th>}<th style={{ ...TH, textAlign: "right" }}>Part</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
                         <tbody>
                           {c.lignes.map((p) => (
                             <tr key={p.n} className="pr-ligne">
                               <td style={liseret(c.couleur)} />
                               <td style={{ ...TD, fontWeight: 600 }}>{p.n}</td>
                               <td style={TDN}>{nombre(p.qty)}</td>
+                              {bureau && pp && (() => { const s = svcProduit(p.n); return <><td style={{ ...TDN, color: MUTED }}>{s ? nombre(s.midi_qty) : "—"}</td><td style={{ ...TDN, color: MUTED }}>{s ? nombre(s.soir_qty) : "—"}</td></>; })()}
                               <td style={TDN}>{euros(p.ca_ht)}</td>
                               {bureau && <td style={{ ...TDN, color: MUTED }}>{euros(p.ca_ttc)}</td>}
                               <td style={{ ...TDN, color: MUTED }}>{c.ht ? pct((p.ca_ht / c.ht) * 100) : "—"}</td>
