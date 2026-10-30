@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { texteBrut } from "@/lib/pennylane/syncEvenementiel";
+import { texteBrut } from "@/lib/pennylane/texte";
 
 describe("textes libres Pennylane", () => {
   it("aplatit le rich text des devis", () => {

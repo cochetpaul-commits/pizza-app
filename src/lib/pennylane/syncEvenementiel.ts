@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCustomerInvoices, getCustomers, getQuotes, type PlDossier } from "@/lib/pennylane/api";
+import { texteBrut } from "@/lib/pennylane/texte";
 
 /**
  * Événementiel Piccola Mia (30/10/2026) : les devis et factures clients sont faits dans Pennylane
@@ -17,16 +18,6 @@ export type LigneEvenementiel = {
 
 const num = (v: string | number | null | undefined) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const vide = (s: string | null | undefined) => { const t = (s ?? "").trim(); return t ? t : null; };
-/** Les textes libres des devis arrivent parfois en « rich text » JSON ([{type:paragraph, children:[{text}]}]) : on garde le texte */
-export function texteBrut(s: string | null | undefined): string | null {
-  const t = vide(s);
-  if (!t || !t.startsWith("[{")) return t;
-  try {
-    const blocs = JSON.parse(t) as { children?: { text?: string }[] }[];
-    return vide(blocs.flatMap((b) => (b.children ?? []).map((c) => c.text ?? "")).join(" ").replace(/\s+/g, " "));
-  } catch { return t; }
-}
-
 export async function syncEvenementiel(etabId: string, dossier: PlDossier = "piccola"): Promise<{ devis: number; factures: number; clients: number }> {
   const [tousDevis, factures, clients] = await Promise.all([getQuotes(dossier), getCustomerInvoices(DEPUIS, dossier), getCustomers(dossier)]);
   const devis = tousDevis.filter((d) => (d.date ?? "") >= DEPUIS);
