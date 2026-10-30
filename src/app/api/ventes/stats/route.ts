@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { estHorsAccords } from "@/lib/cave/horsAccords";
 import { etabAccessDenied } from "@/lib/getEtablissement";
 import { createClient } from "@supabase/supabase-js";
 
@@ -158,9 +159,11 @@ type Stats = ReturnType<typeof aggregate>;
  * relu tel quel ; sinon les lignes sont chargées, agrégées, et le résultat remplace le cache.
  * Vécu 08/10 : chaque ouverture de la page rechargeait trois périodes complètes de lignes.
  */
+const VERSION_CALCUL = "2026-10-30a";
 async function statsPeriode(etabId: string, from: string, to: string): Promise<Stats | null> {
   const { data: version } = await supabase.rpc("ventes_version", { p_etab: etabId, p_from: from, p_to: to });
-  const v = typeof version === "string" ? version : null;
+  // VERSION_CALCUL : à changer quand l'agrégation change, pour que le cache se recalcule
+  const v = typeof version === "string" ? `${version}|${VERSION_CALCUL}` : null;
   if (v) {
     const { data: cache } = await supabase
       .from("ventes_stats_cache")
@@ -252,6 +255,8 @@ const SUB_CAT_MAP: Record<string, string> = {
 };
 
 const FOOD_CATS = new Set(["Pizze", "Antipasti", "Cuisine", "Dolci", "Bambini", "Sides"]);
+/** Les plats qui comptent pour « plats qui dorment » : pas les enfants ni les accompagnements */
+const PLATS_CATS = new Set(["Pizze", "Antipasti", "Cuisine", "Dolci"]);
 const DRINK_CATS = new Set([
   "Vins", "Alcool", "Boissons", "Boissons chaudes", "Digestifs",
   "Aperitifs", "Bieres", "Cocktails", "Spritz", "Mocktails", "Softs", "Jus de fruits",
@@ -794,12 +799,14 @@ function aggregate(rows: Row[]) {
     else if (DRINK_CATS.has(cat)) { drink_ttc += Number(r.ttc); drink_ht += Number(r.ht); }
   }
 
-  // Bottom 5 — plats qui dorment (lowest qty, food only)
+  // Bottom 5 — plats qui dorment : les vrais plats de la carte (antipasti, cuisine, dolci, pizze), sans les
+  // assiettes et pâtes des enfants, les contorni, les glaces, la pizza bianca ni les menus (30/10/2026)
   const bottom5 = Object.entries(prodMap)
     .filter(([, v]) => v.qty >= 1)
+    .filter(([name]) => !estHorsAccords(name) && !/pizza\s+bianca|focaccia|^menu\b/i.test(name))
     .filter(([name]) => {
       const row = validRows.find(r => r.description === name);
-      return row ? FOOD_CATS.has(normCat(row.categorie, row.description)) : false;
+      return row ? PLATS_CATS.has(normCat(row.categorie, row.description)) : false;
     })
     .sort((a, b) => a[1].qty - b[1].qty)
     .slice(0, 5)

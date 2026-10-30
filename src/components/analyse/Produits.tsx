@@ -11,8 +11,8 @@ import { useStatsVentes, type Attache, type ProduitVendu, type StatsVentes } fro
 import { FAIBLE, MUTED, ROUGE, VERT, AMBRE, derniersJours, euros, nombre, pct } from "@/components/analyse/gabarit";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { getCategoryColor } from "@/lib/categoryColors";
-import { couleurTexte, couleurTexteSur, styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
-import { BORD, CADRE, CHAMP, liseret, pastille } from "@/components/ui/charte";
+import { couleurTexte } from "@/lib/styleCategories";
+import { BORD, CHAMP, liseret, pastille } from "@/components/ui/charte";
 import { GraphBarres } from "@/components/analyse/GraphBarres";
 import { COULEUR_MIDI, COULEUR_SOIR, periodeEffective } from "@/components/analyse/gabarit";
 import type { ProduitsPeriode } from "@/lib/analyse/produitsPeriode";
@@ -62,7 +62,6 @@ export function Produits() {
   }, [etabId]);
   const obj = (f: typeof FAMILLES[number]) => (objectifs.pour === etabId ? objectifs.valeurs[f.objectif] : undefined) ?? f.defaut;
   const [recherche, setRecherche] = useState("");
-  const [ouvertes, setOuvertes] = useState<Set<string>>(new Set());
   // Tendance et midi / soir (30/10/2026) : la même période effective que les statistiques
   const eff = periodeEffective(range);
   const [periode, setPeriode] = useState<{ cle: string; d: ProduitsPeriode | null }>({ cle: "", d: null });
@@ -104,7 +103,6 @@ export function Produits() {
   const top10 = useMemo(() => (stats?.top10_names ?? []).map((n, i) => ({ n, qty: stats?.top10_qty?.[i] ?? 0, ca_ttc: stats?.top10_ca_ttc?.[i] ?? 0, ca_ht: stats?.top10_ca_ht?.[i] ?? 0 })), [stats]);
   const tickets = stats?.tickets ?? 0, ticketsPrec = prec?.tickets ?? 0;
   const dolci = attache(stats, "dolci"), vin = attache(stats, "vin");
-  const basculer = (cat: string) => setOuvertes((s) => { const n = new Set(s); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; });
   // Clic sur une famille du taux d'attache : la tendance passe sur sa catégorie et son tableau s'ouvre, en vue
   const voirCategorie = (cat: string) => {
     const existe = categories.some((c) => c.cat === cat);
@@ -162,8 +160,11 @@ export function Produits() {
             return (
               <div id="tendance" style={{ scrollMarginTop: 70 }}>
                 <Cadre titre="Tendance des ventes" sous={`Par catégorie de la carte, puis par ${pp.pas === "jour" ? "jour" : pp.pas === "semaine" ? "semaine" : "mois"}. Une catégorie à gauche, ses plats dessous, un clic sur un plat ouvre le zoom.`}
-                  droite={<span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3 }}>
-                    {(["qty", "ht"] as const).map((m) => <button key={m} type="button" onClick={() => setMesure(m)} aria-pressed={mesure === m} style={{ border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: mesure === m ? "#fff" : "transparent", color: mesure === m ? "#1a1a1a" : MUTED }}>{m === "qty" ? "Quantités" : "CA HT"}</button>)}
+                  droite={<span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Chercher un produit…" style={{ ...CHAMP, height: 32, borderRadius: 20, width: 200, fontSize: 12.5 }} />
+                    <span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3 }}>
+                      {(["qty", "ht"] as const).map((m) => <button key={m} type="button" onClick={() => setMesure(m)} aria-pressed={mesure === m} style={{ border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: mesure === m ? "#fff" : "transparent", color: mesure === m ? "#1a1a1a" : MUTED }}>{m === "qty" ? "Quantités" : "CA HT"}</button>)}
+                    </span>
                   </span>}>
                   <div style={{ display: "grid", gridTemplateColumns: bureau ? "250px 1fr" : "1fr", gap: 14, alignItems: "start" }}>
                     <div style={{ display: "grid", gap: 2, borderRight: bureau ? `1px solid ${BORD}` : undefined, paddingRight: bureau ? 10 : 0 }}>
@@ -197,6 +198,27 @@ export function Produits() {
                               </tbody>
                             </table>
                           </div>
+                        </div>
+                      ) : q ? (
+                        <div style={{ marginTop: 14, borderTop: `1px solid ${BORD}`, paddingTop: 10 }}>
+                          <div style={{ fontSize: 12.5, color: MUTED, marginBottom: 6 }}>{categories.reduce((t, c) => t + c.lignes.length, 0)} produit{categories.reduce((t, c) => t + c.lignes.length, 0) > 1 ? "s" : ""} pour « {recherche.trim()} »</div>
+                          <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                            <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Soir</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
+                            <tbody>
+                              {categories.flatMap((c) => c.lignes.map((p) => { const sv = svcProduit(p.n); return (
+                                <tr key={p.n} className="pr-ligne" onClick={() => setZoom(p.n)}>
+                                  <td style={liseret(c.couleur)} />
+                                  <td style={{ ...TD, fontWeight: 600 }}>{p.n}<div style={{ fontSize: 11, color: couleurTexte(c.couleur), fontWeight: 600 }}>{c.cat}</div></td>
+                                  <td style={TDN}>{nombre(p.qty)}</td>
+                                  <td style={{ ...TDN, color: MUTED }}>{sv ? nombre(sv.midi_qty) : "—"}</td>
+                                  <td style={{ ...TDN, color: MUTED }}>{sv ? nombre(sv.soir_qty) : "—"}</td>
+                                  <td style={TDN}>{euros(p.ca_ht)}</td>
+                                  <td style={TDN}>{delta(p, p.avant)}</td>
+                                </tr>
+                              ); }))}
+                              {categories.length === 0 && <tr><td colSpan={7} style={{ ...TD, color: FAIBLE }}>Aucun produit. Essaie un autre mot.</td></tr>}
+                            </tbody>
+                          </table>
                         </div>
                       ) : (
                         <div style={{ marginTop: 14, borderTop: `1px solid ${BORD}`, paddingTop: 10 }}>
@@ -298,47 +320,6 @@ export function Produits() {
               </Cadre>
           </div>
 
-          <div>
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Chercher un produit…" style={{ ...CHAMP, borderRadius: 20, flex: "1 1 220px", maxWidth: 420 }} />
-              <span style={{ fontSize: 12.5, color: MUTED }}>{categories.length} catégorie{categories.length > 1 ? "s" : ""} · {nombre(totalQty)} produits vendus · HT</span>
-            </div>
-            {categories.map((c) => {
-              const ouverte = !!q || ouvertes.has(c.cat);
-              return (
-                <div key={c.cat} id={`cat-${c.cat}`} style={{ marginBottom: 8, scrollMarginTop: 70 }}>
-                  <button type="button" aria-expanded={ouverte} onClick={() => basculer(c.cat)} style={{ ...styleBarreCategorie(c.couleur), minHeight: 44, gap: 10, padding: "0 14px", boxShadow: "none", borderRadius: ouverte ? "14px 14px 0 0" : 14 }}>
-                    <span style={styleTitreCategorie(c.couleur)}>{c.cat}</span>
-                    <span style={stylePastilleBarre(c.couleur)}>{nombre(c.qty)}</span>
-                    <span style={{ fontSize: 12.5, color: couleurTexteSur(c.couleur), opacity: 0.9, whiteSpace: "nowrap" }}>{euros(c.ht)} · {stats.ca_ht ? pct((c.ht / stats.ca_ht) * 100) : ""}</span>
-                    <span style={styleChevronBarre(c.couleur, ouverte)}>▼</span>
-                  </button>
-                  {ouverte && (
-                    <div style={{ ...CADRE, borderTop: 0, borderRadius: "0 0 14px 14px", overflowX: "auto" }}>
-                      <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                        <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th>{bureau && pp && <><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Soir</th></>}<th style={{ ...TH, textAlign: "right" }}>CA HT</th>{bureau && <th style={{ ...TH, textAlign: "right" }}>CA TTC</th>}<th style={{ ...TH, textAlign: "right" }}>Part</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
-                        <tbody>
-                          {c.lignes.map((p) => (
-                            <tr key={p.n} className="pr-ligne" onClick={() => setZoom(p.n)}>
-                              <td style={liseret(c.couleur)} />
-                              <td style={{ ...TD, fontWeight: 600 }}>{p.n}</td>
-                              <td style={TDN}>{nombre(p.qty)}</td>
-                              {bureau && pp && (() => { const s = svcProduit(p.n); return <><td style={{ ...TDN, color: MUTED }}>{s ? nombre(s.midi_qty) : "—"}</td><td style={{ ...TDN, color: MUTED }}>{s ? nombre(s.soir_qty) : "—"}</td></>; })()}
-                              <td style={TDN}>{euros(p.ca_ht)}</td>
-                              {bureau && <td style={{ ...TDN, color: MUTED }}>{euros(p.ca_ttc)}</td>}
-                              <td style={{ ...TDN, color: MUTED }}>{c.ht ? pct((p.ca_ht / c.ht) * 100) : "—"}</td>
-                              <td style={TDN}>{delta(p, p.avant)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {categories.length === 0 && q && <Cadre><EtatVide compact icone="recherche" titre="Aucun produit" texte="Essaie un autre mot." /></Cadre>}
-          </div>
         </>
       )}
       {chargement && !stats && <Chargement texte="Chargement des ventes…" />}
