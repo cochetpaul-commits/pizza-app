@@ -235,6 +235,7 @@ export function CommandesBureau(p: CommandesBureauProps) {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "100%" }}>
           <BoutonLitiges key={p.aRecevoir.length} bureau={bureau} />
+          <a href="/commandes/personnel" style={{ ...BTN, display: "inline-flex", alignItems: "center", textDecoration: "none" }} title="La liste de courses des repas du personnel (Metro), partagée">{bureau ? "Repas du personnel" : "Personnel"}</a>
           <a href="/commandes/theoriques" style={{ ...BTN, display: "inline-flex", alignItems: "center", textDecoration: "none" }} title="Ce qu'il faudrait commander d'après le stock théorique">{bureau ? "Proposition de commande" : "Proposition"}</a>
           <button type="button" onClick={p.onCommander} style={{ ...BTN, background: p.accent, color: "#fff", border: "none", fontWeight: 700 }}>+ Commander</button>
         </div>

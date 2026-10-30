@@ -193,7 +193,13 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
       <div key={`group:${group.label}`}>
         <button
           type="button"
-          onClick={() => setOpenGroups((prev) => ({ ...prev, [group.label]: !open }))}
+          onClick={() => setOpenGroups(() => {
+            // Un seul groupe déployé à la fois (30/10/2026) : ouvrir l'un referme les autres, la barre reste courte
+            const suivant: Record<string, boolean> = {};
+            for (const e of entries) if (e.kind === "group") suivant[e.label] = false;
+            suivant[group.label] = !open;
+            return suivant;
+          })}
           onMouseEnter={() => setHovered(`group:${group.label}`)}
           onMouseLeave={() => setHovered(null)}
           aria-expanded={open}

@@ -15,8 +15,8 @@ export default function Page() {
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 90px", boxSizing: "border-box", display: "grid", gap: 14, alignContent: "start" }}>
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
             <div>
-              <h1 style={h1(bureau)}>Courses du personnel</h1>
-              <div style={{ color: MUTED, fontSize: 13, marginTop: 4 }}>Les repas du personnel sont des avantages en nature : à cocher en faisant les courses, hors achats matières, relevé du mois pour le cabinet.</div>
+              <h1 style={h1(bureau)}>Repas du personnel</h1>
+              <div style={{ color: MUTED, fontSize: 13, marginTop: 4 }}>La liste de courses de l&apos;équipe, partagée : on coche en faisant les courses chez Metro. Hors achats matières, avec le relevé du mois pour le cabinet.</div>
             </div>
             <Link href="/commandes" style={{ ...BTN, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>← Commandes</Link>
           </div>
