@@ -79,8 +79,8 @@ export const eur0 = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €
 export const pct1 = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
 
 /* ── Services type ─────────────────────────────────────────────────────── */
-export type ServiceVendu = { date: string; svc: "midi" | "soir"; ca_ht: number; ca_ttc: number; couverts: number };
-export type ServiceType = { jour: number; svc: "midi" | "soir"; libelle: string; n: number; couverts: number; ca_ht: number; ca_ttc: number; tmTtc: number };
+export type ServiceVendu = { date: string; svc: "midi" | "soir" | "journee"; ca_ht: number; ca_ttc: number; couverts: number };
+export type ServiceType = { jour: number; svc: "midi" | "soir" | "journee"; libelle: string; n: number; couverts: number; ca_ht: number; ca_ttc: number; tmTtc: number };
 const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const jourDe = (date: string) => new Date(date + "T12:00:00").getDay();
 
@@ -91,7 +91,8 @@ export function servicesType(services: ServiceVendu[]): ServiceType[] {
     if (s.couverts <= 0 && s.ca_ht <= 0) continue;
     const jour = jourDe(s.date);
     const cle = `${jour}-${s.svc}`;
-    const t = acc.get(cle) ?? { jour, svc: s.svc, libelle: `${JOURS[jour]} ${s.svc}`, n: 0, couverts: 0, ca_ht: 0, ca_ttc: 0, tmTtc: 0 };
+    // « journee » : journal de caisse sans service (Kezia, Piccola Mia)
+    const t = acc.get(cle) ?? { jour, svc: s.svc, libelle: `${JOURS[jour]}${s.svc === "journee" ? "" : ` ${s.svc}`}`, n: 0, couverts: 0, ca_ht: 0, ca_ttc: 0, tmTtc: 0 };
     t.n++; t.couverts += s.couverts; t.ca_ht += s.ca_ht; t.ca_ttc += s.ca_ttc;
     acc.set(cle, t);
   }
@@ -155,7 +156,9 @@ export function calculerSimulation(v: EntreesSimulateur, equipe: Personne[], r: 
 
 /** Hypothèses de départ : l'activité des services type et les charges réelles des derniers mois clos */
 export function entreesParDefaut(types: ServiceType[], moisClos: { ca_ht: number; postes: Record<string, number> }[], r: Reglages): EntreesSimulateur {
-  const midi = types.filter((t) => t.svc === "midi"), soir = types.filter((t) => t.svc === "soir");
+  // Sans midi ni soir (journaux Kezia), la journée entière tient lieu de service unique, côté midi
+  const journee = types.filter((t) => t.svc === "journee");
+  const midi = [...types.filter((t) => t.svc === "midi"), ...journee], soir = types.filter((t) => t.svc === "soir");
   const moy = (l: ServiceType[], f: (t: ServiceType) => number) => (l.length ? l.reduce((a, t) => a + f(t), 0) / l.length : 0);
   const ca = moisClos.reduce((t, m) => t + m.ca_ht, 0);
   const somme = (cle: string) => moisClos.reduce((t, m) => t + montantPoste(POSTES_BUDGET.find((p) => p.cle === cle)!, m.postes), 0);

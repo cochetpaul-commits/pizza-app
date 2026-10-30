@@ -13,6 +13,7 @@ import { AMBRE, BLEU, FAIBLE, MUTED, ROUGE, TERRACOTTA, VERT, derniersMois, euro
 import type { MoisMarge } from "@/app/api/analyse/marge/route";
 import { EtatVide } from "@/components/ui/EtatVide";
 import Link from "next/link";
+import { useProfile } from "@/lib/ProfileContext";
 
 /**
  * Analyse › Marge (10/10/2026) : « Que reste-t-il ? »
@@ -29,7 +30,21 @@ export function Marge() {
   const [range, setRange] = usePilotageRange(() => derniersMois(6));
   const etabId = etab?.id ?? "";
   const [etat, setEtat] = useState<{ cle: string; donnees: Reponse | null; erreur: string | null }>({ cle: "", donnees: null, erreur: null });
-  const cle = `${etabId}|${range.from}|${range.to}`;
+  const { isGroupAdmin } = useProfile();
+  const [synchro, setSynchro] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  // Relire Pennylane sur douze mois (admins) : charges de l'établissement, puis la page se recharge
+  const relirePennylane = async () => {
+    if (!etabId) return;
+    setSynchro("Lecture de Pennylane, douze mois…");
+    const r = await fetchApi("/api/pennylane/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ etablissement_id: etabId, nb_mois: 12 }) });
+    const j = await r.json().catch(() => ({}));
+    const res = (j?.resultats ?? []) as { mois?: string; erreur?: string }[];
+    const erreurs = res.filter((x) => x.erreur);
+    setSynchro(r.ok ? `${res.length - erreurs.length} mois relus${erreurs.length ? `, ${erreurs.length} en erreur : ${erreurs[0].erreur}` : ""}` : (j?.error ?? "Erreur"));
+    if (r.ok) setVersion((v) => v + 1);
+  };
+  const cle = `${etabId}|${range.from}|${range.to}|${version}`;
   useEffect(() => {
     if (!etabId) return;
     let annule = false;
@@ -86,7 +101,9 @@ export function Marge() {
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px", display: "grid", gap: 14, alignContent: "start" }}>
       <EnteteAnalyse titre="Résultat" question="Que reste-t-il ? Du CA à l'EBE, mois par mois, avec les achats, la masse salariale et les charges réellement passées." range={range} onRange={setRange}
-        raccourcis={raccourcis} comparaison={`${nbMois} mois · référence : ${reference ? libelleMoisLong(reference.mois) : "—"}`} />
+        raccourcis={raccourcis} comparaison={`${nbMois} mois · référence : ${reference ? libelleMoisLong(reference.mois) : "—"}`}
+        droite={isGroupAdmin ? <button type="button" onClick={relirePennylane} style={{ height: 32, padding: "0 12px", borderRadius: 20, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a" }}>Relire Pennylane (12 mois)</button> : undefined} />
+      {synchro && <div style={{ fontSize: 12.5, color: MUTED }}>{synchro}</div>}
 
       {etat.erreur && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(180,68,58,0.08)", color: ROUGE, fontSize: 13 }}>{etat.erreur}</div>}
       {chargement && !donnees && <Chargement texte="Chargement des charges…" />}

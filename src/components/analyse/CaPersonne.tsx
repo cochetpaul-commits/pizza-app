@@ -99,7 +99,7 @@ export function CaPersonne() {
 
       {(erreurVentes || etat.erreur) && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(180,68,58,0.08)", color: ROUGE, fontSize: 13 }}>{erreurVentes ?? etat.erreur}</div>}
       {chargement && jours.length === 0 && <Chargement texte="Lecture du planning Combo et des ventes…" />}
-      {!chargement && jours.length === 0 && !etat.erreur && <Cadre><EtatVide icone="equipe" titre="Aucune donnée sur cette période" texte="Il faut des ventes Popina et un planning Combo sur ces jours." /></Cadre>}
+      {!chargement && jours.length === 0 && !etat.erreur && <Cadre><EtatVide icone="equipe" titre="Aucune donnée sur cette période" texte={etab?.slug?.includes("piccola") ? "À Piccola Mia, la caisse Kezia ne donne ni les services ni les opérateurs : le CA par personne n'est pas calculable. Le coût de l'équipe est dans Masse salariale." : "Il faut des ventes Popina et un planning Combo sur ces jours."} /></Cadre>}
 
       {jours.length > 0 && (
         <>
