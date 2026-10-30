@@ -9,6 +9,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { CATEGORIES, CAT_LABELS, CAT_COLORS, type Category, type Ingredient } from "@/types/ingredients";
 import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { ModalNonComptes } from "@/components/inventaire/ModalNonComptes";
+import { LigneInventaire } from "@/components/inventaire/LigneInventaire";
 import { useRouter } from "next/navigation";
 import { fermerOffresActives } from "@/lib/offerClosing";
 import { ZONES_EMBED, appliquerZonesEtab, type ZoneEtabRow } from "@/lib/zonesEtablissement";
@@ -16,7 +17,7 @@ import { couleurTexte, couleurTexteSur as couleurTexteSurBarre, styleBarreCatego
 import { useBureau } from "@/hooks/useBureau";
 import { Tuile } from "@/components/ui/Tuile";
 import { EtatVide } from "@/components/ui/EtatVide";
-import { ACCENT, ATTENTION, BON, BORD, BORD_LIGNE, BTN, CADRE, CHAMP, MAUVAIS, MUTED, TD, TH, filtre as styleFiltre, h1, liseret, pastille } from "@/components/ui/charte";
+import { ACCENT, ATTENTION, BON, BORD, BTN, CADRE, CHAMP, MAUVAIS, MUTED, TD, TH, filtre as styleFiltre, h1, liseret, pastille } from "@/components/ui/charte";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -85,50 +86,6 @@ function fmtDate(iso: string) {
 }
 
 /** Mini stepper −/+ compact pour les doubles champs cartons + unités */
-function MiniStepper({ value, active, color, label, onChange }: {
-  value: number | "";
-  active: boolean;
-  color: string;
-  label: string;
-  onChange: (v: number) => void;
-}) {
-  const n = value === "" ? 0 : Number(value);
-  const btn: React.CSSProperties = {
-    width: 22, height: 36, border: "1px solid #ddd6c8", background: "#f9f5ef",
-    fontSize: 15, fontWeight: 700, cursor: "pointer", padding: 0,
-    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-  };
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <div style={{ display: "flex", alignItems: "center" }}>
-        <button type="button" onClick={() => onChange(Math.max(0, n - 1))}
-          style={{ ...btn, borderRadius: "8px 0 0 8px", borderRight: "none", color: "#D4775A" }}>−</button>
-        <input
-          type="number"
-          step="1"
-          min="0"
-          value={value}
-          onChange={(e) => {
-            const val = e.target.value;
-            onChange(val === "" ? 0 : Math.max(0, Math.round(Number(val))));
-          }}
-          placeholder="0"
-          style={{
-            width: 40, height: 36, borderRadius: 0,
-            border: active ? `1.5px solid ${color}` : "1px solid #ddd6c8",
-            padding: "0 2px", fontSize: 14, fontWeight: 600,
-            textAlign: "center", background: "#fff", outline: "none",
-            color: active ? color : "#1a1a1a",
-          }}
-        />
-        <button type="button" onClick={() => onChange(n + 1)}
-          style={{ ...btn, borderRadius: "0 8px 8px 0", borderLeft: "none", color: "#4a6741" }}>+</button>
-      </div>
-      <span style={{ fontSize: 8, color: active ? color : "#999", fontWeight: 700, marginTop: 1 }}>{label}</span>
-    </div>
-  );
-}
-
 function fmtMoney(n: number) {
   return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 }
@@ -441,21 +398,35 @@ export default function InventairePage() {
     }
   }, []);
 
-  function handleQtyChange(id: string, val: string) {
+  // Références à jour pour des rappels stables (30/10/2026) : les lignes mémorisées ne se redessinent pas à chaque frappe
+  const activeZoneRef = useRef(activeZone); activeZoneRef.current = activeZone;
+  const sessionRef = useRef(session); sessionRef.current = session;
+  const ingredientsRef = useRef(ingredients); ingredientsRef.current = ingredients;
+  const handleQtyChange = useCallback((id: string, val: string) => {
     const parsed = val === "" ? "" : parseFloat(val);
     if (val !== "" && isNaN(parsed as number)) return;
-    const zoneDb = zoneDbKey(activeZone);
-    const key = qk(id, activeZone);
+    const zone = activeZoneRef.current, sess = sessionRef.current;
+    const zoneDb = zoneDbKey(zone);
+    const key = qk(id, zone);
     setQuantities((prev) => ({ ...prev, [key]: parsed }));
 
-    if (!session) return;
+    if (!sess) return;
     clearTimeout(debounceRef.current[key]);
     debounceRef.current[key] = setTimeout(() => {
       const qty = typeof parsed === "number" ? parsed : 0;
-      const ing = ingredients.find((i) => i.id === id);
-      if (ing) upsertLigne(session.id, id, qty, ing, zoneDb);
+      const ing = ingredientsRef.current.find((i) => i.id === id);
+      if (ing) upsertLigne(sess.id, id, qty, ing, zoneDb);
     }, 600);
-  }
+  }, [upsertLigne]);
+  const retirerProduit = useCallback(async (ing: Ingredient) => {
+    if (!confirm(`Retirer "${ing.name}" de cet inventaire ?`)) return;
+    setQuantities((prev) => { const n = { ...prev }; delete n[ing.id]; return n; });
+    const sess = sessionRef.current;
+    if (sess) await supabase.from("inventaire_lignes").delete().eq("inventaire_id", sess.id).eq("ingredient_id", ing.id);
+    await supabase.from("ingredients").update({ is_active: false }).eq("id", ing.id);
+    await fermerOffresActives(supabase, ing.id);
+    setIngredients((prev) => prev.filter((p) => p.id !== ing.id));
+  }, []);
 
   // ── Bulk set category to 0 ─────────────────────────────────
 
@@ -1378,225 +1349,11 @@ export default function InventairePage() {
                   {/* Items : cadre blanc accroché sous la barre, liseré de couleur par ligne */}
                   {!isCollapsed && (
                     <div style={{ ...CADRE, borderTop: 0, borderRadius: "0 0 14px 14px" }}>
-                      {items.map((ing) => {
-                        const pack = packInfo[ing.id];
-                        const rawQty = quantities[qk(ing.id, activeZone)];
-                        const totalAllZones = ingTotals.totals[ing.id] ?? 0;
-                        const rawQtyNum = typeof rawQty === "number" ? rawQty : 0;
-                        const hasQty = rawQtyNum > 0;
-                        const isZeroConfirmed = quantities[qk(ing.id, activeZone)] === 0;
-                        const valeur = hasQty && ing.cost_per_unit != null
-                          ? rawQtyNum * ing.cost_per_unit : null;
-
-                        // For pack items: decompose stored qty into cartons + loose
-                        const nbCartons = pack ? Math.floor(rawQtyNum / pack.pack_count) : 0;
-                        const nbLoose = pack ? rawQtyNum % pack.pack_count : rawQtyNum;
-                        const packUnit = pack?.pack_each_unit ?? ing.default_unit ?? "pcs";
-
-                        return (
-                          <div
-                            key={ing.id}
-                            className="inv-article"
-                            style={{
-                              display: "flex", alignItems: "center", gap: 10,
-                              padding: "9px 14px 9px 16px",
-                              borderBottom: `1px solid ${BORD_LIGNE}`,
-                              boxShadow: `inset 6px 0 0 ${hasQty ? color : isZeroConfirmed ? "#d6d0c4" : `${color}55`}`,
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            {/* Name + unit + delete — affichage produit canonique */}
-                            <div className="produit-main">
-                              <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
-                                <span className="produit-name" style={{
-                                  fontSize: 13.5, fontWeight: hasQty ? 600 : 500,
-                                  color: hasQty ? "#1a1a1a" : isZeroConfirmed ? MUTED : "#1a1a1a",
-                                  textDecoration: isZeroConfirmed ? "line-through" : "none",
-                                  flex: 1, minWidth: 0,
-                                }}>
-                                  {ing.name}
-                                </span>
-                                {isActive && (
-                                  <button type="button" onClick={async (e) => {
-                                    e.stopPropagation();
-                                    if (!confirm(`Retirer "${ing.name}" de cet inventaire ?`)) return;
-                                    // Remove from quantities
-                                    setQuantities(prev => { const n = { ...prev }; delete n[ing.id]; return n; });
-                                    // Delete the line from DB
-                                    if (session) await supabase.from("inventaire_lignes").delete().eq("inventaire_id", session.id).eq("ingredient_id", ing.id);
-                                    // Deactivate ingredient
-                                    await supabase.from("ingredients").update({ is_active: false }).eq("id", ing.id);
-                                    await fermerOffresActives(supabase, ing.id);
-                                    setIngredients(prev => prev.filter(p => p.id !== ing.id));
-                                  }} style={{
-                                    flexShrink: 0, width: 20, height: 20, borderRadius: 5,
-                                    border: "none", background: "none", color: "#ccc",
-                                    fontSize: 11, cursor: "pointer", display: "flex",
-                                    alignItems: "center", justifyContent: "center",
-                                  }} title="Supprimer ce produit">✕</button>
-                                )}
-                              </div>
-                              <div style={{ fontSize: 10, color: "#999", marginTop: 1, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                                <span className="pastille-cadre">
-                                  {pack
-                                    ? `crt ${pack.pack_count} × ${pack.pack_each_qty ?? 1}${packUnit}`
-                                    : (ing.default_unit ?? "pcs")}
-                                </span>
-                                {ing.storage_zone && (() => {
-                                  const z = zones.find(zz => zz.name === ing.storage_zone);
-                                  const zc = z?.couleur ?? "#b0a894";
-                                  return <span className="pastille" style={{ "--pastille-c": zc } as React.CSSProperties}>{ing.storage_zone}</span>;
-                                })()}
-                                {ingSupplier[ing.id] && (
-                                  <span className="pastille" style={{ "--pastille-c": ingSupplier[ing.id].color ?? "#b0a894" } as React.CSSProperties}>
-                                    {ingSupplier[ing.id].name}
-                                  </span>
-                                )}
-                                <a
-                                  href={`/ingredients?edit=${ing.id}&back=${encodeURIComponent("/inventaire")}`}
-                                  title="Modifier la fiche produit"
-                                  className="pastille-cadre"
-                                  style={{ textDecoration: "none", cursor: "pointer" }}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  ✎
-                                </a>
-                                {/* Previous inventory comparison */}
-                                {hasQty && prevQuantities[ing.id] != null && (() => {
-                                  const prev = prevQuantities[ing.id];
-                                  const delta = rawQtyNum - prev;
-                                  if (delta === 0) return null;
-                                  return (
-                                    <span style={{
-                                      fontSize: 9, fontWeight: 700, padding: "0 5px", borderRadius: 4,
-                                      background: delta > 0 ? "rgba(74,103,65,0.10)" : "rgba(220,38,38,0.10)",
-                                      color: delta > 0 ? "#4a6741" : "#DC2626",
-                                    }}>
-                                      {delta > 0 ? "+" : ""}{delta} vs prec.
-                                    </span>
-                                  );
-                                })()}
-                                {/* Theoretical stock vs real */}
-                                {hasQty && theoreticalStock[ing.id] != null && (() => {
-                                  const theo = Math.round(theoreticalStock[ing.id] * 10) / 10;
-                                  const ecart = Math.round((rawQtyNum - theo) * 10) / 10;
-                                  if (ecart === 0 || theo <= 0) return null;
-                                  return (
-                                    <span style={{
-                                      fontSize: 9, fontWeight: 700, padding: "0 5px", borderRadius: 4,
-                                      background: Math.abs(ecart) > theo * 0.2 ? "rgba(220,38,38,0.10)" : "rgba(212,160,60,0.10)",
-                                      color: Math.abs(ecart) > theo * 0.2 ? "#DC2626" : "#D4A03C",
-                                    }}>
-                                      stock théorique {theo} · écart {ecart > 0 ? "+" : ""}{ecart}
-                                    </span>
-                                  );
-                                })()}
-                                {/* Stock alerts */}
-                                {totalAllZones > rawQtyNum && (
-                                  <span style={{ fontSize: 9, fontWeight: 700, padding: "0 5px", borderRadius: 4, background: "rgba(37,99,235,0.10)", color: "#2563EB" }}
-                                    title="Ce produit est aussi compté dans d'autres zones">
-                                    Total {totalAllZones}
-                                  </span>
-                                )}
-                                {hasQty && ing.stock_min != null && totalAllZones < ing.stock_min && (
-                                  <span style={{ fontSize: 9, fontWeight: 700, padding: "0 5px", borderRadius: 4, background: "rgba(220,38,38,0.10)", color: "#DC2626" }}>
-                                    Sous min ({ing.stock_min})
-                                  </span>
-                                )}
-                                {hasQty && ing.stock_max != null && totalAllZones > ing.stock_max && (
-                                  <span style={{ fontSize: 9, fontWeight: 700, padding: "0 5px", borderRadius: 4, background: "rgba(212,160,60,0.10)", color: "#D4A03C" }}>
-                                    Sur-stock ({ing.stock_max})
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Value */}
-                            {valeur != null && (
-                              <span style={{ fontSize: 12, color: MUTED, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-                                {fmtMoney(valeur)}
-                              </span>
-                            )}
-
-                            {/* Qty inputs */}
-                            {readOnly ? (
-                              <span style={{
-                                fontSize: 15, fontWeight: 700, color: hasQty ? "#1a1a1a" : "#ccc",
-                                minWidth: 50, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums",
-                              }}>
-                                {hasQty ? (pack ? `${nbCartons}c + ${nbLoose}` : `${rawQtyNum}`) : "-"}
-                              </span>
-                            ) : pack ? (
-                              /* Dual input: cartons + loose units, avec steppers −/+ */
-                              <div style={{ display: "flex", alignItems: "flex-start", gap: 4, flexShrink: 0 }}>
-                                <MiniStepper
-                                  value={hasQty || isZeroConfirmed ? nbCartons : ""}
-                                  active={nbCartons > 0}
-                                  color="#7C3AED"
-                                  label="crt"
-                                  onChange={(c) => handleQtyChange(ing.id, String(c * pack.pack_count + nbLoose))}
-                                />
-                                <span style={{ fontSize: 11, color: "#999", fontWeight: 600, alignSelf: "center" }}>+</span>
-                                <MiniStepper
-                                  value={hasQty || isZeroConfirmed ? nbLoose : ""}
-                                  active={nbLoose > 0}
-                                  color={color}
-                                  label={packUnit}
-                                  onChange={(l) => handleQtyChange(ing.id, String(nbCartons * pack.pack_count + l))}
-                                />
-                              </div>
-                            ) : (
-                              /* Stepper input with +/- buttons */
-                              <div style={{ display: "flex", alignItems: "center", gap: 0, flexShrink: 0 }}>
-                                <button type="button" onClick={() => {
-                                  const cur = typeof rawQty === "number" ? rawQty : 0;
-                                  handleQtyChange(ing.id, String(Math.max(0, cur - 1)));
-                                }} style={{
-                                  width: 32, height: 36, borderRadius: "10px 0 0 10px",
-                                  border: `1px solid ${BORD}`, borderRight: "none",
-                                  background: "#fff", color: ACCENT, fontSize: 18, fontFamily: "inherit",
-                                  fontWeight: 700, cursor: "pointer", display: "flex",
-                                  alignItems: "center", justifyContent: "center",
-                                }}>-</button>
-                                <input
-                                  type="number"
-                                  step="0.5"
-                                  min="0"
-                                  value={rawQty ?? ""}
-                                  onChange={(e) => handleQtyChange(ing.id, e.target.value)}
-                                  placeholder="0"
-                                  style={{
-                                    width: 52, height: 36, borderRadius: 0,
-                                    border: hasQty ? `1.5px solid ${color}` : "1px solid #ddd6c8",
-                                    padding: "0 4px", fontSize: 14, fontWeight: 600,
-                                    textAlign: "center", background: "#fff", outline: "none",
-                                    color: hasQty ? color : "#1a1a1a",
-                                  }}
-                                />
-                                <button type="button" onClick={() => {
-                                  const cur = typeof rawQty === "number" ? rawQty : 0;
-                                  handleQtyChange(ing.id, String(cur + 1));
-                                }} style={{
-                                  width: 32, height: 36, borderRadius: "0 10px 10px 0",
-                                  border: `1px solid ${BORD}`, borderLeft: "none",
-                                  background: "#fff", color: BON, fontSize: 18, fontFamily: "inherit",
-                                  fontWeight: 700, cursor: "pointer", display: "flex",
-                                  alignItems: "center", justifyContent: "center",
-                                }}>+</button>
-                              </div>
-                            )}
-
-                            {/* Total compté : pastille ronde en bas à droite (charte) */}
-                            {hasQty && (
-                              <div className="produit-footer" style={{ flexBasis: "100%", marginTop: 4 }}>
-                                <span className="pastille-ronde" style={{ background: "rgba(109,40,217,0.10)", color: "#6d28d9" }}>
-                                  = {rawQtyNum} {packUnit}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                      {items.map((ing) => (
+                        <LigneInventaire key={ing.id} ing={ing} pack={packInfo[ing.id]} rawQty={quantities[qk(ing.id, activeZone)]} totalAllZones={ingTotals.totals[ing.id] ?? 0}
+                          prevQty={prevQuantities[ing.id]} theo={theoreticalStock[ing.id]} zoneCouleur={ing.storage_zone ? (zones.find((zz) => zz.name === ing.storage_zone)?.couleur ?? "#b0a894") : "#b0a894"}
+                          supplier={ingSupplier[ing.id]} isActive={isActive} readOnly={readOnly} color={color} onQty={handleQtyChange} onRetirer={retirerProduit} />
+                      ))}
                     </div>
                   )}
                 </div>

@@ -421,6 +421,15 @@ function CommandesPage() {
       // session à rafraîchir…), on affiche une erreur + Réessayer au lieu
       // d'un chargement sans fin.
       const timeout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 20000));
+      // Les quatre listes de commandes partent en même temps que les fournisseurs (30/10/2026) :
+      // elles ne dépendent que de l'établissement, pas les unes des autres. Cinq allers-retours en file → un seul.
+      const etabIdCourant = etab?.id ?? null;
+      const sessionsEnCours = etabIdCourant ? Promise.all([
+        supabase.from("commande_sessions").select("supplier_id, commande_lignes(count)").eq("etablissement_id", etabIdCourant).eq("status", "brouillon"),
+        supabase.from("commande_sessions").select("id, supplier_id, type, created_at, total_ht, email_sent_at, commande_lignes(count)").eq("etablissement_id", etabIdCourant).in("status", ["validee", "envoyee"]).order("created_at", { ascending: false }),
+        supabase.from("commande_sessions").select("id, supplier_id, type, status, created_at, total_ht, commande_lignes(count)").eq("etablissement_id", etabIdCourant).in("status", ["brouillon", "en_attente"]).order("created_at", { ascending: false }),
+        supabase.from("commande_sessions").select("id, supplier_id, type, status, created_at, total_ht").eq("etablissement_id", etabIdCourant).eq("status", "recue").order("created_at", { ascending: false }).limit(8),
+      ]) : null;
       const { data, error } = await Promise.race([
         supabase
           .from("suppliers")
@@ -449,12 +458,8 @@ function CommandesPage() {
       list.sort((a, b) => a.name.localeCompare(b.name, "fr"));
 
       // Load draft sessions with at least 1 ligne to show pastilles
-      if (etab?.id) {
-        const { data: drafts } = await supabase
-          .from("commande_sessions")
-          .select("supplier_id, commande_lignes(count)")
-          .eq("etablissement_id", etab.id)
-          .eq("status", "brouillon");
+      if (etab?.id && sessionsEnCours) {
+        const [{ data: drafts }, { data: validees }, { data: actives }, { data: recentData }] = await sessionsEnCours;
         const draftIds = new Set(
           (drafts ?? [])
             .filter((d: { supplier_id: string; commande_lignes: { count: number }[] }) =>
@@ -477,13 +482,7 @@ function CommandesPage() {
           return a.name.localeCompare(b.name, "fr");
         });
 
-        // Load pending receptions (validated orders)
-        const { data: validees } = await supabase
-          .from("commande_sessions")
-          .select("id, supplier_id, type, created_at, total_ht, email_sent_at, commande_lignes(count)")
-          .eq("etablissement_id", etab.id)
-          .in("status", ["validee", "envoyee"])
-          .order("created_at", { ascending: false });
+        // Réceptions en attente (commandes validées)
         const supplierMap = new Map(list.map((s) => [s.id, s.name]));
         // Also map alias IDs to canonical names
         for (const [canonical, aliasSet] of aliases.entries()) {
@@ -502,13 +501,7 @@ function CommandesPage() {
           }))
         );
 
-        // Load active sessions (brouillon + en_attente) across all suppliers
-        const { data: actives } = await supabase
-          .from("commande_sessions")
-          .select("id, supplier_id, type, status, created_at, total_ht, commande_lignes(count)")
-          .eq("etablissement_id", etab.id)
-          .in("status", ["brouillon", "en_attente"])
-          .order("created_at", { ascending: false });
+        // Commandes en cours (brouillon + en attente), tous fournisseurs
         setActiveSessions(
           (actives ?? [])
             .filter((a: { commande_lignes: { count: number }[] }) => a.commande_lignes?.[0]?.count > 0)
@@ -523,14 +516,7 @@ function CommandesPage() {
             }))
         );
 
-        // Load recent orders (recue) for dashboard historique
-        const { data: recentData } = await supabase
-          .from("commande_sessions")
-          .select("id, supplier_id, type, status, created_at, total_ht")
-          .eq("etablissement_id", etab.id)
-          .eq("status", "recue")
-          .order("created_at", { ascending: false })
-          .limit(8);
+        // Dernières commandes reçues (historique)
         setRecentOrders(
           (recentData ?? []).map((r: { id: string; supplier_id: string; type?: string; status: string; created_at: string; total_ht: number }) => ({
             id: r.id,
