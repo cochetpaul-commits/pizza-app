@@ -228,32 +228,27 @@ export default function EmployeDetailPage() {
         .single();
 
       if (cancelled || !empBase) { setLoading(false); return; }
+      // Tout ce qui ne dépend que de la fiche part en même temps (30/10/2026) : confidentiel (admins), établissement,
+      // postes, opérateurs Popina récents, contrats, absences. Six allers-retours en file → un seul.
+      const etabFiche = (empBase as { etablissement_id?: string | null }).etablissement_id ?? null;
+      const depuis = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+      const [confRes, etabRes, postesRes, opsRes, contratsRes, absRes] = await Promise.all([
+        isGroupAdmin ? supabase.rpc("employe_confidentiel", { p_id: id }) : Promise.resolve({ data: null }),
+        etabFiche ? supabase.from("etablissements").select("id, nom, couleur").eq("id", etabFiche).single() : Promise.resolve({ data: null }),
+        etabFiche ? supabase.from("postes").select("id, nom, equipe").eq("etablissement_id", etabFiche).eq("actif", true).order("equipe", { ascending: true }).order("nom", { ascending: true }) : Promise.resolve({ data: null }),
+        etabFiche ? supabase.rpc("ventes_operateurs_recents", { p_etab: etabFiche, p_depuis: depuis }) : Promise.resolve({ data: null }),
+        lireContrats(id, isGroupAdmin),
+        supabase.from("absences").select("*").eq("employe_id", id).order("date_debut", { ascending: false }),
+      ]);
+      if (cancelled) return;
       // Données confidentielles (n° sécu, adresse, naissance…) : admins uniquement, par la fonction dédiée
       let empData: Record<string, any> = empBase; // eslint-disable-line @typescript-eslint/no-explicit-any
-      if (isGroupAdmin) {
-        const { data: conf } = await supabase.rpc("employe_confidentiel", { p_id: id });
-        if (conf) empData = { ...empBase, ...(conf as Record<string, unknown>) };
-      }
-      if (cancelled) return;
+      if (confRes.data) empData = { ...empBase, ...(confRes.data as Record<string, unknown>) };
       setEmp(empData);
+      if (etabRes.data) setEmpEtab(etabRes.data as { id: string; nom: string; couleur: string });
+      if (postesRes.data) setContratPostes(postesRes.data as { id: string; nom: string; equipe: string | null }[]);
+      setPopinaOps(((opsRes.data ?? []) as { operateur: string }[]).map((r) => r.operateur));
 
-      // Load employee's establishment for correct color
-      if (empData.etablissement_id) {
-        const { data: etabData } = await supabase.from("etablissements").select("id, nom, couleur").eq("id", empData.etablissement_id).single();
-        if (etabData && !cancelled) setEmpEtab(etabData as { id: string; nom: string; couleur: string });
-
-        // Load postes available on this establishment
-        const { data: postesData } = await supabase
-          .from("postes")
-          .select("id, nom, equipe")
-          .eq("etablissement_id", empData.etablissement_id)
-          .eq("actif", true)
-          .order("equipe", { ascending: true })
-          .order("nom", { ascending: true });
-        if (postesData && !cancelled) {
-          setContratPostes(postesData as { id: string; nom: string; equipe: string | null }[]);
-        }
-      }
       // Load existing poste_id
       if (empData.poste_id) setPosteId(empData.poste_id);
 
@@ -292,30 +287,6 @@ export default function EmployeDetailPage() {
       setNote(empData.note ?? "");
       setPopinaOperateur(empData.popina_operateur ?? "");
 
-      // Suggestions : operateurs presents dans les ventes des 90 derniers jours
-      if (empData.etablissement_id) {
-        const since = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
-        supabase
-          .from("ventes_lignes")
-          .select("operateur")
-          .eq("etablissement_id", empData.etablissement_id)
-          .gte("date_service", since)
-          .not("operateur", "is", null)
-          .limit(2000)
-          .then(({ data: opRows }) => {
-            if (cancelled) return;
-            const ops = [...new Set((opRows ?? []).map(r => (r.operateur as string).trim()).filter(Boolean))].sort();
-            setPopinaOps(ops);
-          });
-      }
-
-      // Load related
-      const [contratsRes, absRes] = await Promise.all([
-        lireContrats(id, isGroupAdmin),
-        supabase.from("absences").select("*").eq("employe_id", id).order("date_debut", { ascending: false }),
-      ]);
-
-      if (cancelled) return;
       const cList = contratsRes;
       setContrats(cList);
       setAbsences(absRes.data ?? []);
