@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { triParLibelle } from "@/lib/tri";
+import { fetchApi } from "@/lib/fetchApi";
 import { TYPES_COLISAGE, libelleType, libelleColisage, libelleElement, type UniteCommande, type ElementCommande, estUniteCommande } from "@/lib/commandeArticles";
 
 import type { CSSProperties } from "react";
@@ -257,7 +258,62 @@ export type EditState = {
   establishments: string[];
   /** Repas du personnel (avantage en nature) */
   pourPersonnel: boolean;
+  /** Référence chez le fournisseur (code facture / bon de livraison) */
+  supplierSku: string;
 };
+
+/** Alias de références fournisseur d'une fiche (autre calibre, autre origine, code changé) : lus par le rapprochement des factures et des bons */
+function CodesFournisseurAlias({ ingredientId, supplierId, hauteur }: { ingredientId: string; supplierId: string | null; hauteur: number }) {
+  const [alias, setAlias] = useState<{ id: string; sku: string; label: string | null }[] | null>(null);
+  const [ouvert, setOuvert] = useState(false);
+  const [nouveau, setNouveau] = useState("");
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    let annule = false;
+    fetchApi(`/api/factures/alias?ingredient_id=${ingredientId}`).then(async (r) => { const j = r.ok ? await r.json() : null; if (!annule) setAlias((j?.alias ?? []) as { id: string; sku: string; label: string | null }[]); }).catch(() => { if (!annule) setAlias([]); });
+    return () => { annule = true; };
+  }, [ingredientId]);
+  const ajouter = async () => {
+    const sku = nouveau.trim();
+    if (!sku || !supplierId) { setMsg(supplierId ? "Code vide" : "Choisis d'abord le fournisseur"); return; }
+    const r = await fetchApi("/api/factures/alias", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ supplier_id: supplierId, sku, ingredient_id: ingredientId }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { setMsg(j?.error ?? "Erreur"); return; }
+    setAlias((a) => [...(a ?? []).filter((x) => x.sku !== sku), ...(j.alias as { id: string; sku: string; label: string | null }[])]);
+    setNouveau(""); setMsg("");
+  };
+  const retirer = async (id: string) => {
+    const r = await fetchApi("/api/factures/alias", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    if (r.ok) setAlias((a) => (a ?? []).filter((x) => x.id !== id));
+  };
+  const n = alias?.length ?? 0;
+  return (
+    <div style={{ position: "relative" }}>
+      <button type="button" onClick={() => setOuvert((v) => !v)} title="Autres codes de ce produit chez le fournisseur (calibre, origine, code changé)"
+        style={{ fontSize: 11, padding: "0 8px", height: hauteur, borderRadius: 6, border: "1.5px solid #e5ddd0", background: n ? "#f5e9e2" : "white", color: n ? "#D4775A" : "#888", cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit", fontWeight: 600 }}>
+        {n ? `+${n} code${n > 1 ? "s" : ""}` : "+ code"}
+      </button>
+      {ouvert && (
+        <div style={{ position: "absolute", right: 0, top: hauteur + 4, zIndex: 20, width: 280, background: "#fff", border: "1px solid #ddd6c8", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.10)", padding: 10, display: "grid", gap: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", textTransform: "uppercase", letterSpacing: ".06em" }}>Autres codes fournisseur</div>
+          {alias === null ? <div style={{ fontSize: 12, color: "#999" }}>Chargement…</div> : alias.length === 0 ? <div style={{ fontSize: 12, color: "#999" }}>Aucun alias. Un même produit peut avoir plusieurs codes (calibre, origine) : ajoute-les ici.</div>
+            : alias.map((a) => (
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                <span style={{ fontFamily: "monospace", fontWeight: 600 }}>{a.sku.startsWith("n:") ? "libellé" : a.sku}</span>
+                <span style={{ color: "#999", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.label ?? (a.sku.startsWith("n:") ? a.sku.slice(2) : "")}</span>
+                <button type="button" onClick={() => retirer(a.id)} style={{ border: "none", background: "transparent", color: "#b4443a", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>retirer</button>
+              </div>
+            ))}
+          <div style={{ display: "flex", gap: 6 }}>
+            <input value={nouveau} onChange={(e) => setNouveau(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void ajouter(); } }} placeholder="code à ajouter" style={{ flex: 1, height: 30, padding: "0 8px", borderRadius: 6, border: "1px solid #ddd6c8", fontSize: 12, fontFamily: "monospace", minWidth: 0 }} />
+            <button type="button" onClick={() => void ajouter()} style={{ height: 30, padding: "0 10px", borderRadius: 6, border: "none", background: "#D4775A", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Ajouter</button>
+          </div>
+          {msg && <div style={{ fontSize: 11.5, color: "#b4443a" }}>{msg}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── IngredientRow ──────────────────────────────────────────────────────────
 export type StorageZoneOption = { id: string; name: string };
@@ -837,6 +893,19 @@ export const IngredientRow = React.memo(function IngredientRow({
             options={[{ value: "1", label: "Actif" }, { value: "0", label: "Inactif" }]}
           />
         );
+        // Code fournisseur (30/10/2026) : la référence qui figure sur la facture et le bon de livraison,
+        // pour que le rapprochement reconnaisse la fiche même si le libellé diffère. Les codes supplémentaires
+        // (autre calibre, autre origine) sont des alias, gérés dans le bouton à côté.
+        const champCodeFournisseur = (hauteur: number, taille: number) => (
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 8, padding: "0 10px", height: hauteur }}>
+              <span style={{ fontSize: 10, color: "#aaa", fontWeight: 600, whiteSpace: "nowrap" }}>Code fournisseur :</span>
+              <input value={edit.supplierSku} onChange={(e) => onEditChange({ ...edit, supplierSku: e.target.value })} placeholder="réf. sur la facture (ex. 106921)"
+                style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "monospace", fontSize: taille + 1, minWidth: 0 }} />
+            </div>
+            <CodesFournisseurAlias ingredientId={x.id} supplierId={edit.supplierId || x.supplier_id || null} hauteur={hauteur} />
+          </div>
+        );
         const ligneImport = (hauteur: number, taille: number) => (
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, background: "#f5f0e8", border: "1.5px solid #e5ddd0", borderRadius: 8, padding: "6px 10px", fontSize: taille, color: "#999", height: hauteur }}>
@@ -861,6 +930,7 @@ export const IngredientRow = React.memo(function IngredientRow({
                   <div><div style={fieldLabel}>Statut</div>{selectStatut}</div>
                 </div>
                 {ligneImport(36, 11)}
+                {champCodeFournisseur(36, 11)}
               </div>
               <div style={titreSection}>Prix d&apos;achat</div>
               {renderPrixContent()}
@@ -885,6 +955,7 @@ export const IngredientRow = React.memo(function IngredientRow({
               <div><div style={fieldLabel}>Statut</div>{selectStatut}</div>
             </div>
             {ligneImport(32, 11)}
+            <div style={{ marginTop: 6 }}>{champCodeFournisseur(32, 11)}</div>
           </div>
 
           {/* ═══ MOBILE TOP BAR: stacked rows ═══ */}
@@ -897,6 +968,7 @@ export const IngredientRow = React.memo(function IngredientRow({
               <div><div style={fieldLabel}>Statut</div>{selectStatut}</div>
             </div>
             {ligneImport(36, 10)}
+            <div style={{ marginTop: 6 }}>{champCodeFournisseur(36, 10)}</div>
           </div>
 
           {/* ═══ DESKTOP: 2 columns, no accordions ═══ */}

@@ -780,6 +780,7 @@ function IngredientsPageInner() {
       stockMax: x.stock_max != null ? String(x.stock_max) : "",
       establishments: x.establishments ?? ["bellomio", "piccola"],
       pourPersonnel: !!x.pour_personnel,
+      supplierSku: x.supplier_sku ?? "",
     };
 
     // Run auto-calc to fill missing prices (e.g. kgL from base price). Source déduite du champ rempli si inconnue.
@@ -941,7 +942,7 @@ function IngredientsPageInner() {
     }
 
     const up: Partial<IngredientUpsert> = {
-      name, category: edit.category, sub_category: normaliserSousCategorie(edit.subCategory, sousCategoriesParCategorie[edit.category] ?? []), is_active: edit.is_active, pour_personnel: edit.pourPersonnel,
+      name, category: edit.category, sub_category: normaliserSousCategorie(edit.subCategory, sousCategoriesParCategorie[edit.category] ?? []), is_active: edit.is_active, pour_personnel: edit.pourPersonnel, supplier_sku: edit.supplierSku.trim() || null,
       ...(edit.useOffer ? {} : { supplier_id }), // Don't update supplier_id when using offers (managed via supplier_offers table)
       piece_volume_ml: pieceVolumeMl,
       piece_weight_g: pieceWeightG,

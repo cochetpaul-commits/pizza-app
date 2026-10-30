@@ -115,6 +115,8 @@ export type Ingredient = {
   is_active: boolean;
   /** Repas du personnel (avantage en nature) : pas pour la carte, hors achats matières */
   pour_personnel?: boolean;
+  /** Référence du produit chez le fournisseur (code sur la facture et le bon de livraison) */
+  supplier_sku?: string | null;
   default_unit: string | null;
 
   purchase_price: number | null;
@@ -202,6 +204,8 @@ export type IngredientUpsert = {
     allergens: unknown | null;
   is_active: boolean;
   pour_personnel?: boolean;
+  /** Référence du produit chez le fournisseur (code sur la facture et le bon de livraison) */
+  supplier_sku?: string | null;
   default_unit: string | null;
 
   purchase_price: number | null;

@@ -5,6 +5,7 @@
  * et une suggestion de contrôle (absent du bon, prix plus élevé, quantité facturée moindre).
  */
 import type { EtatReception } from "@/lib/reception";
+import { estLigneDeFrais } from "@/lib/invoices/rapprochement";
 
 export type LigneDocument = {
   sku: string | null;
@@ -119,6 +120,11 @@ export function rapprocher(commande: LigneCommandeRapprochement[], doc: Document
     if (statut === "ecart") nbEcarts++;
     parLigne[c.id] = { doc: d, totalDoc, totalCommande, ecart, statut, suggestion };
   }
-  const horsCommande = restantes.map((x) => x.l).filter((l) => (totalLigneDoc(l) ?? 0) !== 0 || (l.quantite ?? 0) !== 0);
+  // Un forfait ou des frais à 0 € (livraison sur seuil) ne sont pas une ligne à contrôler ; une consigne facturée, si
+  const horsCommande = restantes.map((x) => x.l).filter((l) => {
+    const total = totalLigneDoc(l) ?? 0;
+    if (estLigneDeFrais(l.nom)) return total !== 0;
+    return total !== 0 || (l.quantite ?? 0) !== 0;
+  });
   return { parLigne, horsCommande, nbEcarts: nbEcarts + horsCommande.length };
 }

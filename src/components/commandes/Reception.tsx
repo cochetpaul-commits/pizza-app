@@ -25,7 +25,7 @@ type Ligne = {
   qty_received: number | null; reception_note: string | null;
   etat_reception: EtatReception | null; prix_recu: number | null; facture_sur_bon: boolean; montant_reclame: number;
 };
-type Session = { id: string; status: string; supplier_name: string; created_at: string; email_sent_at: string | null; received_at: string | null; total_ht: number | null };
+type Session = { id: string; status: string; supplier_id?: string | null; supplier_name: string; created_at: string; email_sent_at: string | null; received_at: string | null; total_ht: number | null };
 type Filtre = "tout" | "a_controler" | "problemes" | "ecarts";
 type DocumentJoint = { nom: string | null; type: string | null; url: string | null; lu: DocumentLu | null };
 
@@ -124,6 +124,14 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
   const retirer = (l: Ligne) => appliquer(l.id, { etat_reception: null, qty_received: null, prix_recu: null, facture_sur_bon: true, reception_note: null });
 
   const resume = useMemo(() => resumeReception(lignes.map(controle)), [lignes]);
+  // Relier (30/10/2026) : la référence du bon devient un alias de la fiche commandée, pour cette réception et les suivantes
+  const relier = async (d: { sku: string | null; nom: string }, ligneId: string) => {
+    setErreur(null);
+    const r = await fetchApi("/api/commandes/reception/relier", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: sessionId, sku: d.sku, nom: d.nom, ligne_id: ligneId }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { setErreur(j?.error ?? "Rapprochement impossible"); return; }
+    if (j.document) setDocument((prev) => (prev ? { ...prev, lu: j.document as DocumentLu } : prev));
+  };
   const rappro = useMemo(() => rapprocher(lignes.map((l) => ({ id: l.id, ingredient_id: l.ingredient_id, nom: l.ingredient_name, quantite: l.quantite, prix_unitaire_ht: l.prix_unitaire_ht })), document?.lu ?? null), [lignes, document]);
 
   async function joindre(f: File) {
@@ -332,9 +340,18 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
               <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em" }}>Sur le bon, hors commande · {rappro.horsCommande.length}</div>
               {rappro.horsCommande.map((d, i) => {
                 const t = totalLigneDoc(d);
+                // Lignes commandées qui n'ont rien en face : la ligne du bon en est peut-être une (autre code, autre libellé)
+                const candidates = lignes.filter((l) => l.ingredient_id && rappro.parLigne[l.id]?.statut === "absent");
                 return (
                   <div key={i} style={{ background: "#fff", border: `1px solid ${BORD}`, borderLeft: "4px solid #2563EB", borderRadius: 12, padding: "8px 12px", fontSize: 12.5 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{d.nom}</div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{d.nom}{d.sku ? <span style={{ color: FAIBLE, fontWeight: 500, fontSize: 11.5 }}> · réf. {d.sku}</span> : null}</div>
+                    {!lue && candidates.length > 0 && (
+                      <select value="" onChange={(e) => { if (e.target.value) void relier(d, e.target.value); }} aria-label="Relier à une ligne commandée"
+                        style={{ ...CHAMP, height: 32, fontSize: 12.5, margin: "6px 0 2px", fontWeight: 600 }}>
+                        <option value="">C&apos;est en fait une ligne commandée…</option>
+                        {candidates.map((l) => <option key={l.id} value={l.id}>{l.ingredient_name}</option>)}
+                      </select>
+                    )}
                     <div style={{ color: MUTED }}>{d.quantite != null ? `${qte(d.quantite)}${d.unite ? ` ${d.unite}` : ""}` : ""}{d.prix_unitaire != null ? ` × ${eur(d.prix_unitaire)}` : ""}{t != null ? ` = ${eur(t)}` : ""} · facturé sans avoir été commandé : à vérifier (livré ? consigne ? frais ?)</div>
                   </div>
                 );
