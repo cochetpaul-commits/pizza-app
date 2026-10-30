@@ -7,9 +7,10 @@ export type LigneAgregee = { date_service: string; service: string; categorie: s
 export type Pas = "jour" | "semaine" | "mois";
 export type ProduitsPeriode = {
   pas: Pas;
-  tendance: { cles: string[]; etiquettes: string[]; categories: string[]; qty: Record<string, number[]>; ht: Record<string, number[]> };
-  categories: { cat: string; midi_qty: number; soir_qty: number; midi_ht: number; soir_ht: number }[];
-  produits: Record<string, { cat: string; midi_qty: number; soir_qty: number }>;
+  cles: string[];
+  etiquettes: string[];
+  /** Par produit : service et séries par période (le client regroupe selon les catégories affichées) */
+  produits: Record<string, { cat: string; midi_qty: number; soir_qty: number; qty: number[]; ht: number[] }>;
 };
 
 const estMessage = (cat: string) => /^messages?$/i.test(cat.trim());
@@ -92,31 +93,17 @@ export function construireProduitsPeriode(lignes: LigneAgregee[], from: string, 
   const pas = pasPour(from, to);
   const cles = clesEntre(from, to, pas);
   const index = new Map(cles.map((k, i) => [k, i]));
-  const qty: Record<string, number[]> = {}, ht: Record<string, number[]> = {};
-  const cats = new Map<string, { cat: string; midi_qty: number; soir_qty: number; midi_ht: number; soir_ht: number }>();
   const produits: ProduitsPeriode["produits"] = {};
   for (const l of lignes) {
     const cat = (l.categorie || "Autre").trim();
     if (estMessage(cat)) continue;
     const q = Number(l.qty) || 0, h = Number(l.ht) || 0;
-    const i = index.get(cleBucket(l.date_service, pas));
-    if (i != null) {
-      (qty[cat] ??= cles.map(() => 0))[i] += q;
-      (ht[cat] ??= cles.map(() => 0))[i] += h;
-    }
     const midi = (l.service ?? "midi").toLowerCase() === "midi";
-    const c = cats.get(cat) ?? { cat, midi_qty: 0, soir_qty: 0, midi_ht: 0, soir_ht: 0 };
-    if (midi) { c.midi_qty += q; c.midi_ht += h; } else { c.soir_qty += q; c.soir_ht += h; }
-    cats.set(cat, c);
-    const p = produits[l.description] ?? { cat, midi_qty: 0, soir_qty: 0 };
+    const p = produits[l.description] ?? { cat, midi_qty: 0, soir_qty: 0, qty: cles.map(() => 0), ht: cles.map(() => 0) };
     if (midi) p.midi_qty += q; else p.soir_qty += q;
+    const i = index.get(cleBucket(l.date_service, pas));
+    if (i != null) { p.qty[i] += q; p.ht[i] += h; }
     produits[l.description] = p;
   }
-  const categories = [...cats.keys()].sort((a, b) => a.localeCompare(b, "fr"));
-  return {
-    pas,
-    tendance: { cles, etiquettes: cles.map((k) => etiquetteBucket(k, pas)), categories, qty, ht },
-    categories: categories.map((k) => cats.get(k)!),
-    produits,
-  };
+  return { pas, cles, etiquettes: cles.map((k) => etiquetteBucket(k, pas)), produits };
 }

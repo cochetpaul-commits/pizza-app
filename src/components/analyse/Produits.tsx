@@ -110,7 +110,6 @@ export function Produits() {
     const existe = categories.some((c) => c.cat === cat);
     setCatTendance(existe ? cat : "total");
     if (!existe) return;
-    setOuvertes((s) => new Set(s).add(cat));
     setTimeout(() => document.getElementById("tendance")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
   const delta = (p: ProduitVendu, avant: ProduitVendu | null | undefined) => {
@@ -138,136 +137,95 @@ export function Produits() {
             <TuileVariation compacte={!bureau} icone="foodcost" libelle="Part des boissons" valeur={stats.ca_ht ? pct((stats.drink_ht / stats.ca_ht) * 100) : "—"} actuel={stats.ca_ht ? (stats.drink_ht / stats.ca_ht) * 100 : 0} precedent={prec?.ca_ht ? (prec.drink_ht / prec.ca_ht) * 100 : null} sous={`${euros(stats.drink_ht)} HT de boissons`} />
           </div>
 
-          {/* Ventes par catégorie (le « mix » de l'ancienne page, barres cliquables) et midi / soir (30/10/2026) */}
-          {pp && pp.tendance.categories.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: bureau ? "1fr 1fr" : "1fr", gap: 14, alignItems: "start" }}>
-              <Cadre titre="Ventes par catégorie" sous="CA HT de la période, part et quantités. Un clic ouvre la catégorie dans la tendance." sansMarge>
-                <div style={{ padding: "10px 16px 14px", display: "grid", gap: 8 }}>
-                  {[...categories].sort((a, b) => b.ht - a.ht).map((c) => {
-                    const part = stats.ca_ht ? (c.ht / stats.ca_ht) * 100 : 0;
-                    const max = Math.max(1, ...categories.map((x) => x.ht));
-                    return (
-                      <div key={c.cat} className="pr-mix" onClick={() => voirCategorie(c.cat)} style={{ cursor: "pointer", borderRadius: 8, padding: "4px 6px", margin: "0 -6px" }} title="Voir la catégorie">
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5, marginBottom: 3 }}>
-                          <span style={{ fontWeight: 700, color: couleurTexte(c.couleur) }}>{c.cat}</span>
-                          <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}><b>{euros(c.ht)}</b> <span style={{ color: MUTED }}>· {pct(part)} · {nombre(c.qty)} vendus</span></span>
-                        </div>
-                        <div style={{ height: 8, borderRadius: 4, background: "#f0ebe3", overflow: "hidden" }}><div style={{ width: `${(c.ht / max) * 100}%`, height: "100%", background: c.couleur, borderRadius: 4 }} /></div>
-                      </div>
-                    );
-                  })}
+          {/* Tendance des ventes (30/10/2026) : les catégories à gauche (le « mix » de l'ancienne page, cliquables),
+              le graphique et les plats à droite. Deux tuiles en une, à la demande de Paul. */}
+          {pp && categories.length > 0 && (() => {
+            const n = pp.cles.length;
+            const serie = (noms: string[], champ: "qty" | "ht") => { const out = Array.from({ length: n }, () => 0); for (const nom of noms) { const v = pp.produits[nom]?.[champ]; if (v) for (let i = 0; i < n; i++) out[i] += v[i] ?? 0; } return out; };
+            const cat = categories.find((c) => c.cat === catTendance) ?? null;
+            const noms = cat ? cat.lignes.map((l) => l.n) : categories.flatMap((c) => c.lignes.map((l) => l.n));
+            const series = cat
+              ? [{ libelle: cat.cat, couleur: cat.couleur, valeurs: serie(noms, mesure) }]
+              : [{ libelle: "Tous produits", couleur: "#1a1a1a", valeurs: serie(noms, mesure) }];
+            const maxHt = Math.max(1, ...categories.map((x) => x.ht));
+            const lignesCat = cat ? [...cat.lignes].sort((a, b) => b.qty - a.qty) : [];
+            const ligneCat = (libelle: string, couleur: string, ht: number, qty: number, active: boolean, onClick: () => void) => (
+              <div key={libelle} className="pr-mix" onClick={onClick} aria-pressed={active} style={{ cursor: "pointer", borderRadius: 10, padding: "6px 8px", background: active ? "#f7f3ec" : undefined, boxShadow: active ? `inset 3px 0 0 ${couleur}` : undefined }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5, marginBottom: 3 }}>
+                  <span style={{ fontWeight: 700, color: couleurTexte(couleur) }}>{libelle}</span>
+                  <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: MUTED }}>{nombre(qty)}</span>
                 </div>
-              </Cadre>
-              <Cadre titre="Midi et soir" sous="Ce qui part à chaque service, par catégorie." sansMarge>
-                <div style={{ overflowX: "auto", marginTop: 10 }}>
-                  <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                    <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Catégorie</th><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Soir</th></tr></thead>
-                    <tbody>
-                      {pp.categories.map((c) => {
-                        const tot = c.midi_qty + c.soir_qty;
-                        const part = tot ? (c.midi_qty / tot) * 100 : 0;
-                        return (
-                          <tr key={c.cat} className="pr-ligne" onClick={() => voirCategorie(c.cat)}>
-                            <td style={liseret(getCategoryColor(c.cat))} />
-                            <td style={{ ...TD, fontWeight: 600 }}>{c.cat}
-                              <div style={{ height: 5, borderRadius: 3, background: COULEUR_SOIR, marginTop: 5, overflow: "hidden" }}><div style={{ width: `${part}%`, height: "100%", background: COULEUR_MIDI }} /></div>
-                            </td>
-                            <td style={TDN}>{nombre(c.midi_qty)}<div style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>{pct(part)}</div></td>
-                            <td style={TDN}>{nombre(c.soir_qty)}<div style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>{pct(100 - part)}</div></td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </Cadre>
-            </div>
-          )}
-
-          {/* Tendance des ventes, pleine largeur, avec les plats dessous */}
-          {pp && pp.tendance.categories.length > 0 && (
-            <div id="tendance" style={{ scrollMarginTop: 70 }}>
-              <Cadre titre="Tendance des ventes" sous={`Par ${pp.pas === "jour" ? "jour" : pp.pas === "semaine" ? "semaine" : "mois"}, empilé par catégorie de la carte.`}
-                droite={<span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <select value={catTendance} onChange={(e) => setCatTendance(e.target.value)} aria-label="Catégorie" style={{ ...CHAMP, height: 32, width: "auto", fontSize: 12.5, fontWeight: 600 }}>
-                    <option value="total">Toutes les catégories · total</option>
-                    <option value="empile">Toutes · empilées</option>
-                    {pp.tendance.categories.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  <span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3 }}>
+                <div style={{ height: 6, borderRadius: 3, background: "#f0ebe3", overflow: "hidden" }}><div style={{ width: `${Math.min(100, (ht / maxHt) * 100)}%`, height: "100%", background: couleur, borderRadius: 3 }} /></div>
+                <div style={{ fontSize: 11, color: FAIBLE, marginTop: 2 }}>{euros(ht)} HT · {stats.ca_ht ? pct((ht / stats.ca_ht) * 100) : "—"}</div>
+              </div>
+            );
+            return (
+              <div id="tendance" style={{ scrollMarginTop: 70 }}>
+                <Cadre titre="Tendance des ventes" sous={`Par catégorie de la carte, puis par ${pp.pas === "jour" ? "jour" : pp.pas === "semaine" ? "semaine" : "mois"}. Une catégorie à gauche, ses plats dessous, un clic sur un plat ouvre le zoom.`}
+                  droite={<span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3 }}>
                     {(["qty", "ht"] as const).map((m) => <button key={m} type="button" onClick={() => setMesure(m)} aria-pressed={mesure === m} style={{ border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: mesure === m ? "#fff" : "transparent", color: mesure === m ? "#1a1a1a" : MUTED }}>{m === "qty" ? "Quantités" : "CA HT"}</button>)}
-                  </span>
-                </span>}>
-                {(() => {
-                  const src = mesure === "qty" ? pp.tendance.qty : pp.tendance.ht;
-                  const n = pp.tendance.cles.length;
-                  const series = catTendance === "empile"
-                    ? pp.tendance.categories.map((c) => ({ libelle: c, couleur: getCategoryColor(c), valeurs: src[c] ?? [] }))
-                    : catTendance === "total"
-                      ? [{ libelle: "Tous produits", couleur: "#1a1a1a", valeurs: Array.from({ length: n }, (_, i) => pp.tendance.categories.reduce((t, c) => t + (src[c]?.[i] ?? 0), 0)) }]
-                      : [{ libelle: catTendance, couleur: getCategoryColor(catTendance), valeurs: src[catTendance] ?? [] }];
-                  return <GraphBarres empile={catTendance === "empile"} sansValeurs={n > 12 || catTendance === "empile"} format={(v) => (mesure === "qty" ? nombre(v) : euros(v))} etiquettes={pp.tendance.etiquettes} libelleAxe="Ventes" series={series} />;
-                })()}
-                {/* Sous le graphique (30/10/2026, comme l'ancienne page) : les plats de la catégorie choisie, ou le top 3 de chaque catégorie */}
-                {(() => {
-                  const cat = categories.find((c) => c.cat === catTendance);
-                  if (cat) {
-                    const lignes = [...cat.lignes].sort((a, b) => b.qty - a.qty);
-                    return (
-                      <div style={{ marginTop: 14, borderTop: `1px solid ${BORD}`, paddingTop: 10 }}>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: couleurTexte(cat.couleur) }}>{cat.cat}</span>
-                          <span style={{ fontSize: 12.5, color: MUTED }}>{lignes.length} produit{lignes.length > 1 ? "s" : ""} · {nombre(cat.qty)} vendus · {euros(cat.ht)} HT · un clic ouvre le zoom</span>
+                  </span>}>
+                  <div style={{ display: "grid", gridTemplateColumns: bureau ? "250px 1fr" : "1fr", gap: 14, alignItems: "start" }}>
+                    <div style={{ display: "grid", gap: 2, borderRight: bureau ? `1px solid ${BORD}` : undefined, paddingRight: bureau ? 10 : 0 }}>
+                      {ligneCat("Toutes les catégories", "#1a1a1a", stats.ca_ht, totalQty, !cat, () => setCatTendance("total"))}
+                      {[...categories].sort((a, b) => b.ht - a.ht).map((c) => ligneCat(c.cat, c.couleur, c.ht, c.qty, cat?.cat === c.cat, () => setCatTendance(c.cat)))}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <GraphBarres sansValeurs={n > 12} format={(v) => (mesure === "qty" ? nombre(v) : euros(v))} etiquettes={pp.etiquettes} libelleAxe="Ventes" series={series} />
+                      {cat ? (
+                        <div style={{ marginTop: 14, borderTop: `1px solid ${BORD}`, paddingTop: 10 }}>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: couleurTexte(cat.couleur) }}>{cat.cat}</span>
+                            <span style={{ fontSize: 12.5, color: MUTED }}>{lignesCat.length} produit{lignesCat.length > 1 ? "s" : ""} · {nombre(cat.qty)} vendus · {euros(cat.ht)} HT</span>
+                          </div>
+                          <div style={{ overflowX: "auto" }}>
+                            <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                              <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Soir</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th><th style={{ ...TH, textAlign: "right" }}>Part</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
+                              <tbody>
+                                {lignesCat.map((p) => { const sv = svcProduit(p.n); return (
+                                  <tr key={p.n} className="pr-ligne" onClick={() => setZoom(p.n)}>
+                                    <td style={liseret(cat.couleur)} />
+                                    <td style={{ ...TD, fontWeight: 600 }}>{p.n}</td>
+                                    <td style={TDN}>{nombre(p.qty)}</td>
+                                    <td style={{ ...TDN, color: MUTED }}>{sv ? nombre(sv.midi_qty) : "—"}</td>
+                                    <td style={{ ...TDN, color: MUTED }}>{sv ? nombre(sv.soir_qty) : "—"}</td>
+                                    <td style={TDN}>{euros(p.ca_ht)}</td>
+                                    <td style={{ ...TDN, color: MUTED }}>{cat.qty ? pct((p.qty / cat.qty) * 100) : "—"}</td>
+                                    <td style={TDN}>{delta(p, p.avant)}</td>
+                                  </tr>
+                                ); })}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
-                        <div style={{ overflowX: "auto" }}>
-                          <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                            <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Soir</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th><th style={{ ...TH, textAlign: "right" }}>Part</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
-                            <tbody>
-                              {lignes.map((p) => { const s = svcProduit(p.n); return (
-                                <tr key={p.n} className="pr-ligne" onClick={() => setZoom(p.n)}>
-                                  <td style={liseret(cat.couleur)} />
-                                  <td style={{ ...TD, fontWeight: 600 }}>{p.n}</td>
-                                  <td style={TDN}>{nombre(p.qty)}</td>
-                                  <td style={{ ...TDN, color: MUTED }}>{s ? nombre(s.midi_qty) : "—"}</td>
-                                  <td style={{ ...TDN, color: MUTED }}>{s ? nombre(s.soir_qty) : "—"}</td>
-                                  <td style={TDN}>{euros(p.ca_ht)}</td>
-                                  <td style={{ ...TDN, color: MUTED }}>{cat.qty ? pct((p.qty / cat.qty) * 100) : "—"}</td>
-                                  <td style={TDN}>{delta(p, p.avant)}</td>
-                                </tr>
-                              ); })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    );
-                  }
-                  if (!categories.length) return null;
-                  return (
-                    <div style={{ marginTop: 14, borderTop: `1px solid ${BORD}`, paddingTop: 10 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: MUTED, marginBottom: 8 }}>Top 3 par catégorie</div>
-                      <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(auto-fill, minmax(200px, 1fr))" : "1fr 1fr", gap: 8 }}>
-                        {categories.map((c) => (
-                          <div key={c.cat} style={{ border: `1px solid ${BORD}`, borderRadius: 10, overflow: "hidden", boxShadow: `inset 6px 0 0 ${c.couleur}`, cursor: "pointer" }} onClick={() => setCatTendance(c.cat)} title="Voir toute la catégorie">
-                            <div style={{ padding: "7px 10px 4px 14px", fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: couleurTexte(c.couleur) }}>{c.cat} <span style={{ color: FAIBLE, fontWeight: 500, letterSpacing: 0, textTransform: "none" }}>· {nombre(c.qty)}</span></div>
-                            {[...c.lignes].sort((a, b) => b.qty - a.qty).slice(0, 3).map((p) => (
-                              <div key={p.n} onClick={(e) => { e.stopPropagation(); setZoom(p.n); }} className="pr-top" style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "4px 10px 4px 14px", fontSize: 12.5 }}>
-                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>{p.n}</span>
-                                <span style={{ color: MUTED, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{nombre(p.qty)}</span>
+                      ) : (
+                        <div style={{ marginTop: 14, borderTop: `1px solid ${BORD}`, paddingTop: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: MUTED, marginBottom: 8 }}>Top 3 par catégorie</div>
+                          <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(auto-fill, minmax(200px, 1fr))" : "1fr 1fr", gap: 8 }}>
+                            {categories.map((c) => (
+                              <div key={c.cat} style={{ border: `1px solid ${BORD}`, borderRadius: 10, overflow: "hidden", boxShadow: `inset 6px 0 0 ${c.couleur}`, cursor: "pointer" }} onClick={() => setCatTendance(c.cat)} title="Voir toute la catégorie">
+                                <div style={{ padding: "7px 10px 4px 14px", fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: couleurTexte(c.couleur) }}>{c.cat} <span style={{ color: FAIBLE, fontWeight: 500, letterSpacing: 0, textTransform: "none" }}>· {nombre(c.qty)}</span></div>
+                                {[...c.lignes].sort((a, b) => b.qty - a.qty).slice(0, 3).map((p) => (
+                                  <div key={p.n} onClick={(e) => { e.stopPropagation(); setZoom(p.n); }} className="pr-top" style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "4px 10px 4px 14px", fontSize: 12.5 }}>
+                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>{p.n}</span>
+                                    <span style={{ color: MUTED, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{nombre(p.qty)}</span>
+                                  </div>
+                                ))}
+                                <div style={{ height: 6 }} />
                               </div>
                             ))}
-                            <div style={{ height: 6 }} />
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      )}
                     </div>
-                  );
-                })()}
-              </Cadre>
-            </div>
-          )}
+                  </div>
+                </Cadre>
+              </div>
+            );
+          })()}
 
-          {/* Les trois blocs côte à côte sur bureau (29/10) */}
-          <div style={{ display: "grid", gridTemplateColumns: bureau ? "1.35fr 1fr 1fr" : "1fr", gap: 14, alignItems: "start" }}>
+          {/* Taux d'attache et midi / soir côte à côte, puis Top 10 et dormants (30/10) */}
+          <div style={{ display: "grid", gridTemplateColumns: bureau ? "1.2fr 1fr" : "1fr", gap: 14, alignItems: "start" }}>
             <Cadre titre="Taux d'attache" sous="Part des tickets qui prennent au moins un produit de la famille, face à l'objectif. Un clic ouvre la catégorie." sansMarge>
               <div style={{ overflowX: "auto", marginTop: 10 }}>
                 <table style={{ borderCollapse: "collapse", width: "100%" }}>
@@ -291,6 +249,33 @@ export function Produits() {
               </div>
               <div style={{ padding: "8px 16px 14px" }}><Note>Objectifs : Paramètres › Établissements, clés attache_*. Un ticket = une table ou une commande à emporter.</Note></div>
             </Cadre>
+            {pp && (
+              <Cadre titre="Midi et soir" sous="Ce qui part à chaque service, par catégorie. Un clic ouvre la catégorie." sansMarge>
+                <div style={{ overflowX: "auto", marginTop: 10 }}>
+                  <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                    <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Catégorie</th><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Soir</th></tr></thead>
+                    <tbody>
+                      {categories.map((c) => {
+                        const midi = c.lignes.reduce((t, l) => t + (svcProduit(l.n)?.midi_qty ?? 0), 0), soir = c.lignes.reduce((t, l) => t + (svcProduit(l.n)?.soir_qty ?? 0), 0);
+                        const tot = midi + soir, part = tot ? (midi / tot) * 100 : 0;
+                        return (
+                          <tr key={c.cat} className="pr-ligne" onClick={() => voirCategorie(c.cat)}>
+                            <td style={liseret(c.couleur)} />
+                            <td style={{ ...TD, fontWeight: 600 }}>{c.cat}
+                              <div style={{ height: 5, borderRadius: 3, background: COULEUR_SOIR, marginTop: 5, overflow: "hidden" }}><div style={{ width: `${part}%`, height: "100%", background: COULEUR_MIDI }} /></div>
+                            </td>
+                            <td style={TDN}>{nombre(midi)}<div style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>{pct(part)}</div></td>
+                            <td style={TDN}>{nombre(soir)}<div style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>{pct(100 - part)}</div></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Cadre>
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: bureau ? "1fr 1fr" : "1fr", gap: 14, alignItems: "start" }}>
               <Cadre titre="Top 10" sous="Les produits les plus vendus, en quantité." sansMarge>
                 <table style={{ borderCollapse: "collapse", width: "100%", marginTop: 10 }}>
                   <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
