@@ -17,6 +17,15 @@ export type LigneEvenementiel = {
 
 const num = (v: string | number | null | undefined) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const vide = (s: string | null | undefined) => { const t = (s ?? "").trim(); return t ? t : null; };
+/** Les textes libres des devis arrivent parfois en « rich text » JSON ([{type:paragraph, children:[{text}]}]) : on garde le texte */
+export function texteBrut(s: string | null | undefined): string | null {
+  const t = vide(s);
+  if (!t || !t.startsWith("[{")) return t;
+  try {
+    const blocs = JSON.parse(t) as { children?: { text?: string }[] }[];
+    return vide(blocs.flatMap((b) => (b.children ?? []).map((c) => c.text ?? "")).join(" ").replace(/\s+/g, " "));
+  } catch { return t; }
+}
 
 export async function syncEvenementiel(etabId: string, dossier: PlDossier = "piccola"): Promise<{ devis: number; factures: number; clients: number }> {
   const [tousDevis, factures, clients] = await Promise.all([getQuotes(dossier), getCustomerInvoices(DEPUIS, dossier), getCustomers(dossier)]);
@@ -27,12 +36,12 @@ export async function syncEvenementiel(etabId: string, dossier: PlDossier = "pic
     ...devis.map((d): LigneEvenementiel => ({
       type: "devis", id: d.id, etablissement_id: etabId, numero: vide(d.quote_number) ?? vide(d.label), client_id: d.customer?.id ?? null, client_nom: d.customer ? nomClient.get(d.customer.id) ?? null : null,
       date: d.date, echeance: d.deadline, montant_ht: num(d.currency_amount_before_tax), montant_ttc: num(d.currency_amount), statut: d.status, paye: false, reste_ttc: null,
-      objet: vide(d.pdf_invoice_subject), description: vide(d.pdf_description), texte_libre: vide(d.pdf_invoice_free_text), url_pdf: d.public_file_url, devis_id: null, avoir_de: null, archive: !!d.archived_at, synchro_at: maintenant,
+      objet: texteBrut(d.pdf_invoice_subject), description: texteBrut(d.pdf_description), texte_libre: texteBrut(d.pdf_invoice_free_text), url_pdf: d.public_file_url, devis_id: null, avoir_de: null, archive: !!d.archived_at, synchro_at: maintenant,
     })),
     ...factures.filter((f) => !f.draft).map((f): LigneEvenementiel => ({
       type: "facture", id: f.id, etablissement_id: etabId, numero: vide(f.invoice_number) ?? vide(f.label), client_id: f.customer?.id ?? null, client_nom: f.customer ? nomClient.get(f.customer.id) ?? null : null,
       date: f.date, echeance: f.deadline, montant_ht: num(f.currency_amount_before_tax), montant_ttc: num(f.currency_amount), statut: f.status, paye: !!f.paid, reste_ttc: f.remaining_amount_with_tax == null ? null : num(f.remaining_amount_with_tax),
-      objet: vide(f.pdf_invoice_subject), description: vide(f.pdf_description), texte_libre: vide(f.pdf_invoice_free_text), url_pdf: f.public_file_url, devis_id: f.quote?.id ?? null, avoir_de: f.credited_invoice?.id ?? null, archive: !!f.archived_at, synchro_at: maintenant,
+      objet: texteBrut(f.pdf_invoice_subject), description: texteBrut(f.pdf_description), texte_libre: texteBrut(f.pdf_invoice_free_text), url_pdf: f.public_file_url, devis_id: f.quote?.id ?? null, avoir_de: f.credited_invoice?.id ?? null, archive: !!f.archived_at, synchro_at: maintenant,
     })),
   ];
   for (let i = 0; i < lignes.length; i += 200) {
