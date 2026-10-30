@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleBucket, clesEntre, construireProduitsPeriode, pasPour } from "@/lib/analyse/produitsPeriode";
+import { cleBucket, clesEntre, construireProduitsPeriode, detailProduit, pasPour } from "@/lib/analyse/produitsPeriode";
 
 describe("par produit : tendance et midi / soir", () => {
   it("choisit le pas selon la période", () => {
@@ -25,5 +25,18 @@ describe("par produit : tendance et midi / soir", () => {
     expect(r.categories.find((c) => c.cat === "PIZZE")).toMatchObject({ midi_qty: 3, soir_qty: 5, midi_ht: 30, soir_ht: 50 });
     expect(r.produits.REGINA).toEqual({ cat: "PIZZE", midi_qty: 3, soir_qty: 5 });
     expect(r.produits["SANS OIGNON"]).toBeUndefined();
+  });
+  it("zoom sur un produit : midi / soir par période et par jour de semaine", () => {
+    const lignes = [
+      { date_service: "2026-10-28", service: "midi", categorie: "PIZZE", description: "REGINA", qty: 3, ht: 30, ttc: 33 },
+      { date_service: "2026-10-28", service: "soir", categorie: "PIZZE", description: "REGINA", qty: 5, ht: 50, ttc: 55 },
+      { date_service: "2026-10-29", service: "soir", categorie: "DOLCI", description: "TIRAMISÙ", qty: 2, ht: 12, ttc: 13 },
+    ];
+    const d = detailProduit(lignes, "2026-10-28", "2026-10-29", "REGINA")!;
+    expect(d).toMatchObject({ cat: "PIZZE", qty: 8, ht: 80, midi_qty: 3, soir_qty: 5, jours_vendu: 1, jours_ouverts: 2 });
+    expect(d.tendance.midi).toEqual([3, 0]);
+    expect(d.tendance.soir).toEqual([5, 0]);
+    expect(d.semaine[2]).toEqual({ jour: "Mercredi", midi: 3, soir: 5 });
+    expect(detailProduit(lignes, "2026-10-28", "2026-10-29", "INCONNU")).toBeNull();
   });
 });

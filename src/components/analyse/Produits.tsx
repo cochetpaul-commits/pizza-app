@@ -16,6 +16,7 @@ import { CADRE, CHAMP, liseret, pastille } from "@/components/ui/charte";
 import { GraphBarres } from "@/components/analyse/GraphBarres";
 import { COULEUR_MIDI, COULEUR_SOIR, periodeEffective } from "@/components/analyse/gabarit";
 import type { ProduitsPeriode } from "@/lib/analyse/produitsPeriode";
+import { ZoomProduit } from "@/components/analyse/ZoomProduit";
 
 /**
  * Ventes › Par produit (29/10/2026) : « Qu'est-ce qui se vend ? »
@@ -65,6 +66,8 @@ export function Produits() {
   const eff = periodeEffective(range);
   const [periode, setPeriode] = useState<{ cle: string; d: ProduitsPeriode | null }>({ cle: "", d: null });
   const [mesure, setMesure] = useState<"qty" | "ht">("qty");
+  // Zoom sur un produit : un clic sur une ligne ouvre le volet
+  const [zoom, setZoom] = useState<string | null>(null);
   const clePeriode = `${etabId}|${eff.from}|${eff.to}`;
   useEffect(() => {
     if (!etabId) return;
@@ -107,7 +110,8 @@ export function Produits() {
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px", display: "grid", gap: 14, alignContent: "start" }}>
-      <style>{`.pr-ligne:hover td{background:#f7f3ec}`}</style>
+      <style>{`.pr-ligne{cursor:pointer}.pr-ligne:hover td{background:#f7f3ec}`}</style>
+      {zoom && etabId && <ZoomProduit nom={zoom} etabId={etabId} periode={eff} bureau={bureau} onFermer={() => setZoom(null)} />}
       <EnteteAnalyse titre="Par produit" question="Qu'est-ce qui se vend ? Ce que chaque table prend, les produits qui marchent et ceux qui dorment." range={range} onRange={setRange} />
 
       {erreur && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(180,68,58,0.08)", color: ROUGE, fontSize: 13 }}>{erreur}</div>}
@@ -189,7 +193,7 @@ export function Produits() {
                   <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
                   <tbody>
                     {top10.map((p) => (
-                      <tr key={p.n} className="pr-ligne"><td style={liseret(couleurProduit(p.n))} /><td style={{ ...TD, fontWeight: 600 }}>{p.n}</td><td style={TDN}>{nombre(p.qty)}</td><td style={TDN}>{euros(p.ca_ht)}</td><td style={TDN}>{delta(p, parNomPrec.get(p.n))}</td></tr>
+                      <tr key={p.n} className="pr-ligne" onClick={() => setZoom(p.n)}><td style={liseret(couleurProduit(p.n))} /><td style={{ ...TD, fontWeight: 600 }}>{p.n}</td><td style={TDN}>{nombre(p.qty)}</td><td style={TDN}>{euros(p.ca_ht)}</td><td style={TDN}>{delta(p, parNomPrec.get(p.n))}</td></tr>
                     ))}
                   </tbody>
                 </table>
@@ -198,7 +202,7 @@ export function Produits() {
                 <table style={{ borderCollapse: "collapse", width: "100%", marginTop: 10 }}>
                   <tbody>
                     {(stats.bottom5 ?? []).map((p) => (
-                      <tr key={p.n} className="pr-ligne"><td style={liseret(couleurProduit(p.n))} /><td style={{ ...TD, fontWeight: 600 }}>{p.n}</td><td style={TDN}>{nombre(p.qty)} vendu{p.qty > 1 ? "s" : ""}</td><td style={TDN}>{euros(p.ca_ht)}</td></tr>
+                      <tr key={p.n} className="pr-ligne" onClick={() => setZoom(p.n)}><td style={liseret(couleurProduit(p.n))} /><td style={{ ...TD, fontWeight: 600 }}>{p.n}</td><td style={TDN}>{nombre(p.qty)} vendu{p.qty > 1 ? "s" : ""}</td><td style={TDN}>{euros(p.ca_ht)}</td></tr>
                     ))}
                     {(stats.bottom5 ?? []).length === 0 && <tr><td style={{ ...TD, color: FAIBLE }} colSpan={4}>Rien à signaler.</td></tr>}
                   </tbody>
@@ -227,7 +231,7 @@ export function Produits() {
                         <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th>{bureau && pp && <><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Soir</th></>}<th style={{ ...TH, textAlign: "right" }}>CA HT</th>{bureau && <th style={{ ...TH, textAlign: "right" }}>CA TTC</th>}<th style={{ ...TH, textAlign: "right" }}>Part</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
                         <tbody>
                           {c.lignes.map((p) => (
-                            <tr key={p.n} className="pr-ligne">
+                            <tr key={p.n} className="pr-ligne" onClick={() => setZoom(p.n)}>
                               <td style={liseret(c.couleur)} />
                               <td style={{ ...TD, fontWeight: 600 }}>{p.n}</td>
                               <td style={TDN}>{nombre(p.qty)}</td>

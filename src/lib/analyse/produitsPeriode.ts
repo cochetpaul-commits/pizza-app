@@ -50,6 +50,44 @@ export function clesEntre(from: string, to: string, pas: Pas): string[] {
   return out;
 }
 
+export type DetailProduit = {
+  nom: string; cat: string; qty: number; ht: number; midi_qty: number; soir_qty: number;
+  /** Jours de service où le produit s'est vendu / jours ouverts de la période */
+  jours_vendu: number; jours_ouverts: number;
+  tendance: { cles: string[]; etiquettes: string[]; midi: number[]; soir: number[] };
+  /** Par jour de semaine (lundi → dimanche) : quantité midi et soir */
+  semaine: { jour: string; midi: number; soir: number }[];
+};
+
+/** Zoom sur un produit (30/10/2026) : combien, quand (jour, semaine ou mois), à quel service, quel jour de la semaine */
+export function detailProduit(lignes: LigneAgregee[], from: string, to: string, nom: string): DetailProduit | null {
+  const pas = pasPour(from, to);
+  const cles = clesEntre(from, to, pas);
+  const index = new Map(cles.map((k, i) => [k, i]));
+  const midi = cles.map(() => 0), soir = cles.map(() => 0);
+  const semaine = JOURS_SEMAINE.map((jour) => ({ jour, midi: 0, soir: 0 }));
+  const joursOuverts = new Set<string>(), joursVendu = new Set<string>();
+  let cat = "", qty = 0, ht = 0, midiQ = 0, soirQ = 0;
+  for (const l of lignes) {
+    if (estMessage((l.categorie || "").trim())) continue;
+    joursOuverts.add(l.date_service);
+    if (l.description !== nom) continue;
+    cat ||= (l.categorie || "Autre").trim();
+    const q = Number(l.qty) || 0, h = Number(l.ht) || 0;
+    const estMidi = (l.service ?? "midi").toLowerCase() === "midi";
+    qty += q; ht += h; if (estMidi) midiQ += q; else soirQ += q;
+    joursVendu.add(l.date_service);
+    const i = index.get(cleBucket(l.date_service, pas));
+    if (i != null) (estMidi ? midi : soir)[i] += q;
+    const dow = (new Date(l.date_service + "T12:00:00").getDay() + 6) % 7;
+    if (estMidi) semaine[dow].midi += q; else semaine[dow].soir += q;
+  }
+  if (!cat) return null;
+  return { nom, cat, qty, ht, midi_qty: midiQ, soir_qty: soirQ, jours_vendu: joursVendu.size, jours_ouverts: joursOuverts.size, tendance: { cles, etiquettes: cles.map((k) => etiquetteBucket(k, pas)), midi, soir }, semaine };
+}
+
+const JOURS_SEMAINE = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+
 export function construireProduitsPeriode(lignes: LigneAgregee[], from: string, to: string): ProduitsPeriode {
   const pas = pasPour(from, to);
   const cles = clesEntre(from, to, pas);
