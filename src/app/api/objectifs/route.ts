@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ecrireCache, invaliderCache, lireCache } from "@/lib/cacheCourt";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { callerProfile, etabAccessDenied } from "@/lib/getEtablissement";
 import { chargesParMois, dernierJourMois, moisPlus } from "@/lib/analyse/chargesParMois";
@@ -39,6 +40,9 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
   const profil = await callerProfile(req);
   const admin = profil?.role === "group_admin";
+  const cle = `objectifs|${etabId}|${nbMois}|${admin ? "admin" : "manager"}`;
+  const enMemoire = searchParams.get("fresh") === "1" ? null : lireCache<object>(cle);
+  if (enMemoire) return NextResponse.json(enMemoire);
 
   const aujourdhui = new Date().toISOString().slice(0, 10);
   const moisCourant = aujourdhui.slice(0, 7);
@@ -80,7 +84,7 @@ export async function GET(req: NextRequest) {
     salaires: admin,
     aujourdhui,
   };
-  return NextResponse.json(reponse);
+  return NextResponse.json(ecrireCache(cle, reponse));
 }
 
 /** Salariés sous contrat actif (les gérants TNS sont dans « Direction ») */
@@ -122,5 +126,6 @@ export async function PUT(req: NextRequest) {
     if (existant) await supabaseAdmin.from("objectifs").update({ valeur, updated_at: new Date().toISOString() }).eq("id", existant.id);
     else await supabaseAdmin.from("objectifs").insert({ etablissement_id: etabId, cle, valeur, unite: "%" });
   }
+  invaliderCache(`objectifs|${etabId}`);
   return NextResponse.json({ reglages });
 }

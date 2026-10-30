@@ -99,9 +99,11 @@ export async function valoriserInventaire(invId: string, etabId: string): Promis
 /** Clôture : coûts figés sur les lignes, total HT sur l'inventaire */
 export async function figerValorisation(invId: string, etabId: string): Promise<{ total: number; sans_prix: number }> {
   const v = await valoriserInventaire(invId, etabId);
-  for (const l of v.lignes) {
-    if (l.cout == null || l.source === "figé") continue;
-    await supabaseAdmin.from("inventaire_lignes").update({ cout_unitaire: l.cout }).eq("id", l.id);
+  // Un seul appel pour toutes les lignes (30/10/2026) : avant, une écriture par ligne
+  const aFiger = v.lignes.filter((l) => l.cout != null && l.source !== "figé").map((l) => ({ id: l.id, cout: l.cout }));
+  for (let i = 0; i < aFiger.length; i += 500) {
+    const { error } = await supabaseAdmin.rpc("inventaire_figer_couts", { p_lignes: aFiger.slice(i, i + 500) });
+    if (error) throw new Error(error.message);
   }
   await supabaseAdmin.from("inventaires").update({ total_valeur: v.total }).eq("id", invId);
   return { total: v.total, sans_prix: v.nb_sans_prix };

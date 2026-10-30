@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ecrireCache, lireCache } from "@/lib/cacheCourt";
 import { etabAccessDenied } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -59,6 +60,10 @@ export async function GET(req: NextRequest) {
   }
   const denied = await etabAccessDenied(req, etabId, ["group_admin", "manager"]);
   if (denied) return denied;
+  // Mémoire d'une minute (30/10/2026) ; ?fresh=1 force
+  const cle = `marges|${etabId}|${from}|${to}`;
+  const enMemoire = searchParams.get("fresh") === "1" ? null : lireCache<object>(cle);
+  if (enMemoire) return NextResponse.json(enMemoire);
 
 
   /* ── 1+2. Ventes agrégées par produit (RPC SQL) + coûts recettes, en parallèle ── */
@@ -370,7 +375,7 @@ export async function GET(req: NextRequest) {
   const foodCostPct =
     totalCaHT > 0 ? Math.round((totalCOGS / totalCaHT) * 1000) / 10 : 0;
 
-  return NextResponse.json({
+  return NextResponse.json(ecrireCache(cle, {
     kpis: {
       ca_ttc: totalCaTTC,
       ca_ht: totalCaHT,
@@ -384,5 +389,5 @@ export async function GET(req: NextRequest) {
     products,
     categories,
     recipeCount: recipeCosts.size,
-  });
+  }));
 }

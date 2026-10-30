@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ecrireCache, lireCache } from "@/lib/cacheCourt";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { etabAccessDenied } from "@/lib/getEtablissement";
 import { LIBELLES } from "@/lib/pennylane/syncCharges";
@@ -44,6 +45,10 @@ export async function GET(req: NextRequest) {
   }
   const denied = await etabAccessDenied(req, etabId, ["group_admin", "manager"]);
   if (denied) return denied;
+  // Mémoire d'une minute (30/10/2026) : la page rouverte ne recalcule pas tout ; ?fresh=1 force
+  const cle = `marge|${etabId}|${from}|${to}`;
+  const enMemoire = searchParams.get("fresh") === "1" ? null : lireCache<object>(cle);
+  if (enMemoire) return NextResponse.json(enMemoire);
 
   // Mois touchés par la période (au plus 24)
   const moisListe: string[] = [];
@@ -75,5 +80,5 @@ export async function GET(req: NextRequest) {
   });
   const obj: Record<string, number> = {};
   for (const o of objectifs ?? []) obj[o.cle as string] = Number(o.valeur);
-  return NextResponse.json({ mois, libelles: LIBELLES, postes_exploitation: POSTES_EXPLOITATION, objectifs: obj });
+  return NextResponse.json(ecrireCache(cle, { mois, libelles: LIBELLES, postes_exploitation: POSTES_EXPLOITATION, objectifs: obj }));
 }

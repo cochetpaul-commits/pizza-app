@@ -630,7 +630,17 @@ export async function runImport(options: {
         if (d.error) throw new Error(d.error.message);
       };
       const aFermer = new Set(ingredientIds);
-      for (const o of activesMemeFournisseur) if (aFermer.has(o.ingredient_id)) await fermer(o);
+      // Fermeture groupée (30/10/2026) : une écriture par date de fin au lieu d'une par offre
+      const parDateFin = new Map<string, string[]>();
+      for (const o of activesMemeFournisseur) {
+        if (!aFermer.has(o.ingredient_id)) continue;
+        const vt = o.valid_from && o.valid_from > dateFacture ? o.valid_from : dateFacture;
+        parDateFin.set(vt, [...(parDateFin.get(vt) ?? []), o.id]);
+      }
+      for (const [vt, ids] of parDateFin) {
+        const d = await supabase.from("supplier_offers").update({ is_active: false, valid_to: vt }).in("id", ids).eq("is_active", true);
+        if (d.error) throw new Error(d.error.message);
+      }
 
       for (const row of offerRowsAppliquees) {
         const ingId = String(row.ingredient_id);
