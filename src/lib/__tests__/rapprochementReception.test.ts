@@ -36,12 +36,12 @@ describe("rapprochement document ↔ commande", () => {
     );
     expect(r.parLigne.a.statut).toBe("conforme");
     expect(r.horsCommande.map((l) => l.nom)).toEqual(["CONSIGNE PALETTE"]);
+    expect(r.nbEcarts).toBe(1);
   });
   it("un forfait à 0 € n'est pas une ligne hors commande", () => {
     const r = rapprocher([], doc([ld({ nom: "FORFAIT LIVRAISON SUR SEUIL CA", quantite: 1, prix_unitaire: 0, total: 0 })]));
     expect(r.horsCommande).toEqual([]);
     expect(r.nbEcarts).toBe(0);
-    expect(r.nbEcarts).toBe(1);
   });
   it("ressemblance", () => {
     expect(ressemblance("Mozzarella fior di latte", "FIOR DI LATTE MOZZARELLA 1KG")).toBe(1);
