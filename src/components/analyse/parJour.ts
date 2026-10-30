@@ -11,7 +11,8 @@ export function parJour(stats: StatsVentes | null): Jour[] {
   for (const s of stats.services) {
     const j = m.get(s.date); if (!j) continue;
     j.ht += s.ht; j.ttc += s.ttc; j.emporter += s.emp_ht; j.cov += s.cov;
-    if (s.svc === "midi") { j.midi += s.sp_ht; j.covMidi += s.cov; } else { j.soir += s.sp_ht; j.covSoir += s.cov; }
+    // « journee » (journal Kezia, Piccola Mia) : pas de service midi / soir, seulement le jour
+    if (s.svc === "midi") { j.midi += s.sp_ht; j.covMidi += s.cov; } else if (s.svc === "soir") { j.soir += s.sp_ht; j.covSoir += s.cov; }
   }
   return [...m.values()].sort((a, b) => a.date.localeCompare(b.date));
 }

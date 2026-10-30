@@ -107,7 +107,8 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     { kind: "page", label: "Accueil", href: accueil, icon: "dashboard" },
     // Exploitation scindée en trois (29/10/2026) : la salle, la cuisine, les achats et le stock
     { kind: "divider", label: "Service" },
-    { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
+    // Piccola Mia (30/10/2026) : la caisse est Kezia, pas reliée ; la page ne sert qu'aux fiches techniques et préparations
+    { kind: "page", label: piccola ? "Fiches techniques" : "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
     ...(piccola ? [] : [{ kind: "page", label: "Cave", href: "/cave", icon: "tag", permission: "operations.recettes" } as NavEntry]),
     // Clôture de caisse : Bello Mio seulement pour l'instant (Popina + TPE Flatpay)
     ...(piccola ? [] : [{ kind: "page", label: "Clôture", href: "/cloture", icon: "calculator", permission: "caisse.cloture" } as NavEntry]),

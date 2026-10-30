@@ -652,7 +652,10 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
   const { can, isGroupAdmin, loading } = useProfile();
   // Mode tablette (30/10/2026) : pas d'articles (prix, food cost, marge) sur l'écran partagé, quel que soit le compte
   const tablette = useTablette();
-  const voitArticles = can("performances.show_money") && !tablette.actif;
+  const { current: etabActuel } = useEtablissement();
+  // Piccola Mia : la caisse (Kezia) n'est pas reliée, les articles n'existent pas ; seulement fiches techniques et préparations
+  const estPiccola = !!etabActuel?.slug?.includes("piccola");
+  const voitArticles = can("performances.show_money") && !tablette.actif && !estPiccola;
   const peutEcrire = can("operations.edit_recettes");
   const vues: { cle: VueCarte; libelle: string; icone: ReactNode }[] = [
     ...(voitArticles ? [{ cle: "articles" as const, libelle: "Articles", icone: ICONES.articles }] : []),
@@ -684,7 +687,7 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
       <div style={{ padding: bureau ? "18px 28px 60px" : "12px 14px 60px", boxSizing: "border-box", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 14, alignContent: "start" }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
           <div>
-            <h1 style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: bureau ? 28 : 22, textTransform: "uppercase", letterSpacing: ".02em", margin: 0, lineHeight: 1.05, color: "#1a1a1a" }}>Carte</h1>
+            <h1 style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: bureau ? 28 : 22, textTransform: "uppercase", letterSpacing: ".02em", margin: 0, lineHeight: 1.05, color: "#1a1a1a" }}>{estPiccola ? "Fiches techniques" : "Carte"}</h1>
             <div style={{ color: MUTED, fontSize: 13 }}>
               {vue === "articles" ? "Ce qui se vend en caisse, relié à sa fiche technique : prix, coût matière, food cost, marge."
                 : vue === "fiches" ? "Les fiches techniques de ce qui se vend : pizze, cuisine, cocktails, vins."

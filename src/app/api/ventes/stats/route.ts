@@ -123,10 +123,20 @@ export async function GET(req: NextRequest) {
   const comparer = searchParams.get("comparer");
   if (comparer === "precedente" || comparer === "an_dernier") {
     const nbJours = Math.round((Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10)) - Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10))) / 86_400_000) + 1;
+    const dFrom = comparer === "an_dernier" ? fromA1 : shiftDays(from, -nbJours), dTo = comparer === "an_dernier" ? toA1 : shiftDays(to, -nbJours);
     const stats = await statsPeriode(etabId, from, to);
     // « an_dernier » : les mêmes dates un an plus tôt (29/10/2026)
-    const prec = comparer === "an_dernier" ? await statsPeriode(etabId, fromA1, toA1) : await statsPeriode(etabId, shiftDays(from, -nbJours), shiftDays(to, -nbJours));
-    return NextResponse.json({ empty: !stats, stats, prec, prev: null, prevWeek: null });
+    if (stats) {
+      const prec = await statsPeriode(etabId, dFrom, dTo);
+      return NextResponse.json({ empty: false, stats, prec, prev: null, prevWeek: null });
+    }
+    // Pas de lignes de caisse (Piccola Mia : journaux Kezia) : les ventes journalières, même comparaison (30/10/2026)
+    const daily = await buildFromDailySales(etabId, from, to);
+    if (daily) {
+      const prec = await buildFromDailySales(etabId, dFrom, dTo);
+      return NextResponse.json({ empty: false, stats: daily, prec, prev: null, prevWeek: null, source: "daily_sales" });
+    }
+    return NextResponse.json({ empty: true, stats: null, prec: null, prev: null, prevWeek: null });
   }
 
   const [stats, prev, prevWeek] = await Promise.all([
@@ -1172,10 +1182,18 @@ async function buildFromDailySales(etabId: string, from: string, to: string) {
   }
 
   const emptyUpsell = { tables: 0, coverts: 0, ca_ttc: 0, ca_ht: 0 };
+  // Un « service » par jour pour les pages qui lisent jour par jour (CA, couverts) : pas de midi / soir dans un journal Kezia
+  const services = rows.map((d, i) => ({
+    date: d.date, jour: dayNames[i], svc: "journee", ttc: Number(d.ca_ttc) || 0, ht: Number(d.ca_ht) || 0, cov: day_cov[i],
+    sp_ttc: Number(d.ca_ttc) || 0, sp_ht: Number(d.ca_ht) || 0, emp_ttc: 0, emp_ht: 0, sp_cov: day_cov[i], z_ttc: {}, z_ht: {},
+  }));
 
   return {
     dates,
     days: dayNames.map(d => d.charAt(0).toUpperCase() + d.slice(1)),
+    food_ttc: 0, food_ht: 0, drink_ttc: 0, drink_ht: 0,
+    cov_midi: 0, cov_soir: 0, tickets_midi: 0, tickets_soir: 0,
+    hourly_ttc: hourly_totals,
     ca_ttc: Math.round(ca_ttc * 100) / 100,
     ca_ht: Math.round(ca_ht * 100) / 100,
     couverts: totalCouverts,
@@ -1188,7 +1206,7 @@ async function buildFromDailySales(etabId: string, from: string, to: string) {
     place_sur_ht: Math.round(ca_ht),
     place_emp_ttc: 0, place_emp_ht: 0,
     cov_sur: totalCouverts, cov_emp: 0,
-    services: [],
+    services,
     mix_labels: finalMixLabels,
     mix_ttc: finalMixTtc,
     mix_ht: finalMixHt,

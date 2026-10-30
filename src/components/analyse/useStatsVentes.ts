@@ -8,7 +8,7 @@ import { usePilotageComparaison } from "@/lib/pilotageRange";
 import { periodeEffective } from "./gabarit";
 
 /** Ce que les pages Analyse lisent dans la réponse de /api/ventes/stats (agrégat Popina) */
-export type ServiceJour = { date: string; jour: string; svc: "midi" | "soir"; ttc: number; ht: number; cov: number; sp_ttc: number; sp_ht: number; emp_ttc: number; emp_ht: number; sp_cov: number; z_ttc: Record<string, number>; z_ht: Record<string, number> };
+export type ServiceJour = { date: string; jour: string; /** « journee » : journal de caisse sans service (Kezia, Piccola Mia) */ svc: "midi" | "soir" | "journee"; ttc: number; ht: number; cov: number; sp_ttc: number; sp_ht: number; emp_ttc: number; emp_ht: number; sp_cov: number; z_ttc: Record<string, number>; z_ht: Record<string, number> };
 export type StatsVentes = {
   dates: string[];
   ca_ttc: number; ca_ht: number; couverts: number; tickets: number;
