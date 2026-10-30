@@ -6,6 +6,7 @@ import { triParLibelle } from "@/lib/tri";
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
+import { useTablette } from "@/lib/tablette/store";
 import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { useBureau } from "@/hooks/useBureau";
 import { VoletDroit } from "@/components/produits/BaseProduits";
@@ -649,7 +650,9 @@ const ICONES: Record<VueCarte, ReactNode> = {
 export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
   const bureau = useBureau();
   const { can, isGroupAdmin, loading } = useProfile();
-  const voitArticles = can("performances.show_money");
+  // Mode tablette (30/10/2026) : pas d'articles (prix, food cost, marge) sur l'écran partagé, quel que soit le compte
+  const tablette = useTablette();
+  const voitArticles = can("performances.show_money") && !tablette.actif;
   const peutEcrire = can("operations.edit_recettes");
   const vues: { cle: VueCarte; libelle: string; icone: ReactNode }[] = [
     ...(voitArticles ? [{ cle: "articles" as const, libelle: "Articles", icone: ICONES.articles }] : []),

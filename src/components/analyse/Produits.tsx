@@ -23,16 +23,17 @@ import { ZoomProduit } from "@/components/analyse/ZoomProduit";
  * Remplace l'ancien rapport de vente : taux d'attache face aux objectifs, top et produits qui dorment,
  * ventes par catégorie (barres de catégorie, produits dessous) avec recherche, comparées à la période précédente.
  */
-const FAMILLES: { cle: string; libelle: string; objectif: string; defaut: number }[] = [
-  { cle: "anti", libelle: "Antipasti", objectif: "attache_antipasti", defaut: 30 },
-  { cle: "pizze", libelle: "Pizzas", objectif: "attache_pizzas", defaut: 50 },
-  { cle: "plats", libelle: "Plats", objectif: "attache_plats", defaut: 40 },
-  { cle: "dolci", libelle: "Desserts", objectif: "attache_desserts", defaut: 80 },
-  { cle: "vin", libelle: "Vins", objectif: "attache_vins", defaut: 60 },
-  { cle: "alcool", libelle: "Alcools, cocktails, bières", objectif: "attache_alcool", defaut: 30 },
-  { cle: "boissons", libelle: "Boissons (toutes)", objectif: "attache_boissons", defaut: 90 },
-  { cle: "cafe", libelle: "Cafés et boissons chaudes", objectif: "attache_cafe", defaut: 40 },
-  { cle: "digestif", libelle: "Digestifs", objectif: "attache_digestif", defaut: 15 },
+// cat : la catégorie de caisse correspondante (clic sur la ligne → tendance et tableau de cette catégorie)
+const FAMILLES: { cle: string; libelle: string; objectif: string; defaut: number; cat: string }[] = [
+  { cle: "anti", libelle: "Antipasti", objectif: "attache_antipasti", defaut: 30, cat: "ANTIPASTI" },
+  { cle: "pizze", libelle: "Pizzas", objectif: "attache_pizzas", defaut: 50, cat: "PIZZE" },
+  { cle: "plats", libelle: "Plats", objectif: "attache_plats", defaut: 40, cat: "CUCINA" },
+  { cle: "dolci", libelle: "Desserts", objectif: "attache_desserts", defaut: 80, cat: "DOLCI" },
+  { cle: "vin", libelle: "Vins", objectif: "attache_vins", defaut: 60, cat: "VINI" },
+  { cle: "alcool", libelle: "Alcools, cocktails, bières", objectif: "attache_alcool", defaut: 30, cat: "ALCOOL" },
+  { cle: "boissons", libelle: "Boissons (toutes)", objectif: "attache_boissons", defaut: 90, cat: "BEVANDE" },
+  { cle: "cafe", libelle: "Cafés et boissons chaudes", objectif: "attache_cafe", defaut: 40, cat: "BEVANDE CALDE" },
+  { cle: "digestif", libelle: "Digestifs", objectif: "attache_digestif", defaut: 15, cat: "DIGESTIVI" },
 ];
 const attache = (s: StatsVentes | null, cle: string): Attache | null => { const r = s?.ratios?.[cle]; return r && typeof r === "object" ? r : null; };
 const taux = (a: Attache | null, tickets: number) => (a && tickets > 0 ? (a.tables / tickets) * 100 : null);
@@ -104,6 +105,14 @@ export function Produits() {
   const tickets = stats?.tickets ?? 0, ticketsPrec = prec?.tickets ?? 0;
   const dolci = attache(stats, "dolci"), vin = attache(stats, "vin");
   const basculer = (cat: string) => setOuvertes((s) => { const n = new Set(s); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; });
+  // Clic sur une famille du taux d'attache : la tendance passe sur sa catégorie et son tableau s'ouvre, en vue
+  const voirCategorie = (cat: string) => {
+    const existe = categories.some((c) => c.cat === cat);
+    setCatTendance(existe ? cat : "total");
+    if (!existe) return;
+    setOuvertes((s) => new Set(s).add(cat));
+    setTimeout(() => document.getElementById(`cat-${cat}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
   const delta = (p: ProduitVendu, avant: ProduitVendu | null | undefined) => {
     if (!avant || !avant.qty) return <span style={{ color: FAIBLE }}>—</span>;
     const d = (p.qty - avant.qty) / avant.qty;
@@ -182,7 +191,7 @@ export function Produits() {
 
           {/* Les trois blocs côte à côte sur bureau (29/10) */}
           <div style={{ display: "grid", gridTemplateColumns: bureau ? "1.35fr 1fr 1fr" : "1fr", gap: 14, alignItems: "start" }}>
-            <Cadre titre="Taux d'attache" sous="Part des tickets qui prennent au moins un produit de la famille, face à l'objectif." sansMarge bande="#1a1a1a">
+            <Cadre titre="Taux d'attache" sous="Part des tickets qui prennent au moins un produit de la famille, face à l'objectif. Un clic ouvre la catégorie." sansMarge>
               <div style={{ overflowX: "auto", marginTop: 10 }}>
                 <table style={{ borderCollapse: "collapse", width: "100%" }}>
                   <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Famille</th><th style={{ ...TH, textAlign: "right" }}>Taux</th><th style={{ ...TH, textAlign: "right" }}>Objectif</th>{bureau && <><th style={{ ...TH, textAlign: "right" }}>Midi</th><th style={{ ...TH, textAlign: "right" }}>Soir</th></>}</tr></thead>
@@ -191,7 +200,7 @@ export function Produits() {
                       const a = attache(stats, f.cle), t = taux(a, tickets), o = obj(f), c = couleurTaux(t, o);
                       const svc = (s: string) => { const r = stats.ratios_by_svc?.[s]?.[f.cle]; return r && r.total ? pct((r.tables / r.total) * 100) : "—"; };
                       return (
-                        <tr key={f.cle} className="pr-ligne">
+                        <tr key={f.cle} className="pr-ligne" onClick={() => voirCategorie(f.cat)}>
                           <td style={liseret(c)} />
                           <td style={{ ...TD, fontWeight: 600 }}>{f.libelle}{a && <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400 }}>{euros(a.ca_ht)} HT</div>}</td>
                           <td style={TDN}><span style={pastille(c)}>{t != null ? pct(t) : "—"}</span></td>
@@ -205,7 +214,7 @@ export function Produits() {
               </div>
               <div style={{ padding: "8px 16px 14px" }}><Note>Objectifs : Paramètres › Établissements, clés attache_*. Un ticket = une table ou une commande à emporter.</Note></div>
             </Cadre>
-              <Cadre titre="Top 10" sous="Les produits les plus vendus, en quantité." sansMarge bande="#1a1a1a">
+              <Cadre titre="Top 10" sous="Les produits les plus vendus, en quantité." sansMarge>
                 <table style={{ borderCollapse: "collapse", width: "100%", marginTop: 10 }}>
                   <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
                   <tbody>
@@ -235,7 +244,7 @@ export function Produits() {
             {categories.map((c) => {
               const ouverte = !!q || ouvertes.has(c.cat);
               return (
-                <div key={c.cat} style={{ marginBottom: 8 }}>
+                <div key={c.cat} id={`cat-${c.cat}`} style={{ marginBottom: 8, scrollMarginTop: 70 }}>
                   <button type="button" aria-expanded={ouverte} onClick={() => basculer(c.cat)} style={{ ...styleBarreCategorie(c.couleur), minHeight: 44, gap: 10, padding: "0 14px", boxShadow: "none", borderRadius: ouverte ? "14px 14px 0 0" : 14 }}>
                     <span style={styleTitreCategorie(c.couleur)}>{c.cat}</span>
                     <span style={stylePastilleBarre(c.couleur)}>{nombre(c.qty)}</span>
