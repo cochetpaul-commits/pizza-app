@@ -66,6 +66,8 @@ export function Produits() {
   const eff = periodeEffective(range);
   const [periode, setPeriode] = useState<{ cle: string; d: ProduitsPeriode | null }>({ cle: "", d: null });
   const [mesure, setMesure] = useState<"qty" | "ht">("qty");
+  // Tendance : toutes les catégories empilées, c'est illisible ; par défaut le total, et un sélecteur par catégorie
+  const [catTendance, setCatTendance] = useState<string>("total");
   // Zoom sur un produit : un clic sur une ligne ouvre le volet
   const [zoom, setZoom] = useState<string | null>(null);
   const clePeriode = `${etabId}|${eff.from}|${eff.to}`;
@@ -131,11 +133,26 @@ export function Produits() {
           {pp && pp.tendance.categories.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: bureau ? "2fr 1fr" : "1fr", gap: 14, alignItems: "start" }}>
               <Cadre titre="Tendance des ventes" sous={`Par ${pp.pas === "jour" ? "jour" : pp.pas === "semaine" ? "semaine" : "mois"}, empilé par catégorie de la carte.`}
-                droite={<span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3 }}>
-                  {(["qty", "ht"] as const).map((m) => <button key={m} type="button" onClick={() => setMesure(m)} aria-pressed={mesure === m} style={{ border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: mesure === m ? "#fff" : "transparent", color: mesure === m ? "#1a1a1a" : MUTED }}>{m === "qty" ? "Quantités" : "CA HT"}</button>)}
+                droite={<span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <select value={catTendance} onChange={(e) => setCatTendance(e.target.value)} aria-label="Catégorie" style={{ ...CHAMP, height: 32, width: "auto", fontSize: 12.5, fontWeight: 600 }}>
+                    <option value="total">Toutes les catégories · total</option>
+                    <option value="empile">Toutes · empilées</option>
+                    {pp.tendance.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3 }}>
+                    {(["qty", "ht"] as const).map((m) => <button key={m} type="button" onClick={() => setMesure(m)} aria-pressed={mesure === m} style={{ border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: mesure === m ? "#fff" : "transparent", color: mesure === m ? "#1a1a1a" : MUTED }}>{m === "qty" ? "Quantités" : "CA HT"}</button>)}
+                  </span>
                 </span>}>
-                <GraphBarres empile sansValeurs={pp.tendance.cles.length > 12} format={(v) => (mesure === "qty" ? nombre(v) : euros(v))} etiquettes={pp.tendance.etiquettes} libelleAxe="Ventes par catégorie"
-                  series={pp.tendance.categories.map((c) => ({ libelle: c, couleur: getCategoryColor(c), valeurs: (mesure === "qty" ? pp.tendance.qty[c] : pp.tendance.ht[c]) ?? [] }))} />
+                {(() => {
+                  const src = mesure === "qty" ? pp.tendance.qty : pp.tendance.ht;
+                  const n = pp.tendance.cles.length;
+                  const series = catTendance === "empile"
+                    ? pp.tendance.categories.map((c) => ({ libelle: c, couleur: getCategoryColor(c), valeurs: src[c] ?? [] }))
+                    : catTendance === "total"
+                      ? [{ libelle: "Tous produits", couleur: "#1a1a1a", valeurs: Array.from({ length: n }, (_, i) => pp.tendance.categories.reduce((t, c) => t + (src[c]?.[i] ?? 0), 0)) }]
+                      : [{ libelle: catTendance, couleur: getCategoryColor(catTendance), valeurs: src[catTendance] ?? [] }];
+                  return <GraphBarres empile={catTendance === "empile"} sansValeurs={n > 12 || catTendance === "empile"} format={(v) => (mesure === "qty" ? nombre(v) : euros(v))} etiquettes={pp.tendance.etiquettes} libelleAxe="Ventes" series={series} />;
+                })()}
               </Cadre>
               <Cadre titre="Midi et soir" sous="Ce qui part à chaque service, par catégorie." sansMarge>
                 <div style={{ overflowX: "auto", marginTop: 10 }}>
