@@ -102,7 +102,8 @@ const MAPPING: Record<string, string | null> = {
   "Cotisations professionnelles": "autres_charges",
   "Sécurité": "autres_charges",
   "CFE & taxes locales": "autres_charges",
-  "Gros équipements & travaux": "autres_charges",
+  // Investissements (validé par Paul, 30/10/2026) : hors EBE, à immobiliser dans Pennylane
+  "Gros équipements & travaux": null,
   // Piccola Mia : l'épicerie achetée pour la revente, c'est de la matière (30/10/2026)
   "Achat épicerie": "achats_matieres",
   "En attente de catégorisation": "autres_charges",
@@ -149,6 +150,12 @@ const norm = (s: string) =>
 const MAPPING_NORM = new Map<string, string | null>(Object.entries(MAPPING).map(([k, v]) => [norm(k), v]));
 /** Poste EBE d'un libellé de catégorie : par le compte en préfixe (plan du 29/10/2026), sinon par
  *  le nom historique ; `undefined` = libellé inconnu. */
+/** Fournisseurs sans catégorie Pennylane, mais au poste connu : [nom normalisé, poste (null = hors EBE), libellé] */
+const FOURNISSEURS_SANS_CATEGORIE: [string, string | null, string][] = [
+  ["da carmela", "remuneration_gerants", "Holding Da Carmela (direction, sans catégorie)"],
+  ["collaborative steel", null, "Travaux (investissement, sans catégorie)"],
+];
+
 function posteDe(label: string): string | null | undefined {
   const parCompte = posteParCompte(label);
   if (parCompte !== undefined) return parCompte;
@@ -224,6 +231,16 @@ export async function syncPennylaneMois(etabId: string, moisDebut: string, dossi
     // Sans catégorie : un fournisseur de la mercuriale = achats matières
     const nomFournisseur = inv.supplier?.id ? plNameById.get(inv.supplier.id) ?? "" : "";
     const n = norm(nomFournisseur);
+    // Fournisseurs connus sans catégorie dans Pennylane (validé par Paul, 30/10/2026) : la holding Da Carmela facture
+    // la direction des deux sociétés ; Collaborative Steel, ce sont des travaux, donc un investissement hors EBE
+    const connu = FOURNISSEURS_SANS_CATEGORIE.find(([nom]) => n.includes(nom));
+    if (connu) {
+      const [, poste, libelle] = connu;
+      if (poste === null) { horsEbe += ht; continue; }
+      add(poste, ht);
+      details.push({ date: inv.date ?? null, poste, categorie: libelle, fournisseur: nomFournisseur, libelle: inv.label ?? null, montant_ht: ht, type: "facture", ref_externe: String(inv.id) });
+      continue;
+    }
     const estMatiere = n.length > 3 && [...mercuriale].some(m => n.includes(m) || m.includes(n));
     if (estMatiere) { add("achats_matieres", ht); parFournisseur++; }
     else { add("a_categoriser", ht); nonClassees++; }
