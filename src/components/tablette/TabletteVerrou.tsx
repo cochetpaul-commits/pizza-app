@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { fetchApi } from "@/lib/fetchApi";
 import { identifierEmploye } from "@/lib/tablette/store";
@@ -14,22 +14,23 @@ export function TabletteVerrou() {
   const [occupe, setOccupe] = useState(false);
   const couleur = etab?.couleur ?? "#D4775A";
 
+  // Le 4e chiffre déclenche la vérification tout seul (pas de bouton Entrée). Une seule requête à la fois,
+  // suivie par une référence : l'état « occupé » ne doit pas relancer l'effet (il annulait la réponse en route).
+  const enCours = useRef(false);
   useEffect(() => {
-    if (code.length !== 4 || occupe) return;
-    let annule = false;
+    if (code.length !== 4 || enCours.current) return;
+    enCours.current = true;
+    setOccupe(true);
     (async () => {
-      setOccupe(true);
       try {
         const r = await fetchApi("/api/tablette/identifier", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
         const j = await r.json().catch(() => ({}));
-        if (annule) return;
         if (!r.ok) { setErreur(j?.error ?? "Code inconnu"); setCode(""); return; }
         identifierEmploye(j.employe);
-      } catch { if (!annule) { setErreur("Connexion impossible"); setCode(""); } }
-      finally { if (!annule) setOccupe(false); }
+      } catch { setErreur("Connexion impossible"); setCode(""); }
+      finally { enCours.current = false; setOccupe(false); }
     })();
-    return () => { annule = true; };
-  }, [code, occupe]);
+  }, [code]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
