@@ -202,12 +202,13 @@ function AchatsContent() {
     if (!etabId) return;
     (async () => {
       setLoading(true);
-      await loadSupplierColors(supabase);
-      const { data } = await supabase
+      // Couleurs et factures en parallèle (30/10/2026)
+      const [, { data }] = await Promise.all([loadSupplierColors(supabase), supabase
         .from("supplier_invoices")
         .select("id, invoice_number, invoice_date, total_ht, total_ttc, supplier_id, suppliers(name)")
         .eq("etablissement_id", etabId)
-        .order("invoice_date", { ascending: false });
+        .order("invoice_date", { ascending: false })
+        .range(0, 4999)]);
       setAllInvoices((data ?? []) as unknown as InvoiceRow[]);
       setLoading(false);
     })();
@@ -245,16 +246,17 @@ function AchatsContent() {
     (async () => {
       if (ids.length === 0) { setTopProducts([]); setPersonnel({ total: 0, nb: 0 }); return; }
       setTopProductsLoading(true);
-      const chunkSize = 200;
-      const allLines: { name: string | null; quantity: number | null; unit: string | null; unit_price: number | null; total_price: number | null; invoice_id: string }[] = [];
-      for (let i = 0; i < ids.length; i += chunkSize) {
-        const chunk = ids.slice(i, i + chunkSize);
-        const { data } = await supabase
-          .from("supplier_invoice_lines")
-          .select("name, quantity, unit, unit_price, total_price, invoice_id")
-          .in("invoice_id", chunk);
-        if (data) allLines.push(...(data as typeof allLines));
-      }
+      // Paquets de 40 factures, lus en parallèle (30/10/2026) : 200 factures Metro dépassaient la limite de 1 000 lignes par requête
+      const chunkSize = 40;
+      type LigneFacture = { name: string | null; quantity: number | null; unit: string | null; unit_price: number | null; total_price: number | null; invoice_id: string };
+      const paquets: string[][] = [];
+      for (let i = 0; i < ids.length; i += chunkSize) paquets.push(ids.slice(i, i + chunkSize));
+      const reponses = await Promise.all(paquets.map((chunk) => supabase
+        .from("supplier_invoice_lines")
+        .select("name, quantity, unit, unit_price, total_price, invoice_id")
+        .in("invoice_id", chunk)
+        .range(0, 4999)));
+      const allLines: LigneFacture[] = reponses.flatMap((r) => (r.data ?? []) as LigneFacture[]);
       const invSupplierMap: Record<string, string> = {};
       for (const inv of rangeInvoices) {
         invSupplierMap[inv.id] = inv.suppliers?.name ?? "Inconnu";

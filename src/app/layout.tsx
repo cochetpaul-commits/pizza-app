@@ -1,34 +1,28 @@
 import type { Metadata, Viewport } from "next";
 import { FreshnessGuard } from "@/components/FreshnessGuard";
-import { Geist, Geist_Mono, DM_Sans, Oswald, Cormorant_Garamond } from "next/font/google";
+import { DM_Sans, Oswald, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
+// Trois polices seulement (charte) : DM Sans, Oswald, Cormorant. display: swap = le texte s'affiche sans attendre la police.
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const oswald = Oswald({
   variable: "--font-oswald",
   subsets: ["latin"],
   weight: ["600", "700"],
+  display: "swap",
 });
 
 const cormorantGaramond = Cormorant_Garamond({
   variable: "--font-cormorant",
   subsets: ["latin"],
   weight: ["400", "600", "700"],
+  display: "swap",
 });
 
 export const viewport: Viewport = {
@@ -104,7 +98,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
         `}} />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${dmSans.variable} ${oswald.variable} ${cormorantGaramond.variable} antialiased`}>
+      <body className={`${dmSans.variable} ${oswald.variable} ${cormorantGaramond.variable} antialiased`}>
         <FreshnessGuard />
         <Providers>{children}</Providers>
         <script dangerouslySetInnerHTML={{ __html: `

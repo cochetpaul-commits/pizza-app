@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef, Suspense } from "react";
+import dynamic from "next/dynamic";
 import { triParLibelle } from "@/lib/tri";
 import { RecoverProductsModal } from "@/components/RecoverProductsModal";
-import { ImportExportModal } from "@/components/ImportExportModal";
+const ImportExportModal = dynamic(() => import("@/components/ImportExportModal").then((m) => m.ImportExportModal), { ssr: false });
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

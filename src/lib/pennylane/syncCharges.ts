@@ -103,6 +103,8 @@ const MAPPING: Record<string, string | null> = {
   "Sécurité": "autres_charges",
   "CFE & taxes locales": "autres_charges",
   "Gros équipements & travaux": "autres_charges",
+  // Piccola Mia : l'épicerie achetée pour la revente, c'est de la matière (30/10/2026)
+  "Achat épicerie": "achats_matieres",
   "En attente de catégorisation": "autres_charges",
 
   // ── Hors EBE ──
