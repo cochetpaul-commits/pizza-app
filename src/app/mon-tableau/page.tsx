@@ -10,6 +10,7 @@ import { fetchApi } from "@/lib/fetchApi";
 import { MesPourboires } from "@/components/pourboires/PourboiresMois";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { couleurTexte } from "@/lib/styleCategories";
+import { TableauEquipe } from "@/components/equipe/TableauEquipe";
 
 /* ── Types (réponse /api/mon-tableau) ─────────────────────── */
 
@@ -354,6 +355,9 @@ export default function MonTableauPage() {
           </div>
         </div>
       )}
+
+      {/* Les chiffres de l'équipe, la météo et ce qu'il y a à faire (30/10/2026) */}
+      <TableauEquipe />
 
       {/* Pourboires du mois : la part estimée de chacun, à J-1 */}
       {!loading && !err && <MesPourboires />}

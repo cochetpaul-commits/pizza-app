@@ -98,7 +98,8 @@ export async function GET(req: NextRequest) {
   if (!etabId || !from || !to) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
-  const denied = await etabAccessDenied(req, etabId, ["group_admin", "manager"]);
+  // Toute l'équipe lit les ventes de son établissement (tableau de l'équipe sur la tablette, 30/10/2026)
+  const denied = await etabAccessDenied(req, etabId);
   if (denied) return denied;
 
 
