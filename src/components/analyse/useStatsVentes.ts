@@ -45,14 +45,15 @@ export const totalZones = (s: StatsVentes) => Object.fromEntries(Object.entries(
 export type EtatStats = { chargement: boolean; erreur: string | null; stats: StatsVentes | null; prec: StatsVentes | null; meteo: Record<string, MeteoJour> };
 
 /** Stats de la période et de la période précédente (même longueur), météo par service en option */
-export function useStatsVentes(range: DateRange, avecMeteo = false): EtatStats {
+/** `equipe` : le résumé ouvert à toute l'équipe (tableau de la tablette), pas les statistiques complètes */
+export function useStatsVentes(range: DateRange, avecMeteo = false, equipe = false): EtatStats {
   const { current: etab } = useEtablissement();
   const [etat, setEtat] = useState<EtatStats & { cle: string }>({ cle: "", chargement: true, erreur: null, stats: null, prec: null, meteo: {} });
   const etabId = etab?.id ?? null;
   const [mode] = usePilotageComparaison();
   // Les jours à venir n'ont pas de ventes : la période s'arrête à aujourd'hui, la comparaison porte sur autant de jours
   const effective = periodeEffective(range);
-  const cle = `${etabId}|${effective.from}|${effective.to}|${mode}`;
+  const cle = `${etabId}|${effective.from}|${effective.to}|${mode}|${equipe ? "equipe" : ""}`;
 
   useEffect(() => {
     if (!etabId) return;
@@ -60,7 +61,7 @@ export function useStatsVentes(range: DateRange, avecMeteo = false): EtatStats {
     (async () => {
       // Un seul appel : la période et les N jours d'avant (calculés côté serveur, mis en cache)
       const charge = async (r: DateRange): Promise<{ stats: StatsVentes | null; prec: StatsVentes | null }> => {
-        const res = await fetchApi(`/api/ventes/stats?etablissement_id=${etabId}&from=${r.from}&to=${r.to}&comparer=${mode}`);
+        const res = await fetchApi(`/api/ventes/stats?etablissement_id=${etabId}&from=${r.from}&to=${r.to}&comparer=${mode}${equipe ? "&equipe=1" : ""}`);
         if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Chargement impossible");
         const j = await res.json();
         return { stats: (j?.stats ?? null) as StatsVentes | null, prec: (j?.prec ?? null) as StatsVentes | null };

@@ -13,8 +13,9 @@ const supabase = createClient(
 export async function GET(req: NextRequest) {
   const etabId = req.nextUrl.searchParams.get("etablissement_id");
   if (!etabId) return NextResponse.json({ error: "etablissement_id requis" }, { status: 400 });
-  // Lecture ouverte à toute l'équipe de l'établissement (capacités pour le tableau de l'équipe, 30/10/2026)
-  const denied = await etabAccessDenied(req, etabId);
+  // ?equipe=1 (tableau de l'équipe sur la tablette, 30/10/2026) : toute l'équipe, mais seulement les capacités de salle
+  const equipe = req.nextUrl.searchParams.get("equipe") === "1";
+  const denied = await etabAccessDenied(req, etabId, equipe ? undefined : ["group_admin", "manager"]);
   if (denied) return denied;
 
 
@@ -31,5 +32,6 @@ export async function GET(req: NextRequest) {
   for (const row of data ?? []) {
     map[row.cle] = { valeur: Number(row.valeur), unite: row.unite ?? "" };
   }
+  if (equipe) return NextResponse.json({ objectifs: Object.fromEntries(Object.entries(map).filter(([k]) => k.startsWith("capacite_"))) });
   return NextResponse.json({ objectifs: map });
 }

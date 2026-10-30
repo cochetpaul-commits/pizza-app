@@ -31,7 +31,7 @@ export function TableauEquipe() {
   const estPiccola = !!etab?.slug?.includes("piccola");
   const [periode, setPeriode] = useState<Periode>("hier");
   const range = useMemo(() => (periode === "hier" ? hier() : periode === "7j" ? derniersJours(7) : moisEnCours()), [periode]);
-  const { stats, prec, chargement } = useStatsVentes(range);
+  const { stats, prec, chargement } = useStatsVentes(range, false, true);
   const [capacites, setCapacites] = useState<Capacites & { pour: string }>({ pour: "", salle: null, jardin: null });
   const [commandes, setCommandes] = useState<{ pour: string; liste: Commande[] }>({ pour: "", liste: [] });
   const [meteo, setMeteo] = useState<{ pour: string; services: Meteo[] }>({ pour: "", services: [] });
@@ -43,7 +43,7 @@ export function TableauEquipe() {
     (async () => {
       await loadSupplierColors(supabase);
       const [obj, cmd, met] = await Promise.all([
-        fetchApi(`/api/pilotage/objectifs?etablissement_id=${etabId}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetchApi(`/api/pilotage/objectifs?etablissement_id=${etabId}&equipe=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
         supabase.from("commande_sessions").select("id, status, created_at, email_sent_at, total_ht, suppliers(name)").eq("etablissement_id", etabId).in("status", ["en_attente", "validee"]).order("created_at", { ascending: false }).limit(20),
         fetchApi(`/api/meteo?from=${aujourdhui}&to=${aujourdhui}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       ]);

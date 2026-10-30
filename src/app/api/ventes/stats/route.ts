@@ -98,8 +98,10 @@ export async function GET(req: NextRequest) {
   if (!etabId || !from || !to) {
     return NextResponse.json({ error: "etablissement_id, from, to requis" }, { status: 400 });
   }
-  // Toute l'équipe lit les ventes de son établissement (tableau de l'équipe sur la tablette, 30/10/2026)
-  const denied = await etabAccessDenied(req, etabId);
+  // ?equipe=1 (tableau de l'équipe sur la tablette, 30/10/2026) : toute l'équipe, mais un résumé seulement
+  // (CA, couverts, ticket moyen par service, à emporter) ; le reste des statistiques reste aux managers et admins
+  const equipe = searchParams.get("equipe") === "1";
+  const denied = await etabAccessDenied(req, etabId, equipe ? undefined : ["group_admin", "manager"]);
   if (denied) return denied;
 
 
@@ -127,15 +129,16 @@ export async function GET(req: NextRequest) {
     const dFrom = comparer === "an_dernier" ? fromA1 : shiftDays(from, -nbJours), dTo = comparer === "an_dernier" ? toA1 : shiftDays(to, -nbJours);
     const stats = await statsPeriode(etabId, from, to);
     // « an_dernier » : les mêmes dates un an plus tôt (29/10/2026)
+    const resume = (s: unknown) => (equipe ? resumeEquipe(s as Record<string, unknown> | null) : s);
     if (stats) {
       const prec = await statsPeriode(etabId, dFrom, dTo);
-      return NextResponse.json({ empty: false, stats, prec, prev: null, prevWeek: null });
+      return NextResponse.json({ empty: false, stats: resume(stats), prec: resume(prec), prev: null, prevWeek: null });
     }
     // Pas de lignes de caisse (Piccola Mia : journaux Kezia) : les ventes journalières, même comparaison (30/10/2026)
     const daily = await buildFromDailySales(etabId, from, to);
     if (daily) {
       const prec = await buildFromDailySales(etabId, dFrom, dTo);
-      return NextResponse.json({ empty: false, stats: daily, prec, prev: null, prevWeek: null, source: "daily_sales" });
+      return NextResponse.json({ empty: false, stats: resume(daily), prec: resume(prec), prev: null, prevWeek: null, source: "daily_sales" });
     }
     return NextResponse.json({ empty: true, stats: null, prec: null, prev: null, prevWeek: null });
   }
@@ -171,6 +174,20 @@ type Stats = ReturnType<typeof aggregate>;
  * Vécu 08/10 : chaque ouverture de la page rechargeait trois périodes complètes de lignes.
  */
 const VERSION_CALCUL = "2026-10-30a";
+
+/** Ce que le tableau de l'équipe a le droit de voir : CA, tickets, couverts et ticket moyen par service, à emporter. Rien d'autre. */
+function resumeEquipe(s: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!s) return null;
+  const services = Array.isArray(s.services) ? (s.services as Record<string, unknown>[]).map((x) => ({
+    date: x.date, jour: x.jour, svc: x.svc, ttc: x.ttc, ht: x.ht, cov: x.cov, sp_ttc: x.sp_ttc, sp_ht: x.sp_ht, emp_ttc: x.emp_ttc, emp_ht: x.emp_ht, sp_cov: x.sp_cov, z_ttc: x.z_ttc ?? {}, z_ht: {},
+  })) : [];
+  return {
+    dates: s.dates ?? [], ca_ttc: s.ca_ttc ?? 0, ca_ht: s.ca_ht ?? 0, couverts: s.couverts ?? 0, tickets: s.tickets ?? 0,
+    cov_midi: s.cov_midi ?? 0, cov_soir: s.cov_soir ?? 0, cov_sur: s.cov_sur ?? 0, cov_emp: s.cov_emp ?? 0,
+    place_sur_ttc: s.place_sur_ttc ?? 0, place_sur_ht: s.place_sur_ht ?? 0, place_emp_ttc: s.place_emp_ttc ?? 0, place_emp_ht: s.place_emp_ht ?? 0,
+    services, tm_ttc: [], tm_ht: [], zones_ttc: {}, zones_ht: {}, food_ttc: 0, food_ht: 0, drink_ttc: 0, drink_ht: 0, hourly_ttc: [],
+  };
+}
 async function statsPeriode(etabId: string, from: string, to: string): Promise<Stats | null> {
   const { data: version } = await supabase.rpc("ventes_version", { p_etab: etabId, p_from: from, p_to: to });
   // VERSION_CALCUL : à changer quand l'agrégation change, pour que le cache se recalcule
