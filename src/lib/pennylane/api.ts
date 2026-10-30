@@ -218,6 +218,7 @@ export type PlCustomerInvoice = {
 };
 export type PlCustomer = { id: number; name: string | null; first_name: string | null; last_name: string | null; emails?: string[]; phone?: string | null };
 
-export const getQuotes = (from: string, dossier: PlDossier) => plListe<PlQuote>("quotes", [{ field: "date", operator: "gteq", value: from }], dossier);
+// Les devis ne se filtrent pas par date dans l'API Pennylane (seulement id, client, statut) : on lit tout et on trie après
+export const getQuotes = (dossier: PlDossier) => plListe<PlQuote>("quotes", null, dossier);
 export const getCustomerInvoices = (from: string, dossier: PlDossier) => plListe<PlCustomerInvoice>("customer_invoices", [{ field: "date", operator: "gteq", value: from }], dossier);
 export const getCustomers = (dossier: PlDossier) => plListe<PlCustomer>("customers", null, dossier);

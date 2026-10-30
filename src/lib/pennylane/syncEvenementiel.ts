@@ -19,7 +19,8 @@ const num = (v: string | number | null | undefined) => { const n = Number(v); re
 const vide = (s: string | null | undefined) => { const t = (s ?? "").trim(); return t ? t : null; };
 
 export async function syncEvenementiel(etabId: string, dossier: PlDossier = "piccola"): Promise<{ devis: number; factures: number; clients: number }> {
-  const [devis, factures, clients] = await Promise.all([getQuotes(DEPUIS, dossier), getCustomerInvoices(DEPUIS, dossier), getCustomers(dossier)]);
+  const [tousDevis, factures, clients] = await Promise.all([getQuotes(dossier), getCustomerInvoices(DEPUIS, dossier), getCustomers(dossier)]);
+  const devis = tousDevis.filter((d) => (d.date ?? "") >= DEPUIS);
   const nomClient = new Map(clients.map((c) => [c.id, vide(c.name) ?? vide(`${c.first_name ?? ""} ${c.last_name ?? ""}`)]));
   const maintenant = new Date().toISOString();
   const lignes: LigneEvenementiel[] = [
