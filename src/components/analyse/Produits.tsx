@@ -111,7 +111,7 @@ export function Produits() {
     setCatTendance(existe ? cat : "total");
     if (!existe) return;
     setOuvertes((s) => new Set(s).add(cat));
-    setTimeout(() => document.getElementById(`cat-${cat}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    setTimeout(() => document.getElementById("tendance")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
   const delta = (p: ProduitVendu, avant: ProduitVendu | null | undefined) => {
     if (!avant || !avant.qty) return <span style={{ color: FAIBLE }}>—</span>;
@@ -121,7 +121,7 @@ export function Produits() {
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px", display: "grid", gap: 14, alignContent: "start" }}>
-      <style>{`.pr-ligne{cursor:pointer}.pr-ligne:hover td{background:#f7f3ec}.pr-top:hover{background:#f7f3ec}`}</style>
+      <style>{`.pr-ligne{cursor:pointer}.pr-ligne:hover td{background:#f7f3ec}.pr-top:hover{background:#f7f3ec}.pr-mix:hover{background:#f7f3ec}`}</style>
       {zoom && etabId && <ZoomProduit nom={zoom} etabId={etabId} periode={eff} bureau={bureau} onFermer={() => setZoom(null)} />}
       <EnteteAnalyse titre="Par produit" question="Qu'est-ce qui se vend ? Ce que chaque table prend, les produits qui marchent et ceux qui dorment." range={range} onRange={setRange} />
 
@@ -138,9 +138,55 @@ export function Produits() {
             <TuileVariation compacte={!bureau} icone="foodcost" libelle="Part des boissons" valeur={stats.ca_ht ? pct((stats.drink_ht / stats.ca_ht) * 100) : "—"} actuel={stats.ca_ht ? (stats.drink_ht / stats.ca_ht) * 100 : 0} precedent={prec?.ca_ht ? (prec.drink_ht / prec.ca_ht) * 100 : null} sous={`${euros(stats.drink_ht)} HT de boissons`} />
           </div>
 
-          {/* Tendance des ventes et midi / soir (30/10/2026, retour de l'ancienne page Produits) */}
+          {/* Ventes par catégorie (le « mix » de l'ancienne page, barres cliquables) et midi / soir (30/10/2026) */}
           {pp && pp.tendance.categories.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: bureau ? "2fr 1fr" : "1fr", gap: 14, alignItems: "start" }}>
+            <div style={{ display: "grid", gridTemplateColumns: bureau ? "1fr 1fr" : "1fr", gap: 14, alignItems: "start" }}>
+              <Cadre titre="Ventes par catégorie" sous="CA HT de la période, part et quantités. Un clic ouvre la catégorie dans la tendance." sansMarge>
+                <div style={{ padding: "10px 16px 14px", display: "grid", gap: 8 }}>
+                  {[...categories].sort((a, b) => b.ht - a.ht).map((c) => {
+                    const part = stats.ca_ht ? (c.ht / stats.ca_ht) * 100 : 0;
+                    const max = Math.max(1, ...categories.map((x) => x.ht));
+                    return (
+                      <div key={c.cat} className="pr-mix" onClick={() => voirCategorie(c.cat)} style={{ cursor: "pointer", borderRadius: 8, padding: "4px 6px", margin: "0 -6px" }} title="Voir la catégorie">
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5, marginBottom: 3 }}>
+                          <span style={{ fontWeight: 700, color: couleurTexte(c.couleur) }}>{c.cat}</span>
+                          <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}><b>{euros(c.ht)}</b> <span style={{ color: MUTED }}>· {pct(part)} · {nombre(c.qty)} vendus</span></span>
+                        </div>
+                        <div style={{ height: 8, borderRadius: 4, background: "#f0ebe3", overflow: "hidden" }}><div style={{ width: `${(c.ht / max) * 100}%`, height: "100%", background: c.couleur, borderRadius: 4 }} /></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Cadre>
+              <Cadre titre="Midi et soir" sous="Ce qui part à chaque service, par catégorie." sansMarge>
+                <div style={{ overflowX: "auto", marginTop: 10 }}>
+                  <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                    <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Catégorie</th><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Soir</th></tr></thead>
+                    <tbody>
+                      {pp.categories.map((c) => {
+                        const tot = c.midi_qty + c.soir_qty;
+                        const part = tot ? (c.midi_qty / tot) * 100 : 0;
+                        return (
+                          <tr key={c.cat} className="pr-ligne" onClick={() => voirCategorie(c.cat)}>
+                            <td style={liseret(getCategoryColor(c.cat))} />
+                            <td style={{ ...TD, fontWeight: 600 }}>{c.cat}
+                              <div style={{ height: 5, borderRadius: 3, background: COULEUR_SOIR, marginTop: 5, overflow: "hidden" }}><div style={{ width: `${part}%`, height: "100%", background: COULEUR_MIDI }} /></div>
+                            </td>
+                            <td style={TDN}>{nombre(c.midi_qty)}<div style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>{pct(part)}</div></td>
+                            <td style={TDN}>{nombre(c.soir_qty)}<div style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>{pct(100 - part)}</div></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Cadre>
+            </div>
+          )}
+
+          {/* Tendance des ventes, pleine largeur, avec les plats dessous */}
+          {pp && pp.tendance.categories.length > 0 && (
+            <div id="tendance" style={{ scrollMarginTop: 70 }}>
               <Cadre titre="Tendance des ventes" sous={`Par ${pp.pas === "jour" ? "jour" : pp.pas === "semaine" ? "semaine" : "mois"}, empilé par catégorie de la carte.`}
                 droite={<span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <select value={catTendance} onChange={(e) => setCatTendance(e.target.value)} aria-label="Catégorie" style={{ ...CHAMP, height: 32, width: "auto", fontSize: 12.5, fontWeight: 600 }}>
@@ -216,29 +262,6 @@ export function Produits() {
                     </div>
                   );
                 })()}
-              </Cadre>
-              <Cadre titre="Midi et soir" sous="Ce qui part à chaque service, par catégorie." sansMarge>
-                <div style={{ overflowX: "auto", marginTop: 10 }}>
-                  <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                    <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Catégorie</th><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Soir</th></tr></thead>
-                    <tbody>
-                      {pp.categories.map((c) => {
-                        const tot = c.midi_qty + c.soir_qty;
-                        const part = tot ? (c.midi_qty / tot) * 100 : 0;
-                        return (
-                          <tr key={c.cat} className="pr-ligne">
-                            <td style={liseret(getCategoryColor(c.cat))} />
-                            <td style={{ ...TD, fontWeight: 600 }}>{c.cat}
-                              <div style={{ height: 5, borderRadius: 3, background: COULEUR_SOIR, marginTop: 5, overflow: "hidden" }}><div style={{ width: `${part}%`, height: "100%", background: COULEUR_MIDI }} /></div>
-                            </td>
-                            <td style={TDN}>{nombre(c.midi_qty)}<div style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>{pct(part)}</div></td>
-                            <td style={TDN}>{nombre(c.soir_qty)}<div style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>{pct(100 - part)}</div></td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
               </Cadre>
             </div>
           )}
