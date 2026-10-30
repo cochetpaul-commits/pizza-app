@@ -68,6 +68,8 @@ export const HACCP_ITEMS: NavItemV2[] = [
 
 // ÉVÉNEMENTIEL (Piccola Mia uniquement)
 export const EVENEMENTIEL_ITEMS: NavItemV2[] = [
+  // Devis et factures faits dans Pennylane (30/10/2026) : lus chaque nuit, comptés dans le CA
+  { label: "Devis et factures", href: "/evenementiel", icon: "fileText" },
   { label: "Événements", href: "/evenements", icon: "calendarEvent" },
   { label: "Carnet clients", href: "/clients", icon: "users" },
   { label: "Devis", href: "/devis", icon: "fileText" },

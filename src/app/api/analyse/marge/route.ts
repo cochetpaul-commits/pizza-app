@@ -55,9 +55,14 @@ export async function GET(req: NextRequest) {
 
   const [cas, { parMois, error }, { data: objectifs }] = await Promise.all([
     Promise.all(moisListe.map(async (m) => {
-      const { data } = await supabaseAdmin.rpc("ventes_ca_periode", { p_etab: etabId, p_from: `${m}-01`, p_to: dernierJour(m) });
+      const [{ data }, { data: evt }] = await Promise.all([
+        supabaseAdmin.rpc("ventes_ca_periode", { p_etab: etabId, p_from: `${m}-01`, p_to: dernierJour(m) }),
+        // Événementiel facturé dans Pennylane (Piccola Mia, 30/10/2026) : compté dans le CA du mois de la facture
+        supabaseAdmin.from("evenementiel_pennylane").select("montant_ht, montant_ttc").eq("etablissement_id", etabId).eq("type", "facture").eq("archive", false).neq("statut", "cancelled").gte("date", `${m}-01`).lte("date", dernierJour(m)),
+      ]);
       const row = Array.isArray(data) ? data[0] : data;
-      return { mois: m, ca_ht: Number(row?.ca_ht ?? 0), ca_ttc: Number(row?.ca_ttc ?? 0) };
+      const evtHt = (evt ?? []).reduce((t, x) => t + Number(x.montant_ht ?? 0), 0), evtTtc = (evt ?? []).reduce((t, x) => t + Number(x.montant_ttc ?? 0), 0);
+      return { mois: m, ca_ht: Number(row?.ca_ht ?? 0) + evtHt, ca_ttc: Number(row?.ca_ttc ?? 0) + evtTtc };
     })),
     chargesParMois(etabId, moisListe),
     supabaseAdmin.from("objectifs").select("cle, valeur").eq("etablissement_id", etabId).in("cle", ["ratio_masse_sal", "ratio_matiere"]),

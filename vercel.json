@@ -37,6 +37,10 @@
       "schedule": "30 7 * * *"
     },
     {
+      "path": "/api/cron/pennylane-evenementiel",
+      "schedule": "20 6 * * *"
+    },
+    {
       "path": "/api/cron/cloture-controle",
       "schedule": "15 23 * * *"
     },

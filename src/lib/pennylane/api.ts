@@ -188,3 +188,36 @@ export async function getSuppliers(dossier: PlDossier = "bello"): Promise<{ id: 
   }
   return out;
 }
+
+/* ── Ventes : devis et factures clients (événementiel Piccola Mia, 30/10/2026) ─────────────── */
+type Paged2<T> = { items: T[]; has_more: boolean; next_cursor: string | null };
+async function plListe<T>(ressource: string, filtre: unknown[] | null, dossier: PlDossier): Promise<T[]> {
+  const filter = filtre ? `filter=${encodeURIComponent(JSON.stringify(filtre))}&` : "";
+  const out: T[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 60; page++) {
+    const data: Paged2<T> = await plGet(`${ressource}?${filter}limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, dossier);
+    out.push(...(data.items ?? []));
+    if (!data.has_more || !data.next_cursor) break;
+    cursor = data.next_cursor;
+  }
+  return out;
+}
+
+export type PlQuote = {
+  id: number; quote_number: string | null; label: string | null; status: string | null; date: string | null; deadline: string | null;
+  currency_amount: string | null; currency_amount_before_tax: string | null; archived_at: string | null;
+  pdf_invoice_subject: string | null; pdf_description: string | null; pdf_invoice_free_text: string | null; public_file_url: string | null;
+  customer: { id: number } | null;
+};
+export type PlCustomerInvoice = {
+  id: number; invoice_number: string | null; label: string | null; status: string | null; paid: boolean; date: string | null; deadline: string | null;
+  currency_amount: string | null; currency_amount_before_tax: string | null; remaining_amount_with_tax: string | null; archived_at: string | null; draft: boolean;
+  pdf_invoice_subject: string | null; pdf_description: string | null; pdf_invoice_free_text: string | null; public_file_url: string | null;
+  customer: { id: number } | null; quote: { id: number } | null; credited_invoice: { id: number } | null;
+};
+export type PlCustomer = { id: number; name: string | null; first_name: string | null; last_name: string | null; emails?: string[]; phone?: string | null };
+
+export const getQuotes = (from: string, dossier: PlDossier) => plListe<PlQuote>("quotes", [{ field: "date", operator: "gteq", value: from }], dossier);
+export const getCustomerInvoices = (from: string, dossier: PlDossier) => plListe<PlCustomerInvoice>("customer_invoices", [{ field: "date", operator: "gteq", value: from }], dossier);
+export const getCustomers = (dossier: PlDossier) => plListe<PlCustomer>("customers", null, dossier);

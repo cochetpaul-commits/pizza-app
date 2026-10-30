@@ -10,6 +10,8 @@ import { ticketMoyen, useStatsVentes } from "@/components/analyse/useStatsVentes
 import { parJour, parJourSemaine } from "@/components/analyse/parJour";
 import { COULEUR_EMPORTER, COULEUR_MIDI, COULEUR_SOIR, FAIBLE, MUTED, ROUGE, VERT, derniersJours, euros, jourCourt, nombre, pct } from "@/components/analyse/gabarit";
 import { EtatVide } from "@/components/ui/EtatVide";
+import { useEvenementiel } from "@/components/evenementiel/useEvenementiel";
+import Link from "next/link";
 
 /**
  * Analyse › Chiffre d'affaires (10/10/2026) : « Comment se porte le CA ? »
@@ -21,6 +23,8 @@ export function ChiffreAffaires() {
   const bureau = useBureau();
   const [range, setRange] = usePilotageRange(() => derniersJours(30));
   const { stats, prec, chargement, erreur } = useStatsVentes(range);
+  // Piccola Mia : l'événementiel facturé dans Pennylane s'ajoute au CA de la caisse (30/10/2026)
+  const evt = useEvenementiel(range);
   const jours = useMemo(() => parJour(stats), [stats]);
   const joursPrec = useMemo(() => parJour(prec), [prec]);
   const semaine = useMemo(() => parJourSemaine(jours), [jours]);
@@ -40,8 +44,13 @@ export function ChiffreAffaires() {
 
       {stats && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(5, 1fr)" : "repeat(2, 1fr)", gap: bureau ? 10 : 8, opacity: chargement ? 0.6 : 1 }}>
+          <div style={{ display: "grid", gridTemplateColumns: bureau ? `repeat(${evt.estPiccola ? 6 : 5}, 1fr)` : "repeat(2, 1fr)", gap: bureau ? 10 : 8, opacity: chargement ? 0.6 : 1 }}>
             <TuileVariation compacte={!bureau} icone="euro" libelle="CA HT" valeur={euros(stats.ca_ht)} actuel={stats.ca_ht} precedent={prec?.ca_ht} sous={`${euros(stats.ca_ttc)} TTC`} />
+            {evt.estPiccola && evt.totaux && (
+              <Link href="/evenementiel" style={{ textDecoration: "none", color: "inherit", display: "contents" }}>
+                <TuileVariation compacte={!bureau} icone="facture" libelle="Événementiel facturé" valeur={euros(evt.totaux.facture_ht)} actuel={evt.totaux.facture_ht} precedent={null} sous={`${evt.totaux.nb_factures} facture${evt.totaux.nb_factures > 1 ? "s" : ""} Pennylane · ${euros(evt.totaux.a_encaisser_ttc)} à encaisser`} />
+              </Link>
+            )}
             <TuileVariation compacte={!bureau} icone="ticket" couleur={COULEUR_MIDI} libelle="Midi" valeur={euros(midi)} actuel={midi} precedent={midiPrec} sous={stats.ca_ht ? `${pct((midi / stats.ca_ht) * 100)} du CA` : undefined} />
             <TuileVariation compacte={!bureau} icone="ticket" couleur={COULEUR_SOIR} libelle="Soir" valeur={euros(soir)} actuel={soir} precedent={soirPrec} sous={stats.ca_ht ? `${pct((soir / stats.ca_ht) * 100)} du CA` : undefined} />
             <TuileVariation compacte={!bureau} icone="camion" couleur={COULEUR_EMPORTER} libelle="À emporter" valeur={euros(stats.place_emp_ht)} actuel={stats.place_emp_ht} precedent={prec?.place_emp_ht} sous={stats.ca_ht ? `${pct((stats.place_emp_ht / stats.ca_ht) * 100)} du CA` : undefined} />
