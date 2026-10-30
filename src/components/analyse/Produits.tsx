@@ -11,8 +11,8 @@ import { useStatsVentes, type Attache, type ProduitVendu, type StatsVentes } fro
 import { FAIBLE, MUTED, ROUGE, VERT, AMBRE, derniersJours, euros, nombre, pct } from "@/components/analyse/gabarit";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { getCategoryColor } from "@/lib/categoryColors";
-import { couleurTexteSur, styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
-import { CADRE, CHAMP, liseret, pastille } from "@/components/ui/charte";
+import { couleurTexte, couleurTexteSur, styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
+import { BORD, CADRE, CHAMP, liseret, pastille } from "@/components/ui/charte";
 import { GraphBarres } from "@/components/analyse/GraphBarres";
 import { COULEUR_MIDI, COULEUR_SOIR, periodeEffective } from "@/components/analyse/gabarit";
 import type { ProduitsPeriode } from "@/lib/analyse/produitsPeriode";
@@ -121,7 +121,7 @@ export function Produits() {
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px", display: "grid", gap: 14, alignContent: "start" }}>
-      <style>{`.pr-ligne{cursor:pointer}.pr-ligne:hover td{background:#f7f3ec}`}</style>
+      <style>{`.pr-ligne{cursor:pointer}.pr-ligne:hover td{background:#f7f3ec}.pr-top:hover{background:#f7f3ec}`}</style>
       {zoom && etabId && <ZoomProduit nom={zoom} etabId={etabId} periode={eff} bureau={bureau} onFermer={() => setZoom(null)} />}
       <EnteteAnalyse titre="Par produit" question="Qu'est-ce qui se vend ? Ce que chaque table prend, les produits qui marchent et ceux qui dorment." range={range} onRange={setRange} />
 
@@ -161,6 +161,60 @@ export function Produits() {
                       ? [{ libelle: "Tous produits", couleur: "#1a1a1a", valeurs: Array.from({ length: n }, (_, i) => pp.tendance.categories.reduce((t, c) => t + (src[c]?.[i] ?? 0), 0)) }]
                       : [{ libelle: catTendance, couleur: getCategoryColor(catTendance), valeurs: src[catTendance] ?? [] }];
                   return <GraphBarres empile={catTendance === "empile"} sansValeurs={n > 12 || catTendance === "empile"} format={(v) => (mesure === "qty" ? nombre(v) : euros(v))} etiquettes={pp.tendance.etiquettes} libelleAxe="Ventes" series={series} />;
+                })()}
+                {/* Sous le graphique (30/10/2026, comme l'ancienne page) : les plats de la catégorie choisie, ou le top 3 de chaque catégorie */}
+                {(() => {
+                  const cat = categories.find((c) => c.cat === catTendance);
+                  if (cat) {
+                    const lignes = [...cat.lignes].sort((a, b) => b.qty - a.qty);
+                    return (
+                      <div style={{ marginTop: 14, borderTop: `1px solid ${BORD}`, paddingTop: 10 }}>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: couleurTexte(cat.couleur) }}>{cat.cat}</span>
+                          <span style={{ fontSize: 12.5, color: MUTED }}>{lignes.length} produit{lignes.length > 1 ? "s" : ""} · {nombre(cat.qty)} vendus · {euros(cat.ht)} HT · un clic ouvre le zoom</span>
+                        </div>
+                        <div style={{ overflowX: "auto" }}>
+                          <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                            <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Produit</th><th style={{ ...TH, textAlign: "right" }}>Qté</th><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Soir</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th><th style={{ ...TH, textAlign: "right" }}>Part</th><th style={{ ...TH, textAlign: "right" }}>vs avant</th></tr></thead>
+                            <tbody>
+                              {lignes.map((p) => { const s = svcProduit(p.n); return (
+                                <tr key={p.n} className="pr-ligne" onClick={() => setZoom(p.n)}>
+                                  <td style={liseret(cat.couleur)} />
+                                  <td style={{ ...TD, fontWeight: 600 }}>{p.n}</td>
+                                  <td style={TDN}>{nombre(p.qty)}</td>
+                                  <td style={{ ...TDN, color: MUTED }}>{s ? nombre(s.midi_qty) : "—"}</td>
+                                  <td style={{ ...TDN, color: MUTED }}>{s ? nombre(s.soir_qty) : "—"}</td>
+                                  <td style={TDN}>{euros(p.ca_ht)}</td>
+                                  <td style={{ ...TDN, color: MUTED }}>{cat.qty ? pct((p.qty / cat.qty) * 100) : "—"}</td>
+                                  <td style={TDN}>{delta(p, p.avant)}</td>
+                                </tr>
+                              ); })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (!categories.length) return null;
+                  return (
+                    <div style={{ marginTop: 14, borderTop: `1px solid ${BORD}`, paddingTop: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: MUTED, marginBottom: 8 }}>Top 3 par catégorie</div>
+                      <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(auto-fill, minmax(200px, 1fr))" : "1fr 1fr", gap: 8 }}>
+                        {categories.map((c) => (
+                          <div key={c.cat} style={{ border: `1px solid ${BORD}`, borderRadius: 10, overflow: "hidden", boxShadow: `inset 6px 0 0 ${c.couleur}`, cursor: "pointer" }} onClick={() => setCatTendance(c.cat)} title="Voir toute la catégorie">
+                            <div style={{ padding: "7px 10px 4px 14px", fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: couleurTexte(c.couleur) }}>{c.cat} <span style={{ color: FAIBLE, fontWeight: 500, letterSpacing: 0, textTransform: "none" }}>· {nombre(c.qty)}</span></div>
+                            {[...c.lignes].sort((a, b) => b.qty - a.qty).slice(0, 3).map((p) => (
+                              <div key={p.n} onClick={(e) => { e.stopPropagation(); setZoom(p.n); }} className="pr-top" style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "4px 10px 4px 14px", fontSize: 12.5 }}>
+                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>{p.n}</span>
+                                <span style={{ color: MUTED, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{nombre(p.qty)}</span>
+                              </div>
+                            ))}
+                            <div style={{ height: 6 }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
                 })()}
               </Cadre>
               <Cadre titre="Midi et soir" sous="Ce qui part à chaque service, par catégorie." sansMarge>
