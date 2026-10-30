@@ -172,6 +172,15 @@ export async function runImport(options: {
   const lignesSansFiche: string[] = [];
   let offresAValider = 0;
   if (estFournisseurInterne(supplierName)) throw new Error("Fournisseur interne (sans facture) : aucun import possible");
+  // Établissement d'import (30/10/2026) : une fiche créée par une facture appartient à l'établissement qui l'importe,
+  // pas aux deux. Les stocks, commandes et prix ne sont pas les mêmes à Bello Mio et à Piccola Mia.
+  let etabImport: "bellomio" | "piccola" | null = options.establishment === "bellomio" || options.establishment === "piccola" ? options.establishment : null;
+  if (!etabImport && etabId) {
+    const { data: e } = await supabase.from("etablissements").select("slug").eq("id", etabId).maybeSingle();
+    const slug = String((e as { slug?: string } | null)?.slug ?? "");
+    etabImport = slug.includes("piccola") ? "piccola" : slug.includes("bello") ? "bellomio" : null;
+  }
+  const etabsFiche: string[] = etabImport ? [etabImport] : ["bellomio", "piccola"];
 
   // 1. Fournisseur : nom canonique (« Armor Emballages » → « Armor »), Title Case, puis ligne existante
   // de l'établissement. Une ligne DÉSACTIVÉE (fusionnée) n'est jamais réactivée : on refuse l'import
@@ -394,8 +403,8 @@ export async function runImport(options: {
         storage_zone: storageZone,
       };
       if (etabId) ingRow.etablissement_id = etabId;
-      // Always assign both establishments — user refines at validation
-      ingRow.establishments = ["bellomio", "piccola"];
+      // La fiche appartient à l'établissement qui importe (les deux seulement si l'import ne le précise pas)
+      ingRow.establishments = etabsFiche;
       toCreate.push(ingRow);
     }
 
@@ -489,7 +498,7 @@ export async function runImport(options: {
           currency: "EUR",
           is_active: true,
           density_kg_per_l: null,
-          establishment: "both",
+          establishment: etabImport ?? "both",
         };
 
         if (packInfo && packInfo.count > 1 && l.total_price && l.total_price > 0 && !prixDejaAuPoids) {
@@ -659,7 +668,8 @@ export async function runImport(options: {
 
         for (const row of (estabRows ?? []) as Array<{ id: string; establishments: string[] | null }>) {
           const current: string[] = row.establishments ?? [];
-          const target = ["bellomio", "piccola"];
+          // Une fiche existante facturée ici est au moins dans cet établissement ; on n'ajoute pas l'autre
+          const target = etabsFiche;
           const missing = target.filter((e) => !current.includes(e));
           if (missing.length > 0) {
             await supabase
