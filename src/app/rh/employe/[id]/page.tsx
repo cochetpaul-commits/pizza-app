@@ -1723,10 +1723,18 @@ function PlanifEquipes({ etabId, currentAccess, empId, onUpdate }: {
 
 
 /* ── Compte & accès : etat du compte, role unique, exceptions ── */
-function CodeTablette({ empId, defini, onChange }: { empId: string; defini: boolean; onChange: (defini: boolean) => void }) {
+function CodeTablette({ empId }: { empId: string }) {
   const [code, setCode] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  // Le haché ne sort jamais vers le navigateur (colonne non lisible) : on demande seulement s'il existe
+  const [defini, setDefini] = useState(false);
+  useEffect(() => {
+    let annule = false;
+    fetchApi(`/api/tablette/code?employe_id=${empId}`).then(async (r) => { const j = r.ok ? await r.json() : null; if (!annule) setDefini(!!j?.defini); }).catch(() => undefined);
+    return () => { annule = true; };
+  }, [empId]);
+  const onChange = (d: boolean) => setDefini(d);
   const envoyer = async (valeur: string) => {
     setBusy(true); setMsg("");
     const res = await fetchApi("/api/tablette/code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employe_id: empId, code: valeur }) });
@@ -1858,7 +1866,7 @@ function CompteAcces({ emp, setEmp, isGroupAdmin, etabIds, prenom, nom, email }:
       </div>
 
       {/* Code tablette (30/10/2026) : 4 chiffres pour s'identifier sur la tablette partagée, comme Popina */}
-      <CodeTablette empId={String(emp.id)} defini={!!emp.code_pin_hash} onChange={(defini) => setEmp((prev) => ({ ...prev, code_pin_hash: defini ? "défini" : null }))} />
+      <CodeTablette empId={String(emp.id)} />
 
       {/* Role — source unique */}
       <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6 }}>Role</div>
