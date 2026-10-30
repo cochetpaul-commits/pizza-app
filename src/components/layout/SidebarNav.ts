@@ -87,6 +87,18 @@ export const PARAMETRES_ITEMS: NavItemV2[] = [
 
 /* ── Listes ────────────────────────────────────────────── */
 
+/** Mode tablette (30/10/2026) : seulement les sections du quotidien, les pages qui les suivent, rien d'autre */
+const SECTIONS_TABLETTE = new Set(["Service", "Cuisine", "Achats et stock"]);
+export function navTablette(liste: NavEntry[]): NavEntry[] {
+  const sortie: NavEntry[] = [];
+  let garder = false;
+  for (const e of liste) {
+    if (e.kind === "divider") garder = SECTIONS_TABLETTE.has(e.label ?? "");
+    if (garder) sortie.push(e);
+  }
+  return sortie;
+}
+
 /** Managers et admins, dans un établissement. `accueil` = page d'accueil de l'établissement. */
 export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] {
   // Ordre validé le 10/10/2026 : le quotidien d'abord (du plus fréquent au plus rare), les référentiels ensuite,

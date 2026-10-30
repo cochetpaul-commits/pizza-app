@@ -7,6 +7,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { GlobalSearch } from "./GlobalSearch";
+import { EmployeTabletteBouton } from "@/components/tablette/EmployeTabletteBouton";
 
 /**
  * Barre du haut, bureau uniquement (classe .topbar-desktop, masquée sur mobile où
@@ -126,6 +127,7 @@ export function TopBarDesktop() {
           {nom}
         </span>
       )}
+      <EmployeTabletteBouton />
       <NotificationBell />
       <Profil />
     </header>

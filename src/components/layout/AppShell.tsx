@@ -7,6 +7,8 @@ import { canAccess } from "@/lib/rbac";
 import { Sidebar } from "./Sidebar";
 import { MobileHeader } from "./MobileHeader";
 import { TopBarDesktop } from "./TopBarDesktop";
+import { useTablette } from "@/lib/tablette/store";
+import { TabletteVerrou } from "@/components/tablette/TabletteVerrou";
 
 const EXCLUDED_PATHS = ["/login", "/auth", "/installer"];
 
@@ -40,6 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { role, loading, can } = useProfile();
   const excluded = isExcluded(pathname);
+  const tablette = useTablette();
 
   // Pas de session (jeton expiré, déconnexion) sur une page de l'app :
   // renvoyer vers la connexion au lieu de laisser une page blanche.
@@ -53,6 +56,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Global route guard — enforce RBAC on every page
   const allowed = canAccess(role, pathname, can);
+  // Mode tablette : personne d'identifié → pavé à code, rien d'autre à l'écran
+  if (tablette.actif && !tablette.employe) return <TabletteVerrou />;
 
   return (
     <>

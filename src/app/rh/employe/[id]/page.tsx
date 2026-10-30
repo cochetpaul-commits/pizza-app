@@ -1723,6 +1723,33 @@ function PlanifEquipes({ etabId, currentAccess, empId, onUpdate }: {
 
 
 /* ── Compte & accès : etat du compte, role unique, exceptions ── */
+function CodeTablette({ empId, defini, onChange }: { empId: string; defini: boolean; onChange: (defini: boolean) => void }) {
+  const [code, setCode] = useState("");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const envoyer = async (valeur: string) => {
+    setBusy(true); setMsg("");
+    const res = await fetchApi("/api/tablette/code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employe_id: empId, code: valeur }) });
+    const j = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) { setMsg(j?.error ?? "Erreur"); return; }
+    setCode(""); setMsg(valeur ? "Code enregistré" : "Code retiré"); onChange(!!valeur);
+  };
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6 }}>Code tablette</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 999, background: defini ? "rgba(45,106,79,0.10)" : "rgba(0,0,0,0.06)", color: defini ? "#2D6A4F" : "#6f6a61" }}>{defini ? "Code défini" : "Aucun code"}</span>
+        <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder="4 chiffres" style={{ width: 90, height: 32, padding: "0 10px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 13, fontFamily: "inherit", letterSpacing: ".2em" }} />
+        <button type="button" disabled={busy || code.length !== 4} onClick={() => envoyer(code)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#D4775A", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: busy || code.length !== 4 ? 0.5 : 1 }}>{defini ? "Changer" : "Définir"}</button>
+        {defini && <button type="button" disabled={busy} onClick={() => envoyer("")} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#b4443a" }}>Retirer</button>}
+        {msg && <span style={{ fontSize: 11.5, color: "#6f6a61" }}>{msg}</span>}
+      </div>
+      <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>Pour s&apos;identifier sur la tablette partagée (mode tablette dans Mon compte). Unique par établissement.</div>
+    </div>
+  );
+}
+
 function CompteAcces({ emp, setEmp, isGroupAdmin, etabIds, prenom, nom, email }: {
   emp: Record<string, unknown>;
   setEmp: React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
@@ -1829,6 +1856,9 @@ function CompteAcces({ emp, setEmp, isGroupAdmin, etabIds, prenom, nom, email }:
         )}
         <span style={{ fontSize: 11, color: "#999" }}>{email || "— pas d'email"}</span>
       </div>
+
+      {/* Code tablette (30/10/2026) : 4 chiffres pour s'identifier sur la tablette partagée, comme Popina */}
+      <CodeTablette empId={String(emp.id)} defini={!!emp.code_pin_hash} onChange={(defini) => setEmp((prev) => ({ ...prev, code_pin_hash: defini ? "défini" : null }))} />
 
       {/* Role — source unique */}
       <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6 }}>Role</div>

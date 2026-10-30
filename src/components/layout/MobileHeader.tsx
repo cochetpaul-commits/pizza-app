@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { EmployeTabletteBouton } from "@/components/tablette/EmployeTabletteBouton";
 import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -385,6 +386,7 @@ export function MobileHeader() {
         <div style={{ flex: 1 }} />
         {/* Right: bell + avatar */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          <EmployeTabletteBouton compact />
           <NotifBell />
           <UserAvatar />
         </div>

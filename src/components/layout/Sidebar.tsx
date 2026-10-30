@@ -6,7 +6,8 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
-import { navEtablissement, NAV_EQUIPIER, NAV_GROUPE, type NavEntry, type NavItemV2 } from "./SidebarNav";
+import { navEtablissement, navTablette, NAV_EQUIPIER, NAV_GROUPE, type NavEntry, type NavItemV2 } from "./SidebarNav";
+import { useTablette } from "@/lib/tablette/store";
 import {
   IconDashboard, IconUsers, IconCalendar, IconClock, IconBeach,
   IconClipboard, IconCalculator, IconSettings, IconWallet,
@@ -77,6 +78,7 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
   const { current, setCurrent, etablissements, isGroupView, setGroupView } = useEtablissement();
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const tablette = useTablette();
   const [etabOpen, setEtabOpen] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -100,12 +102,13 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
     isRoleAllowed(item.roles, role) && (!item.permission || can(item.permission));
 
   const entries: NavEntry[] = useMemo(() => {
-    const liste = !isManager ? NAV_EQUIPIER : isGroupView ? NAV_GROUPE : navEtablissement(accueil, isPiccola);
+    const base = !isManager ? NAV_EQUIPIER : isGroupView ? NAV_GROUPE : navEtablissement(accueil, isPiccola);
+    const liste = tablette.actif ? navTablette(base) : base;
     return liste
       .map((e) => (e.kind === "group" ? { ...e, items: e.items.filter(visible) } : e))
       .filter((e) => (e.kind === "page" ? visible(e) : e.kind === "group" ? visible(e) && e.items.length > 0 : true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isManager, isGroupView, accueil, isPiccola, role, can]);
+  }, [isManager, isGroupView, accueil, isPiccola, role, can, tablette.actif]);
 
   const allHrefs = useMemo(
     () => entries.flatMap((e) => (e.kind === "page" ? [e.href] : e.kind === "group" ? e.items.map((i) => i.href) : [])),

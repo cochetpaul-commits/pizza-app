@@ -11,6 +11,7 @@ import { EtatVide } from "@/components/ui/EtatVide";
 import { clesPersonnel, estLignePersonnel } from "@/lib/achats/personnel";
 import { probablePersonnel } from "@/lib/achats/probablePersonnel";
 import { CAT_LABELS } from "@/types/ingredients";
+import { employeTabletteActif } from "@/lib/tablette/store";
 
 /**
  * Repas du personnel (30/10/2026, d'après Paul) : pas un menu, un bouton dans Commandes.
@@ -108,7 +109,7 @@ export function CoursesPersonnel({ bureau }: { bureau: boolean }) {
     const { data: u } = await supabase.auth.getUser();
     const r = etait
       ? await supabase.from("courses_personnel").delete().eq("etablissement_id", etabId).eq("ingredient_id", id)
-      : await supabase.from("courses_personnel").upsert({ etablissement_id: etabId, ingredient_id: id, coche_par: u.user?.id ?? null, coche_at: new Date().toISOString() });
+      : await supabase.from("courses_personnel").upsert({ etablissement_id: etabId, ingredient_id: id, coche_par: u.user?.id ?? null, employe_id: employeTabletteActif()?.id ?? null, coche_at: new Date().toISOString() });
     if (r.error) { setErreur(r.error.message); void charger(); }
   };
   const toutDecocher = async () => {

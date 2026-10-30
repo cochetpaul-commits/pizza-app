@@ -5,7 +5,7 @@
  * Ne jamais lire employes / contrats avec select("*") côté écran.
  */
 // Une seule chaîne littérale : le client Supabase en déduit le type des lignes
-export const EMPLOYE_COLONNES = "id, etablissement_id, prenom, nom, initiales, email, tel_mobile, tel_fixe, genre, contact_urgence_prenom, contact_urgence_nom, contact_urgence_lien, contact_urgence_tel, date_visite_medicale, prochaine_visite_medicale, matricule, date_anciennete, avatar_url, actif, created_at, role, equipes_access, affichage_planning, civilite, nom_usage, custom_permissions, disponibilites, etablissements_ids, cp_n_minus_1, poste_id, auth_user_id, combo_id, combo_contract_id, date_entree, date_sortie, affichage_rup, popina_operateur" as const;
+export const EMPLOYE_COLONNES = "id, etablissement_id, code_pin_hash, prenom, nom, initiales, email, tel_mobile, tel_fixe, genre, contact_urgence_prenom, contact_urgence_nom, contact_urgence_lien, contact_urgence_tel, date_visite_medicale, prochaine_visite_medicale, matricule, date_anciennete, avatar_url, actif, created_at, role, equipes_access, affichage_planning, civilite, nom_usage, custom_permissions, disponibilites, etablissements_ids, cp_n_minus_1, poste_id, auth_user_id, combo_id, combo_contract_id, date_entree, date_sortie, affichage_rup, popina_operateur" as const;
 
 export const EMPLOYE_CONFIDENTIEL = [
   "numero_secu", "iban", "bic", "titulaire_compte", "adresse", "code_postal", "ville",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ReglageTablette } from "@/components/tablette/ReglageTablette";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { mapToPermRole, ROLE_INFO } from "@/lib/permissions";
@@ -281,6 +282,9 @@ export default function MonComptePage() {
           (l'app utilise des couleurs écrites en dur). Il ne changeait
           donc rien à l'écran. À rebrancher le jour où un vrai thème
           sombre sera implémenté. */}
+
+      {/* ── Tablette partagée (mode tablette, par appareil) ── */}
+      <div style={card}><ReglageTablette /></div>
 
       {/* ── Déconnexion ── */}
       <button type="button" onClick={logout} style={{ ...btnPrimary, width: "100%", background: "#fff", color: "#DC2626", border: "1px solid rgba(220,38,38,0.3)" }}>
