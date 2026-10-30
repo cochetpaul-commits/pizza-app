@@ -8,6 +8,7 @@ import { useBureau } from "@/hooks/useBureau";
 import type { ReponseObjectifs } from "@/app/api/objectifs/route";
 import { calculerSimulation, entreesParDefaut, heuresEquipe, masseSalariale, personneAjoutee, servicesType, type EntreesSimulateur, type Personne } from "@/lib/objectifs";
 import { Champ, eur, num, pct } from "./commun";
+import Link from "next/link";
 
 /**
  * Onglet Et si… : l'activité (couverts, ticket moyen, services), l'équipe personne par personne
@@ -38,6 +39,7 @@ export function EtSi({ d, onMemoriser }: { d: ReponseObjectifs; onMemoriser: (s:
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ fontSize: 12.5, color: MUTED }}>Pour les hypothèses détaillées (embauche, statut, équipe de croisière) : <Link href="/analyse/simulations" style={{ color: ACCENT, fontWeight: 600, textDecoration: "none" }}>Simulations →</Link></div>
       <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, 1fr)" : "repeat(2, 1fr)", gap: 8 }}>
         <Tuile libelle="CA HT par mois" valeur={eur(res.caHt)} couleur="#1a1a1a" icone="euro" sous={`${num(res.couverts)} couverts`} />
         <Tuile libelle="EBE par mois" valeur={eur(res.ebe)} couleur={res.ebe >= 0 ? BON : MAUVAIS} icone="foodcost" sous={`${pct(res.caHt ? (res.ebe / res.caHt) * 100 : 0)} du CA (liasse : ${pct(7.3)})`} />

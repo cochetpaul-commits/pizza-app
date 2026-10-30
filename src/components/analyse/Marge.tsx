@@ -47,6 +47,8 @@ export function Marge() {
   }, [cle]);
   const chargement = etat.cle !== cle;
   const donnees = etat.donnees;
+  // Coût matière théorique (recettes × ventes) du mois de référence, repris de l'ancienne page Rentabilité (fusion 30/10/2026)
+  const [theorique, setTheorique] = useState<{ mois: string; v: { cout: number; caCouvert: number; pct: number; couverture: number } | null } | null>(null);
 
   const lignes = useMemo<Ligne[]>(() => {
     if (!donnees) return [];
@@ -66,12 +68,24 @@ export function Marge() {
   const objMs = donnees?.objectifs.ratio_masse_sal ?? null;
   const ratio = (v: number, ca: number) => (ca > 0 ? (v / ca) * 100 : null);
   const couleurRatio = (r: number | null, bon: number, moyen: number) => (r == null ? undefined : r <= bon ? VERT : r <= moyen ? AMBRE : ROUGE);
+  const moisRef = reference?.mois ?? null;
+  useEffect(() => {
+    if (!etabId || !moisRef) return;
+    let annule = false;
+    const [a, m] = moisRef.split("-").map(Number);
+    const fin = new Date(a, m, 0).toISOString().slice(0, 10);
+    fetchApi(`/api/rentabilite?etablissement_id=${etabId}&from=${moisRef}-01&to=${fin}`).then(async (r) => {
+      const j = r.ok ? await r.json() : null;
+      if (!annule) setTheorique({ mois: moisRef, v: j?.theorique ?? null });
+    }).catch(() => { if (!annule) setTheorique({ mois: moisRef, v: null }); });
+    return () => { annule = true; };
+  }, [etabId, moisRef]);
   const raccourcis: { libelle: string; r: DateRange }[] = [{ libelle: "3 mois", r: derniersMois(3) }, { libelle: "6 mois", r: derniersMois(6) }, { libelle: "12 mois", r: derniersMois(12) }];
   const nbMois = lignes.length;
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px", display: "grid", gap: 14, alignContent: "start" }}>
-      <EnteteAnalyse titre="Marge" question="Que reste-t-il ? Du CA à l'EBE, mois par mois, avec les achats, la masse salariale et les charges réellement passées." range={range} onRange={setRange}
+      <EnteteAnalyse titre="Résultat" question="Que reste-t-il ? Du CA à l'EBE, mois par mois, avec les achats, la masse salariale et les charges réellement passées." range={range} onRange={setRange}
         raccourcis={raccourcis} comparaison={`${nbMois} mois · référence : ${reference ? libelleMoisLong(reference.mois) : "—"}`} />
 
       {etat.erreur && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(180,68,58,0.08)", color: ROUGE, fontSize: 13 }}>{etat.erreur}</div>}
@@ -143,7 +157,13 @@ export function Marge() {
               ))}
               {Object.keys(reference.postes).filter((k) => donnees!.postes_exploitation.includes(k)).length === 0 && <div style={{ color: FAIBLE, fontSize: 13 }}>Aucune charge d&apos;exploitation ce mois-ci dans Pennylane.</div>}
             </Cadre>
-            <Cadre titre="Lecture rapide" sous="Les trois ratios qui décident de la rentabilité.">
+            <Cadre titre="Lecture rapide" sous="Les ratios qui décident de la rentabilité, et l'écart entre la matière théorique et le réel.">
+              {theorique?.mois === reference.mois && theorique.v && (
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0", borderBottom: "1px solid #f0ebe2", fontSize: 13 }}>
+                  <span><span style={{ fontWeight: 600 }}>Matière théorique (recettes × ventes)</span><span style={{ color: FAIBLE }}> · {pct(theorique.v.couverture)} du CA relié à une fiche</span></span>
+                  <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}><b>{pct(theorique.v.pct, 1)}</b>{reference.achats > 0 && <span style={{ color: MUTED, fontSize: 12 }}> · écart réel {pct(Math.abs((ratio(reference.achats, reference.ca) ?? 0) - theorique.v.pct), 1)}</span>}</span>
+                </div>
+              )}
               {[
                 { l: "Matière (achats / CA HT)", v: ratio(reference.achats, reference.ca), obj: "≤ 32 %", c: couleurRatio(ratio(reference.achats, reference.ca), 32, 38), p: precedent ? ratio(precedent.achats, precedent.ca) : null },
                 { l: "Masse salariale / CA HT", v: ratio(reference.ms, reference.ca), obj: objMs ? `≤ ${pct(objMs)}` : "≤ 35 %", c: couleurRatio(ratio(reference.ms, reference.ca), objMs ?? 35, (objMs ?? 35) + 8), p: precedent ? ratio(precedent.ms, precedent.ca) : null },

@@ -148,9 +148,8 @@ function AchatsContent() {
   const searchParams = useSearchParams();
   const etab = useEtablissement();
   const etabId = etab.current?.id ?? null;
-  const [activeTab, setActiveTab] = useState<"factures" | "stats">(() => {
-    return searchParams.get("tab") === "stats" ? "stats" : "factures";
-  });
+  // ?tab=stats (anciens liens) : la page Variations de prix a repris l'onglet
+  const versVariations = searchParams.get("tab") === "stats";
 
   // ── Période : la même que les autres pages Pilotage (29/10), mois en cours par défaut ──
   const [range, setRange] = usePilotageRange(() => {
@@ -706,30 +705,14 @@ function AchatsContent() {
     <RequireRole allowedRoles={["group_admin"]}>
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 120px" }}>
 
-        {/* ══════════════════════════════════════════════════ */}
-        {/*  TABS — Factures / Stats prix                    */}
-        {/* ══════════════════════════════════════════════════ */}
-        <div style={{ display: "flex", gap: 4, padding: 4, background: "#f0ebe2", borderRadius: 12, marginBottom: 18, border: "1px solid #e8e0d0" }}>
-          {([["factures", "Factures"], ["stats", "Stats prix"]] as const).map(([key, label]) => (
-            <button key={key} type="button" onClick={() => setActiveTab(key)} style={{
-              flex: 1, padding: "8px 10px", borderRadius: 10, border: "none",
-              background: activeTab === key ? "#fff" : "transparent",
-              color: activeTab === key ? "#1a1a1a" : "#777",
-              fontSize: 12, fontWeight: 700, cursor: "pointer",
-              boxShadow: activeTab === key ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-              whiteSpace: "nowrap",
-            }}>
-              {label}
-            </button>
-          ))}
-        </div>
+        {/* Onglet « Stats prix » retiré le 30/10/2026 : c'est la page Achats › Variations de prix */}
 
         {/* Date picker — shared between tabs */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginBottom: 24 }}>
           <DateRangePicker value={range} onChange={(r) => setRange(r)} />
         </div>
 
-        {activeTab === "stats" ? (
+        {versVariations ? (
           <VariationsPrix enOnglet />
         ) : (<>
 

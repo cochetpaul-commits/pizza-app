@@ -42,11 +42,10 @@ export const VENTES_ITEMS: NavItemV2[] = [
   { label: "Par produit", href: "/ventes", icon: "tag", permission: "performances.view" },
 ];
 export const RENTABILITE_ITEMS: NavItemV2[] = [
-  { label: "Résultat", href: "/rentabilite", icon: "wallet", permission: "performances.pilotage" },
-  { label: "Marge", href: "/analyse/marge", icon: "calculator", permission: "performances.pilotage" },
+  // 30/10/2026 : Résultat et Marge fusionnés (une seule page, du CA à l'EBE) ; Simulations accessible depuis Objectifs › Et si…
+  { label: "Résultat", href: "/analyse/marge", icon: "wallet", permission: "performances.pilotage" },
   { label: "Rentabilité des plats", href: "/analyse/plats", icon: "book", permission: "performances.pilotage" },
   { label: "Objectifs", href: "/objectifs", icon: "dashboard", permission: "performances.pilotage" },
-  { label: "Simulations", href: "/analyse/simulations", icon: "trendingUp", permission: "performances.pilotage" },
 ];
 export const ACHATS_ITEMS: NavItemV2[] = [
   { label: "Suivi des achats", href: "/achats", icon: "fileText", permission: "achats.view" },

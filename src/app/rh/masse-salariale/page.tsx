@@ -462,7 +462,7 @@ export default function MasseSalarialePage() {
         {/* Nature des chiffres : estimation planning × contrats, pas la paie */}
         <div style={{ fontSize: 11, color: "#8a8378", margin: "-6px 0 12px", lineHeight: 1.45 }}>
           <strong style={{ color: "#6f6a61" }}>Estimation</strong> : heures du planning Combo (synchro chaque matin à 7h{lastSyncLabel ? `, dernière ${lastSyncLabel}` : ""}) × salaires des contrats × 42 % de charges.
-          La masse salariale réellement payée est dans <a href="/rentabilite" style={{ color: ACCENT, fontWeight: 600 }}>Rentabilité</a> (Pennylane).
+          La masse salariale réellement payée est dans <a href="/analyse/marge" style={{ color: ACCENT, fontWeight: 600 }}>Rentabilité</a> (Pennylane).
         </div>
 
         {/* ═══ KPIs compacts ═══ */}
