@@ -59,7 +59,7 @@ export function TableauEquipe() {
   const cap = useMemo<Capacites>(() => (capacites.pour === etabId ? { salle: capacites.salle, jardin: capacites.jardin } : { salle: null, jardin: null }), [capacites, etabId]);
   const service = (svc: "midi" | "soir") => {
     const s = (stats?.services ?? []).filter((x) => x.svc === svc);
-    const cov = s.reduce((t, x) => t + x.cov, 0), ttc = s.reduce((t, x) => t + x.sp_ttc, 0), ht = s.reduce((t, x) => t + x.sp_ht, 0);
+    const cov = s.reduce((t, x) => t + x.sp_cov, 0), ttc = s.reduce((t, x) => t + x.sp_ttc, 0), ht = s.reduce((t, x) => t + x.sp_ht, 0);
     return { cov, ht, tm: cov > 0 ? ttc / cov : 0 };
   };
   const midi = service("midi"), soir = service("soir");

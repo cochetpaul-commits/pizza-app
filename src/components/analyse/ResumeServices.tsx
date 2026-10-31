@@ -16,7 +16,7 @@ function parService(s: StatsVentes | null): { midi: Bloc; soir: Bloc; emporter: 
   const jours = new Set<string>();
   for (const x of s?.services ?? []) {
     const b = x.svc === "midi" ? midi : x.svc === "soir" ? soir : null;
-    if (b) { b.ca_ht += x.sp_ht; b.ca_ttc += x.sp_ttc; b.couverts += x.cov; if (x.sp_ht > 0 || x.cov > 0) b.services++; }
+    if (b) { b.ca_ht += x.sp_ht; b.ca_ttc += x.sp_ttc; b.couverts += x.sp_cov; if (x.sp_ht > 0 || x.sp_cov > 0) b.services++; }
     emporter.ca_ht += x.emp_ht; emporter.ca_ttc += x.emp_ttc;
     if (x.emp_ht > 0) jours.add(x.date);
   }
