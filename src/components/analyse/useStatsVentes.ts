@@ -32,13 +32,21 @@ export type StatsVentes = {
   remises_ttc?: number;
   remises_detail?: { operateur: string; count: number; total: number }[];
   produits_offerts?: { name: string; qty: number; operateurs: string[] }[];
-  duration?: { avgDurMin: number; byZone: { zone: string; avgDur: number; tables: number; couverts: number }[]; bySvc: { svc: string; avgDur: number; tables: number }[]; avgRotation: number; rotByZone: { zone: string; avgRotation: number; maxRotation: number }[]; totalOrders: number };
+  duration?: { avgDurMin: number; byZone: { zone: string; avgDur: number; tables: number; couverts: number }[]; bySvc: { svc: string; avgDur: number; tables: number }[]; avgRotation: number; byZoneSvc?: { zone: string; svc: string; avgDur: number; tables: number; couverts: number; rotation: number }[]; rotByZone: { zone: string; avgRotation: number; maxRotation: number }[]; totalOrders: number };
 };
 export type ProduitVendu = { n: string; qty: number; ca_ttc: number; ca_ht: number };
 export type Attache = { tables: number; coverts: number; ca_ttc: number; ca_ht: number };
 export type MeteoJour = { emoji: string; desc: string; temp: number };
 /** Ticket moyen TTC par couvert sur place sur la période */
 export const ticketMoyen = (s: StatsVentes | null | undefined) => (s && s.cov_sur > 0 ? s.place_sur_ttc / s.cov_sur : 0);
+/** Ticket moyen TTC par couvert sur place d'un service (midi ou soir) sur la période */
+export function ticketMoyenService(s: StatsVentes | null | undefined, svc: "midi" | "soir"): number {
+  let ttc = 0, cov = 0;
+  for (const x of s?.services ?? []) if (x.svc === svc) { ttc += x.sp_ttc; cov += x.sp_cov; }
+  return cov > 0 ? ttc / cov : 0;
+}
+/** Total HT par zone sur la période */
+export const totalZonesHt = (s: StatsVentes) => Object.fromEntries(Object.entries(s.zones_ht ?? {}).map(([z, v]) => [z, (Array.isArray(v) ? v : [v]).reduce((t, x) => t + (Number(x) || 0), 0)]));
 /** Total par zone sur la période (les zones sont données jour par jour) */
 export const totalZones = (s: StatsVentes) => Object.fromEntries(Object.entries(s.zones_ttc).map(([z, v]) => [z, (Array.isArray(v) ? v : [v]).reduce((t, x) => t + (Number(x) || 0), 0)]));
 

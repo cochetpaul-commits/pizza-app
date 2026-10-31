@@ -11,6 +11,7 @@ import { MesPourboires } from "@/components/pourboires/PourboiresMois";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { couleurTexte } from "@/lib/styleCategories";
 import { TableauEquipe } from "@/components/equipe/TableauEquipe";
+import { useTablette } from "@/lib/tablette/store";
 
 /* ── Types (réponse /api/mon-tableau) ─────────────────────── */
 
@@ -233,6 +234,8 @@ function semaineCourante(): DateRange {
 
 export default function MonTableauPage() {
   const router = useRouter();
+  const tablette = useTablette();
+  const jetonTablette = tablette.actif ? tablette.employe?.jeton ?? null : null;
   const { current: etabCourant } = useEtablissement();
   const [period, setPeriod] = usePilotageRange(semaineCourante);
   const [data, setData] = useState<ApiData | null>(null);
@@ -280,8 +283,9 @@ export default function MonTableauPage() {
       const token = sess?.session?.access_token;
       if (!token) { setErr("Non connecté"); setLoading(false); return; }
       try {
+        // Tablette : le jeton de l'employé identifié par son code, pour ses propres chiffres (31/10/2026)
         const res = await fetchApi(`/api/mon-tableau?from=${period.from}&to=${period.to}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}`, ...(jetonTablette ? { "x-employe-tablette": jetonTablette } : {}) },
         });
         const json = await res.json();
         if (cancelled) return;
@@ -302,7 +306,7 @@ export default function MonTableauPage() {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period.from, period.to]);
+  }, [period.from, period.to, jetonTablette]);
 
   const profile = data?.employe?.profile;
   const today = new Date().toISOString().slice(0, 10);

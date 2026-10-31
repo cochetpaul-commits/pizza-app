@@ -8,12 +8,13 @@ import { useBureau } from "@/hooks/useBureau";
 import { fetchApi } from "@/lib/fetchApi";
 import { EnteteAnalyse, TuileVariation, Cadre, Note, Chargement, TH, TD, TDN } from "@/components/analyse/Blocs";
 import { GraphBarres } from "@/components/analyse/GraphBarres";
-import { ticketMoyen, totalZones, useStatsVentes } from "@/components/analyse/useStatsVentes";
+import { ticketMoyen, ticketMoyenService, totalZones, useStatsVentes } from "@/components/analyse/useStatsVentes";
 import { capacitesParJour, parJour, parJourSemaine, type Capacites } from "@/components/analyse/parJour";
-import { COULEUR_MIDI, COULEUR_SOIR, AMBRE, FAIBLE, MUTED, ROUGE, VERT, derniersJours, euros, jourCourt, nombre, pct } from "@/components/analyse/gabarit";
+import { COULEUR_EMPORTER, COULEUR_MIDI, COULEUR_SOIR, AMBRE, FAIBLE, MUTED, ROUGE, VERT, derniersJours, euros, jourCourt, nombre, pct } from "@/components/analyse/gabarit";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { ResumeServices } from "@/components/analyse/ResumeServices";
 import Link from "next/link";
+import { liseret } from "@/components/ui/charte";
 
 /**
  * Analyse › Couverts (10/10/2026) : « Qui vient, quand ? »
@@ -76,6 +77,23 @@ export function Couverts() {
     return Object.entries(zones).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([nom, ttc]) => ({ nom, ttc, part: total ? (ttc / total) * 100 : 0 }));
   }, [stats]);
   const couleurRemplissage = (r: number | null) => (r == null ? undefined : r >= 80 ? VERT : r >= 55 ? AMBRE : ROUGE);
+  // Ticket moyen de chaque service, en tuile (31/10/2026, demande de Paul)
+  const tmMidi = ticketMoyenService(stats, "midi"), tmSoir = ticketMoyenService(stats, "soir");
+  const tmMidiPrec = prec ? ticketMoyenService(prec, "midi") : null, tmSoirPrec = prec ? ticketMoyenService(prec, "soir") : null;
+  // Durée et rotation par zone et par service, face à la période comparée
+  const zonesServices = useMemo(() => {
+    const act = stats?.duration?.byZoneSvc ?? [], avant = prec?.duration?.byZoneSvc ?? [];
+    const zones = [...new Set(act.map((z) => z.zone))].sort((a, b) => a.localeCompare(b, "fr"));
+    const cherche = (liste: typeof act, zone: string, svc: string) => liste.find((z) => z.zone === zone && z.svc === svc) ?? null;
+    return zones.map((zone) => ({ zone, midi: cherche(act, zone, "midi"), soir: cherche(act, zone, "soir"), midiPrec: cherche(avant, zone, "midi"), soirPrec: cherche(avant, zone, "soir") }));
+  }, [stats, prec]);
+  const ecart = (v: number | undefined, pv: number | undefined, unite: string, inverse = false) => {
+    if (!v || !pv) return null;
+    const d = v - pv;
+    if (Math.abs(d) < 0.005) return null;
+    const bon = inverse ? d < 0 : d > 0;
+    return <div style={{ fontSize: 11, color: bon ? VERT : ROUGE, fontWeight: 600 }}>{d > 0 ? "+" : "−"}{unite === "min" ? Math.round(Math.abs(d)) : nombre(Math.abs(d), 2)} {unite}</div>;
+  };
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px", display: "grid", gap: 14, alignContent: "start" }}>
@@ -86,13 +104,16 @@ export function Couverts() {
 
       {stats && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(5, 1fr)" : "repeat(2, 1fr)", gap: bureau ? 10 : 8, opacity: chargement ? 0.6 : 1 }}>
+          <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, 1fr)" : "repeat(2, 1fr)", gap: bureau ? 10 : 8, opacity: chargement ? 0.6 : 1 }}>
             <TuileVariation compacte={!bureau} icone="couverts" libelle="Couverts" valeur={nombre(stats.couverts)} actuel={stats.couverts} precedent={prec?.couverts} sous={`${nombre(stats.tickets)} tickets`} />
             <TuileVariation compacte={!bureau} icone="couverts" couleur={COULEUR_MIDI} libelle="Midi" valeur={nombre(stats.cov_midi)} actuel={stats.cov_midi} precedent={prec?.cov_midi} sous={nMidi ? `${nombre(stats.cov_midi / nMidi)} par service` : undefined} />
             <TuileVariation compacte={!bureau} icone="couverts" couleur={COULEUR_SOIR} libelle="Soir" valeur={nombre(stats.cov_soir)} actuel={stats.cov_soir} precedent={prec?.cov_soir} sous={nSoir ? `${nombre(stats.cov_soir / nSoir)} par service` : undefined} />
             <TuileVariation compacte={!bureau} icone="produit" couleur={couleurRemplissage(rGlobal)} libelle="Remplissage" valeur={rGlobal != null ? pct(rGlobal) : "—"} actuel={rGlobal ?? 0} precedent={null}
               sous={cap.salle ? `midi ${rMidi != null ? pct(rMidi) : "—"} · soir ${rSoir != null ? pct(rSoir) : "—"} · ${cap.salle} places${cap.jardin ? `, +${cap.jardin} au jardin (ouvert ${nbJardin} service${nbJardin > 1 ? "s" : ""})` : ""}` : "capacités à renseigner dans Objectifs"} />
             <TuileVariation compacte={!bureau} icone="euro" libelle="Ticket moyen" valeur={euros(ticketMoyen(stats), 1)} actuel={ticketMoyen(stats)} precedent={prec ? ticketMoyen(prec) : null} sous="TTC par couvert sur place" />
+            <TuileVariation compacte={!bureau} icone="euro" couleur={COULEUR_MIDI} libelle="Ticket midi" valeur={tmMidi ? euros(tmMidi, 1) : "—"} actuel={tmMidi} precedent={tmMidiPrec} sous="TTC par couvert sur place, le midi" />
+            <TuileVariation compacte={!bureau} icone="euro" couleur={COULEUR_SOIR} libelle="Ticket soir" valeur={tmSoir ? euros(tmSoir, 1) : "—"} actuel={tmSoir} precedent={tmSoirPrec} sous="TTC par couvert sur place, le soir" />
+            <TuileVariation compacte={!bureau} icone="camion" couleur={COULEUR_EMPORTER} libelle="À emporter" valeur={nombre(stats.cov_emp)} actuel={stats.cov_emp} precedent={prec?.cov_emp} sous={`commandes · ${euros(stats.place_emp_ht)} HT`} />
           </div>
 
           {/* Midi, soir, à emporter en un coup d'œil (30/10/2026) */}
@@ -159,18 +180,38 @@ export function Couverts() {
               <GraphBarres format={(v) => euros(v)} etiquettes={Array.from({ length: 13 }, (_, i) => `${11 + i} h`)} libelleAxe="CA par heure"
                 series={[{ libelle: "CA TTC", couleur: COULEUR_SOIR, valeurs: Array.from({ length: 13 }, (_, i) => stats.hourly_ttc?.[11 + i] ?? 0) }]} />
             </Cadre>
-            <Cadre titre="Durée et rotation des tables" sous="Entre l'ouverture et la fermeture du ticket ; rotation : tickets par table et par service." sansMarge>
-              <table style={{ borderCollapse: "collapse", width: "100%", marginTop: 10 }}>
-                <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Zone</th><th style={{ ...TH, textAlign: "right" }}>Durée</th><th style={{ ...TH, textAlign: "right" }}>Rotation</th></tr></thead>
-                <tbody>
-                  {(stats.duration?.byZone ?? []).map((z) => {
-                    const r = stats.duration?.rotByZone.find((x) => x.zone === z.zone);
-                    return <tr key={z.zone}><td style={{ ...TD, width: 6, padding: 0, background: COULEUR_SOIR }} /><td style={{ ...TD, fontWeight: 600 }}>{z.zone}<div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400 }}>{nombre(z.tables)} tables</div></td><td style={TDN}>{z.avgDur} min</td><td style={TDN}>{r ? `×${nombre(r.avgRotation, 1)}` : "—"}</td></tr>;
-                  })}
-                  {(stats.duration?.bySvc ?? []).map((s) => <tr key={s.svc}><td style={{ ...TD, width: 6, padding: 0 }} /><td style={{ ...TD, color: MUTED }}>{s.svc === "midi" ? "Midi" : "Soir"}</td><td style={{ ...TDN, color: MUTED }}>{s.avgDur} min</td><td style={TDN} /></tr>)}
-                </tbody>
-              </table>
-              <div style={{ padding: "8px 16px 14px" }}><Note>En moyenne {stats.duration?.avgDurMin ?? 0} min par table, rotation ×{nombre(stats.duration?.avgRotation ?? 0, 1)} par service.</Note></div>
+            <Cadre titre="Durée et rotation des tables" sous="Par zone, midi et soir : minutes entre l'ouverture et la fermeture du ticket, et tickets par table et par service. En dessous, l'écart face à la période comparée." sansMarge>
+              <div style={{ overflowX: "auto", marginTop: 10 }}>
+                <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Zone</th>
+                      <th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Durée midi</th><th style={{ ...TH, textAlign: "right", color: COULEUR_MIDI }}>Rotation</th>
+                      <th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Durée soir</th><th style={{ ...TH, textAlign: "right", color: COULEUR_SOIR }}>Rotation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {zonesServices.length === 0 && <tr><td colSpan={6} style={{ ...TD, color: FAIBLE }}>Pas de durée de table sur la période.</td></tr>}
+                    {zonesServices.map((z) => (
+                      <tr key={z.zone}>
+                        <td style={liseret(COULEUR_SOIR)} />
+                        <td style={{ ...TD, fontWeight: 600 }}>{z.zone}<div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400 }}>{nombre((z.midi?.tables ?? 0) + (z.soir?.tables ?? 0))} tables</div></td>
+                        <td style={TDN}>{z.midi ? `${z.midi.avgDur} min` : "—"}{ecart(z.midi?.avgDur, z.midiPrec?.avgDur, "min", true)}</td>
+                        <td style={TDN}>{z.midi?.rotation ? `×${nombre(z.midi.rotation, 2)}` : "—"}{ecart(z.midi?.rotation, z.midiPrec?.rotation, "")}</td>
+                        <td style={TDN}>{z.soir ? `${z.soir.avgDur} min` : "—"}{ecart(z.soir?.avgDur, z.soirPrec?.avgDur, "min", true)}</td>
+                        <td style={TDN}>{z.soir?.rotation ? `×${nombre(z.soir.rotation, 2)}` : "—"}{ecart(z.soir?.rotation, z.soirPrec?.rotation, "")}</td>
+                      </tr>
+                    ))}
+                    {(stats.duration?.bySvc ?? []).length > 0 && (
+                      <tr>
+                        <td style={{ ...TD, width: 6, padding: 0 }} /><td style={{ ...TD, color: MUTED }}>Toutes zones</td>
+                        {(["midi", "soir"] as const).map((svc) => { const d = stats.duration?.bySvc.find((x) => x.svc === svc); return <td key={svc} colSpan={2} style={{ ...TDN, color: MUTED }}>{d ? `${d.avgDur} min · ${nombre(d.tables)} tables` : "—"}</td>; })}
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ padding: "8px 16px 14px" }}><Note>En moyenne {stats.duration?.avgDurMin ?? 0} min par table, rotation ×{nombre(stats.duration?.avgRotation ?? 0, 1)} par service. Une durée plus courte est en vert : la table tourne mieux.</Note></div>
             </Cadre>
           </div>
         </>

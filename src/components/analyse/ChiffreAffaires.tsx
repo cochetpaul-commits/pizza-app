@@ -6,13 +6,14 @@ import { usePilotageRange } from "@/lib/pilotageRange";
 import { useBureau } from "@/hooks/useBureau";
 import { EnteteAnalyse, TuileVariation, Cadre, Note, Chargement, TH, TD, TDN } from "@/components/analyse/Blocs";
 import { GraphBarres } from "@/components/analyse/GraphBarres";
-import { ticketMoyen, useStatsVentes } from "@/components/analyse/useStatsVentes";
+import { ticketMoyen, totalZones, totalZonesHt, useStatsVentes } from "@/components/analyse/useStatsVentes";
 import { parJour, parJourSemaine } from "@/components/analyse/parJour";
-import { COULEUR_EMPORTER, COULEUR_MIDI, COULEUR_SOIR, FAIBLE, MUTED, ROUGE, VERT, derniersJours, euros, jourCourt, nombre, pct } from "@/components/analyse/gabarit";
+import { COULEUR_EMPORTER, COULEUR_MIDI, COULEUR_SOIR, FAIBLE, MUTED, ROUGE, VERT, derniersJours, euros, jourCourt, nombre, pct, texteVariation, variation } from "@/components/analyse/gabarit";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { ResumeServices } from "@/components/analyse/ResumeServices";
 import { useEvenementiel } from "@/components/evenementiel/useEvenementiel";
 import Link from "next/link";
+import { liseret } from "@/components/ui/charte";
 
 /**
  * Analyse › Chiffre d'affaires (10/10/2026) : « Comment se porte le CA ? »
@@ -35,6 +36,15 @@ export function ChiffreAffaires() {
   const meilleur = semaine.length ? semaine.reduce((a, b) => (b.ht > a.ht ? b : a)) : null;
   const pire = semaine.length > 1 ? semaine.reduce((a, b) => (b.ht < a.ht ? b : a)) : null;
   const tva = stats ? stats.ca_ttc - stats.ca_ht : 0;
+  // CA par zone de la caisse (31/10/2026, demande de Paul) : salle, pergolas, terrasse, à emporter, face à la période comparée
+  const zones = useMemo(() => {
+    if (!stats) return [];
+    const ht = totalZonesHt(stats), ttc = totalZones(stats), avant = prec ? totalZonesHt(prec) : {};
+    const total = Object.values(ht).reduce((t, v) => t + v, 0);
+    return Object.keys({ ...ht, ...avant }).filter((z) => (ht[z] ?? 0) > 0 || (avant[z] ?? 0) > 0)
+      .sort((x, y) => (ht[y] ?? 0) - (ht[x] ?? 0))
+      .map((z) => ({ nom: z, ht: ht[z] ?? 0, ttc: ttc[z] ?? 0, avant: avant[z] ?? 0, part: total ? ((ht[z] ?? 0) / total) * 100 : 0 }));
+  }, [stats, prec]);
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px", display: "grid", gap: 14, alignContent: "start" }}>
@@ -72,6 +82,33 @@ export function ChiffreAffaires() {
                 ]} />
             )}
           </Cadre>
+
+          {zones.length > 0 && (
+            <Cadre titre="CA par zone" sous="Hors taxes par zone de la caisse : salle, pergolas, terrasse, à emporter. La variation est face à la période comparée." sansMarge>
+              <div style={{ overflowX: "auto", marginTop: 10 }}>
+                <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                  <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Zone</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th>{bureau && <th style={{ ...TH, textAlign: "right" }}>TTC</th>}<th style={{ ...TH, textAlign: "right" }}>Part</th><th style={{ ...TH, textAlign: "right" }}>Avant</th></tr></thead>
+                  <tbody>
+                    {zones.map((z) => {
+                      const d = variation(z.ht, z.avant || null);
+                      const emporter = z.nom.toLowerCase().includes("emporter");
+                      return (
+                        <tr key={z.nom}>
+                          <td style={liseret(emporter ? COULEUR_EMPORTER : COULEUR_SOIR)} />
+                          <td style={{ ...TD, fontWeight: 600 }}>{z.nom}<div style={{ height: 5, borderRadius: 3, background: "#f0ebe3", marginTop: 5, overflow: "hidden", maxWidth: 160 }}><div style={{ width: `${z.part}%`, height: "100%", background: emporter ? COULEUR_EMPORTER : COULEUR_SOIR }} /></div></td>
+                          <td style={{ ...TDN, fontWeight: 700 }}>{euros(z.ht)}</td>
+                          {bureau && <td style={{ ...TDN, color: MUTED }}>{euros(z.ttc)}</td>}
+                          <td style={{ ...TDN, color: MUTED }}>{pct(z.part)}</td>
+                          <td style={TDN}>{d == null ? <span style={{ color: FAIBLE }}>—</span> : <span style={{ color: d >= 0 ? VERT : ROUGE, fontWeight: 600 }}>{texteVariation(d)}</span>}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ padding: "8px 16px 14px" }}><Note>Une terrasse ou des pergolas à zéro un jour de pluie n&apos;est pas une anomalie de saisie.</Note></div>
+            </Cadre>
+          )}
 
           <Cadre titre="Par jour de semaine" sous="Moyenne par jour ouvert sur la période : où sont les jours forts et les jours faibles."
             droite={meilleur && pire && meilleur !== pire ? <div style={{ fontSize: 12.5, color: MUTED }}>Meilleur jour <b style={{ color: VERT }}>{meilleur.jour}</b> · plus faible <b style={{ color: ROUGE }}>{pire.jour}</b></div> : undefined} sansMarge>

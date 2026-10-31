@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import { CODE_VALIDE, verifierCode } from "@/lib/tablette/codePin";
+import { signerJeton } from "@/lib/tablette/jeton";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,5 +27,6 @@ export async function POST(req: NextRequest) {
   // Petite attente : un code à 4 chiffres ne se devine pas en rafale
   await new Promise((r) => setTimeout(r, 350));
   if (!trouve) return NextResponse.json({ error: "Code inconnu" }, { status: 404 });
-  return NextResponse.json({ employe: { id: trouve.id, prenom: trouve.prenom, nom: trouve.nom, equipe: ((trouve.equipes_access as string[] | null) ?? [])[0] ?? null } });
+  // Le jeton signé sert aux chiffres personnels de l'employé (tableau de bord) sans changer les droits de la tablette
+  return NextResponse.json({ employe: { id: trouve.id, prenom: trouve.prenom, nom: trouve.nom, equipe: ((trouve.equipes_access as string[] | null) ?? [])[0] ?? null, jeton: signerJeton(trouve.id as string, etabId) } });
 }

@@ -173,7 +173,7 @@ type Stats = ReturnType<typeof aggregate>;
  * relu tel quel ; sinon les lignes sont chargées, agrégées, et le résultat remplace le cache.
  * Vécu 08/10 : chaque ouverture de la page rechargeait trois périodes complètes de lignes.
  */
-const VERSION_CALCUL = "2026-10-30a";
+const VERSION_CALCUL = "2026-10-31a";
 
 /** Ce que le tableau de l'équipe a le droit de voir : CA, tickets, couverts et ticket moyen par service, à emporter. Rien d'autre. */
 function resumeEquipe(s: Record<string, unknown> | null): Record<string, unknown> | null {
@@ -395,7 +395,7 @@ function aggregate(rows: Row[]) {
   }
 
   // Zones par jour (TTC + HT)
-  const zoneNames = ["Salle", "Pergolas", "Terrasse", "Salon", "\u00C0 emporter"];
+  const zoneNames = ["Salle", "Pergolas", "Terrasse", "Jardin", "Salon", "\u00C0 emporter"];
   const isEmp = (r: Row) => r.salle?.toLowerCase().includes("emporter");
   const isSalle = (r: Row) => r.salle === "Salle" || r.salle === "Salle pizza";
   const zoneMatch = (z: string) => z === "\u00C0 emporter" ? isEmp : z === "Salle" ? isSalle : (r: Row) => r.salle === z;
@@ -765,6 +765,26 @@ function aggregate(rows: Row[]) {
     couverts: d.totalCov,
   }));
 
+  // Par zone et par service (31/10/2026) : durée moyenne, tables, couverts et rotation midi / soir
+  const durByZoneSvc: Record<string, { zone: string; svc: string; count: number; totalDur: number; totalCov: number; slots: Record<string, number> }> = {};
+  for (const o of orderDurs) {
+    if (o.salle.toLowerCase().includes("emporter") || (o.service !== "midi" && o.service !== "soir")) continue;
+    const k = `${o.salle}|${o.service}`;
+    if (!durByZoneSvc[k]) durByZoneSvc[k] = { zone: o.salle, svc: o.service, count: 0, totalDur: 0, totalCov: 0, slots: {} };
+    const z = durByZoneSvc[k];
+    z.count++; z.totalDur += o.dur; z.totalCov += o.cov;
+    if (o.table) { const slot = `${o.date}:${o.table}`; z.slots[slot] = (z.slots[slot] ?? 0) + 1; }
+  }
+  const byZoneSvc = Object.values(durByZoneSvc).map((z) => {
+    const rots = Object.values(z.slots);
+    return {
+      zone: z.zone, svc: z.svc,
+      avgDur: z.count > 0 ? Math.round(z.totalDur / z.count) : 0,
+      tables: z.count, couverts: z.totalCov,
+      rotation: rots.length > 0 ? Math.round(rots.reduce((a, b) => a + b, 0) / rots.length * 100) / 100 : 0,
+    };
+  });
+
   // Duration by service
   const durBySvc: Record<string, { count: number; totalDur: number }> = {};
   for (const o of orderDurs) {
@@ -873,6 +893,7 @@ function aggregate(rows: Row[]) {
       bySvc: svcDurations,
       avgRotation,
       rotByZone: zoneRotations,
+      byZoneSvc,
       totalOrders: orderDurs.length,
     },
     remises_ttc: Math.round(remises_ttc * 100) / 100,

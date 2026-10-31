@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifierJeton } from "@/lib/tablette/jeton";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { normalizeRole, type Role } from "@/lib/rbac";
 
@@ -172,6 +173,9 @@ export async function GET(req: NextRequest) {
     .eq("id", user.id)
     .maybeSingle();
 
+  // ── Tablette : l'employé identifié par son code (jeton signé) voit ses propres chiffres ──
+  const jeton = verifierJeton(req.headers.get("x-employe-tablette"));
+
   // ── Fiche employé + poste ──
   let empQ = await supabaseAdmin
     .from("employes")
@@ -188,6 +192,18 @@ export async function GET(req: NextRequest) {
     emps = empQ.data ?? [];
   }
 
+  let tabletteOk = false;
+  if (jeton && emps.some(e => e.etablissement_id === jeton.etab_id)) {
+    const { data: ident } = await supabaseAdmin
+      .from("employes")
+      .select("id, prenom, role, popina_operateur, etablissement_id, poste_id, postes(nom, equipe)")
+      .eq("id", jeton.employe_id)
+      .eq("etablissement_id", jeton.etab_id)
+      .eq("actif", true)
+      .maybeSingle();
+    if (ident) { emps = [ident]; tabletteOk = true; }
+  }
+
   const RANK: Record<Role, number> = { equipier: 0, manager: 1, group_admin: 2 };
   let effectiveRole: Role = profileRow?.role ? normalizeRole(profileRow.role as string) : "equipier";
   for (const e of emps) {
@@ -196,6 +212,9 @@ export async function GET(req: NextRequest) {
       if (RANK[r] > RANK[effectiveRole]) effectiveRole = r;
     }
   }
+
+  // Sur la tablette, l'employé identifié garde une vue personnelle : les droits restent ceux du compte tablette
+  if (tabletteOk) effectiveRole = "equipier";
 
   // Admins : vision globale via /pilotage — pas de tableau personnalisé
   if (effectiveRole === "group_admin") {

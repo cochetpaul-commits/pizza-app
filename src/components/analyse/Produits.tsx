@@ -8,7 +8,7 @@ import { useBureau } from "@/hooks/useBureau";
 import { fetchApi } from "@/lib/fetchApi";
 import { EnteteAnalyse, TuileVariation, Cadre, Note, Chargement, TH, TD, TDN } from "@/components/analyse/Blocs";
 import { useStatsVentes, type Attache, type ProduitVendu, type StatsVentes } from "@/components/analyse/useStatsVentes";
-import { FAIBLE, MUTED, ROUGE, VERT, AMBRE, derniersJours, euros, nombre, pct } from "@/components/analyse/gabarit";
+import { FAIBLE, MUTED, ROUGE, VERT, AMBRE, derniersJours, euros, nombre, pct, texteVariation, variation } from "@/components/analyse/gabarit";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { getCategoryColor } from "@/lib/categoryColors";
 import { couleurTexte } from "@/lib/styleCategories";
@@ -95,6 +95,21 @@ export function Produits() {
       return { cat, couleur: getCategoryColor(cat), qty, ht, ttc, lignes: q ? lignes.filter((p) => norm(p.n).includes(q)) : lignes };
     }).filter((c) => c.lignes.length > 0).sort((a, b) => a.cat.localeCompare(b.cat, "fr"));
   }, [stats, prec, q]);
+  // Tendances par catégorie (31/10/2026, demande de Paul) : quantités et CA de chaque catégorie face à la période comparée,
+  // sans le filtre de recherche, classées par CA
+  const tendancesCat = useMemo(() => {
+    if (!stats?.cat_products) return [];
+    const precParCat = prec?.cat_products ?? {};
+    const somme = (ps: ProduitVendu[] | undefined) => (ps ?? []).reduce((t, p) => ({ qty: t.qty + p.qty, ht: t.ht + p.ca_ht }), { qty: 0, ht: 0 });
+    const total = Object.values(stats.cat_products).flat().reduce((t, p) => t + p.ca_ht, 0);
+    return Object.keys({ ...stats.cat_products, ...precParCat }).map((cat) => {
+      const a = somme(stats.cat_products?.[cat]), av = somme(precParCat[cat]);
+      return { cat, couleur: getCategoryColor(cat), qty: a.qty, ht: a.ht, qtyAvant: av.qty, htAvant: av.ht, part: total ? (a.ht / total) * 100 : 0 };
+    }).filter((c) => c.qty > 0 || c.qtyAvant > 0).sort((a, b) => b.ht - a.ht);
+  }, [stats, prec]);
+  const plats = tendancesCat.find((c) => /cucina|cuisine|plat/i.test(c.cat)) ?? null, pizze = tendancesCat.find((c) => /pizz/i.test(c.cat)) ?? null;
+  const ratioPlats = plats && pizze && pizze.qty > 0 ? (plats.qty / pizze.qty) * 100 : null;
+  const ratioPlatsAvant = plats && pizze && pizze.qtyAvant > 0 ? (plats.qtyAvant / pizze.qtyAvant) * 100 : null;
   const totalQty = useMemo(() => Object.values(stats?.cat_products ?? {}).flat().reduce((t, p) => t + p.qty, 0), [stats]);
   const totalQtyPrec = useMemo(() => Object.values(prec?.cat_products ?? {}).flat().reduce((t, p) => t + p.qty, 0), [prec]);
   const parNomPrec = useMemo(() => new Map(Object.values(prec?.cat_products ?? {}).flat().map((p) => [p.n, p])), [prec]);
@@ -134,6 +149,35 @@ export function Produits() {
             <TuileVariation compacte={!bureau} icone="ticket" couleur={couleurTaux(taux(vin, tickets), obj(FAMILLES[4]))} libelle="Tables avec vin" valeur={taux(vin, tickets) != null ? pct(taux(vin, tickets)!) : "—"} actuel={taux(vin, tickets) ?? 0} precedent={taux(attache(prec, "vin"), ticketsPrec)} sous={`objectif ${pct(obj(FAMILLES[4]), 0)}`} />
             <TuileVariation compacte={!bureau} icone="foodcost" libelle="Part des boissons" valeur={stats.ca_ht ? pct((stats.drink_ht / stats.ca_ht) * 100) : "—"} actuel={stats.ca_ht ? (stats.drink_ht / stats.ca_ht) * 100 : 0} precedent={prec?.ca_ht ? (prec.drink_ht / prec.ca_ht) * 100 : null} sous={`${euros(stats.drink_ht)} HT de boissons`} />
           </div>
+
+          {tendancesCat.length > 0 && (
+            <Cadre titre="Tendances par catégorie" sous="Ce que chaque catégorie a vendu sur la période, en quantité et en CA HT, face à la période comparée. Un clic ouvre la catégorie." sansMarge
+              droite={ratioPlats != null ? <div style={{ fontSize: 12.5, color: MUTED }}>Plats face aux pizze : <b style={{ color: "#1a1a1a" }}>{nombre(ratioPlats)} plats pour 100 pizze</b>{ratioPlatsAvant != null && ratioPlatsAvant > 0 && (() => { const d = variation(ratioPlats, ratioPlatsAvant); return d == null ? null : <span style={{ color: d >= 0 ? VERT : ROUGE, fontWeight: 600 }}> {texteVariation(d)}</span>; })()}</div> : undefined}>
+              <div style={{ overflowX: "auto", marginTop: 10 }}>
+                <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                  <thead><tr><th style={{ ...TH, padding: 0, width: 6 }} /><th style={TH}>Catégorie</th><th style={{ ...TH, textAlign: "right" }}>Quantité</th><th style={{ ...TH, textAlign: "right" }}>Évolution</th><th style={{ ...TH, textAlign: "right" }}>CA HT</th>{bureau && <th style={{ ...TH, textAlign: "right" }}>Évolution</th>}<th style={{ ...TH, textAlign: "right" }}>Part</th></tr></thead>
+                  <tbody>
+                    {tendancesCat.map((c) => {
+                      const dq = variation(c.qty, c.qtyAvant || null), dh = variation(c.ht, c.htAvant || null);
+                      const ev = (d: number | null) => (d == null ? <span style={{ color: FAIBLE }}>—</span> : <span style={{ color: d >= 0 ? VERT : ROUGE, fontWeight: 600 }}>{texteVariation(d)}</span>);
+                      return (
+                        <tr key={c.cat} className="pr-ligne" onClick={() => voirCategorie(c.cat)}>
+                          <td style={liseret(c.couleur)} />
+                          <td style={{ ...TD, fontWeight: 700, color: couleurTexte(c.couleur) }}>{c.cat}{c.qtyAvant > 0 && <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 400 }}>avant {nombre(c.qtyAvant)} · {euros(c.htAvant)}</div>}</td>
+                          <td style={{ ...TDN, fontWeight: 700 }}>{nombre(c.qty)}</td>
+                          <td style={TDN}>{ev(dq)}</td>
+                          <td style={TDN}>{euros(c.ht)}</td>
+                          {bureau && <td style={TDN}>{ev(dh)}</td>}
+                          <td style={{ ...TDN, color: MUTED }}>{pct(c.part)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {!bureau && ratioPlats != null && <div style={{ padding: "8px 16px 12px", fontSize: 12.5, color: MUTED }}>Plats face aux pizze : <b style={{ color: "#1a1a1a" }}>{nombre(ratioPlats)} plats pour 100 pizze</b></div>}
+            </Cadre>
+          )}
 
           {/* Tendance des ventes (30/10/2026) : les catégories à gauche (le « mix » de l'ancienne page, cliquables),
               le graphique et les plats à droite. Deux tuiles en une, à la demande de Paul. */}

@@ -7,7 +7,7 @@ import { useSyncExternalStore } from "react";
  * l'employé devant l'écran s'identifie avec son code à 4 chiffres, et se déconnecte après un délai sans activité,
  * ou avec « Changer d'employé ». Les menus se limitent à Service, Cuisine et Achats et stock.
  */
-export type EmployeTablette = { id: string; prenom: string; nom: string; equipe: string | null; depuis: number };
+export type EmployeTablette = { id: string; prenom: string; nom: string; equipe: string | null; depuis: number; /** jeton signé (API /api/tablette/identifier) : qui est devant l'écran */ jeton?: string };
 export type EtatTablette = { actif: boolean; delai: number; employe: EmployeTablette | null };
 export const DELAIS: { valeur: number; libelle: string }[] = [
   { valeur: 30, libelle: "30 secondes" }, { valeur: 60, libelle: "1 minute" }, { valeur: 300, libelle: "5 minutes" }, { valeur: 0, libelle: "Jamais" },

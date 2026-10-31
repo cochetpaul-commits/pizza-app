@@ -4,6 +4,7 @@ import { COULEUR_EMPORTER, COULEUR_MIDI, COULEUR_SOIR, FAIBLE, MUTED, euros, nom
 import { Cadre, TH, TD } from "@/components/analyse/Blocs";
 import type { StatsVentes } from "@/components/analyse/useStatsVentes";
 import { liseret } from "@/components/ui/charte";
+import { useBureau } from "@/hooks/useBureau";
 
 /**
  * Midi · Soir · À emporter en un coup d'œil (30/10/2026, demande de Paul) : CA HT, services, couverts,
@@ -26,6 +27,7 @@ function parService(s: StatsVentes | null): { midi: Bloc; soir: Bloc; emporter: 
 }
 
 export function ResumeServices({ stats, prec, titre = "Midi, soir, à emporter", sous = "Le CA, les couverts et le ticket moyen de chaque service sur la période, face à la période comparée." }: { stats: StatsVentes; prec: StatsVentes | null; titre?: string; sous?: string }) {
+  const bureau = useBureau();
   const a = parService(stats), p = parService(prec);
   type Colonne = { cle: "midi" | "soir" | "emporter"; libelle: string; couleur: string; unite: string };
   const toutes: Colonne[] = [
@@ -51,6 +53,29 @@ export function ResumeServices({ stats, prec, titre = "Midi, soir, à emporter",
     const d = variation(v, pv);
     return d == null ? null : <span style={{ fontSize: 11.5, color: d >= 0 ? "#4a6741" : "#b4443a", fontWeight: 600, marginLeft: 6 }}>{texteVariation(d)}</span>;
   };
+  if (!bureau) {
+    // Téléphone (31/10/2026) : le tableau débordait et se lisait sans ses libellés ; un bloc par service
+    return (
+      <Cadre titre={titre} sous={sous}>
+        <div style={{ display: "grid", gap: 10 }}>
+          {colonnes.map((c) => (
+            <div key={c.cle} style={{ borderRadius: 10, border: "1px solid #ece6db", boxShadow: `inset 6px 0 0 ${c.couleur}`, padding: "8px 12px 8px 16px" }}>
+              <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", fontWeight: 700, color: c.couleur, marginBottom: 4 }}>{c.libelle}</div>
+              {lignes.map((l, i) => {
+                const v = l.valeur(a[c.cle]), pv = l.valeur(p[c.cle]);
+                return (
+                  <div key={l.libelle} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, padding: "3px 0", borderTop: i ? "1px solid #f3efe7" : undefined }}>
+                    <span style={{ color: i === 0 ? "#1a1a1a" : MUTED, fontWeight: i === 0 ? 700 : 500 }}>{l.libelle}</span>
+                    <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", fontWeight: i === 0 ? 700 : 500, color: v > 0 ? "#1a1a1a" : FAIBLE }}>{v > 0 ? l.format(v, c) : "—"}{delta(v, pv)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </Cadre>
+    );
+  }
   return (
     <Cadre titre={titre} sous={sous} sansMarge>
       <div style={{ overflowX: "auto", marginTop: 10 }}>
