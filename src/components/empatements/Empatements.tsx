@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useBureau } from "@/hooks/useBureau";
-import { calculerPate, type EmpatementType, type FlourMixItem, type Phase } from "@/lib/pateEngine";
+import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult } from "@/lib/pateEngine";
+import { formatG, lignesPesee, nomPhase } from "@/lib/pateAffichage";
+import { openApiFile } from "@/lib/fetchApi";
 import { Tuile } from "@/components/ui/Tuile";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { ACCENT, ATTENTION, BORD, BTN, CADRE, INTERTITRE, MUTED, OSWALD, TD, TH, h1, liseret } from "@/components/ui/charte";
@@ -20,28 +22,20 @@ type Recette = {
   id: string; name: string; type: EmpatementType; balls_count: number; ball_weight: number;
   hydration_total: number; salt_percent: number; honey_percent: number; oil_percent: number;
   yeast_percent: number; biga_yeast_percent: number; flour_mix: FlourMixItem[]; procedure: string[];
+  /* Module pâte, phase 1 (01/11/2026) */
+  biga_percent: number; biga_hydration: number; biga_flour: string | null; water_start_pct: number; loss_margin_pct: number; mixer_max_balls: number;
 };
 
 const n2 = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
 const g = (x: number) => `${Math.round(x).toLocaleString("fr-FR")} g`;
 const kg = (x: number) => x >= 1000 ? `${(x / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} kg` : g(x);
 const cle = (id: string) => `empatements_patons_${id}`;
-/** « FARINE TIPO 0 'SOFFIO 25 KG » → « Tipo 0 Soffio » : le nom du sac tronquait sur mobile */
-const nomFarine = (s: string) => {
-  const court = s.replace(/["'«»]/g, "").replace(/\b\d+\s*kg\b/i, "").replace(/^farine\s+/i, "").replace(/\s+/g, " ").trim();
-  return (court || s).toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
-};
 
 function lireProcedure(p: unknown): string[] {
   if (!p) return [];
   const s = String(p);
   try { const j = JSON.parse(s); if (Array.isArray(j)) return j.map(String); } catch { /* texte brut */ }
   return [s];
-}
-
-function nomPhase(ph: Phase, type: EmpatementType, i: number) {
-  if (type !== "biga") return "Pesée";
-  return i === 0 ? "Biga" : "Pâte finale";
 }
 
 export function Empatements() {
@@ -67,6 +61,8 @@ export function Empatements() {
           hydration_total: n2(r.hydration_total) || 65, salt_percent: n2(r.salt_percent), honey_percent: n2(r.honey_percent),
           oil_percent: n2(r.oil_percent), yeast_percent: n2(r.yeast_percent), biga_yeast_percent: n2(r.biga_yeast_percent),
           flour_mix: Array.isArray(mix) ? mix : [], procedure: lireProcedure(r.procedure),
+          biga_percent: n2(r.biga_percent) || 50, biga_hydration: n2(r.biga_hydration) || 45, biga_flour: r.biga_flour ? String(r.biga_flour) : null,
+          water_start_pct: r.water_start_pct == null ? 80 : n2(r.water_start_pct), loss_margin_pct: n2(r.loss_margin_pct), mixer_max_balls: n2(r.mixer_max_balls),
         };
       });
       // Les pâtes de l'établissement courant d'abord (ex. « Focaccia Piccola Mia » chez Piccola)
@@ -93,39 +89,50 @@ export function Empatements() {
   );
 }
 
-function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: Recette; onReglages: () => void; bureau: boolean }) {
+export function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: Recette; onReglages: () => void; bureau: boolean }) {
   const [patons, setPatons] = useState<number | "">(() => {
     try { const v = Number(localStorage.getItem(cle(r.id))); if (v > 0) return v; } catch { /* stockage indisponible */ }
     return r.balls_count;
   });
   const [poids, setPoids] = useState<number | "">(r.ball_weight);
   const [procedeOuvert, setProcedeOuvert] = useState(false);
+  // Au delà de la capacité du pétrin : afficher les pesées par pétrissage
+  const [parPetrin, setParPetrin] = useState(false);
   useEffect(() => { try { if (patons) localStorage.setItem(cle(r.id), String(patons)); } catch { /* ignoré */ } }, [patons, r.id]);
 
+  const calculer = (nb: number) => calculerPate({
+    type: r.type, nbPatons: nb, poidsPaton: Number(poids),
+    recipe: {
+      hydration_total: r.hydration_total, salt_percent: r.salt_percent, honey_percent: r.honey_percent, oil_percent: r.oil_percent,
+      yeast_percent: r.yeast_percent, biga_yeast_percent: r.biga_yeast_percent, biga_percent: r.biga_percent, biga_hydration: r.biga_hydration,
+      biga_flour: r.biga_flour, water_start_pct: r.water_start_pct, loss_margin_pct: r.loss_margin_pct, mixer_max_balls: r.mixer_max_balls,
+    },
+    flourMix: r.flour_mix.length ? r.flour_mix : undefined,
+  });
   const resultat = useMemo(() => {
     if (!patons || !poids) return null;
-    try {
-      return calculerPate({
-        type: r.type, nbPatons: Number(patons), poidsPaton: Number(poids),
-        recipe: { hydration_total: r.hydration_total, salt_percent: r.salt_percent, honey_percent: r.honey_percent, oil_percent: r.oil_percent, yeast_percent: r.yeast_percent, biga_yeast_percent: r.biga_yeast_percent },
-        flourMix: r.flour_mix.length ? r.flour_mix : undefined,
-      });
-    } catch { return null; }
+    try { return calculer(Number(patons)); } catch { return null; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [r, patons, poids]);
-
-  const mix = r.flour_mix.length ? r.flour_mix : [{ name: "Farine", percent: 100 }];
+  const lots = resultat?.summary.lots ?? [];
+  const resultatsLots = useMemo(() => {
+    if (!parPetrin || lots.length < 2) return null;
+    try { return lots.map((nb) => calculer(nb)); } catch { return null; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [r, poids, parPetrin, lots.join(",")]);
+  const etiquettes = () => { if (patons && poids) void openApiFile(`/api/empatements/etiquettes?recette=${r.id}&patons=${patons}&poids=${poids}`); };
   const typeLabel = r.type === "biga" ? "Biga" : r.type === "focaccia" ? "Focaccia" : "Direct";
   const couleur = r.type === "biga" ? "#b8601f" : r.type === "focaccia" ? "#8a6a3a" : "#4a6741";
   const params = [
     `Hydratation ${r.hydration_total.toLocaleString("fr-FR")} %`, `Sel ${r.salt_percent.toLocaleString("fr-FR")} %`,
     ...(r.honey_percent > 0 ? [`Miel ${r.honey_percent.toLocaleString("fr-FR")} %`] : []),
     ...(r.oil_percent > 0 ? [`Huile ${r.oil_percent.toLocaleString("fr-FR")} %`] : []),
-    ...(r.type === "biga" ? [`Levure biga ${r.biga_yeast_percent.toLocaleString("fr-FR")} %`] : [`Levure ${r.yeast_percent.toLocaleString("fr-FR")} %`]),
+    ...(r.type === "biga" ? [`Biga ${r.biga_percent.toLocaleString("fr-FR")} %`, `Levure biga ${r.biga_yeast_percent.toLocaleString("fr-FR")} %`] : [`Levure ${r.yeast_percent.toLocaleString("fr-FR")} %`]),
   ];
   const pasPoids = r.ball_weight >= 1000 ? 50 : 2;
 
   return (
-    <section style={{ ...CADRE, display: "grid" }}>
+    <section style={{ ...CADRE, display: "grid", alignContent: "start" }}>
       {/* En-tête : liseré de couleur, nom en Oswald, type et paramètres en pastilles fines ; les réglages à droite */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 16px", background: degradeCategorie(couleur), color: "#fff" }}>
         <div style={{ minWidth: 0, flex: 1, display: "grid", gap: 6 }}>
@@ -162,59 +169,38 @@ function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: Recette;
           <div style={bureau ? { gridColumn: "1 / -1" } : undefined}><Tuile compacte couleur={couleur} libelle="Poids d'un pâton" valeur={
             <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
               <BoutonRond onClick={() => setPoids(Math.max(1, (Number(poids) || r.ball_weight) - pasPoids))} taille={32} couleur={couleur} label="−" aria="Moins" clair />
-              <span style={{ textAlign: "center", fontSize: Number(poids) >= 1000 ? 20 : 24, whiteSpace: "nowrap", minWidth: 76 }}>{poids ? `${Number(poids).toLocaleString("fr-FR")} g` : "—"}</span>
+              <span style={{ textAlign: "center", fontSize: Number(poids) >= 1000 ? 20 : 24, whiteSpace: "nowrap", minWidth: 76 }}>{poids ? `${Number(poids).toLocaleString("fr-FR")} g` : "—"}
+                {resultat && resultat.summary.poidsCalcule_g !== resultat.summary.poidsPaton_g && <div style={{ fontSize: 11, fontWeight: 500, fontFamily: "inherit", color: MUTED, letterSpacing: 0 }}>calculé à {resultat.summary.poidsCalcule_g} g</div>}
+              </span>
               <BoutonRond onClick={() => setPoids((Number(poids) || r.ball_weight) + pasPoids)} taille={32} couleur={couleur} label="+" aria="Plus" clair />
             </span>
           } /></div>
-          <Tuile compacte couleur={couleur} libelle="Pâte totale" valeur={resultat ? kg(resultat.summary.total_dough_g) : "—"} />
+          <Tuile compacte couleur={couleur} libelle="Pâte totale" valeur={resultat ? kg(resultat.summary.total_ingredients_g) : "—"} />
           {bureau && <Tuile compacte couleur={couleur} libelle="Farine" valeur={resultat ? kg(resultat.flour_total_g) : "—"} />}
         </div>
 
       {resultat && (
         <div style={{ display: "grid", gap: 10 }}>
-          {/* Les farines se pré-mélangent : une seule pesée de farine par phase (28/10), le détail du mélange en note */}
-          {mix.length > 1 && (
-            <div style={{ fontSize: 13, color: MUTED }}>
-              Mélange de farines du jour : {mix.map((f) => `${g(resultat.flour_total_g * f.percent / 100)} ${nomFarine(f.name)}`).join(" + ")}, soit {kg(resultat.flour_total_g)}.
+          {resultat.warnings.map((w) => <div key={w} style={{ fontSize: 13, color: ATTENTION, fontWeight: 600 }}>{w}</div>)}
+          {lots.length > 1 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" onClick={() => setParPetrin(false)} style={{ ...BTN, ...(parPetrin ? {} : { background: couleur, borderColor: couleur, color: "#fff" }) }}>En une fois</button>
+              <button type="button" onClick={() => setParPetrin(true)} style={{ ...BTN, ...(parPetrin ? { background: couleur, borderColor: couleur, color: "#fff" } : {}) }}>Par pétrissage ({lots.join(" + ")})</button>
             </div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-            {resultat.phases.map((ph, i) => {
-              const pesees: [string, number, boolean][] = [
-                [mix.length > 1 ? "Farine (mélange)" : nomFarine(mix[0].name), ph.flour_g, false], ["Eau", ph.water_g, false],
-                ...(ph.yeast_g > 0 ? [["Levure", ph.yeast_g, true] as [string, number, boolean]] : []),
-                ...(ph.salt_g > 0 ? [["Sel", ph.salt_g, false] as [string, number, boolean]] : []),
-                ...(ph.honey_g > 0 ? [["Miel", ph.honey_g, false] as [string, number, boolean]] : []),
-                ...(ph.oil_g > 0 ? [["Huile", ph.oil_g, false] as [string, number, boolean]] : []),
-              ];
-              return (
-                <div key={ph.name} style={{ ...CADRE, minWidth: 0 }}>
-                  <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-                    <colgroup><col style={{ width: 6 }} /><col /><col style={{ width: 110 }} /></colgroup>
-                    <thead>
-                      <tr>
-                        <th style={{ ...TH, padding: 0 }} />
-                        <th style={TH}>{resultat.phases.length > 1 ? nomPhase(ph, r.type, i) : "Pesée"}</th>
-                        <th style={{ ...TH, textAlign: "right" }}>Grammes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pesees.map(([lib, gr, precis], k) => (
-                        <tr key={lib} className="emp-ligne">
-                          <td style={{ ...liseret(couleur), ...(k === pesees.length - 1 ? { borderBottom: 0 } : {}) }} />
-                          <td style={{ ...TD, fontSize: 14, ...(k === pesees.length - 1 ? { borderBottom: 0 } : {}), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lib}</td>
-                          <td style={{ ...TD, textAlign: "right", fontFamily: OSWALD, fontWeight: 700, fontSize: 22, lineHeight: 1.1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", ...(k === pesees.length - 1 ? { borderBottom: 0 } : {}) }}>
-                            {precis && gr < 100 ? `${(Math.round(gr * 10) / 10).toLocaleString("fr-FR")} g` : g(gr)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })}
+          {resultatsLots ? resultatsLots.map((res, i) => (
+            <div key={i} style={{ display: "grid", gap: 8 }}>
+              <span style={INTERTITRE}>Pétrissage {i + 1} · {res.summary.nbPatons} pâtons · {kg(res.summary.total_ingredients_g)}</span>
+              <Pesees resultat={res} couleur={couleur} />
+            </div>
+          )) : <Pesees resultat={resultat} couleur={couleur} />}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <button type="button" onClick={etiquettes} style={{ ...BTN, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><path d="M6 14h12v8H6z" /></svg>
+              Étiquettes de la veille
+            </button>
+            <span style={{ fontSize: 12, color: MUTED }}>Une étiquette par contenant, à imprimer pour la pesée.</span>
           </div>
-          {resultat.warnings.map((w) => <div key={w} style={{ fontSize: 13, color: ATTENTION }}>{w}</div>)}
         </div>
       )}
 
@@ -233,6 +219,43 @@ function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: Recette;
       )}
       </div>
     </section>
+  );
+}
+
+/** Les pesées, une table par phase : farines nommées, eau de départ et de bassinage, sel, miel, levure là où elle va */
+function Pesees({ resultat, couleur }: { resultat: PateResult; couleur: string }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+      {resultat.phases.map((ph) => {
+        const pesees = lignesPesee(ph);
+        return (
+          <div key={ph.name} style={{ ...CADRE, minWidth: 0 }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+              <colgroup><col style={{ width: 6 }} /><col /><col style={{ width: 110 }} /></colgroup>
+              <thead>
+                <tr>
+                  <th style={{ ...TH, padding: 0 }} />
+                  <th style={TH}>{nomPhase(ph, resultat.phases.length)}</th>
+                  <th style={{ ...TH, textAlign: "right" }}>Grammes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pesees.map((l, k) => {
+                  const dernier = k === pesees.length - 1 ? { borderBottom: 0 } : {};
+                  return (
+                    <tr key={l.libelle} className="emp-ligne">
+                      <td style={{ ...liseret(couleur), ...dernier }} />
+                      <td style={{ ...TD, fontSize: 14, ...dernier, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.libelle}{l.note && <span style={{ color: MUTED, fontSize: 12 }}> · {l.note}</span>}</td>
+                      <td style={{ ...TD, textAlign: "right", fontFamily: OSWALD, fontWeight: 700, fontSize: 22, lineHeight: 1.1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", ...dernier }}>{formatG(l.grammes, l.precis)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

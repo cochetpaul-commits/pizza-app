@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     }
 
     const nbPatons = Math.max(1, Math.round(toNum(body.nbPatons, 150)));
-    const poidsPaton = Math.max(1, Math.round(toNum(body.poidsPaton, 264)));
+    const poidsPatonDemande = body.poidsPaton;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: auth } },
@@ -98,6 +98,12 @@ export async function POST(req: Request) {
         | "focaccia";
 
     const flour_mix = Array.isArray(recipe.flour_mix) ? recipe.flour_mix : [];
+    const poidsPaton = Math.max(1, Math.round(toNum(poidsPatonDemande, toNum(recipe.ball_weight, 260))));
+    // Module pâte (01/11/2026) : mêmes paramètres que l'écran Empâtements
+    const communs = {
+      biga_percent: toNum(recipe.biga_percent, 50) || 50, biga_hydration: toNum(recipe.biga_hydration, 45) || 45, biga_flour: recipe.biga_flour ?? null,
+      water_start_pct: recipe.water_start_pct == null ? 80 : toNum(recipe.water_start_pct, 80), loss_margin_pct: toNum(recipe.loss_margin_pct, 0), mixer_max_balls: toNum(recipe.mixer_max_balls, 0),
+    };
 
     const calc = calculerPate({
       type,
@@ -110,8 +116,9 @@ export async function POST(req: Request) {
               salt_percent: toNum(recipe.salt_percent, 2),
               honey_percent: toNum(recipe.honey_percent, 0),
               oil_percent: toNum(recipe.oil_percent, 0),
-              biga_yeast_percent: toNum(recipe.biga_yeast_percent, 0),
+              biga_yeast_percent: toNum(recipe.biga_yeast_percent, 0.5) || 0.5,
               yeast_percent: 0,
+              ...communs,
             }
           : {
               hydration_total: toNum(recipe.hydration_total, 65),
@@ -120,6 +127,7 @@ export async function POST(req: Request) {
               oil_percent: toNum(recipe.oil_percent, 0),
               yeast_percent: toNum(recipe.yeast_percent, 0),
               biga_yeast_percent: 0,
+              ...communs,
             },
       flourMix: flour_mix,
     });

@@ -37,6 +37,8 @@ type EmpData = {
   yeast: number;
   biga_yeast: number;
   flour_mix: FlourMixItem[];
+  /* Module pâte (01/11/2026) */
+  params?: { biga_percent: number; biga_hydration: number; biga_flour: string | null; water_start_pct: number; loss_margin_pct: number; mixer_max_balls: number };
 };
 
 type Recipe = {
@@ -234,16 +236,23 @@ function computeEmpResult(d: EmpData, countOverride?: number, weightOverride?: n
       oil_percent: d.oil,
       yeast_percent: d.yeast,
       biga_yeast_percent: d.biga_yeast,
+      ...(d.params ?? {}),
     },
     flourMix: d.flour_mix,
   });
 }
 
 function phaseToLines(phase: PateResult["phases"][0]): RecipeLine[] {
-  const lines: RecipeLine[] = [
-    { ingredient_id: null, ingredient_name: "Farine", qty: phase.flour_g, unit: "g" },
-    { ingredient_id: null, ingredient_name: "Eau", qty: phase.water_g, unit: "g" },
-  ];
+  // Module pâte (01/11/2026) : farines nommées, eau de départ et de bassinage
+  const lines: RecipeLine[] = phase.flours.length
+    ? phase.flours.map((f) => ({ ingredient_id: f.ingredient_id ?? null, ingredient_name: f.name, qty: f.grams, unit: "g" }))
+    : [{ ingredient_id: null, ingredient_name: "Farine", qty: phase.flour_g, unit: "g" }];
+  if ((phase.water_bassinage_g ?? 0) > 0 && phase.water_start_g != null) {
+    lines.push({ ingredient_id: null, ingredient_name: "Eau de départ", qty: phase.water_start_g, unit: "g" });
+    lines.push({ ingredient_id: null, ingredient_name: "Eau de bassinage", qty: phase.water_bassinage_g ?? 0, unit: "g" });
+  } else {
+    lines.push({ ingredient_id: null, ingredient_name: "Eau", qty: phase.water_g, unit: "g" });
+  }
   if (phase.salt_g > 0) lines.push({ ingredient_id: null, ingredient_name: "Sel", qty: phase.salt_g, unit: "g" });
   if (phase.honey_g > 0) lines.push({ ingredient_id: null, ingredient_name: "Miel", qty: phase.honey_g, unit: "g" });
   if (phase.oil_g > 0) lines.push({ ingredient_id: null, ingredient_name: "Huile", qty: phase.oil_g, unit: "g" });
@@ -438,7 +447,7 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
   // ── Empâtement ──
   const { data: empatements } = await supabase
     .from("recipes")
-    .select("id, name, type, balls_count, ball_weight, flour_mix, hydration_total, salt_percent, honey_percent, oil_percent, yeast_percent, biga_yeast_percent, procedure, pivot_ingredient_id")
+    .select("id, name, type, balls_count, ball_weight, flour_mix, hydration_total, salt_percent, honey_percent, oil_percent, yeast_percent, biga_yeast_percent, procedure, pivot_ingredient_id, biga_percent, biga_hydration, biga_flour, water_start_pct, loss_margin_pct, mixer_max_balls")
     .order("name");
 
   for (const e of (empatements ?? [])) {
@@ -462,6 +471,10 @@ async function fetchAllRecipes(etabSlug: string | null): Promise<Recipe[]> {
       yeast: e.yeast_percent ?? 0.3,
       biga_yeast: e.biga_yeast_percent ?? 0.5,
       flour_mix: flourMix,
+      params: {
+        biga_percent: e.biga_percent ?? 50, biga_hydration: e.biga_hydration ?? 45, biga_flour: e.biga_flour ?? null,
+        water_start_pct: e.water_start_pct ?? 80, loss_margin_pct: e.loss_margin_pct ?? 0, mixer_max_balls: e.mixer_max_balls ?? 0,
+      },
     };
     const result = computeEmpResult(empData);
     const lines = resultToLines(result);

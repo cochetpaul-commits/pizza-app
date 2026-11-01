@@ -10,6 +10,7 @@ import { StepperInput } from "@/components/StepperInput";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { calculerPate, type EmpatementType, type FlourMixItem } from "@/lib/pateEngine";
+import { formatG, lignesPesee, nomPhase } from "@/lib/pateAffichage";
 import type { Ingredient } from "@/types/ingredients";
 import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
 import { fetchApi } from "@/lib/fetchApi";
@@ -42,6 +43,14 @@ interface EmpItem { id: EmpItemId; name: string; qty: number; unit: string; }
 
 interface Props { recipeId?: string; initialProdMode?: boolean; }
 
+type FlourSaisie = { name: string; id: string | null; percent: number };
+/** La dernière farine prend ce qui reste pour faire 100 % */
+function pourcentagesFarines(fs: FlourSaisie[]): FlourSaisie[] {
+  if (fs.length === 0) return fs;
+  const autres = fs.slice(0, -1).reduce((t, f) => t + Math.max(0, Number(f.percent) || 0), 0);
+  return fs.map((f, i) => (i === fs.length - 1 ? { ...f, percent: Math.max(0, Math.round((100 - autres) * 100) / 100) } : { ...f, percent: Math.max(0, Number(f.percent) || 0) }));
+}
+
 export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   const router = useRouter();
   const { can } = useProfile();
@@ -66,13 +75,16 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   const [yeast, setYeast] = useState(0.3);
   const [bigaYeast, setBigaYeast] = useState(0.5);
 
-  // Flour mix (max 2 farines)
-  const [flour1Name, setFlour1Name] = useState("Tipo 00");
-  const [flour1Id, setFlour1Id] = useState<string | null>(null);
-  const [flour1Pct, setFlour1Pct] = useState(80);
-  const [flour2Name, setFlour2Name] = useState("Tipo 1");
-  const [flour2Id, setFlour2Id] = useState<string | null>(null);
-  const [useTwoFlours, setUseTwoFlours] = useState(false);
+  // Farines (jusqu'à trois, la dernière prend le reste des pourcentages)
+  const [flours, setFlours] = useState<FlourSaisie[]>([{ name: "Tipo 00", id: null, percent: 100 }]);
+  // Module pâte, phase 1 (01/11/2026) : part et hydratation de la biga, farine de la biga, eau de départ,
+  // marge de perte sur le pâton, capacité du pétrin
+  const [bigaPct, setBigaPct] = useState(50);
+  const [bigaHyd, setBigaHyd] = useState(45);
+  const [bigaFlour, setBigaFlour] = useState("");
+  const [waterStart, setWaterStart] = useState(80);
+  const [lossMargin, setLossMargin] = useState(1.5);
+  const [mixerMax, setMixerMax] = useState(215);
 
   // Steps
   const [steps, setSteps] = useState<string[]>([]);
@@ -122,15 +134,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     };
   });
 
-  const flourMix: FlourMixItem[] = useMemo(() => {
-    if (!useTwoFlours) return [{ name: flour1Name, percent: 100 }];
-    const p1 = Math.max(0, Math.min(100, flour1Pct));
-    const p2 = 100 - p1;
-    return [
-      { name: flour1Name, percent: p1 },
-      { name: flour2Name, percent: p2 },
-    ].filter(f => f.percent > 0);
-  }, [useTwoFlours, flour1Name, flour1Pct, flour2Name]);
+  const flourMix: FlourMixItem[] = useMemo(() => pourcentagesFarines(flours).filter(f => f.percent > 0).map(f => ({ name: f.name, percent: f.percent, ingredient_id: f.id })), [flours]);
 
   // Calculate dough
   const result = useMemo(() => {
@@ -139,11 +143,14 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         type,
         nbPatons,
         poidsPaton,
-        recipe: { hydration_total: hydration, salt_percent: salt, honey_percent: honey, oil_percent: oil, yeast_percent: yeast, biga_yeast_percent: bigaYeast },
+        recipe: {
+          hydration_total: hydration, salt_percent: salt, honey_percent: honey, oil_percent: oil, yeast_percent: yeast, biga_yeast_percent: bigaYeast,
+          biga_percent: bigaPct, biga_hydration: bigaHyd, biga_flour: bigaFlour || null, water_start_pct: waterStart, loss_margin_pct: lossMargin, mixer_max_balls: mixerMax,
+        },
         flourMix,
       });
     } catch { return null; }
-  }, [type, nbPatons, poidsPaton, hydration, salt, honey, oil, yeast, bigaYeast, flourMix]);
+  }, [type, nbPatons, poidsPaton, hydration, salt, honey, oil, yeast, bigaYeast, flourMix, bigaPct, bigaHyd, bigaFlour, waterStart, lossMargin, mixerMax]);
 
   // Live cost calculation
   const liveCost = useMemo(() => {
@@ -153,7 +160,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
     const flourTotal = result.totals.flour_total_g;
     for (const fm of flourMix) {
-      const fId = fm === flourMix[0] ? flour1Id : flour2Id;
+      const fId = fm.ingredient_id ?? null;
       const epg = fId ? cpuToEurPerG(cpuMap[fId] ?? {}) : null;
       if (epg) {
         cost += (flourTotal * fm.percent / 100) * epg;
@@ -180,7 +187,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     if (!hasAnyCost) return null;
     const yg = result.summary.total_dough_g;
     return { total: round2(cost), perKg: yg > 0 ? round2((cost / yg) * 1000) : null };
-  }, [result, cpuMap, flourMix, flour1Id, flour2Id, saltId, waterId, oilId, honeyId, yeastId]);
+  }, [result, cpuMap, flourMix, saltId, waterId, oilId, honeyId, yeastId]);
 
   // Virtual ingredient lines for Mode Production
   const empItems: EmpItem[] = useMemo(() => {
@@ -262,20 +269,21 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
             else if (mr > 0) setMarginRate(String(Math.round(mr * 100)));
           }
           if (r.sell_price != null) setSellPrice(Number(r.sell_price));
+          const links0 = (r.ingredient_links && typeof r.ingredient_links === "object" ? r.ingredient_links : {}) as Record<string, string>;
           if (r.flour_mix) {
             try {
               const mix = (typeof r.flour_mix === "string" ? JSON.parse(r.flour_mix) : r.flour_mix) as FlourMixItem[];
               if (Array.isArray(mix) && mix.length >= 1) {
-                setFlour1Name(mix[0]?.name ?? "Tipo 00");
-                setFlour1Pct(mix[0]?.percent ?? 100);
-                if (mix.length >= 2) {
-                  setFlour2Name(mix[1]?.name ?? "Tipo 1");
-                  setFlour1Pct(100 - (mix[1]?.percent ?? 20));
-                  setUseTwoFlours(true);
-                }
+                setFlours(mix.slice(0, 3).map((m, i) => ({ name: m?.name ?? "Farine", percent: n2(m?.percent), id: m?.ingredient_id ?? links0[`flour${i + 1}`] ?? null })));
               }
             } catch { /* ignore */ }
           }
+          setBigaPct(n2(r.biga_percent) || 50);
+          setBigaHyd(n2(r.biga_hydration) || 45);
+          setBigaFlour(r.biga_flour ? String(r.biga_flour) : "");
+          setWaterStart(r.water_start_pct == null ? 80 : n2(r.water_start_pct));
+          setLossMargin(r.loss_margin_pct == null ? 1.5 : n2(r.loss_margin_pct));
+          setMixerMax(r.mixer_max_balls == null ? 215 : n2(r.mixer_max_balls));
           if (r.procedure) {
             try { setSteps(JSON.parse(String(r.procedure)) as string[]); }
             catch { setSteps(String(r.procedure) ? [String(r.procedure)] : []); }
@@ -283,8 +291,6 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
           // Restore ingredient links
           if (r.ingredient_links && typeof r.ingredient_links === "object") {
             const links = r.ingredient_links as Record<string, string>;
-            if (links.flour1) setFlour1Id(links.flour1);
-            if (links.flour2) setFlour2Id(links.flour2);
             if (links.salt) setSaltId(links.salt);
             if (links.water) setWaterId(links.water);
             if (links.oil) setOilId(links.oil);
@@ -318,8 +324,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
 
       // Build ingredient links map
       const ingredientLinks: Record<string, string> = {};
-      if (flour1Id) ingredientLinks.flour1 = flour1Id;
-      if (flour2Id) ingredientLinks.flour2 = flour2Id;
+      flours.forEach((f, i) => { if (f.id) ingredientLinks[`flour${i + 1}`] = f.id; });
       if (saltId) ingredientLinks.salt = saltId;
       if (waterId) ingredientLinks.water = waterId;
       if (oilId) ingredientLinks.oil = oilId;
@@ -340,6 +345,12 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         oil_percent: oil,
         yeast_percent: yeast,
         biga_yeast_percent: bigaYeast,
+        biga_percent: type === "biga" ? bigaPct : null,
+        biga_hydration: type === "biga" ? bigaHyd : null,
+        biga_flour: type === "biga" && bigaFlour ? bigaFlour : null,
+        water_start_pct: waterStart,
+        loss_margin_pct: lossMargin,
+        mixer_max_balls: mixerMax,
         flour_mix: flourMix,
         yield_grams: yieldGrams,
         vat_rate: vatRate,
@@ -599,12 +610,15 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                         />
                       </div>
                       <div>
-                        <label className="label">Poids paton (g)</label>
+                        <label className="label">Poids du pâton détaillé (g)</label>
                         <StepperInput
                           value={poidsPaton}
                           onChange={v => setPoidsPaton(v === "" ? 50 : v)}
                           step={1} min={50}
                         />
+                        {result && result.summary.poidsCalcule_g !== result.summary.poidsPaton_g && (
+                          <div style={{ fontSize: 11.5, color: "#6f6a61", marginTop: 4 }}>calculé à {result.summary.poidsCalcule_g} g avec la marge de perte</div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -621,89 +635,79 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                       { label: "Sel (%)", value: salt, set: setSalt, min: 0, max: 5 },
                       { label: "Huile (%)", value: oil, set: setOil, min: 0, max: 20 },
                       { label: "Miel (%)", value: honey, set: setHoney, min: 0, max: 10 },
-                      ...(type !== "biga" ? [{ label: "Levure (%)", value: yeast, set: setYeast, min: 0, max: 5 }] : []),
-                      ...(type === "biga" ? [{ label: "Levure biga (%)", value: bigaYeast, set: setBigaYeast, min: 0, max: 5 }] : []),
+                      ...(type !== "biga" ? [{ label: "Levure (% farine totale)", value: yeast, set: setYeast, min: 0, max: 5, step: 0.01 }] : []),
+                      ...(type === "biga" ? [
+                        { label: "Part de biga (% farine)", value: bigaPct, set: setBigaPct, min: 1, max: 100, step: 5 },
+                        { label: "Eau de biga (% farine biga)", value: bigaHyd, set: setBigaHyd, min: 0, max: 100, step: 1 },
+                        { label: "Levure biga (% farine biga)", value: bigaYeast, set: setBigaYeast, min: 0, max: 5, step: 0.05 },
+                      ] : []),
+                      { label: "Eau de départ (% eau du pétrissage)", value: waterStart, set: setWaterStart, min: 0, max: 100, step: 5 },
+                      { label: "Marge de perte (%)", value: lossMargin, set: setLossMargin, min: 0, max: 10, step: 0.5 },
+                      { label: "Capacité du pétrin (pâtons)", value: mixerMax, set: setMixerMax, min: 0, max: 2000, step: 5 },
                     ].map(p => (
                       <div key={p.label}>
                         <label className="label">{p.label}</label>
                         <StepperInput
                           value={p.value}
                           onChange={v => p.set(v === "" ? p.min : v)}
-                          step={0.1} min={p.min} max={p.max}
+                          step={p.step ?? 0.1} min={p.min} max={p.max}
                         />
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Farines */}
+                {/* Farines : jusqu'à trois, la dernière prend le reste ; pour une biga, la farine désignée la remplit en priorité */}
                 <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Farines
                   </h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-                      <div style={{ flex: "1 1 120px" }}>
-                        <label className="label">Farine 1 -- nom</label>
-                        <input className="input" value={flour1Name} onChange={e => setFlour1Name(e.target.value)} placeholder="ex: Tipo 00" />
-                      </div>
-                      {flourOptions.length > 0 && (
-                        <div style={{ flex: "1 1 140px" }}>
-                          <label className="label">Lie a un ingredient</label>
-                          <SmartSelect
-                            options={flourOptions}
-                            value={flour1Id ?? ""}
-                            onChange={id => {
-                              setFlour1Id(id || null);
-                              const ing = allIngredients.find(i => i.id === id);
-                              if (ing) setFlour1Name(ing.name);
-                            }}
-                            placeholder="Ingredient..."
-                          />
-                        </div>
-                      )}
-                      {useTwoFlours && (
-                        <div style={{ width: 140 }}>
-                          <label className="label">% farine 1</label>
-                          <StepperInput
-                            value={flour1Pct}
-                            onChange={v => setFlour1Pct(v === "" ? 0 : v)}
-                            step={5} min={0} max={100}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
-                      <input type="checkbox" checked={useTwoFlours} onChange={e => setUseTwoFlours(e.target.checked)} />
-                      Utiliser 2 farines
-                    </label>
-
-                    {useTwoFlours && (
-                      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                    {pourcentagesFarines(flours).map((f, i) => (
+                      <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
                         <div style={{ flex: "1 1 120px" }}>
-                          <label className="label">Farine 2 -- nom</label>
-                          <input className="input" value={flour2Name} onChange={e => setFlour2Name(e.target.value)} placeholder="ex: Tipo 1" />
+                          <label className="label">Farine {i + 1}</label>
+                          <input className="input" value={f.name} onChange={e => setFlours(fs => fs.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))} placeholder="ex: Tipo 0" />
                         </div>
                         {flourOptions.length > 0 && (
                           <div style={{ flex: "1 1 140px" }}>
                             <label className="label">Lie a un ingredient</label>
                             <SmartSelect
                               options={flourOptions}
-                              value={flour2Id ?? ""}
+                              value={f.id ?? ""}
                               onChange={id => {
-                                setFlour2Id(id || null);
-                                const ing = allIngredients.find(i => i.id === id);
-                                if (ing) setFlour2Name(ing.name);
+                                const ing = allIngredients.find(x => x.id === id);
+                                setFlours(fs => fs.map((x, k) => (k === i ? { ...x, id: id || null, name: ing ? ing.name : x.name } : x)));
                               }}
                               placeholder="Ingredient..."
                             />
                           </div>
                         )}
-                        <div style={{ width: 80 }}>
-                          <label className="label">% farine 2</label>
-                          <input type="text" readOnly value={100 - flour1Pct} className="input" style={{ opacity: 0.6 }} />
+                        <div style={{ width: 120 }}>
+                          <label className="label">% farine</label>
+                          {i === flours.length - 1
+                            ? <input type="text" readOnly value={f.percent} className="input" style={{ opacity: 0.6 }} title="Le reste des pourcentages" />
+                            : <StepperInput value={f.percent} onChange={v => setFlours(fs => fs.map((x, k) => (k === i ? { ...x, percent: v === "" ? 0 : v } : x)))} step={5} min={0} max={100} />}
                         </div>
+                        {flours.length > 1 && (
+                          <button type="button" onClick={() => setFlours(fs => fs.filter((_, k) => k !== i))} style={{ border: "1px solid #e0d8ce", background: "#fff", borderRadius: 20, padding: "6px 10px", cursor: "pointer", fontSize: 12, color: "#b4443a", fontFamily: "inherit" }}>Retirer</button>
+                        )}
+                      </div>
+                    ))}
+                    {flours.length < 3 && (
+                      <button type="button" onClick={() => setFlours(fs => [...fs, { name: fs.length === 1 ? "Tipo 1" : "Farine", id: null, percent: 0 }])}
+                        style={{ alignSelf: "flex-start", border: "1px solid #e0d8ce", background: "#fff", borderRadius: 20, padding: "6px 12px", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
+                        + Ajouter une farine
+                      </button>
+                    )}
+                    {type === "biga" && (
+                      <div style={{ maxWidth: 320 }}>
+                        <label className="label">Farine de la biga (remplie en priorité)</label>
+                        <select className="input" value={bigaFlour} onChange={e => setBigaFlour(e.target.value)}>
+                          <option value="">Première farine du mélange</option>
+                          {flours.map((f, i) => <option key={i} value={f.name}>{f.name}</option>)}
+                        </select>
+                        <div style={{ fontSize: 11.5, color: "#6f6a61", marginTop: 4 }}>La biga prend {bigaPct} % de la farine totale sur cette farine ; tout le reste part au pétrissage final.</div>
                       </div>
                     )}
                   </div>
@@ -789,7 +793,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                       </div>
                     )}
 
-                    {useTwoFlours && result.flour_breakdown.length > 1 && (
+                    {result.flour_breakdown.length > 1 && (
                       <div style={{ marginTop: 10 }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Detail farines</div>
                         {result.flour_breakdown.map(f => (
@@ -801,21 +805,18 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                       </div>
                     )}
 
-                    {type === "biga" && result.phases.length > 1 && (
-                      <div style={{ marginTop: 10 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Phases</div>
-                        {result.phases.map(ph => (
-                          <div key={ph.name} style={{ marginBottom: 8, padding: "8px 10px", borderRadius: 8, background: "rgba(180,83,9,0.04)", border: "1px solid rgba(180,83,9,0.15)" }}>
-                            <div style={{ fontWeight: 800, fontSize: 12, color: ACCENT, marginBottom: 4 }}>{ph.name}</div>
-                            <div style={{ fontSize: 12, color: "#6f6a61" }}>
-                              Farine: {fmtG(ph.flour_g)} -- Eau: {fmtG(ph.water_g)} -- Levure: {fmtG(ph.yeast_g)}
-                              {ph.salt_g > 0 ? ` -- Sel: ${fmtG(ph.salt_g)}` : ""}
-                              {ph.oil_g > 0 ? ` -- Huile: ${fmtG(ph.oil_g)}` : ""}
-                            </div>
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Pesées</div>
+                      {result.phases.map(ph => (
+                        <div key={ph.name} style={{ marginBottom: 8, padding: "8px 10px", borderRadius: 8, background: "rgba(180,83,9,0.04)", border: "1px solid rgba(180,83,9,0.15)" }}>
+                          <div style={{ fontWeight: 800, fontSize: 12, color: ACCENT, marginBottom: 4 }}>{nomPhase(ph, result.phases.length)}</div>
+                          <div style={{ fontSize: 12, color: "#6f6a61" }}>
+                            {lignesPesee(ph).map(l => `${l.libelle}${l.note ? ` (${l.note})` : ""} : ${formatG(l.grammes, l.precis)}`).join(" · ")}
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        </div>
+                      ))}
+                      <div style={{ fontSize: 12, color: "#6f6a61" }}>Pâte totale pesée : {fmtG(result.summary.total_ingredients_g)} pour {result.summary.nbPatons} pâtons, calculés à {result.summary.poidsCalcule_g} g.</div>
+                    </div>
 
                     {result.warnings.length > 0 && (
                       <div style={{ marginTop: 8 }}>

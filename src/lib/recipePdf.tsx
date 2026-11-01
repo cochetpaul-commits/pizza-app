@@ -21,6 +21,10 @@ export type RecipePdfPhase = {
   honey_g: number;
   oil_g: number;
   yeast_g: number;
+  /* Module pâte (01/11/2026) : farines nommées, eau de départ et de bassinage */
+  flours?: { name: string; grams: number }[];
+  water_start_g?: number;
+  water_bassinage_g?: number;
 };
 
 export type RecipePdfData = {
@@ -175,14 +179,26 @@ function fmtG(n: number | null | undefined) {
   return `${Math.round(n)} g`;
 }
 
+/** « FARINE TIPO 0 'SOFFIO 25 KG » → « Tipo 0 Soffio » */
+function nomFarineCourt(s: string) {
+  const court = s.replace(/["'«»]/g, "").replace(/\b\d+\s*kg\b/i, "").replace(/^farine\s+/i, "").replace(/\s+/g, " ").trim();
+  return (court || s).toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+}
+
 function isNonZeroG(n: number | null | undefined) {
   return n != null && Number.isFinite(n) && Math.round(n) !== 0;
 }
 
 function getPhaseRows(p: RecipePdfPhase) {
   const rows: Array<{ name: string; qty: string }> = [];
-  rows.push({ name: "Farine", qty: fmtG(p.flour_g) });
-  rows.push({ name: "Eau", qty: fmtG(p.water_g) });
+  if (p.flours && p.flours.length) for (const f of p.flours) rows.push({ name: nomFarineCourt(f.name), qty: fmtG(f.grams) });
+  else rows.push({ name: "Farine", qty: fmtG(p.flour_g) });
+  if (isNonZeroG(p.water_bassinage_g) && p.water_start_g != null) {
+    rows.push({ name: isNonZeroG(p.honey_g) ? "Eau de départ (miel dissous)" : "Eau de départ", qty: fmtG(p.water_start_g) });
+    rows.push({ name: "Eau de bassinage", qty: fmtG(p.water_bassinage_g ?? 0) });
+  } else {
+    rows.push({ name: "Eau", qty: fmtG(p.water_g) });
+  }
   if (isNonZeroG(p.salt_g)) rows.push({ name: "Sel", qty: fmtG(p.salt_g) });
   if (isNonZeroG(p.honey_g)) rows.push({ name: "Miel", qty: fmtG(p.honey_g) });
   if (isNonZeroG(p.oil_g)) rows.push({ name: "Huile", qty: fmtG(p.oil_g) });
