@@ -11,6 +11,7 @@ import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { calculerPate, type EmpatementType, type FlourMixItem } from "@/lib/pateEngine";
 import { formatG, lignesPesee, nomPhase } from "@/lib/pateAffichage";
+import { etapesParDefaut } from "@/lib/pateEtapes";
 import type { Ingredient } from "@/types/ingredients";
 import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
 import { fetchApi } from "@/lib/fetchApi";
@@ -157,6 +158,11 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     if (!result) return null;
     let cost = 0;
     let hasAnyCost = false;
+    // Brief v2 (1.1) : un coût n'est définitif que si chaque ingrédient est lié à un article du catalogue qui a un prix
+    const nonLies: string[] = [];
+    const sansPrix: string[] = [];
+    // Un lien vers un article supprimé du catalogue vaut « non lié »
+    const existe = (id: string | null) => !!id && allIngredients.some(i => i.id === id);
 
     const flourTotal = result.totals.flour_total_g;
     for (const fm of flourMix) {
@@ -165,29 +171,28 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       if (epg) {
         cost += (flourTotal * fm.percent / 100) * epg;
         hasAnyCost = true;
-      }
+      } else if (existe(fId)) sansPrix.push(fm.name); else nonLies.push(fm.name);
     }
 
-    const nonFlour: [string | null, number][] = [
-      [saltId, result.totals.salt_g],
-      [waterId, result.totals.water_g],
-      [oilId, result.totals.oil_g],
-      [honeyId, result.totals.honey_g],
-      [yeastId, result.totals.yeast_g],
+    const nonFlour: [string, string | null, number][] = [
+      ["Sel", saltId, result.totals.salt_g],
+      ["Eau", waterId, result.totals.water_g],
+      ["Huile", oilId, result.totals.oil_g],
+      ["Miel", honeyId, result.totals.honey_g],
+      ["Levure", yeastId, result.totals.yeast_g],
     ];
-    for (const [ingId, qty] of nonFlour) {
-      if (!ingId || qty <= 0) continue;
-      const epg = cpuToEurPerG(cpuMap[ingId] ?? {});
+    for (const [nom, ingId, qty] of nonFlour) {
+      if (qty <= 0) continue;
+      const epg = ingId ? cpuToEurPerG(cpuMap[ingId] ?? {}) : null;
       if (epg) {
         cost += qty * epg;
         hasAnyCost = true;
-      }
+      } else if (nom !== "Eau") { if (existe(ingId)) sansPrix.push(nom); else nonLies.push(nom); }
     }
 
-    if (!hasAnyCost) return null;
     const yg = result.summary.total_dough_g;
-    return { total: round2(cost), perKg: yg > 0 ? round2((cost / yg) * 1000) : null };
-  }, [result, cpuMap, flourMix, saltId, waterId, oilId, honeyId, yeastId]);
+    return { total: round2(cost), perKg: yg > 0 ? round2((cost / yg) * 1000) : null, complet: nonLies.length === 0 && sansPrix.length === 0, nonLies, sansPrix, hasAnyCost };
+  }, [result, cpuMap, flourMix, saltId, waterId, oilId, honeyId, yeastId, allIngredients]);
 
   // Virtual ingredient lines for Mode Production
   const empItems: EmpItem[] = useMemo(() => {
@@ -202,6 +207,19 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
     if (result.totals.yeast_g > 0) items.push({ id: "yeast", name: "Levure", qty: result.totals.yeast_g, unit: "g" });
     return items.filter(i => i.qty > 0);
   }, [result]);
+
+  // Ingrédient sans article du catalogue (ou dont l'article n'a pas de prix) : le coût ne peut pas le compter
+  const etatLien = (id: EmpItemId): "non lié" | "sans prix" | null => {
+    const nom = id === "flour" ? null : id === "salt" ? "Sel" : id === "water" ? "Eau" : id === "oil" ? "Huile" : id === "honey" ? "Miel" : "Levure";
+    if (id === "flour") {
+      if (flours.some(f => !f.id) || liveCost?.nonLies.some(n => flours.some(f => f.name === n))) return "non lié";
+      return liveCost?.sansPrix.some(n => flours.some(f => f.name === n)) ? "sans prix" : null;
+    }
+    if (!nom || nom === "Eau") return null;
+    if (liveCost?.nonLies.includes(nom)) return "non lié";
+    if (liveCost?.sansPrix.includes(nom)) return "sans prix";
+    return null;
+  };
 
   // Production computations
   const prodPivotItem = empItems.find(i => i.id === pivotItemId) ?? null;
@@ -331,8 +349,8 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       if (honeyId) ingredientLinks.honey = honeyId;
       if (yeastId) ingredientLinks.yeast = yeastId;
 
-      // Calculate total_cost from linked ingredients (reuse liveCost logic)
-      const totalCost = liveCost?.total ?? 0;
+      // Le coût n'est enregistré (et montré sur la Carte) que s'il est complet : tous les ingrédients liés
+      const totalCost = liveCost && liveCost.complet ? liveCost.total : null;
 
       const payload: Record<string, unknown> = {
         name: name || `Empatement ${type}`,
@@ -356,11 +374,11 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         vat_rate: vatRate,
         margin_rate,
         sell_price: sellPrice !== "" ? Number(sellPrice) : null,
-        procedure: steps.length > 0 ? JSON.stringify(steps) : "[]",
+        procedure: JSON.stringify(steps.length > 0 ? steps : etapesParDefaut(type)),
         user_id: auth.user.id,
         pivot_ingredient_id: pivotItemId,
         ingredient_links: ingredientLinks,
-        total_cost: totalCost ?? 0,
+        total_cost: totalCost,
       };
 
       let rid = recipeId;
@@ -666,7 +684,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                     {pourcentagesFarines(flours).map((f, i) => (
                       <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
                         <div style={{ flex: "1 1 120px" }}>
-                          <label className="label">Farine {i + 1}</label>
+                          <label className="label">Farine {i + 1}{(!f.id || liveCost?.nonLies.includes(f.name) || liveCost?.sansPrix.includes(f.name)) && <span style={{ marginLeft: 8, padding: "1px 7px", borderRadius: 8, background: "rgba(183,121,31,0.12)", color: "#b7791f", fontSize: 10, fontWeight: 700 }}>{liveCost?.sansPrix.includes(f.name) ? "sans prix" : "non lié"}</span>}</label>
                           <input className="input" value={f.name} onChange={e => setFlours(fs => fs.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))} placeholder="ex: Tipo 0" />
                         </div>
                         {flourOptions.length > 0 && (
@@ -767,21 +785,28 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                             {pivotItemId === item.id ? "★" : "☆"}
                           </button>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 10, fontWeight: 700, color: "#9a8f84", textTransform: "uppercase" }}>{item.name}</div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "#9a8f84", textTransform: "uppercase" }}>{item.name}
+                              {etatLien(item.id) && <span style={{ marginLeft: 8, padding: "1px 7px", borderRadius: 8, background: "rgba(183,121,31,0.12)", color: "#b7791f", fontSize: 10, letterSpacing: 0, textTransform: "none" }}>{etatLien(item.id)}</span>}
+                            </div>
                             <div style={{ fontSize: 16, fontWeight: 800, color: "#2f3a33" }}>{fmtG(item.qty)}</div>
                           </div>
                         </div>
                       ))}
                     </div>
 
-                    {liveCost && (
+                    {liveCost && !liveCost.complet && (() => { const n = liveCost.nonLies.length + liveCost.sansPrix.length; return (
+                      <div style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(183,121,31,0.1)", color: "#b7791f", fontSize: 12.5, fontWeight: 600, marginBottom: 8 }}>
+                        Coût incomplet : {n} ingrédient{n > 1 ? "s" : ""} {liveCost.nonLies.length ? `non lié${liveCost.nonLies.length > 1 ? "s" : ""} (${liveCost.nonLies.join(", ")})` : ""}{liveCost.nonLies.length && liveCost.sansPrix.length ? " et " : ""}{liveCost.sansPrix.length ? `sans prix au catalogue (${liveCost.sansPrix.join(", ")})` : ""}. Lie chaque ingrédient à un article qui a un prix pour un coût juste.
+                      </div>
+                    ); })()}
+                    {liveCost && liveCost.hasAnyCost && (
                       <div style={{
                         display: "flex", gap: 12, padding: "10px 12px", borderRadius: 8,
                         background: "rgba(180,83,9,0.06)", border: "1px solid rgba(180,83,9,0.2)",
                         marginBottom: 8,
                       }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: "#9a8f84", textTransform: "uppercase" }}>Cout total</div>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#9a8f84", textTransform: "uppercase" }}>{liveCost.complet ? "Cout total" : "Coût partiel, ingrédients liés seulement"}</div>
                           <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>{liveCost.total.toFixed(2)} €</div>
                         </div>
                         {liveCost.perKg != null && (
@@ -833,6 +858,11 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                   <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                     Procedure / Etapes
                   </h3>
+                  <div style={{ marginBottom: 8 }}>
+                    <button type="button" className="btn" onClick={() => setSteps(etapesParDefaut(type))} disabled={type === "focaccia"} style={{ fontSize: 12 }}>
+                      Remettre les étapes par défaut ({type === "biga" ? "biga" : type === "direct" ? "directe" : "aucune pour la focaccia"})
+                    </button>
+                  </div>
                   <StepsList steps={steps} onChange={setSteps} />
                 </div>
 

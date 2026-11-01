@@ -23,8 +23,9 @@ describe("poids calculé et découpe", () => {
 
 describe("recette biga, valeurs de contrôle du brief", () => {
   it.each([
-    [130, { farine: 19942, tipo0: 9971, eauBiga: 4487, levure: 50, tipo1: 9971, depart: 7418, bassinage: 1855, sel: 419, miel: 199 }],
-    [200, { farine: 30680, tipo0: 15340, eauBiga: 6903, levure: 77, tipo1: 15340, depart: 11413, bassinage: 2853, sel: 644, miel: 307 }],
+    // Brief v2 : la levure entre dans le facteur, la pâte pesée tombe exactement sur pâtons × 264 g
+    [130, { farine: 19913, tipo0: 9956, eauBiga: 4480, levure: 50, tipo1: 9956, depart: 7408, bassinage: 1852, sel: 418, miel: 199 }],
+    [200, { farine: 30635, tipo0: 15318, eauBiga: 6893, levure: 77, tipo1: 15318, depart: 11396, bassinage: 2849, sel: 643, miel: 306 }],
   ])("%i pâtons", (patons, attendu) => {
     const r = calculerPate({ type: "biga", nbPatons: patons, poidsPaton: 260, recipe: BIGA, flourMix: MIX });
     expect(r.summary.poidsCalcule_g).toBe(264);
@@ -46,8 +47,8 @@ describe("recette biga, valeurs de contrôle du brief", () => {
     // Toute la levure est dans la biga : plus de ligne levure dans la pâte finale
     expect(final.yeast_g).toBe(0);
     expect(r.totals.yeast_g).toBe(attendu.levure);
-    // La pâte totale pesée comprend la levure
-    expect(r.summary.total_ingredients_g).toBe(Math.round(attendu.farine * 1.721 + attendu.levure));
+    // La pâte totale pesée, levure comprise, est exactement pâtons × poids calculé
+    expect(r.summary.total_ingredients_g).toBe(patons * 264);
     expect(r.warnings).toEqual([]);
   });
 
@@ -92,14 +93,21 @@ describe("répartition des farines", () => {
 describe("recette directe", () => {
   it("mêmes pourcentages, levure 0,18 % sur la farine totale : 36 g pour 130 pâtons", () => {
     const r = calculerPate({ type: "direct", nbPatons: 130, poidsPaton: 260, recipe: { hydration_total: 69, salt_percent: 2.1, honey_percent: 1, yeast_percent: 0.18, loss_margin_pct: 1.5, water_start_pct: 80 }, flourMix: MIX });
-    expect(r.flour_total_g).toBe(19942);
+    expect(r.flour_total_g).toBe(19921);
+    expect(r.summary.total_ingredients_g).toBe(130 * 264);
     const [u] = r.phases;
     expect(u.kind).toBe("unique");
     expect(u.yeast_g).toBe(36);
-    expect(u.flours.map((f) => [f.name, f.grams])).toEqual([["Tipo 0 Soffio", 9971], ["Tipo 1 Soffio", 9971]]);
-    expect(u.water_g).toBe(13760);
-    expect(u.water_start_g).toBe(11008);
-    expect(u.water_bassinage_g).toBe(2752);
+    expect(u.flours.map((f) => [f.name, f.grams])).toEqual([["Tipo 0 Soffio", 9961], ["Tipo 1 Soffio", 9961]]);
+    expect(u.water_g).toBe(13746);
+    expect(u.water_start_g).toBe(10996);
+    expect(u.water_bassinage_g).toBe(2749);
+  });
+  it("168 pâtons à 264 g : 44 352 g de pâte pesée, pas un gramme de plus", () => {
+    const r = calculerPate({ type: "biga", nbPatons: 168, poidsPaton: 260, recipe: BIGA, flourMix: MIX });
+    expect(r.summary.total_ingredients_g).toBe(44352);
+    const somme = r.phases.reduce((t, p) => t + p.flour_g + p.water_g + p.salt_g + p.honey_g + p.oil_g + p.yeast_g, 0);
+    expect(Math.abs(somme - 44352)).toBeLessThanOrEqual(3);
   });
   it("sans paramètres nouveaux, l'ancien appel garde son comportement (focaccia)", () => {
     const r = calculerPate({ type: "focaccia", nbPatons: 10, poidsPaton: 1250, recipe: { hydration_total: 80, salt_percent: 3.3, honey_percent: 3.3, oil_percent: 3.3, yeast_percent: 1 } });

@@ -3,7 +3,8 @@
 // Moteur de calcul des empâtements (réécrit le 01/11/2026, brief « module pâte »).
 // Tout se calcule en pourcentages boulanger sur la farine totale :
 //   pâte visée = pâtons × poids calculé, poids calculé = poids détaillé × (1 + marge de perte)
-//   farine totale = pâte visée ÷ (1 + eau + sel + miel + huile), la levure n'entre pas dans le facteur
+//   farine totale = pâte visée ÷ (1 + eau + sel + miel + huile + levure), la levure comprise pour que la pâte
+//   pesée tombe exactement sur la pâte visée (brief v2, 01/11/2026)
 // Biga : une part de la farine totale (biga_percent) part dans la biga, remplie en priorité avec la
 // farine désignée ; toute la levure va dans la biga. Le reste des farines part au pétrissage final,
 // dont l'eau se sépare en eau de départ (avec le miel dissous) et eau de bassinage.
@@ -213,8 +214,9 @@ export function calculerPate(params: CalcParams): PateResult {
   const mixSum = sumMix(mix);
   if (Math.abs(mixSum - 100) > 1e-6) warnings.push("Le mélange de farines ne fait pas 100 %.");
 
-  // 1) Facteur : la levure reste hors facteur (quelques dizaines de grammes sur plusieurs dizaines de kilos)
-  const factor = 1 + (hydration + salt + honey + oil) / 100;
+  // 1) Facteur, levure comprise : pour une biga, la levure est un % de la farine de biga, elle même un % de la farine totale
+  const yeastShare = type === "biga" ? (bigaPct / 100) * (bigaYeast / 100) : yeast / 100;
+  const factor = 1 + (hydration + salt + honey + oil) / 100 + yeastShare;
   assert(factor > 1 - EPS, "Facteur invalide");
 
   // 2) Farine totale et totaux
