@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useSyncExternalStore, type CSSProperties } from "react";
+import React, { useState, useMemo, useSyncExternalStore, type CSSProperties } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
