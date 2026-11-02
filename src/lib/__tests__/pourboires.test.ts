@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compterPresences, repartir, valeurJour } from "@/lib/pourboires";
-import { appliquerEchange, composerFond, echangerCagnotte, FOND_IDEAL, FOND_IDEAL_LUNDI, idealPourJour, totalComptage } from "@/lib/fondCaisse";
+import { appliquerEchange, cagnotteApresEchange, composerFond, echangerCagnotte, FOND_IDEAL, FOND_IDEAL_LUNDI, idealPourJour, totalComptage } from "@/lib/fondCaisse";
 import { calculerCloture, VIDE } from "@/lib/cloture";
 
 describe("répartition des pourboires", () => {
@@ -48,16 +48,20 @@ describe("fond du lundi et cagnotte", () => {
     expect(idealPourJour("2026-10-27")).toBe(FOND_IDEAL);
   });
 
-  it("échange : les pièces de la cagnotte contre des billets du tiroir, par tranches de 5 €", () => {
-    // tiroir pauvre en pièces de 1 € (il en manque 8 pour le fond du lundi), cagnotte pleine de pièces
+  it("échange : le plus de pièces possible de la cagnotte contre des billets du tiroir, par tranches de 5 € (Paul, 02/11)", () => {
+    // tiroir pauvre en pièces de 1 € (il en manque 8 pour le fond du lundi), cagnotte pleine de pièces : 21 € de pièces, on en échange 20
     const tiroir = { "2000": 6, "1000": 5, "500": 3, "200": 10, "100": 12, "50": 14, "20": 10, "10": 8, "5": 3, "2": 2, "1": 1 };
     const cagnotte = { "2000": 2, "100": 15, "50": 10, "20": 5 };
     const e = echangerCagnotte(cagnotte, tiroir, FOND_IDEAL_LUNDI);
     expect(e).not.toBeNull();
-    expect(e!.montant).toBe(1000);
+    expect(e!.montant).toBe(2000);
     expect(e!.pieces["100"]).toBeGreaterThanOrEqual(8);
-    expect(totalComptage(e!.pieces)).toBe(1000);
-    expect(totalComptage(e!.billets)).toBe(1000);
+    expect(totalComptage(e!.pieces)).toBe(2000);
+    expect(totalComptage(e!.billets)).toBe(2000);
+    // La cagnotte repart en billets, avec le reste de pièces sous 5 €
+    const reste = cagnotteApresEchange(cagnotte, e);
+    expect(totalComptage(reste)).toBe(totalComptage(cagnotte));
+    expect(totalComptage(Object.fromEntries(Object.entries(reste).filter(([k]) => Number(k) < 500)))).toBeLessThan(500);
     const apres = appliquerEchange(tiroir, e!);
     expect(totalComptage(apres)).toBe(totalComptage(tiroir));
     const f = composerFond(apres, 100, FOND_IDEAL_LUNDI);
@@ -76,6 +80,8 @@ describe("fond du lundi et cagnotte", () => {
     const r = calculerCloture(s, "2026-10-23"); // vendredi
     expect(r.pourboiresEspeces).toBe(50);
     expect(r.echange?.montant).toBe(3000); // 30 € de pièces contre 30 € de billets
+    expect(totalComptage(r.cagnotteCoupures)).toBe(5000);
+    expect(Object.keys(r.cagnotteCoupures ?? {}).every((k) => Number(k) >= 500)).toBe(true);
     expect(r.fondCaisse?.totalLaisse).toBe(10000);
     const lundi = calculerCloture({ ...s, cagnotte: null }, "2026-10-26");
     expect(lundi.echange).toBeNull();

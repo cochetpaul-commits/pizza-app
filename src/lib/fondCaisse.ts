@@ -152,6 +152,8 @@ export type EchangeCagnotte = {
  * passent dans le tiroir contre des billets, par tranches rondes (5, 10, 20 €), pour que les pourboires
  * sortent en billets et que la monnaie serve à rendre. On prend d'abord les pièces qui manquent au fond
  * idéal, dans la limite de ce que la cagnotte a en pièces et le tiroir en billets. Null si rien à échanger.
+ * Depuis le 02/11/2026 (Paul) : on échange le plus possible, pas seulement ce qui manque au fond. Toutes
+ * les pièces restent au tiroir, les pourboires ressortent en billets, la remise en banque a un minimum de pièces.
  */
 export function echangerCagnotte(cagnotte: Comptage, tiroir: Comptage, ideal: Record<number, number> = FOND_IDEAL): EchangeCagnotte | null {
   const pieces: Comptage = {};
@@ -164,9 +166,8 @@ export function echangerCagnotte(cagnotte: Comptage, tiroir: Comptage, ideal: Re
   const manque: Comptage = {};
   for (const k of COUPURES) { const n = (ideal[k] ?? 0) - lire(tiroir, k); if (n > 0 && !estBillet(k)) manque[String(k)] = n; }
   const plafond = Math.min(totalPieces, totalBillets);
-  let cible = Math.min(plafond - (plafond % 500), Math.ceil(totalComptage(manque) / 500) * 500);
-  // Rien ne manque au fond : on échange quand même ce qu'on peut, la cagnotte veut des billets
-  if (cible <= 0) cible = plafond - (plafond % 500);
+  // Le plus de pièces possible, par tranches de 5 € (un billet ne se coupe pas)
+  const cible = plafond - (plafond % 500);
   for (let m = cible; m >= 500; m -= 500) {
     const piecesPrises = meilleureCombinaison(pieces, m, manque, "grosses");
     const billetsPris = meilleureCombinaison(billetsTiroir, m, {}, "grosses");
@@ -224,6 +225,13 @@ export function composerSoir(comptage: Comptage, fondEuros: number, enveloppeEur
   const manqueIdeal: Comptage = {};
   for (const k of COUPURES) { const n = (ideal[k] ?? 0) - lire(comptage, k); if (n > 0) manqueIdeal[String(k)] = n; }
   return { ...base, compte, sortir: soustraire(comptage, base.laisser), totalSorti: compte - base.totalLaisse, manqueIdeal, enveloppe: base.sortir, cagnotte, enveloppeManque: 0 };
+}
+
+/** La cagnotte après la monnaie faite : moins les pièces passées au tiroir, plus les billets reçus */
+export function cagnotteApresEchange(cagnotte: Comptage, e: EchangeCagnotte | null): Comptage {
+  const out: Comptage = {};
+  for (const k of COUPURES) { const n = lire(cagnotte, k) - (e ? lire(e.pieces, k) : 0) + (e ? lire(e.billets, k) : 0); if (n > 0) out[String(k)] = n; }
+  return out;
 }
 
 /** « 2 × 20 €, 3 × 1 € » */

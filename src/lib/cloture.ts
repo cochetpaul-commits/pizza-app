@@ -10,7 +10,7 @@
  * comptent pour la paie.
  */
 
-import { appliquerEchange, comptageSaisi, composerSoir, echangerCagnotte, FOND_CIBLE, idealPourJour, totalComptage, type Comptage, type CompositionFond, type EchangeCagnotte } from "@/lib/fondCaisse";
+import { appliquerEchange, cagnotteApresEchange, comptageSaisi, composerSoir, echangerCagnotte, FOND_CIBLE, idealPourJour, totalComptage, type Comptage, type CompositionFond, type EchangeCagnotte } from "@/lib/fondCaisse";
 
 export type SaisieZ = {
   /** Bloc EUR, ligne TOTAL NET (pourboires compris) */
@@ -105,6 +105,8 @@ export type ResultatCloture = {
   pourboiresEspeces: number | null;
   /** Monnaie à faire entre la cagnotte et le tiroir (pièces contre billets), quand les deux sont comptés par coupure */
   echange: EchangeCagnotte | null;
+  /** La cagnotte telle qu'elle part (en billets après la monnaie faite), pour la remise en banque du lundi */
+  cagnotteCoupures: Comptage | null;
 };
 
 /** La note de correction manque-t-elle pour valider ? */
@@ -185,6 +187,7 @@ export function calculerCloture(s: SaisieCloture, jour?: string | null): Resulta
   const echange = parCoupures && tiroir.coupures && cagnotteParCoupures && s.cagnotte?.coupures ? echangerCagnotte(s.cagnotte.coupures, tiroir.coupures, ideal) : null;
   // Ce qu'il faut laisser pour retrouver 100 € de fond, d'après le comptage (après la monnaie faite avec la cagnotte)
   const fondCaisse = parCoupures && tiroir.coupures ? composerSoir(echange ? appliquerEchange(tiroir.coupures, echange) : tiroir.coupures, FOND_CIBLE, p.especes, ideal) : null;
+  const cagnotteCoupures = cagnotteParCoupures && s.cagnotte?.coupures ? cagnotteApresEchange(s.cagnotte.coupures, echange) : null;
   // Règle de Paul (13/10) : l'écart du tiroir se règle avec les pourboires de l'équipe ; la banque reçoit les espèces Popina
   const enveloppe = tiroirCompte != null && p.especes != null ? r2(p.especes) : null;
   const manquePourValider = [
@@ -198,7 +201,7 @@ export function calculerCloture(s: SaisieCloture, jour?: string | null): Resulta
     { mode: "conecs", libelle: "Carte Connecs", popina: v0(p.conecs), attendu: cibleConecs, ecart: ecartConecs },
     { mode: "amex", libelle: "American Express", popina: v0(p.amex), attendu: v0(z.amex), ecart: ecartAmex },
   ];
-  const base = { lignes, cibleCb, ecartCb, cibleConecs, ecartConecs, ecartAmex, residu, pourboireAmex, pourboiresPaie, tiroirAttendu, tiroirCompte, ecartTiroir, erreurEspecesCarte: false, fondCaisse, enveloppe, manquePourValider, petitEcart: null as number | null, ajustement: s.ajustement ?? null, pourboiresEspeces, echange };
+  const base = { lignes, cibleCb, ecartCb, cibleConecs, ecartConecs, ecartAmex, residu, pourboireAmex, pourboiresPaie, tiroirAttendu, tiroirCompte, ecartTiroir, erreurEspecesCarte: false, fondCaisse, enveloppe, manquePourValider, petitEcart: null as number | null, ajustement: s.ajustement ?? null, pourboiresEspeces, echange, cagnotteCoupures };
 
   if (z.total == null || p.cb == null) return { ...base, niveau: "vide", titre: "Remplis le ticket Z et l'écran Popina pour voir le verdict.", etapes: [] };
 
