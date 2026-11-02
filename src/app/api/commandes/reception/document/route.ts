@@ -8,6 +8,7 @@ import { geminiVisionParse } from "@/lib/invoices/geminiVisionParser";
 import { aliasFournisseur, chargerIndexFiches, trouverFiche } from "@/lib/invoices/rapprochement";
 import type { ParsedInvoice } from "@/lib/invoices/importEngine";
 import type { DocumentLu } from "@/lib/rapprochementReception";
+import { nettoyerLignesLues } from "@/lib/invoices/consignesScan";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
       const parser = slug ? PARSERS[slug] : undefined;
       if (parser) {
         const p = parser.parse(texte);
-        if (p.lines.length > 0) { lu = p; lecture = "parser"; }
+        if (p.lines.length > 0) { lu = { ...p, lines: nettoyerLignesLues(p.lines) }; lecture = "parser"; }
       }
     }
     if (!lu) lu = (await geminiVisionParse(octets.slice(), mime, fournisseur || null)).invoice;

@@ -1,4 +1,5 @@
 import type { ParsedInvoice, ParsedLine } from "@/lib/invoices/importEngine";
+import { consignesFournisseur, nettoyerLignesLues } from "@/lib/invoices/consignesScan";
 
 export type SupplierInfo = {
   name: string;
@@ -171,9 +172,10 @@ export async function geminiVisionParse(
 
   if (fileBytes.byteLength === 0) throw new Error("Fichier vide transmis au scan IA (tampon détaché après lecture PDF ?)");
   const base64Data = Buffer.from(fileBytes).toString("base64");
-  const userPrompt = supplierNameHint
+  const consignes = consignesFournisseur(supplierNameHint);
+  const userPrompt = (supplierNameHint
     ? `Voici une facture du fournisseur "${supplierNameHint}". Extrais les données.`
-    : "Voici une facture fournisseur. Identifie le fournisseur et extrais les données.";
+    : "Voici une facture fournisseur. Identifie le fournisseur et extrais les données.") + (consignes ? `\n\n${consignes}` : "");
 
   // Try each model until one succeeds
   let responseText = "";
@@ -201,7 +203,7 @@ export async function geminiVisionParse(
     invoice_date: inv.invoice_date ? String(inv.invoice_date) : null,
     total_ht: toNum(inv.total_ht),
     total_ttc: toNum(inv.total_ttc),
-    lines: linesRaw.map(normalizeLine),
+    lines: nettoyerLignesLues(linesRaw.map(normalizeLine)),
   };
 
   const supplierName = supplierInfo?.name

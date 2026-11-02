@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { compressImage } from "@/lib/compressImage";
 import { VoletDroit } from "@/components/produits/BaseProduits";
 import { OSWALD } from "@/components/TuileProduit";
 import { EtatVide } from "@/components/ui/EtatVide";
@@ -134,15 +135,24 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
   };
   const rappro = useMemo(() => rapprocher(lignes.map((l) => ({ id: l.id, ingredient_id: l.ingredient_id, nom: l.ingredient_name, quantite: l.quantite, prix_unitaire_ht: l.prix_unitaire_ht })), document?.lu ?? null), [lignes, document]);
 
-  async function joindre(f: File) {
+  async function joindre(f0: File) {
     setDepot(true); setErreur(null); setAvertissement(null);
     try {
+      // Photo du téléphone (02/11/2026) : au delà de ~4 Mo, le serveur refuse l'envoi. On la réduit (2400 px, JPEG),
+      // c'est encore largement lisible pour la lecture des lignes.
+      let f = f0;
+      if (f0.type.startsWith("image/") && f0.size > 1.5 * 1024 * 1024) {
+        try {
+          const blob = await compressImage(f0, 2400, 0.85);
+          f = new File([blob], f0.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+        } catch { /* format non lisible par le navigateur (HEIC sur ordinateur) : on envoie l'original */ }
+      }
       const fd = new FormData();
       fd.append("session_id", sessionId);
       fd.append("file", f);
       const r = await fetchApi("/api/commandes/reception/document", { method: "POST", body: fd });
       const j = await r.json().catch(() => null);
-      if (!r.ok) { setErreur(j?.error ?? "Dépôt impossible"); return; }
+      if (!r.ok) { setErreur(j?.error ?? (r.status === 413 ? "Photo trop lourde pour l'envoi : reprends-la un peu plus loin, ou envoie le PDF." : `Dépôt impossible (erreur ${r.status}).`)); return; }
       setDocument(j.document ?? null);
       setAvertissement(j.avertissement ?? null);
     } catch (e) { setErreur(e instanceof Error ? e.message : "Dépôt impossible"); }
