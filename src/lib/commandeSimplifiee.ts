@@ -19,7 +19,7 @@ import { calculerHabituels, lignesCommandesNonFacturees, type AchatBrut, type Fa
 const JOURS_HABITUELS = 90;
 const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
 
-type ArticleRow = CommandeArticle & { ingredient_id: string; ingredient: { id: string; name: string; is_active: boolean; rayon_commande: string | null; stock_objectif?: number | null; storage_zone?: string | null; ingredient_zones?: ZoneEtabRow[] | null } };
+type ArticleRow = CommandeArticle & { ingredient_id: string; toujours_affiche?: boolean | null; ingredient: { id: string; name: string; is_active: boolean; rayon_commande: string | null; stock_objectif?: number | null; storage_zone?: string | null; ingredient_zones?: ZoneEtabRow[] | null } };
 type OffreRow = OffrePrix & { ingredient_id: string; supplier_id: string; supplier_sku: string | null; valid_from: string | null; created_at: string | null };
 
 export type Reponse = { status: number; body: unknown };
@@ -114,7 +114,7 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
   const depuis = new Date(Date.now() - JOURS_HABITUELS * 86400000).toISOString().slice(0, 10);
   const [{ data: articlesData, error: errArt }, { data: rayons }, offres, { data: factures }, session, { data: zonesEtab }] = await Promise.all([
     supabaseAdmin.from("commande_articles")
-      .select("ingredient_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande, ingredient:ingredients!inner(id, name, is_active, rayon_commande, stock_objectif, storage_zone, ingredient_zones(etablissement_id, zone, rang))")
+      .select("ingredient_id, unite_commande, contenu_nb, element, element_qte, element_unite, commande_element_permise, precommande, toujours_affiche, ingredient:ingredients!inner(id, name, is_active, rayon_commande, stock_objectif, storage_zone, ingredient_zones(etablissement_id, zone, rang))")
       .eq("supplier_id", f.ficheId),
     supabaseAdmin.from("rayons_commande").select("code, libelle, ordre").order("ordre"),
     chargerOffres(f.aliasIds),
@@ -150,6 +150,8 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
       nom: a.ingredient.name,
       rayon: a.ingredient.rayon_commande,
       precommande: a.precommande,
+      // Épinglé dans la liste (02/11/2026) : affiché sans passer par la recherche
+      toujours: !!a.toujours_affiche,
       au_poids: a.unite_commande === "kg" || a.unite_commande === "litre",
       unite_commande: a.unite_commande,
       contenu_nb: Number(a.contenu_nb),
@@ -262,6 +264,20 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
 }
 
 /** Fixe la quantité de l'utilisateur sur un produit du brouillon (0 = retrait) */
+/** Épingler ou retirer un produit de la liste de commande (02/11/2026) : responsables seulement */
+export async function fixerToujours(body: unknown, etabId: string, userId: string): Promise<Reponse> {
+  const b = (body ?? {}) as { supplier_id?: string; ingredient_id?: string; toujours?: boolean };
+  if (!b.supplier_id || !b.ingredient_id || typeof b.toujours !== "boolean") return rep({ error: "supplier_id, ingredient_id et toujours requis" }, 400);
+  const { data: profil } = await supabaseAdmin.from("profiles").select("role").eq("id", userId).maybeSingle();
+  if (!["group_admin", "manager"].includes(String(profil?.role ?? ""))) return rep({ error: "Réservé aux responsables" }, 403);
+  const f = await resoudreFiche(b.supplier_id, etabId);
+  if (!f) return rep({ error: "Ce fournisseur n'est pas en commande simplifiée pour cet établissement" }, 404);
+  const { error } = await supabaseAdmin.from("commande_articles").update({ toujours_affiche: b.toujours, updated_at: new Date().toISOString(), updated_by: userId })
+    .eq("supplier_id", f.ficheId).eq("ingredient_id", b.ingredient_id);
+  if (error) return rep({ error: error.message }, 500);
+  return rep({ ok: true, toujours: b.toujours });
+}
+
 export async function fixerApport(body: unknown, etabId: string, userId: string): Promise<Reponse> {
   const { supplier_id, ingredient_id, mode } = body as { supplier_id?: string; ingredient_id?: string; mode?: string };
   const type = typeDe((body as { type?: unknown }).type);

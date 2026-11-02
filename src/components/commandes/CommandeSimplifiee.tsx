@@ -26,6 +26,8 @@ type Article = {
   nom: string;
   rayon: string | null;
   precommande: boolean;
+  /** Épinglé : toujours dans la liste, même sans être un habituel */
+  toujours: boolean;
   au_poids: boolean;
   unite_commande: UniteCommande;
   contenu_nb: number;
@@ -104,7 +106,8 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   const large = useLarge();
   // Commande du jour / précommande du mercredi : deux brouillons séparés
   const router = useRouter();
-  const { canWrite: peutCorrigerFiche } = useProfile();
+  const { canWrite: peutCorrigerFiche, role } = useProfile();
+  const estResponsable = role === "group_admin" || role === "manager";
   /** État à restaurer en revenant de la fiche produit (lu une fois, au montage) */
   const [retour] = useState<EtatRetour | null>(() => (typeof window === "undefined" ? null : lireRetour(supplierId)));
   const [onglet, setOnglet] = useState<Onglet>(retour?.onglet ?? "jour");
@@ -168,7 +171,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     if (!data) return [];
     // Précommande : les produits cochés, tous affichés (à 0 au départ) ; jour : habituels + déjà commandés.
     // Aucun habituel (fournisseur rare, historique court) : tous les articles, l'écran n'est jamais vide.
-    const habituelsOuCommandes = duJour.filter((a) => estHabituel(a) || enCommande(a));
+    const habituelsOuCommandes = duJour.filter((a) => estHabituel(a) || a.toujours || enCommande(a));
     const visibles = onglet === "precommande" || habituelsOuCommandes.length === 0 ? duJour : habituelsOuCommandes;
     return data.rayons
       .map((r) => ({
@@ -177,7 +180,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
           .filter((a) => a.rayon === r.code)
           // D'abord les produits achetés ces 90 derniers jours, puis les autres ; chaque groupe par ordre
           // alphabétique sans accents ni casse (« Crème » / « Creme » ensemble, « Œuf » avec les O), comme le mail et le PDF
-          .sort((x, y) => (Number((y.habituel?.nb_achats ?? 0) > 0) - Number((x.habituel?.nb_achats ?? 0) > 0))
+          .sort((x, y) => (Number((y.habituel?.nb_achats ?? 0) > 0 || y.toujours) - Number((x.habituel?.nb_achats ?? 0) > 0 || x.toujours))
             || x.nom.localeCompare(y.nom, "fr", { sensitivity: "base" })),
       }))
       .filter((r) => r.articles.length > 0)
@@ -285,6 +288,14 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   }
 
   /** Fiche produit : les appuis en attente sont enregistrés d'abord, l'état de l'écran est gardé pour le retour */
+  // Épingler (02/11/2026) : le produit reste dans la liste sans passer par la recherche
+  async function basculerToujours(a: Article) {
+    const toujours = !a.toujours;
+    setData((d) => (d ? { ...d, articles: d.articles.map((x) => (x.ingredient_id === a.ingredient_id ? { ...x, toujours } : x)) } : d));
+    const r = await fetchApi("/api/commandes/simplifiee", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ supplier_id: supplierId, ingredient_id: a.ingredient_id, toujours }) }).catch(() => null);
+    if (!r || !r.ok) setData((d) => (d ? { ...d, articles: d.articles.map((x) => (x.ingredient_id === a.ingredient_id ? { ...x, toujours: !toujours } : x)) } : d));
+  }
+
   async function ouvrirFiche(a: Article) {
     const cles = [...minuteries.current.keys()];
     for (const cle of cles) { clearTimeout(minuteries.current.get(cle)); minuteries.current.delete(cle); }
@@ -381,6 +392,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
           )}
         </CelluleProduit>
         <td style={{ ...TD, padding: "9px 8px 9px 2px", width: 30, textAlign: "right" }}>
+          {estResponsable && <BoutonEpingle actif={a.toujours} onClick={() => void basculerToujours(a)} />}
           {peutCorrigerFiche && <BoutonCrayon onClick={() => void ouvrirFiche(a)} title="Ouvrir la fiche produit" />}
         </td>
       </tr>
@@ -459,6 +471,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
           {total > 0 && prix != null ? euros(total * prix) : "—"}
         </td>
         <td style={{ ...TD, textAlign: "right", width: 40 }}>
+          {estResponsable && <BoutonEpingle actif={a.toujours} onClick={() => void basculerToujours(a)} />}
           {peutCorrigerFiche && <BoutonCrayon onClick={() => void ouvrirFiche(a)} title="Ouvrir la fiche produit" />}
         </td>
       </tr>
@@ -580,5 +593,17 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
       )}
       {resume.prixInconnu && <div style={{ fontSize: 11, color: "#999", marginTop: 8 }}>* un ou plusieurs prix inconnus, non comptés dans le total</div>}
     </div>
+  );
+}
+
+/** Punaise : épingler un produit pour qu'il soit toujours dans la liste de commande */
+function BoutonEpingle({ actif, onClick }: { actif: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={actif} title={actif ? "Toujours dans la liste : cliquer pour retirer" : "Mettre toujours dans la liste"}
+      style={{ width: 28, height: 28, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", color: actif ? "#D4775A" : "#c9c1b3", verticalAlign: "middle" }}>
+      <svg width={16} height={16} viewBox="0 0 24 24" fill={actif ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 3h6l-1 6 4 4H6l4-4z" /><path d="M12 13v8" />
+      </svg>
+    </button>
   );
 }
