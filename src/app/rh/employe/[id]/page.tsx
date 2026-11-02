@@ -1694,6 +1694,26 @@ function PlanifEquipes({ etabId, currentAccess, empId, onUpdate }: {
 
 
 /* ── Compte & accès : etat du compte, role unique, exceptions ── */
+function FormePate({ empId, initial }: { empId: string; initial: boolean }) {
+  const [valeur, setValeur] = useState(initial);
+  const [msg, setMsg] = useState("");
+  const basculer = async (v: boolean) => {
+    setValeur(v); setMsg("");
+    const { error } = await supabase.from("employes").update({ pate_autorise: v }).eq("id", empId);
+    if (error) { setValeur(!v); setMsg(error.message); } else setMsg(v ? "Peut lancer et clôturer les fournées" : "Suit les étapes seulement");
+  };
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6 }}>Pâte à pizza</div>
+      <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer" }}>
+        <input type="checkbox" checked={valeur} onChange={(e) => void basculer(e.target.checked)} style={{ width: 18, height: 18 }} />
+        Formé à la pâte : lance et clôture les fournées (les responsables le peuvent toujours)
+      </label>
+      {msg && <div style={{ fontSize: 11.5, color: "#6f6a61", marginTop: 4 }}>{msg}</div>}
+    </div>
+  );
+}
+
 function CodeTablette({ empId }: { empId: string }) {
   const [code, setCode] = useState("");
   const [msg, setMsg] = useState("");
@@ -1838,6 +1858,8 @@ function CompteAcces({ emp, setEmp, isGroupAdmin, etabIds, prenom, nom, email }:
 
       {/* Code tablette (30/10/2026) : 4 chiffres pour s'identifier sur la tablette partagée, comme Popina */}
       <CodeTablette empId={String(emp.id)} />
+      {/* Module pâte (02/11/2026) : seuls les pizzaiolos formés et les responsables lancent et clôturent une fournée */}
+      <FormePate empId={String(emp.id)} initial={!!(emp as Record<string, unknown>).pate_autorise} />
 
       {/* Role — source unique */}
       <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6 }}>Role</div>

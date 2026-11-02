@@ -12,6 +12,8 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { calculerPate, type EmpatementType, type FlourMixItem } from "@/lib/pateEngine";
 import { formatG, lignesPesee, nomPhase } from "@/lib/pateAffichage";
 import { etapesParDefaut } from "@/lib/pateEtapes";
+import { Fournee } from "@/components/pate/Fournee";
+import { etapesFourneeParDefaut, formatDuree, lireEtapesFournee, type EtapeFournee } from "@/lib/pate/fournee";
 import type { Ingredient } from "@/types/ingredients";
 import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
 import { fetchApi } from "@/lib/fetchApi";
@@ -86,6 +88,12 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   const [waterStart, setWaterStart] = useState(80);
   const [lossMargin, setLossMargin] = useState(1.5);
   const [mixerMax, setMixerMax] = useState(215);
+  // Fabrication par lot (phase 2, 02/11/2026) : TB manuelle, fenêtre des bacs, étapes de fournée avec minuteurs
+  const [tbManuelle, setTbManuelle] = useState(56);
+  const [fenetreMin, setFenetreMin] = useState<number | "">("");
+  const [fenetreMax, setFenetreMax] = useState<number | "">("");
+  const [etapesFournee, setEtapesFournee] = useState<EtapeFournee[] | null>(null);
+  const [ongletProd, setOngletProd] = useState<"fournee" | "quantites">("fournee");
 
   // Steps
   const [steps, setSteps] = useState<string[]>([]);
@@ -302,6 +310,10 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
           setWaterStart(r.water_start_pct == null ? 80 : n2(r.water_start_pct));
           setLossMargin(r.loss_margin_pct == null ? 1.5 : n2(r.loss_margin_pct));
           setMixerMax(r.mixer_max_balls == null ? 215 : n2(r.mixer_max_balls));
+          setTbManuelle(r.tb_manuelle == null ? 56 : n2(r.tb_manuelle));
+          setFenetreMin(r.fenetre_bacs_min_h == null ? "" : n2(r.fenetre_bacs_min_h));
+          setFenetreMax(r.fenetre_bacs_max_h == null ? "" : n2(r.fenetre_bacs_max_h));
+          setEtapesFournee(Array.isArray(r.etapes_fournee) && (r.etapes_fournee as unknown[]).length ? lireEtapesFournee(r.etapes_fournee, (t === "biga" || t === "direct" || t === "focaccia" ? t : "direct") as EmpatementType) : null);
           if (r.procedure) {
             try { setSteps(JSON.parse(String(r.procedure)) as string[]); }
             catch { setSteps(String(r.procedure) ? [String(r.procedure)] : []); }
@@ -369,6 +381,10 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
         water_start_pct: waterStart,
         loss_margin_pct: lossMargin,
         mixer_max_balls: mixerMax,
+        tb_manuelle: tbManuelle,
+        fenetre_bacs_min_h: fenetreMin === "" ? (type === "direct" ? 72 : 24) : fenetreMin,
+        fenetre_bacs_max_h: fenetreMax === "" ? (type === "direct" ? 100 : 48) : fenetreMax,
+        etapes_fournee: etapesFournee,
         flour_mix: flourMix,
         yield_grams: yieldGrams,
         vat_rate: vatRate,
@@ -505,17 +521,27 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                 {/* Banner */}
                 <div style={{
                   background: "#4a6741", color: "white", borderRadius: 12,
-                  padding: "12px 16px", marginBottom: 16,
+                  padding: "12px 16px", marginBottom: 12,
                 }}>
                   <div style={{ fontSize: 15, fontWeight: 800 }}>Mode Production</div>
                   <div style={{ fontSize: 13, opacity: 0.85 }}>
-                    {prodPivotItem
+                    {ongletProd === "fournee" ? "La fournée pas à pas : températures, minuteurs, contrôles" : prodPivotItem
                       ? `Modifie ${prodPivotItem.name}, tout se recalcule`
                       : `${title} -- appuie sur une etoile en mode normal pour choisir un pivot`}
                   </div>
                 </div>
-
-                {!pivotItemId || !prodPivotItem ? (
+                {/* Fabrication par lot (phase 2, 02/11/2026) : la fournée vit ici, le calcul par pivot reste à côté */}
+                {type !== "focaccia" && (
+                  <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                    {([["fournee", "Fournée"], ["quantites", "Quantités"]] as const).map(([k, l]) => (
+                      <button key={k} type="button" onClick={() => setOngletProd(k)} style={{ border: `1px solid ${ongletProd === k ? ACCENT : "#ddd6c8"}`, background: ongletProd === k ? "rgba(212,119,90,0.12)" : "#fff", color: ongletProd === k ? ACCENT : "#1a1a1a", borderRadius: 20, padding: "7px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{l}</button>
+                    ))}
+                  </div>
+                )}
+                {type !== "focaccia" && ongletProd === "fournee" && recipeId ? (
+                  <Fournee recipeId={recipeId} recetteNom={title} type={type} nbPatonsDefaut={nbPatons} poidsPaton={poidsPaton}
+                    calcul={(nb) => { try { return calculerPate({ type, nbPatons: nb, poidsPaton, recipe: { hydration_total: hydration, salt_percent: salt, honey_percent: honey, oil_percent: oil, yeast_percent: yeast, biga_yeast_percent: bigaYeast, biga_percent: bigaPct, biga_hydration: bigaHyd, biga_flour: bigaFlour || null, water_start_pct: waterStart, loss_margin_pct: lossMargin, mixer_max_balls: mixerMax }, flourMix }); } catch { return null; } }} />
+                ) : !pivotItemId || !prodPivotItem ? (
                   <div style={{
                     padding: "24px 16px", background: "rgba(0,0,0,0.03)", borderRadius: 12,
                     textAlign: "center", color: "#6f6a61", fontSize: 14, lineHeight: 1.7, marginBottom: 16,
@@ -674,6 +700,49 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                     ))}
                   </div>
                 </div>
+
+                {/* Fabrication par lot (phase 2) : TB manuelle, fenêtre des bacs, étapes de fournée et minuteurs */}
+                {type !== "focaccia" && (
+                  <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
+                    <h3 style={{ margin: "0 0 12px", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
+                      Fournée
+                    </h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12, marginBottom: 12 }}>
+                      <div>
+                        <label className="label">TB manuelle du pétrin</label>
+                        <StepperInput value={tbManuelle} onChange={v => setTbManuelle(v === "" ? 56 : v)} step={0.5} min={30} max={90} />
+                        <div style={{ fontSize: 11, color: "#6f6a61", marginTop: 4 }}>Utilisée tant que moins de 3 lots sont sortis dans la cible.</div>
+                      </div>
+                      <div>
+                        <label className="label">Fenêtre des bacs, de (h)</label>
+                        <StepperInput value={fenetreMin} onChange={setFenetreMin} step={1} min={0} max={200} placeholder={type === "direct" ? "72" : "24"} />
+                      </div>
+                      <div>
+                        <label className="label">à (h)</label>
+                        <StepperInput value={fenetreMax} onChange={setFenetreMax} step={1} min={0} max={240} placeholder={type === "direct" ? "100" : "48"} />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Étapes de la fournée et minuteurs</div>
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {(etapesFournee ?? etapesFourneeParDefaut(type)).map((e, i, liste) => (
+                        <div key={i} style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 8, alignItems: "center" }}>
+                          <select value={e.phase} disabled={type !== "biga"} onChange={ev => setEtapesFournee(liste.map((x, k) => (k === i ? { ...x, phase: ev.target.value === "biga" ? "biga" : "final" } : x)))} className="input" style={{ width: 96 }}>
+                            <option value="biga">Biga</option><option value="final">Pétrissage</option>
+                          </select>
+                          <input className="input" value={e.texte} onChange={ev => setEtapesFournee(liste.map((x, k) => (k === i ? { ...x, texte: ev.target.value } : x)))} />
+                          <input className="input" type="number" inputMode="numeric" min={0} step={10} value={e.duree_s ?? ""} placeholder="s" title="Minuteur en secondes" onChange={ev => setEtapesFournee(liste.map((x, k) => (k === i ? { ...x, duree_s: ev.target.value === "" ? null : Math.max(0, Math.round(Number(ev.target.value))) } : x)))} style={{ width: 76 }} />
+                          <span style={{ fontSize: 11.5, color: "#6f6a61", minWidth: 40 }}>{e.duree_s ? formatDuree(e.duree_s) : "—"}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                      <button type="button" className="btn" style={{ fontSize: 12 }} onClick={() => setEtapesFournee([...(etapesFournee ?? etapesFourneeParDefaut(type)), { texte: "", phase: "final", duree_s: null }])}>+ Ajouter une étape</button>
+                      <button type="button" className="btn" style={{ fontSize: 12 }} onClick={() => setEtapesFournee(null)}>Remettre les étapes par défaut</button>
+                      {etapesFournee && etapesFournee.length > 1 && <button type="button" className="btn" style={{ fontSize: 12, color: "#b4443a" }} onClick={() => setEtapesFournee(etapesFournee.slice(0, -1))}>Retirer la dernière</button>}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#6f6a61", marginTop: 6 }}>Minuteur en secondes (180 = 3 min). Les étapes sans minuteur se valident d&apos;un geste. Par défaut : étapes du brief.</div>
+                  </div>
+                )}
 
                 {/* Farines : jusqu'à trois, la dernière prend le reste ; pour une biga, la farine désignée la remplit en priorité */}
                 <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e0d8ce", marginBottom: 14 }}>
