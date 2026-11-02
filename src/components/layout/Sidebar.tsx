@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo, useSyncExternalStore, type CSSProperties } from "react";
+import React, { useState, useEffect, useMemo, useSyncExternalStore, type CSSProperties } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -79,18 +79,7 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const tablette = useTablette();
-  const [etabOpen, setEtabOpen] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!etabOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setEtabOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [etabOpen]);
 
   const isManager = role === "group_admin" || role === "manager";
   const isPiccola = !!current?.slug?.includes("piccola");
@@ -128,7 +117,6 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
 
   /* ── Choix de l'établissement ── */
   const choisirEtab = (etab: (typeof etablissements)[number]) => {
-    setEtabOpen(false);
     onNaviguer?.();
     const depuisGroupe = isGroupView || pathname === "/dashboard" || pathname === "/groupe";
     setGroupView(false);
@@ -137,12 +125,10 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
     if (depuisGroupe) router.push(etab.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio");
   };
   const choisirGroupe = () => {
-    setEtabOpen(false);
     onNaviguer?.();
     setGroupView(true);
     router.push("/dashboard");
   };
-  const etabLabel = isGroupView ? "iFratelli Group" : (current?.nom ?? "Choisir…");
   const etabChoixPossible = etablissements.length > 1 || role === "group_admin";
 
   /* ── Rendu d'une page ── */
@@ -227,80 +213,53 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
       fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
       width: "100%",
     }}>
-      {/* Logo */}
-      <div style={{ padding: "14px 18px 8px", display: "flex", alignItems: "center", gap: 9 }}>
-        <Image src="/logo-ifratelli.png" alt="iFratelli" width={30} height={30}
-          style={{ width: 30, height: 30, objectFit: "contain", borderRadius: 8, flexShrink: 0 }} />
-        <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontSize: 17, fontWeight: 700, color: C.textActive, letterSpacing: 0.6, lineHeight: 1 }}>
-          iFratelli
-        </span>
-      </div>
-
-      {/* Établissement */}
-      <div ref={dropdownRef} style={{ position: "relative", padding: "0 10px 6px" }}>
-        <button
-          type="button"
-          onClick={() => etabChoixPossible && setEtabOpen((o) => !o)}
-          aria-haspopup={etabChoixPossible ? "listbox" : undefined}
-          aria-expanded={etabChoixPossible ? etabOpen : undefined}
-          style={{
-            display: "flex", alignItems: "center", gap: 8, width: "100%",
-            padding: "8px 10px", borderRadius: 10,
-            border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.7)",
-            cursor: etabChoixPossible ? "pointer" : "default", textAlign: "left",
-            color: C.textActive, fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-            whiteSpace: "nowrap", overflow: "hidden",
-          }}
-        >
-          {isGroupView ? <IconBuilding size={16} color={etabColor} /> : <IconStore size={16} color={etabColor} />}
-          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>{etabLabel}</span>
-          {etabChoixPossible && (
-            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-              style={{ opacity: 0.55, flexShrink: 0, transform: etabOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          )}
+      {/* Logo : pour un admin du groupe, c'est l'accueil iFratelli Group (02/11/2026, demande de Paul) */}
+      {role === "group_admin" ? (
+        <button type="button" onClick={choisirGroupe} aria-current={isGroupView ? "page" : undefined} title="Accueil iFratelli Group"
+          style={{ margin: "10px 10px 4px", padding: "6px 8px", display: "flex", alignItems: "center", gap: 9, border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", textAlign: "left", background: isGroupView ? C.bgItemActive : "transparent" }}>
+          <Image src="/logo-ifratelli.png" alt="iFratelli" width={30} height={30}
+            style={{ width: 30, height: 30, objectFit: "contain", borderRadius: 8, flexShrink: 0 }} />
+          <span style={{ display: "grid", lineHeight: 1 }}>
+            <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontSize: 17, fontWeight: 700, color: C.textActive, letterSpacing: 0.6 }}>iFratelli Group</span>
+            <span style={{ fontSize: 10.5, color: isGroupView ? C.ifratelli : C.textNormal, fontWeight: 600, marginTop: 3 }}>{isGroupView ? "vue groupe" : "accueil du groupe"}</span>
+          </span>
         </button>
+      ) : (
+        <div style={{ padding: "14px 18px 8px", display: "flex", alignItems: "center", gap: 9 }}>
+          <Image src="/logo-ifratelli.png" alt="iFratelli" width={30} height={30}
+            style={{ width: 30, height: 30, objectFit: "contain", borderRadius: 8, flexShrink: 0 }} />
+          <span style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontSize: 17, fontWeight: 700, color: C.textActive, letterSpacing: 0.6, lineHeight: 1 }}>
+            iFratelli
+          </span>
+        </div>
+      )}
 
-        {etabOpen && (
-          <div role="listbox" style={{
-            position: "absolute", left: 10, right: 10, top: "calc(100% - 2px)", zIndex: 60,
-            background: "#fff", border: `1px solid ${C.border}`, borderRadius: 12,
-            boxShadow: "0 10px 30px rgba(0,0,0,0.12)", padding: 6,
-          }}>
+      {/* Établissements : un bouton par établissement, côte à côte, un seul geste pour changer */}
+      <div style={{ padding: "0 10px 6px" }}>
+        {etabChoixPossible && etablissements.length > 1 ? (
+          <div role="radiogroup" aria-label="Établissement" style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(etablissements.length, 3)}, 1fr)`, gap: 6 }}>
             {etablissements.map((etab) => {
               const selected = !isGroupView && current?.id === etab.id;
               const color = etab.couleur ?? C.ifratelli;
               return (
-                <button key={etab.id} type="button" role="option" aria-selected={selected} onClick={() => choisirEtab(etab)}
+                <button key={etab.id} type="button" role="radio" aria-checked={selected} onClick={() => choisirEtab(etab)}
                   style={{
-                    display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "8px 10px",
-                    borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                    background: selected ? C.bgItemActive : "transparent", color: C.textActive,
-                    fontSize: 13, fontWeight: selected ? 700 : 500,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "9px 6px", minWidth: 0,
+                    borderRadius: 10, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: selected ? 700 : 500,
+                    border: `1px solid ${selected ? color : C.border}`, background: selected ? `${color}1a` : "rgba(255,255,255,0.7)", color: C.textActive,
                   }}>
                   <span style={{ width: 9, height: 9, borderRadius: "50%", background: color, flexShrink: 0 }} />
-                  <span style={{ flex: 1 }}>{etab.nom}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{etab.nom}</span>
                 </button>
               );
             })}
-            {role === "group_admin" && (
-              <>
-                <div style={{ height: 1, background: C.divider, margin: "4px 6px" }} />
-                <button type="button" role="option" aria-selected={isGroupView} onClick={choisirGroupe}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "8px 10px",
-                    borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                    background: isGroupView ? C.bgItemActive : "transparent", color: C.textActive,
-                    fontSize: 13, fontWeight: isGroupView ? 700 : 500,
-                  }}>
-                  <IconBuilding size={15} color={C.ifratelli} />
-                  <span style={{ flex: 1 }}>iFratelli Group</span>
-                </button>
-              </>
-            )}
           </div>
-        )}
+        ) : current ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.7)", color: C.textActive, fontSize: 13, fontWeight: 600 }}>
+            <IconStore size={16} color={etabColor} />
+            <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>{current.nom}</span>
+          </div>
+        ) : null}
       </div>
 
       {/* Liste */}

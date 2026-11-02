@@ -338,13 +338,23 @@ function EtabPill() {
             position: "fixed", zIndex: 301, left: 12, top: "calc(env(safe-area-inset-top, 0px) + 58px)", width: "min(300px, calc(100vw - 24px))",
             background: "#fff", borderRadius: 14, boxShadow: "0 12px 40px rgba(0,0,0,0.22)", padding: 6, display: "grid", gap: 2,
           }}>
-            {etablissements.map((e) => ligne(!isGroupView && current?.id === e.id, e.couleur ?? "#b45f57", e.nom, () => choisirEtab(e)))}
-            {isGroupAdmin && (
-              <>
-                <div style={{ height: 1, background: "rgba(0,0,0,0.08)", margin: "4px 10px" }} />
-                {ligne(isGroupView, "#b45f57", "iFratelli Group", choisirGroupe)}
-              </>
-            )}
+            {/* 02/11/2026 : le groupe en tête (c'est l'accueil), les établissements côte à côte, un seul geste */}
+            {isGroupAdmin && ligne(isGroupView, "#b45f57", "iFratelli Group", choisirGroupe)}
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(etablissements.length, 3)}, 1fr)`, gap: 6, padding: "4px 4px 2px" }}>
+              {etablissements.map((e) => {
+                const actif = !isGroupView && current?.id === e.id;
+                const c = e.couleur ?? "#b45f57";
+                return (
+                  <button key={e.id} type="button" role="option" aria-selected={actif} onClick={() => choisirEtab(e)} style={{
+                    display: "grid", justifyItems: "center", gap: 6, padding: "14px 6px", border: `1px solid ${actif ? c : "rgba(0,0,0,0.1)"}`, borderRadius: 12,
+                    background: actif ? `${c}1a` : "#fff", color: "#1a1a1a", cursor: "pointer", fontFamily: "inherit", fontSize: 15, fontWeight: actif ? 700 : 500, minWidth: 0,
+                  }}>
+                    <span style={{ width: 14, height: 14, borderRadius: "50%", background: c }} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{e.nom}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </>,
         document.body,
