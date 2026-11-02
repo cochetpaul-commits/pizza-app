@@ -24,7 +24,7 @@ export const TB_LOTS_MOYENNE = 5;
 /** Étapes par défaut d'une fournée, avec la phase et le minuteur quand il y en a un (textes du brief v2, 1.3) */
 export const ETAPES_FOURNEE_BIGA: EtapeFournee[] = [
   { phase: "biga", texte: "Délayer la levure dans l'eau de biga.", duree_s: null },
-  { phase: "biga", texte: "Ajouter la farine de biga, mélanger en marche arrière. S'arrêter dès que la farine est hydratée.", duree_s: 180 },
+  { phase: "biga", texte: "Ajouter la farine de biga, mélanger en marche arrière. S'arrêter dès que la farine est hydratée.", duree_s: 120 },
   { phase: "biga", texte: "Bac légèrement huilé, couvert, au froid à 4 °C pendant 24 h (fenêtre 20 à 30 h).", duree_s: null },
   { phase: "final", texte: "Eau de départ et biga coupée en morceaux, vitesse 1.", duree_s: 120 },
   { phase: "final", texte: "Ajouter la farine du pétrissage final, continuer en vitesse 1 jusqu'à 7 min.", duree_s: 300 },

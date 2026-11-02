@@ -219,6 +219,14 @@ function Deroule({ lot, tb, occupe, peutLancer, appliquer }: { lot: Lot; tb: TbC
         <Cloture lot={lot} occupe={occupe} peutLancer={peutLancer} appliquer={appliquer} />
       )}
 
+      {/* Retour en arrière et correction (02/11/2026) : un bouton appuyé trop tôt se rattrape, l'heure et la température se corrigent */}
+      {peutRevenir(lot) && (
+        <button type="button" disabled={occupe} onClick={() => void appliquer({ action: "revenir" })} style={{ ...GROS, fontSize: 14, padding: "12px 10px", color: MUTED }}>
+          ← Revenir à l&apos;étape précédente
+        </button>
+      )}
+      {lot.type === "biga" && lot.biga_froid_at && <CorrigerBiga lot={lot} occupe={occupe} appliquer={appliquer} />}
+
       <details style={{ ...CADRE, padding: "10px 14px" }}>
         <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Étapes de la phase ({faites}/{etapes.length}) et relevés</summary>
         <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
@@ -261,9 +269,10 @@ function EtatBiga({ froidAt }: { froidAt: string | null }) {
 
 /* ── Températures ───────────────────────────────────────────────────────── */
 function Temperatures({ lot, phase, tb, occupe, appliquer }: { lot: Lot; phase: "biga" | "final"; tb: TbCalculee | null; occupe: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
-  const [tFarine, setTFarine] = useState<string>("");
-  const [tCuisine, setTCuisine] = useState<string>("");
-  const [tBiga, setTBiga] = useState<string>("");
+  // Brouillon gardé sur l'appareil (02/11/2026) : quitter l'appli et revenir ne vide plus les températures
+  const [tFarine, setTFarine] = useBrouillon(`${lot.id}:${phase}:farine`, "");
+  const [tCuisine, setTCuisine] = useBrouillon(`${lot.id}:${phase}:cuisine`, "");
+  const [tBiga, setTBiga] = useBrouillon(`${lot.id}:${phase}:biga`, "");
   const n = (s: string) => (s.trim() === "" ? null : Number(s.replace(",", ".")));
   const f = n(tFarine), c = n(tCuisine), b = n(tBiga);
   const complet = f != null && c != null && (phase === "biga" || lot.type === "direct" || b != null);
@@ -366,8 +375,8 @@ function EtapeEnCours({ lot, etape, index, total, faites, calcul, occupe, appliq
 
 /* ── Fin de la biga : au froid ──────────────────────────────────────────── */
 function BigaAuFroid({ lot, occupe, appliquer }: { lot: Lot; occupe: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
-  const [tSortie, setTSortie] = useState("");
-  const [tEau, setTEau] = useState(lot.t_eau_biga_calc != null ? String(lot.t_eau_biga_calc) : "");
+  const [tSortie, setTSortie] = useBrouillon(`${lot.id}:biga:sortie`, "");
+  const [tEau, setTEau] = useBrouillon(`${lot.id}:biga:eau`, lot.t_eau_biga_calc != null ? String(lot.t_eau_biga_calc) : "");
   const t = tSortie.trim() === "" ? null : Number(tSortie.replace(",", "."));
   const a = t != null && Number.isFinite(t) ? alerteBiga(t) : null;
   return (
@@ -394,10 +403,11 @@ function BigaAuFroid({ lot, occupe, appliquer }: { lot: Lot; occupe: boolean; ap
 
 /* ── Contrôles et clôture ───────────────────────────────────────────────── */
 function Cloture({ lot, occupe, peutLancer, appliquer }: { lot: Lot; occupe: boolean; peutLancer: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
-  const [voile, setVoile] = useState(false);
-  const [tPate, setTPate] = useState("");
-  const [tEau, setTEau] = useState(lot.t_eau_calc != null ? String(lot.t_eau_calc) : "");
-  const [commentaire, setCommentaire] = useState(lot.commentaire ?? "");
+  const [voileTxt, setVoileTxt] = useBrouillon(`${lot.id}:final:voile`, "");
+  const voile = voileTxt === "1", setVoile = (v: boolean) => setVoileTxt(v ? "1" : "");
+  const [tPate, setTPate] = useBrouillon(`${lot.id}:final:pate`, "");
+  const [tEau, setTEau] = useBrouillon(`${lot.id}:final:eau`, lot.t_eau_calc != null ? String(lot.t_eau_calc) : "");
+  const [commentaire, setCommentaire] = useBrouillon(`${lot.id}:final:commentaire`, lot.commentaire ?? "");
   const t = tPate.trim() === "" ? null : Number(tPate.replace(",", "."));
   const a = t != null && Number.isFinite(t) ? alertePate(t) : null;
   const pret = voile && t != null && Number.isFinite(t);
@@ -423,5 +433,52 @@ function Cloture({ lot, occupe, peutLancer, appliquer }: { lot: Lot; occupe: boo
       </button>
       {!peutLancer && <div style={{ fontSize: 12.5, color: MUTED, textAlign: "center" }}>Clôturer un lot est réservé aux pizzaiolos formés et aux responsables.</div>}
     </div>
+  );
+}
+
+/** Champ gardé sur l'appareil tant que l'étape n'est pas validée : quitter l'appli et revenir ne le vide pas */
+function useBrouillon(cle: string, initial: string): [string, (v: string) => void] {
+  const k = `pate:brouillon:${cle}`;
+  const [v, setV] = useState<string>(() => {
+    try { const x = localStorage.getItem(k); if (x != null) return x; } catch { /* stockage indisponible */ }
+    return initial;
+  });
+  const fixer = (x: string) => { setV(x); try { if (x === "") localStorage.removeItem(k); else localStorage.setItem(k, x); } catch { /* stockage indisponible */ } };
+  return [v, fixer];
+}
+
+/** Il y a quelque chose à défaire : une étape validée, une phase passée, des températures enregistrées */
+function peutRevenir(lot: Lot): boolean {
+  if (lot.statut === "cloture" || lot.statut === "annule") return false;
+  return lot.etapes.some((e) => e.termine_at) || lot.t_eau_biga_calc != null || lot.t_eau_calc != null;
+}
+
+/** Corriger la biga après coup : heure de mise au froid, température de sortie, eau utilisée */
+function CorrigerBiga({ lot, occupe, appliquer }: { lot: Lot; occupe: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
+  const local = (iso: string | null) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+  const [heure, setHeure] = useState(local(lot.biga_froid_at));
+  const [tSortie, setTSortie] = useState(lot.t_biga_sortie != null ? String(lot.t_biga_sortie) : "");
+  const [tEau, setTEau] = useState(lot.t_eau_biga_utilisee != null ? String(lot.t_eau_biga_utilisee) : "");
+  const [fait, setFait] = useState(false);
+  const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(",", ".")));
+  const champ: React.CSSProperties = { ...CHAMP, height: 40, fontSize: 15 };
+  return (
+    <details style={{ ...CADRE, padding: "10px 14px" }}>
+      <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Corriger la biga (heure au froid {heure ? heure.slice(11) : "—"}, sortie {lot.t_biga_sortie != null ? `${lot.t_biga_sortie} °` : "non saisie"})</summary>
+      <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+        <label style={{ display: "grid", gap: 4, fontSize: 13 }}>Mise au froid<input type="datetime-local" value={heure} onChange={(e) => setHeure(e.target.value)} style={champ} /></label>
+        <label style={{ display: "grid", gap: 4, fontSize: 13 }}>Biga en sortie de pétrin (°C)<input inputMode="decimal" value={tSortie} onChange={(e) => setTSortie(e.target.value)} style={champ} /></label>
+        <label style={{ display: "grid", gap: 4, fontSize: 13 }}>Eau réellement utilisée (°C)<input inputMode="decimal" value={tEau} onChange={(e) => setTEau(e.target.value)} style={champ} /></label>
+        <button type="button" disabled={occupe || !heure} onClick={async () => { const ok = await appliquer({ action: "corriger", biga_froid_at: new Date(heure).toISOString(), t_biga_sortie: num(tSortie), t_eau_biga_utilisee: num(tEau) }); setFait(ok); }} style={{ ...BTN, justifySelf: "start" }}>
+          Enregistrer la correction
+        </button>
+        {fait && <span style={{ fontSize: 12.5, color: BON }}>Correction enregistrée.</span>}
+      </div>
+    </details>
   );
 }

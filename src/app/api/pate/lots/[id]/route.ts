@@ -46,7 +46,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   const maj: Record<string, unknown> = { updated_at: maintenant };
   const type = lot.type === "biga" ? "biga" : "direct";
 
-  if (ferme && action !== "essai" && action !== "commentaire") return NextResponse.json({ error: "Ce lot est clôturé." }, { status: 409 });
+  if (ferme && action !== "essai" && action !== "commentaire" && action !== "corriger") return NextResponse.json({ error: "Ce lot est clôturé." }, { status: 409 });
 
   if (action === "temps_biga") {
     const tf = num(body.t_farine), tc = num(body.t_cuisine);
@@ -87,6 +87,36 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       essai: body.essai === true, essai_variable: String(body.essai_variable ?? "").trim() || null, essai_valeur: String(body.essai_valeur ?? "").trim() || null,
       ...(body.essai_evaluation && typeof body.essai_evaluation === "object" ? { essai_evaluation: body.essai_evaluation } : {}),
     });
+  } else if (action === "revenir") {
+    // Défaire la dernière action (02/11/2026) : l'étape validée la plus récente, sinon la dernière bascule de phase
+    type E = { id: string; phase: string; ordre: number; termine_at: string | null };
+    const etapes = (lot.etapes as E[]);
+    const phase = lot.statut === "biga_en_cours" ? "biga" : "final";
+    const faites = etapes.filter((e) => e.phase === phase && e.termine_at).sort((a, b) => b.ordre - a.ordre);
+    if (faites.length) {
+      const { error } = await supabaseAdmin.from("pate_lot_etapes").update({ termine_at: null, demarre_at: null, valide_par: null, valide_par_nom: null }).eq("id", faites[0].id);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    } else if (phase === "final" && lot.t_eau_calc != null) {
+      Object.assign(maj, { t_farine: null, t_cuisine: null, t_biga: null, t_eau_calc: null, tb_utilisee: null, tb_source: null, petrissage_debut_at: null, statut: type === "biga" ? "biga_au_froid" : "petrissage" });
+    } else if (phase === "final" && type === "biga" && lot.statut === "biga_au_froid") {
+      // Biga mise au froid trop tôt : retour à la biga, sa dernière étape rouverte
+      Object.assign(maj, { statut: "biga_en_cours", biga_froid_at: null });
+      const derniere = etapes.filter((e) => e.phase === "biga" && e.termine_at).sort((a, b) => b.ordre - a.ordre)[0];
+      if (derniere) await supabaseAdmin.from("pate_lot_etapes").update({ termine_at: null, demarre_at: null, valide_par: null, valide_par_nom: null }).eq("id", derniere.id);
+    } else if (phase === "biga" && lot.t_eau_biga_calc != null) {
+      Object.assign(maj, { t_farine_biga: null, t_cuisine_biga: null, t_eau_biga_calc: null });
+    } else {
+      return NextResponse.json({ error: "Rien à défaire." }, { status: 400 });
+    }
+  } else if (action === "corriger") {
+    // Correction après coup : heure de mise au froid, température de sortie de la biga, eau utilisée
+    if (body.biga_froid_at !== undefined) {
+      const d = new Date(String(body.biga_froid_at));
+      if (Number.isNaN(d.getTime()) || d.getTime() > Date.now() + 5 * 60000) return NextResponse.json({ error: "Heure invalide" }, { status: 400 });
+      maj.biga_froid_at = d.toISOString();
+    }
+    if (body.t_biga_sortie !== undefined) maj.t_biga_sortie = num(body.t_biga_sortie);
+    if (body.t_eau_biga_utilisee !== undefined) maj.t_eau_biga_utilisee = num(body.t_eau_biga_utilisee);
   } else if (action === "commentaire") {
     maj.commentaire = String(body.commentaire ?? "").trim() || null;
   } else if (action === "annuler") {

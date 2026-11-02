@@ -5,7 +5,7 @@ import type { EmpatementType } from "@/lib/pateEngine";
  * plus : elle se calcule à chaque fournée. Modifiables par recette dans les réglages.
  */
 export const ETAPES_BIGA: string[] = [
-  "Veille au matin : délayer la levure dans l'eau de biga, ajouter la farine de biga, mélanger 3 min en marche arrière, s'arrêter dès que la farine est hydratée. Bac légèrement huilé, couvert, au froid à 4 °C pendant 24 h (fenêtre 20 à 30 h).",
+  "Veille au matin : délayer la levure dans l'eau de biga, ajouter la farine de biga, mélanger 2 min en marche arrière, s'arrêter dès que la farine est hydratée. Bac légèrement huilé, couvert, au froid à 4 °C pendant 24 h (fenêtre 20 à 30 h).",
   "Veille : peser la farine du pétrissage final (stockée à température ambiante, pas au froid), le sel, l'eau de départ avec le miel dissous, l'eau de bassinage.",
   "Jour J : eau de départ et biga coupée en morceaux, vitesse 1 pendant 2 min.",
   "Ajouter la farine du pétrissage final, continuer en vitesse 1.",
