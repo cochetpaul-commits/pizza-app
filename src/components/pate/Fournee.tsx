@@ -57,6 +57,8 @@ export function Fournee({ recipeId, recetteNom, type, nbPatonsDefaut, poidsPaton
   const [essai, setEssai] = useState(false);
   const [essaiVariable, setEssaiVariable] = useState(VARIABLES_ESSAI[0]);
   const [essaiValeur, setEssaiValeur] = useState("");
+  // Après une clôture ou une annulation, l'écran revient au démarrage : on dit ce qui vient de se passer
+  const [dernier, setDernier] = useState<string | null>(null);
 
   const charger = useCallback(async () => {
     try {
@@ -77,7 +79,10 @@ export function Fournee({ recipeId, recetteNom, type, nbPatonsDefaut, poidsPaton
       if (!r.ok) { setErreur(j.error ?? "Erreur"); return false; }
       setErreur(null);
       setTb(j.tb ?? null);
-      setEtat((e) => (e ? { ...e, ouvert: j.lot.statut === "cloture" || j.lot.statut === "annule" ? null : j.lot, lots: [j.lot, ...e.lots.filter((l) => l.id !== j.lot.id)] } : e));
+      const l = j.lot as Lot;
+      if (l.statut === "cloture") setDernier(`Lot ${l.numero} clôturé à ${heure(l.cloture_at)} : ${l.nb_patons} pâtons, pâte à ${temp(l.t_pate_sortie)}${l.voile_ok ? ", test du voile fait" : ""}.`);
+      else if (l.statut === "annule") setDernier(`Lot ${l.numero} annulé.`);
+      setEtat((e) => (e ? { ...e, ouvert: l.statut === "cloture" || l.statut === "annule" ? null : l, lots: [l, ...e.lots.filter((x) => x.id !== l.id)] } : e));
       return true;
     } catch { setErreur("Réseau indisponible"); return false; } finally { setOccupe(false); }
   };
@@ -106,6 +111,7 @@ export function Fournee({ recipeId, recetteNom, type, nbPatonsDefaut, poidsPaton
         {!etat.acteur.peutLancer && <span style={pastille(ATTENTION)}>peut suivre les étapes, pas lancer ni clôturer</span>}
       </div>
       {erreur && <div style={ALERTE("forte")}>{erreur}</div>}
+      {!lot && dernier && <div style={ALERTE("ok")}>{dernier}</div>}
       {!lot ? (
         <Demarrage type={type} recetteNom={recetteNom} patons={patons} setPatons={setPatons} poidsPaton={poidsPaton} calcul={calcul} peutLancer={etat.acteur.peutLancer} occupe={occupe} onLancer={lancer}
           essai={essai} setEssai={setEssai} essaiVariable={essaiVariable} setEssaiVariable={setEssaiVariable} essaiValeur={essaiValeur} setEssaiValeur={setEssaiValeur} />
@@ -148,7 +154,7 @@ function Demarrage(p: {
           Fournée d&apos;essai (une seule variable change)
         </label>
         {p.essai && (
-          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
+          <div style={{ display: "grid", gap: 8 }}>
             <select value={p.essaiVariable} onChange={(e) => p.setEssaiVariable(e.target.value)} style={{ ...CHAMP, height: 44 }}>{VARIABLES_ESSAI.map((v) => <option key={v}>{v}</option>)}</select>
             <input value={p.essaiValeur} onChange={(e) => p.setEssaiValeur(e.target.value)} placeholder="ex. 0,4 % au lieu de 0,5 %" style={{ ...CHAMP, height: 44 }} />
           </div>
@@ -315,7 +321,17 @@ function EtapeEnCours({ lot, etape, index, total, faites, calcul, occupe, appliq
   // Les pesées utiles à cette étape : la phase en cours
   const phase = calcul?.phases.find((p) => (etape.phase === "biga" ? p.kind === "biga" : p.kind !== "biga")) ?? null;
   const pesees = phase ? lignesPesee(phase) : [];
-  const rappel = pesees.filter((l) => /sel|eau|farine|levure|tipo|miel|huile/i.test(l.libelle) && new RegExp(l.libelle.split(" ")[0], "i").test(etape.libelle));
+  // Les pesées que l'étape mentionne : les farines sur « farine », chaque eau sur son nom, sel, miel, levure, huile
+  const texte = etape.libelle.toLowerCase();
+  const rappel = pesees.filter((l) => {
+    const lib = l.libelle.toLowerCase();
+    if (lib.startsWith("eau de bassinage")) return texte.includes("bassinage");
+    if (lib.startsWith("eau de départ")) return texte.includes("eau de départ");
+    if (lib === "eau") return texte.includes("eau");
+    if (lib === "sel" || lib === "miel" || lib === "huile") return texte.includes(lib);
+    if (lib.startsWith("levure")) return texte.includes("levure");
+    return texte.includes("farine");
+  });
   const couleur = lot.type === "biga" ? "#b8601f" : "#4a6741";
   return (
     <div style={{ display: "grid", gap: 10 }}>
