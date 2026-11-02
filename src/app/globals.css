@@ -272,7 +272,6 @@ html, body{
   z-index: 45;
   transition: left 0.25s ease;
 }
-html.sidebar-collapsed .topbar-desktop { left: 16px; }
 
 body {
   background: var(--creme) !important;
@@ -384,25 +383,7 @@ body {
   .period-sticky { display: none !important; }
 }
 
-/* ── Sidebar repliable (desktop + tablette) ───────── */
-.sidebar-desktop { transition: transform 0.25s ease; }
-.app-main { transition: margin-left 0.25s ease; }
-html.sidebar-collapsed .sidebar-desktop {
-  transform: translateX(-100%);
-  pointer-events: none;
-}
-html.sidebar-collapsed .app-main { margin-left: 16px !important; }
-.sidebar-toggle-btn {
-  position: fixed;
-  top: 14px;
-  left: calc(var(--sidebar-width) - 46px);
-  z-index: 45;
-  transition: left 0.25s ease;
-}
-html.sidebar-collapsed .sidebar-toggle-btn { left: 12px; }
-@media (max-width: 767px) {
-  .sidebar-toggle-btn { display: none !important; }
-}
+/* Barre latérale fixe sur bureau et tablette (02/11/2026, Paul) : plus de bouton de repli */
 
 /* ── Tablet (768–1024px) ── */
 @media (min-width: 768px) and (max-width: 1024px) {
@@ -414,10 +395,6 @@ html.sidebar-collapsed .sidebar-toggle-btn { left: 12px; }
     margin-left: calc(200px + 16px) !important;
   }
   .topbar-desktop { left: calc(200px + 16px); }
-  html.sidebar-collapsed .topbar-desktop { left: 16px; }
-  .sidebar-toggle-btn { left: calc(200px - 46px); }
-  html.sidebar-collapsed .sidebar-toggle-btn { left: 12px; }
-  html.sidebar-collapsed .app-main { margin-left: 16px !important; }
   /* Dashboards */
   .dashboard-grid { grid-template-columns: 1fr !important; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
@@ -453,7 +430,6 @@ body.commande-en-cours .app-main {
 }
 @media (min-width: 768px) {
   .barre-commande { left: calc(var(--sidebar-width) + 16px); justify-content: flex-end; }
-  html.sidebar-collapsed .barre-commande { left: 16px; }
 }
 
 
