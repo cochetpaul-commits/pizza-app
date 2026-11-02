@@ -7,7 +7,9 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { useBureau } from "@/hooks/useBureau";
 import { calculerPate, type EmpatementType, type FlourMixItem, type PateResult } from "@/lib/pateEngine";
 import { formatG, lignesPesee, nomPhase } from "@/lib/pateAffichage";
-import { openApiFile } from "@/lib/fetchApi";
+import { fetchApi, openApiFile } from "@/lib/fetchApi";
+import { Fournee } from "@/components/pate/Fournee";
+import { useTablette } from "@/lib/tablette/store";
 import { Tuile } from "@/components/ui/Tuile";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { ACCENT, ATTENTION, BORD, BTN, CADRE, INTERTITRE, MUTED, OSWALD, TD, TH, h1, liseret } from "@/components/ui/charte";
@@ -130,6 +132,23 @@ export function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: R
     ...(r.type === "biga" ? [`Biga ${r.biga_percent.toLocaleString("fr-FR")} %`, `Levure biga ${r.biga_yeast_percent.toLocaleString("fr-FR")} %`] : [`Levure ${r.yeast_percent.toLocaleString("fr-FR")} %`]),
   ];
   const pasPoids = r.ball_weight >= 1000 ? 50 : 2;
+  // Fournée directement depuis la page (02/11/2026, demande de Paul) : le déroulé s'ouvre dans la carte
+  const avecFournee = r.type === "biga" || r.type === "direct";
+  const [fournee, setFournee] = useState(false);
+  const tablette = useTablette();
+  const jeton = tablette.actif ? tablette.employe?.jeton ?? null : null;
+  const [lotOuvert, setLotOuvert] = useState<{ numero: string; statut: string } | null>(null);
+  useEffect(() => {
+    if (!avecFournee || fournee) return;
+    let annule = false;
+    const h: Record<string, string> = {}; if (jeton) h["x-employe-tablette"] = jeton;
+    fetchApi(`/api/pate/lots?recette=${r.id}&etat=en_cours`, { headers: h }).then(async (res) => {
+      const j = res.ok ? await res.json() : null;
+      if (!annule) setLotOuvert(j?.ouvert ? { numero: j.ouvert.numero, statut: j.ouvert.statut } : null);
+    }).catch(() => undefined);
+    return () => { annule = true; };
+  }, [r.id, avecFournee, fournee, jeton]);
+  const etatLot = lotOuvert ? (lotOuvert.statut === "biga_en_cours" ? "biga en cours" : lotOuvert.statut === "biga_au_froid" ? "biga au froid, à pétrir" : "pétrissage en cours") : null;
 
   return (
     <section style={{ ...CADRE, display: "grid", alignContent: "start" }}>
@@ -151,6 +170,22 @@ export function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: R
       </div>
 
       <div style={{ padding: 16, display: "grid", gap: 14 }}>
+        {avecFournee && (
+          fournee ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              <button type="button" onClick={() => setFournee(false)} style={{ ...BTN, justifySelf: "start" }}>← Retour aux pesées</button>
+              <Fournee recipeId={r.id} recetteNom={r.name} type={r.type} nbPatonsDefaut={Number(patons) || r.balls_count} poidsPaton={Number(poids) || r.ball_weight}
+                calcul={(nb) => { try { return calculer(nb); } catch { return null; } }} />
+            </div>
+          ) : (
+            <button type="button" onClick={() => setFournee(true)}
+              style={{ border: "none", borderRadius: 14, background: lotOuvert ? couleur : ACCENT, color: "#fff", padding: "16px 14px", fontWeight: 700, fontSize: 17, cursor: "pointer", fontFamily: "inherit", touchAction: "manipulation", display: "grid", gap: 2, justifyItems: "center" }}>
+              <span>{lotOuvert ? `Reprendre la fournée ${lotOuvert.numero}` : "Lancer une fournée"}</span>
+              <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.85 }}>{lotOuvert ? etatLot : "températures, minuteurs, contrôles, pas à pas"}</span>
+            </button>
+          )
+        )}
+        {fournee ? null : <>
         {/* Le réglage du jour : les pâtons, en gros, avec ±1 et ±10 ; sur bureau, le compteur est la première des quatre tuiles */}
         {!bureau && <Compteur libelle="Pâtons" valeur={patons} onChange={setPatons} pas={1} grandPas={10} couleur={couleur} />}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -204,7 +239,9 @@ export function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: R
         </div>
       )}
 
-      {r.procedure.length > 0 && (
+      </>}
+
+      {!fournee && r.procedure.length > 0 && (
         <div>
           <button type="button" onClick={() => setProcedeOuvert((v) => !v)} aria-expanded={procedeOuvert}
             style={{ border: "none", background: "transparent", color: ACCENT, fontWeight: 600, fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
