@@ -201,8 +201,12 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
        un vrai navigateur/base que les autres colonnes (quantité, zone…) ne
        sont pas écrasées — trop risqué sur une fiche d'inventaire vivante en
        production sans ce test.
-     - `rh/SimulationContent.tsx` (salaires simulés par employé),
-       `api/factures/prix-a-valider/route.ts` (fermeture des offres actives,
+     - [x] *(02/11/2026)* `rh/SimulationContent.tsx` : `saveOverridesToContracts`
+       faisait un `update()` par employé dont le salaire simulé était validé
+       → remplacé par un seul `upsert(rows, { onConflict: "id" })` groupé
+       (`{ id, remuneration }` uniquement, même patron que `settings/categories`
+       et `fournisseurs` ci-dessus — ne touche à aucune autre colonne du contrat).
+     - `api/factures/prix-a-valider/route.ts` (fermeture des offres actives,
        valeurs calculées par ligne), `api/ingredients/merge/route.ts`
        (suppression de doublons par table lors d'une fusion de fiche),
        `lib/invoices/importEngine.ts` (import de facture),

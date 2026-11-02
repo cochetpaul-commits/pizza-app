@@ -309,12 +309,13 @@ export function SimulationContent({ activeTab }: { activeTab: "tns" | "simulateu
   /** Écrit les salaires ajustés dans les contrats (devient le nouveau réel) */
   const saveOverridesToContracts = async () => {
     if (!etab) return;
-    for (const [empId, brut] of Object.entries(salaryOverrides)) {
+    const rows = Object.entries(salaryOverrides).flatMap(([empId, brut]) => {
       const emp = employes.find(e => e.id === empId);
       const contrat = emp?.contrats?.find(c => c.actif);
-      if (contrat) {
-        await supabase.from("contrats").update({ remuneration: brut }).eq("id", contrat.id);
-      }
+      return contrat ? [{ id: contrat.id, remuneration: brut }] : [];
+    });
+    if (rows.length > 0) {
+      await supabase.from("contrats").upsert(rows, { onConflict: "id" });
     }
     resetAllOverrides();
     setEmployes(await loadEmployes(etab.id));
