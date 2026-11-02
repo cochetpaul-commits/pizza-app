@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
     const e = parId.get(p.employeId);
     const contrat = (e?.contrats ?? []).filter((c) => !c.date_fin || c.date_fin >= debut).sort((x, y) => String(y.date_fin ?? "9999").localeCompare(String(x.date_fin ?? "9999")))[0]?.type ?? null;
     return {
-      employe_id: p.employeId, prenom: e?.prenom ?? "?", nom: e?.nom ?? "", poste: e?.postes?.nom ?? null, equipe: e?.postes?.equipe ?? null, contrat,
+      employe_id: p.employeId, prenom: e?.prenom ?? "?", nom: e?.nom ?? "", matricule: e?.matricule ?? null, poste: e?.postes?.nom ?? null, equipe: e?.postes?.equipe ?? null, contrat,
       jours: p.jours, jours_absents: r2(Math.max(0, joursOuverture - p.jours)), detail: presences.get(p.employeId)?.detail ?? {},
       jours_combo: joursCombo.get(p.employeId) ?? 0, jours_force: joursForces.get(p.employeId) ?? null,
       part: p.part, net: p.net, moi: a.mesIds.has(p.employeId),

@@ -10,7 +10,7 @@ import { fetchApi } from "@/lib/fetchApi";
  * pourboires » de l'équipier (sa ligne, le pot, la valeur du jour), à J-1.
  */
 export type LignePourboires = {
-  employe_id: string; prenom: string; nom: string; poste: string | null; equipe: string | null; contrat: string | null;
+  employe_id: string; prenom: string; nom: string; matricule?: string | null; poste: string | null; equipe: string | null; contrat: string | null;
   jours: number; jours_absents: number; detail: Record<string, number>; part: number; net: number; moi: boolean;
   exclu: { id: string | null; jours_planning: number } | null;
   jours_combo: number; jours_force: { id: string; jours: number; motif: string } | null;
@@ -128,6 +128,22 @@ export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: 
       "Nom\tPoste\tJours\tPart\tAjustements\tNet", ...data.lignes.map((x) => `${x.nom} ${x.prenom}\t${x.poste ?? ""}\t${jours(x.jours)}\t${eur(x.part)}\t${x.ajustements.map((a) => `${a.motif} ${eur(a.montant)}`).join(" ; ")}\t${eur(x.net)}`)];
     void navigator.clipboard?.writeText(l.join("\n")).then(() => { setCopie(true); setTimeout(() => setCopie(false), 1600); });
   };
+  // Export pour le cabinet comptable (02/11/2026) : le PDF du mois, téléchargé avec son nom de fichier
+  const [pdf, setPdf] = useState<string | null>(null);
+  const telechargerPdf = async () => {
+    setPdf("Préparation du PDF…");
+    try {
+      const r = await fetchApi(`/api/pourboires/pdf?mois=${mois}`);
+      if (!r.ok) { const j = await r.json().catch(() => null); setPdf(j?.error ?? "PDF impossible"); return; }
+      const blob = await r.blob();
+      const nom = /filename="([^"]+)"/.exec(r.headers.get("Content-Disposition") ?? "")?.[1] ?? `pourboires-${mois}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = nom; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setPdf(null);
+    } catch { setPdf("PDF impossible, réessaie dans un instant."); }
+  };
   const cellule = { ...TD, fontVariantNumeric: "tabular-nums" as const };
   const entete = TH;
   const btn = BTN;
@@ -223,8 +239,9 @@ export function TableauPourboires({ mois, onMois }: { mois: string; onMois: (m: 
           {envoi && <div style={{ fontSize: 12.5, color: envoi.startsWith("Enregistrement") ? MUTED : ROUGE }}>{envoi}</div>}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <button type="button" onClick={() => void telechargerPdf()} disabled={pdf === "Préparation du PDF…"} style={{ ...btn, background: ACCENT, borderColor: ACCENT, color: "#fff" }}>Télécharger le PDF pour le comptable</button>
           <button type="button" onClick={copier} style={btn}>{copie ? "Copié" : "Copier le tableau pour la paie"}</button>
-          <span style={{ fontSize: 12, color: MUTED }}>Collable dans Excel ou dans un mail.</span>
+          <span style={{ fontSize: 12, color: pdf && pdf !== "Préparation du PDF…" ? ROUGE : MUTED }}>{pdf ?? "Le PDF se joint tel quel à un mail."}</span>
         </div>
         <details style={{ fontSize: 13, color: MUTED, lineHeight: 1.5, maxWidth: "70ch" }}>
           <summary style={{ cursor: "pointer", fontWeight: 700, color: "#1a1a1a" }}>Les règles</summary>
