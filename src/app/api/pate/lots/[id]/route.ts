@@ -62,6 +62,21 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     const tb = await tbDuMoment(acteur.etabId, type, Number(lot.recette_figee?.recette?.tb_manuelle ?? 56));
     const eau = eauPetrissage(tb.tb, tf, tc, type === "biga" ? tb_ : null);
     Object.assign(maj, { t_farine: tf, t_cuisine: tc, t_biga: type === "biga" ? tb_ : null, tb_utilisee: tb.tb, tb_source: tb.source, t_eau_calc: eau, statut: "petrissage", petrissage_debut_at: lot.petrissage_debut_at ?? maintenant });
+    // Le chrono démarre avec la vitesse 1 (04/11/2026) : un seul chrono continu pour tout le pétrissage
+    if (body.demarrer_chrono === true) Object.assign(maj, { chrono_debut_at: maintenant, chrono_avance: 0, petrissage_fin_at: null });
+  } else if (action === "confirmer_biga") {
+    maj.biga_confirmee = true;
+  } else if (action === "demarrer_chrono") {
+    if (lot.t_eau_calc == null) return NextResponse.json({ error: "Températures du pétrissage d'abord." }, { status: 400 });
+    Object.assign(maj, { chrono_debut_at: maintenant, chrono_avance: 0, petrissage_fin_at: null });
+  } else if (action === "avancer") {
+    const i = Math.max(0, Math.min(50, Math.round(Number(body.index) || 0)));
+    maj.chrono_avance = Math.max(Number(lot.chrono_avance ?? 0), i);
+  } else if (action === "fin_petrissage") {
+    if (!lot.chrono_debut_at) return NextResponse.json({ error: "Le chrono n'a pas été lancé." }, { status: 400 });
+    maj.petrissage_fin_at = maintenant;
+    // Les étapes du pétrissage sont faites : on les horodate pour l'historique
+    await supabaseAdmin.from("pate_lot_etapes").update({ termine_at: maintenant, valide_par: acteur.employeId, valide_par_nom: acteur.nom }).eq("lot_id", id).eq("phase", "final").is("termine_at", null);
   } else if (action === "etape") {
     const etapeId = String(body.etape_id ?? "");
     const etape = (lot.etapes as { id: string }[]).find((e) => e.id === etapeId);
@@ -79,6 +94,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     if (t == null) return NextResponse.json({ error: "La température de la pâte en sortie de pétrin est obligatoire." }, { status: 400 });
     Object.assign(maj, {
       voile_ok: true, t_pate_sortie: t, t_eau_utilisee: num(body.t_eau_utilisee) ?? lot.t_eau_calc ?? null,
+      eau_bassinage_restante_g: num(body.eau_bassinage_restante_g),
       commentaire: typeof body.commentaire === "string" ? body.commentaire.trim() || null : lot.commentaire,
       statut: "cloture", boulage_at: maintenant, cloture_at: maintenant,
     });
@@ -93,7 +109,16 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     const etapes = (lot.etapes as E[]);
     const phase = lot.statut === "biga_en_cours" ? "biga" : "final";
     const faites = etapes.filter((e) => e.phase === phase && e.termine_at).sort((a, b) => b.ordre - a.ordre);
-    if (faites.length) {
+    if (phase === "final" && lot.petrissage_fin_at) {
+      // Fin du pétrissage appuyée trop tôt : le chrono reprend là où il en était
+      maj.petrissage_fin_at = null;
+      await supabaseAdmin.from("pate_lot_etapes").update({ termine_at: null, valide_par: null, valide_par_nom: null }).eq("lot_id", id).eq("phase", "final").gte("termine_at", lot.petrissage_fin_at);
+    } else if (phase === "final" && Number(lot.chrono_avance ?? 0) > 0) {
+      maj.chrono_avance = Number(lot.chrono_avance) - 1;
+    } else if (phase === "final" && lot.chrono_debut_at) {
+      // Chrono lancé trop tôt : retour à la mise en place, températures gardées
+      Object.assign(maj, { chrono_debut_at: null, chrono_avance: 0 });
+    } else if (faites.length) {
       const { error } = await supabaseAdmin.from("pate_lot_etapes").update({ termine_at: null, demarre_at: null, valide_par: null, valide_par_nom: null }).eq("id", faites[0].id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     } else if (phase === "final" && lot.t_eau_calc != null) {

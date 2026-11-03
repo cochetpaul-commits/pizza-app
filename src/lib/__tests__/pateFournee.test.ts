@@ -66,3 +66,43 @@ describe("étapes de fournée", () => {
     expect(e).toEqual([{ texte: "Pétrir", phase: "final", duree_s: 90 }, { texte: "Repos", phase: "final", duree_s: null }]);
   });
 });
+
+import { conseilBassinage, detailBacs, etapesFourneeParDefaut, nbBacs, repereCourant, reperesPetrissage, tiersBassinage } from "@/lib/pate/fournee";
+
+describe("pétrissage chronométré", () => {
+  const p = { eauDepart: 11396, farine: 15318, nomFarine: "Tipo 1 Soffio", sel: 643, bassinage: 2849 };
+  it("frise par défaut : 0:00, 2:00, 7:00, 7:30, 9:00, 10:30, 15:00, 18:00", () => {
+    const r = reperesPetrissage(etapesFourneeParDefaut("biga"), p, "biga");
+    expect(r.map((x) => x.t)).toEqual([0, 120, 420, 450, 540, 630, 900, 1080]);
+    expect(r.map((x) => x.grammes)).toEqual([11396, 15318, 643, 950, 950, 949, null, null]);
+    expect(r[3].indicatif).toBe(true);
+    expect(r[6].titre).toBe("Repos");
+    expect(r[7].titre).toBe("Un tour de vitesse 1");
+  });
+  it("directe : mêmes repères, toutes les farines à 2:00", () => {
+    const r = reperesPetrissage(etapesFourneeParDefaut("direct"), { ...p, levure: 36 }, "direct");
+    expect(r.map((x) => x.t)).toEqual([0, 120, 420, 450, 540, 630, 900, 1080]);
+    expect(r[1].titre).toBe("Toutes les farines");
+  });
+  it("bascule automatique au repère, avance manuelle possible", () => {
+    const r = reperesPetrissage(etapesFourneeParDefaut("biga"), p, "biga");
+    expect(repereCourant(r, 0, 0)).toBe(0);
+    expect(repereCourant(r, 125, 0)).toBe(1);
+    expect(repereCourant(r, 541, 0)).toBe(4);
+    expect(repereCourant(r, 125, 3)).toBe(3);
+    expect(repereCourant(r, 5000, 0)).toBe(7);
+  });
+  it("bacs et tiers", () => {
+    expect(nbBacs(200)).toBe(17);
+    expect(detailBacs(200)).toBe("16 bacs pleins et un bac de 8");
+    expect(nbBacs(168)).toBe(14);
+    expect(tiersBassinage(2849)).toEqual([950, 950, 949]);
+  });
+  it("conseil de répartition : deux lots de suite au delà de 5 %", () => {
+    expect(conseilBassinage([{ eau_bassinage_restante_g: 300, bassinage_g: 2849 }], 80)).toBeNull();
+    expect(conseilBassinage([{ eau_bassinage_restante_g: 300, bassinage_g: 2849 }, { eau_bassinage_restante_g: 100, bassinage_g: 2849 }], 80)).toBeNull();
+    const c = conseilBassinage([{ eau_bassinage_restante_g: 700, bassinage_g: 2849 }, { eau_bassinage_restante_g: 720, bassinage_g: 2849 }], 80);
+    expect(c?.de).toEqual([80, 20]);
+    expect(c?.vers).toEqual([85, 15]);
+  });
+});

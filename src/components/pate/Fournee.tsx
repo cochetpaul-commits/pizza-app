@@ -5,8 +5,8 @@ import { fetchApi } from "@/lib/fetchApi";
 import { useTablette } from "@/lib/tablette/store";
 import { BON, ATTENTION, MAUVAIS, INFO, BORD, MUTED, FAIBLE, CADRE, INTERTITRE, OSWALD, BTN, CHAMP, pastille } from "@/components/ui/charte";
 import type { PateResult, Phase } from "@/lib/pateEngine";
-import { formatG, lignesPesee, nomPhase } from "@/lib/pateAffichage";
-import { alerteBiga, alertePate, conseilEau, eauBiga, eauPetrissage, etatBiga, formatDuree, CIBLE_BIGA, CIBLE_PATE, type TbCalculee } from "@/lib/pate/fournee";
+import { formatG, lignesPesee, nomFarine, nomPhase } from "@/lib/pateAffichage";
+import { alerteBiga, alertePate, conseilEau, detailBacs, eauBiga, eauPetrissage, etatBiga, formatDuree, lireEtapesFournee, nbBacs, repereCourant, reperesPetrissage, tiersBassinage, CIBLE_BIGA, CIBLE_PATE, PATONS_PAR_BAC, type Repere, type TbCalculee } from "@/lib/pate/fournee";
 
 /**
  * Fournée (module pâte, phase 2, 02/11/2026) : la fabrication par lot dans le Mode production de la fiche d'empâtement.
@@ -23,10 +23,13 @@ type Lot = {
   t_farine_biga: number | null; t_cuisine_biga: number | null; t_eau_biga_calc: number | null; t_eau_biga_utilisee: number | null; t_biga_sortie: number | null;
   t_farine: number | null; t_cuisine: number | null; t_biga: number | null; t_eau_calc: number | null; t_eau_utilisee: number | null; tb_utilisee: number | null; tb_source: string | null;
   t_pate_sortie: number | null; voile_ok: boolean | null;
+  /* Pétrissage chronométré (04/11/2026) */
+  chrono_debut_at: string | null; chrono_avance: number | null; petrissage_fin_at: string | null; biga_confirmee: boolean | null; eau_bassinage_restante_g: number | null;
   etapes: Etape[];
 };
 type Acteur = { nom: string; peutLancer: boolean; source: "tablette" | "compte" };
-type Etat = { lots: Lot[]; ouvert: Lot | null; acteur: Acteur };
+type Conseil = { de: [number, number]; vers: [number, number]; reste_pct: number } | null;
+type Etat = { lots: Lot[]; ouvert: Lot | null; acteur: Acteur; conseil_bassinage?: Conseil };
 
 const VARIABLES_ESSAI = ["Levure", "Sel", "Hydratation", "Ratio de farines", "Huile", "Miel", "Temps à température ambiante après boulage"];
 const GROS: React.CSSProperties = { border: `1px solid ${BORD}`, borderRadius: 14, background: "#fff", padding: "16px 12px", fontWeight: 700, fontSize: 16, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a", touchAction: "manipulation", width: "100%" };
@@ -116,7 +119,7 @@ export function Fournee({ recipeId, recetteNom, type, nbPatonsDefaut, poidsPaton
         <Demarrage type={type} recetteNom={recetteNom} patons={patons} setPatons={setPatons} poidsPaton={poidsPaton} calcul={calcul} peutLancer={etat.acteur.peutLancer} occupe={occupe} onLancer={lancer}
           essai={essai} setEssai={setEssai} essaiVariable={essaiVariable} setEssaiVariable={setEssaiVariable} essaiValeur={essaiValeur} setEssaiValeur={setEssaiValeur} />
       ) : (
-        <Deroule lot={lot} tb={tb} occupe={occupe} peutLancer={etat.acteur.peutLancer} appliquer={(corps) => appliquer(lot.id, corps)} />
+        <Deroule lot={lot} tb={tb} occupe={occupe} peutLancer={etat.acteur.peutLancer} conseil={etat.conseil_bassinage ?? null} appliquer={(corps) => appliquer(lot.id, corps)} />
       )}
     </div>
   );
@@ -184,7 +187,7 @@ function Pesees({ phase, nbPhases, couleur }: { phase: Phase; nbPhases: number; 
 }
 
 /* ── Déroulé ────────────────────────────────────────────────────────────── */
-function Deroule({ lot, tb, occupe, peutLancer, appliquer }: { lot: Lot; tb: TbCalculee | null; occupe: boolean; peutLancer: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
+function Deroule({ lot, tb, occupe, peutLancer, conseil, appliquer }: { lot: Lot; tb: TbCalculee | null; occupe: boolean; peutLancer: boolean; conseil: Conseil; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
   const phaseCourante: "biga" | "final" = lot.statut === "biga_en_cours" ? "biga" : "final";
   const etapes = lot.etapes.filter((e) => e.phase === phaseCourante);
   const courante = etapes.find((e) => !e.termine_at) ?? null;
@@ -195,6 +198,9 @@ function Deroule({ lot, tb, occupe, peutLancer, appliquer }: { lot: Lot; tb: TbC
   const tempsBigaOk = lot.t_eau_biga_calc != null;
   const tempsFinalOk = lot.t_eau_calc != null;
   const besoinTemps = phaseCourante === "biga" ? !tempsBigaOk : !tempsFinalOk;
+  // Ouverture du pétrissage (04/11/2026) : biga hors de sa fenêtre, confirmation obligatoire avant de continuer
+  const ageBiga = lot.type === "biga" ? etatBiga(lot.biga_froid_at) : null;
+  const bigaAConfirmer = phaseCourante === "final" && lot.type === "biga" && !tempsFinalOk && !lot.biga_confirmee && (ageBiga?.niveau === "jeune" || ageBiga?.niveau === "depassee");
   const [annulation, setAnnulation] = useState(false);
 
   return (
@@ -209,8 +215,22 @@ function Deroule({ lot, tb, occupe, peutLancer, appliquer }: { lot: Lot; tb: TbC
 
       {lot.statut === "biga_au_froid" && <EtatBiga froidAt={lot.biga_froid_at} />}
 
-      {besoinTemps ? (
-        <Temperatures lot={lot} phase={phaseCourante} tb={tb} occupe={occupe} appliquer={appliquer} />
+      {bigaAConfirmer ? (
+        <ControleBiga lot={lot} occupe={occupe} appliquer={appliquer} />
+      ) : besoinTemps ? (
+        <>
+          {phaseCourante === "final" && calcul && <MiseEnPlace lot={lot} calcul={calcul} conseil={conseil} />}
+          <Temperatures lot={lot} phase={phaseCourante} tb={tb} occupe={occupe} appliquer={appliquer} />
+        </>
+      ) : phaseCourante === "final" && !lot.chrono_debut_at ? (
+        <>
+          {calcul && <MiseEnPlace lot={lot} calcul={calcul} conseil={conseil} />}
+          <button type="button" disabled={occupe} onClick={() => void appliquer({ action: "demarrer_chrono" })} style={PRINCIPAL}>Lancer la vitesse 1 et le chrono</button>
+        </>
+      ) : phaseCourante === "final" && !lot.petrissage_fin_at ? (
+        <ChronoPetrissage lot={lot} calcul={calcul} occupe={occupe} appliquer={appliquer} />
+      ) : phaseCourante === "final" ? (
+        <Cloture lot={lot} occupe={occupe} peutLancer={peutLancer} appliquer={appliquer} />
       ) : courante ? (
         <EtapeEnCours key={courante.id} lot={lot} etape={courante} index={etapes.indexOf(courante)} total={etapes.length} faites={faites} calcul={calcul} occupe={occupe} appliquer={appliquer} />
       ) : phaseCourante === "biga" ? (
@@ -303,9 +323,9 @@ function Temperatures({ lot, phase, tb, occupe, appliquer }: { lot: Lot; phase: 
         </div>
         {conseil?.message && <div style={{ ...ALERTE(conseil.niveau), marginTop: 8 }}>{conseil.message}</div>}
       </div>
-      <button type="button" disabled={!complet || occupe} onClick={() => void appliquer(phase === "biga" ? { action: "temps_biga", t_farine: f, t_cuisine: c } : { action: "temps_final", t_farine: f, t_cuisine: c, t_biga: b })}
+      <button type="button" disabled={!complet || occupe} onClick={() => void appliquer(phase === "biga" ? { action: "temps_biga", t_farine: f, t_cuisine: c } : { action: "temps_final", t_farine: f, t_cuisine: c, t_biga: b, demarrer_chrono: true })}
         style={{ ...PRINCIPAL, opacity: !complet || occupe ? 0.5 : 1 }}>
-        {phase === "biga" ? "Eau réglée, commencer la biga" : "Eau réglée, commencer le pétrissage"}
+        {phase === "biga" ? "Eau réglée, commencer la biga" : "Eau réglée, lancer la vitesse 1 et le chrono"}
       </button>
     </div>
   );
@@ -408,12 +428,16 @@ function Cloture({ lot, occupe, peutLancer, appliquer }: { lot: Lot; occupe: boo
   const [tPate, setTPate] = useBrouillon(`${lot.id}:final:pate`, "");
   const [tEau, setTEau] = useBrouillon(`${lot.id}:final:eau`, lot.t_eau_calc != null ? String(lot.t_eau_calc) : "");
   const [commentaire, setCommentaire] = useBrouillon(`${lot.id}:final:commentaire`, lot.commentaire ?? "");
+  const [reste, setReste] = useBrouillon(`${lot.id}:final:reste`, "");
   const t = tPate.trim() === "" ? null : Number(tPate.replace(",", "."));
   const a = t != null && Number.isFinite(t) ? alertePate(t) : null;
   const pret = voile && t != null && Number.isFinite(t);
+  const bassinage = lot.recette_figee?.calcul?.phases.find((p) => p.kind !== "biga")?.water_bassinage_g ?? 0;
+  const resteG = reste.trim() === "" ? null : Math.max(0, Number(reste.replace(",", ".")));
+  const duree = lot.chrono_debut_at && lot.petrissage_fin_at ? Math.round((new Date(lot.petrissage_fin_at).getTime() - new Date(lot.chrono_debut_at).getTime()) / 1000) : null;
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      <span style={INTERTITRE}>Pétrissage · contrôles avant clôture</span>
+      <span style={INTERTITRE}>Pétrissage · contrôles avant clôture{duree != null ? ` · ${formatDuree(duree)} de pétrissage` : ""}</span>
       <label style={{ ...CADRE, padding: 14, display: "flex", alignItems: "center", gap: 12, fontSize: 16, fontWeight: 600, cursor: "pointer", boxShadow: voile ? `inset 6px 0 0 ${BON}` : undefined }}>
         <input type="checkbox" checked={voile} onChange={(e) => setVoile(e.target.checked)} style={{ width: 26, height: 26 }} />
         Test du voile fait
@@ -427,8 +451,21 @@ function Cloture({ lot, occupe, peutLancer, appliquer }: { lot: Lot; occupe: boo
         <span>Eau réellement utilisée <span style={{ color: MUTED, fontSize: 12.5 }}>(conseillée {temp(lot.t_eau_calc)})</span></span>
         <span><input type="number" inputMode="decimal" step={0.5} value={tEau} onChange={(e) => setTEau(e.target.value)} style={{ width: 84, textAlign: "right", fontFamily: OSWALD, fontWeight: 700, fontSize: 24, border: "none", borderBottom: `1px solid ${BORD}`, outline: "none" }} /> <span style={{ color: MUTED }}>°C</span></span>
       </label>
+      {bassinage > 0 && (
+        <label style={{ ...CADRE, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 15 }}>
+          <span>Eau de bassinage restante <span style={{ color: MUTED, fontSize: 12.5 }}>(facultatif, sur {Math.round(bassinage).toLocaleString("fr-FR")} g)</span></span>
+          <span style={{ whiteSpace: "nowrap", flexShrink: 0 }}><input type="number" inputMode="numeric" step={10} value={reste} onChange={(e) => setReste(e.target.value)} aria-label="Eau de bassinage restante" style={{ width: 90, textAlign: "right", fontFamily: OSWALD, fontWeight: 700, fontSize: 24, border: "none", borderBottom: `1px solid ${BORD}`, outline: "none" }} /> <span style={{ color: MUTED }}>g</span></span>
+        </label>
+      )}
+      {resteG != null && bassinage > 0 && resteG / bassinage > 0.05 && <div style={ALERTE("alerte")}>{Math.round(resteG)} g non versés, soit {Math.round((resteG / bassinage) * 100)} % du bassinage. Si ça se répète au prochain lot, l&apos;appli proposera de déplacer une part du bassinage vers l&apos;eau de départ, hydratation inchangée.</div>}
+      <div style={{ ...CADRE, padding: 14, boxShadow: `inset 6px 0 0 ${lot.type === "biga" ? "#b8601f" : "#4a6741"}` }}>
+        <div style={INTERTITRE}>Division · bacs à remplir</div>
+        <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 56, lineHeight: 1 }}>{nbBacs(lot.nb_patons)} <span style={{ fontSize: 26 }}>bacs</span></div>
+        <div style={{ fontSize: 15, fontWeight: 600, marginTop: 6 }}>{lot.nb_patons} pâtons de {lot.poids_paton} g (tolérance 5 g), {PATONS_PAR_BAC} par bac : {detailBacs(lot.nb_patons)}.</div>
+        <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>Grosses boules, rabats, filet d&apos;huile d&apos;olive, détaillage, boulage.</div>
+      </div>
       <textarea value={commentaire} onChange={(e) => setCommentaire(e.target.value)} placeholder="Commentaire (facultatif)" rows={2} style={{ ...CHAMP, height: "auto", resize: "vertical" }} />
-      <button type="button" disabled={!pret || occupe || !peutLancer} onClick={() => void appliquer({ action: "cloture", voile_ok: voile, t_pate_sortie: t, t_eau_utilisee: tEau.trim() === "" ? null : Number(tEau.replace(",", ".")), commentaire })} style={{ ...VALIDE, opacity: !pret || occupe || !peutLancer ? 0.5 : 1 }}>
+      <button type="button" disabled={!pret || occupe || !peutLancer} onClick={() => void appliquer({ action: "cloture", voile_ok: voile, t_pate_sortie: t, t_eau_utilisee: tEau.trim() === "" ? null : Number(tEau.replace(",", ".")), commentaire, eau_bassinage_restante_g: resteG })} style={{ ...VALIDE, opacity: !pret || occupe || !peutLancer ? 0.5 : 1 }}>
         Boulé, lot clôturé
       </button>
       {!peutLancer && <div style={{ fontSize: 12.5, color: MUTED, textAlign: "center" }}>Clôturer un lot est réservé aux pizzaiolos formés et aux responsables.</div>}
@@ -480,5 +517,157 @@ function CorrigerBiga({ lot, occupe, appliquer }: { lot: Lot; occupe: boolean; a
         {fait && <span style={{ fontSize: 12.5, color: BON }}>Correction enregistrée.</span>}
       </div>
     </details>
+  );
+}
+
+/* ── Pétrissage chronométré (04/11/2026, retour terrain) ─────────────────────────────────────────────── */
+
+/** Ouverture du pétrissage : biga hors de sa fenêtre de 20 à 30 h, confirmation obligatoire */
+function ControleBiga({ lot, occupe, appliquer }: { lot: Lot; occupe: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
+  const [coche, setCoche] = useState(false);
+  const e = etatBiga(lot.biga_froid_at);
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <div style={{ ...CADRE, padding: 16, textAlign: "center" }}>
+        <div style={INTERTITRE}>Âge de la biga</div>
+        <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 52, lineHeight: 1.1, color: MAUVAIS }}>{e.heures != null ? formatHeuresCourt(e.heures) : "—"}</div>
+        <div style={{ fontSize: 12.5, color: MUTED }}>au froid depuis {dateHeure(lot.biga_froid_at)}</div>
+      </div>
+      <div style={ALERTE(e.niveau === "jeune" ? "alerte" : "depassee")}>{e.niveau === "jeune" ? "Biga trop jeune : moins de 20 h au froid, elle risque de manquer de force." : "Biga au delà de la fenêtre de 30 h : elle peut être trop acide ou trop faible."}</div>
+      <label style={{ ...CADRE, padding: 14, display: "flex", alignItems: "center", gap: 12, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+        <input type="checkbox" checked={coche} onChange={(ev) => setCoche(ev.target.checked)} style={{ width: 26, height: 26 }} />
+        Je l&apos;ai vérifiée, je continue avec cette biga
+      </label>
+      <button type="button" disabled={!coche || occupe} onClick={() => void appliquer({ action: "confirmer_biga" })} style={{ ...PRINCIPAL, opacity: !coche || occupe ? 0.5 : 1 }}>Continuer</button>
+      <div style={{ fontSize: 12.5, color: MUTED, textAlign: "center" }}>La confirmation est notée sur le lot. Pour ne pas pétrir, annule le lot en bas de page.</div>
+    </div>
+  );
+}
+const formatHeuresCourt = (h: number) => { const hh = Math.floor(h), mm = Math.round((h - hh) * 60); return `${hh} h ${String(mm).padStart(2, "0")}`; };
+
+/** Pesées de la pâte finale, bassinage en trois pichets, bacs à préparer */
+function MiseEnPlace({ lot, calcul, conseil }: { lot: Lot; calcul: PateResult; conseil: Conseil }) {
+  const fin = calcul.phases.find((p) => p.kind !== "biga");
+  if (!fin) return null;
+  const [b1, b2, b3] = tiersBassinage(fin.water_bassinage_g ?? 0);
+  const ligne = (libelle: React.ReactNode, g: string, note?: string) => (
+    <div key={String(libelle)} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "7px 0", borderTop: "1px solid #f3efe7" }}>
+      <span style={{ fontSize: 15 }}>{libelle}{note && <span style={{ display: "block", fontSize: 12, color: MUTED }}>{note}</span>}</span>
+      <b style={{ fontFamily: OSWALD, fontSize: 24, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{g}</b>
+    </div>
+  );
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <div style={{ ...CADRE, padding: "10px 14px" }}>
+        <div style={INTERTITRE}>Mise en place · pâte finale</div>
+        {fin.flours.map((f) => ligne(nomFarine(f.name), formatG(f.grams)))}
+        {ligne("Eau de départ", formatG(fin.water_start_g ?? fin.water_g), fin.honey_g > 0 ? "miel dissous dedans" : undefined)}
+        {fin.honey_g > 0 && ligne("Miel", formatG(fin.honey_g))}
+        {ligne("Sel", formatG(fin.salt_g))}
+        {fin.yeast_g > 0 && ligne("Levure fraîche", formatG(fin.yeast_g, true))}
+        {(fin.water_bassinage_g ?? 0) > 0 && ligne("Bassinage, 3 pichets", formatG(fin.water_bassinage_g ?? 0), `${formatG(b1)} · ${formatG(b2)} · ${formatG(b3)}`)}
+      </div>
+      <div style={{ ...CADRE, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div><div style={INTERTITRE}>Bacs à préparer</div><div style={{ fontSize: 12.5, color: MUTED }}>{lot.nb_patons} pâtons, {PATONS_PAR_BAC} par bac</div></div>
+        <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 48, lineHeight: 1 }}>{nbBacs(lot.nb_patons)}</div>
+      </div>
+      {conseil && <div style={ALERTE("alerte")}>Deux lots de suite avec plus de 5 % d&apos;eau de bassinage restante ({conseil.reste_pct.toLocaleString("fr-FR")} % en moyenne). Dans les réglages de la recette, passe l&apos;eau de départ de {conseil.de[0]} % à {conseil.vers[0]} % (répartition {conseil.de[0]}/{conseil.de[1]} vers {conseil.vers[0]}/{conseil.vers[1]}) : l&apos;hydratation totale ne change pas.</div>}
+    </div>
+  );
+}
+
+/** Un seul chrono continu depuis le début de la vitesse 1, frise des repères, bascule automatique avec son et vibration */
+function ChronoPetrissage({ lot, calcul, occupe, appliquer }: { lot: Lot; calcul: PateResult | null; occupe: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
+  const reperes = useMemo<Repere[]>(() => {
+    const fin = calcul?.phases.find((p) => p.kind !== "biga");
+    const finales = lot.etapes.filter((e) => e.phase === "final").sort((x, y) => x.ordre - y.ordre);
+    const etapes = finales.length ? finales.map((e) => ({ texte: e.libelle, phase: e.phase, duree_s: e.duree_prevue_s })) : lireEtapesFournee(null, lot.type);
+    const farineG = fin ? fin.flours.reduce((t, f) => t + f.grams, 0) : 0;
+    const nom = fin && fin.flours.length === 1 ? nomFarine(fin.flours[0].name) : "Farine";
+    return reperesPetrissage(etapes, { eauDepart: fin?.water_start_g ?? fin?.water_g ?? 0, farine: farineG, nomFarine: nom, sel: fin?.salt_g ?? 0, bassinage: fin?.water_bassinage_g ?? 0, levure: fin?.yeast_g }, lot.type);
+  }, [calcul, lot.etapes, lot.type]);
+  const [maintenant, setMaintenant] = useState(() => Date.now());
+  const debut = lot.chrono_debut_at ? new Date(lot.chrono_debut_at).getTime() : maintenant;
+  useEffect(() => { const t = setInterval(() => setMaintenant(Date.now()), 250); return () => clearInterval(t); }, []);
+  const ecoule = Math.max(0, Math.floor((maintenant - debut) / 1000));
+  const i = repereCourant(reperes, ecoule, Number(lot.chrono_avance ?? 0));
+  const courant = reperes[i], suivant = reperes[i + 1] ?? null;
+  const dernier = i === reperes.length - 1;
+  const fin = reperes[reperes.length - 1].t + 30;
+
+  // Écran allumé pendant tout le pétrissage (navigateurs qui le permettent)
+  useEffect(() => {
+    type Verrou = { release: () => Promise<void> };
+    let verrou: Verrou | null = null;
+    const nav = navigator as Navigator & { wakeLock?: { request: (t: "screen") => Promise<Verrou> } };
+    const demander = () => { nav.wakeLock?.request("screen").then((v) => { verrou = v; }).catch(() => undefined); };
+    demander();
+    const vis = () => { if (document.visibilityState === "visible") demander(); };
+    document.addEventListener("visibilitychange", vis);
+    return () => { document.removeEventListener("visibilitychange", vis); void verrou?.release().catch(() => undefined); };
+  }, []);
+
+  // Son et vibration à chaque bascule (pas au premier affichage)
+  const precedent = useRef<number | null>(null);
+  useEffect(() => {
+    if (precedent.current !== null && precedent.current !== i) {
+      try { navigator.vibrate?.([250, 120, 250, 120, 450]); } catch { /* pas de vibreur */ }
+      try {
+        const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (Ctx) {
+          const ctx = new Ctx();
+          [0, 0.35, 0.7].forEach((d) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 880; g.gain.value = 0.25; o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + d); o.stop(ctx.currentTime + d + 0.2); });
+          setTimeout(() => void ctx.close().catch(() => undefined), 1500);
+        }
+      } catch { /* son indisponible */ }
+    }
+    precedent.current = i;
+  }, [i]);
+
+  const couleur = lot.type === "biga" ? "#b8601f" : "#4a6741";
+  const vitesse = courant.titre === "Repos" ? "Repos" : /vitesse 2/i.test(courant.titre) ? "Vitesse 2" : "Vitesse 1";
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, color: MUTED }}>
+        <span style={{ fontWeight: 700, color: "#1a1a1a" }}>{vitesse}</span><span>écran gardé allumé</span>
+      </div>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 76, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{formatDuree(ecoule)}</div>
+        <div style={{ fontSize: 12, color: MUTED }}>depuis le début de la vitesse 1</div>
+      </div>
+      <div style={{ height: 10, borderRadius: 5, background: "#f0ebe3", overflow: "hidden" }}><div style={{ width: `${Math.min(100, (ecoule / fin) * 100)}%`, height: "100%", background: couleur, transition: "width .25s linear" }} /></div>
+      <div style={{ ...CADRE, padding: 16, boxShadow: `inset 6px 0 0 ${couleur}` }}>
+        <div style={{ ...INTERTITRE, color: couleur }}>Maintenant · {formatDuree(courant.t)}{courant.indicatif ? " · repère indicatif" : ""}</div>
+        {courant.grammes != null ? (
+          <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 64, lineHeight: 1, fontVariantNumeric: "tabular-nums", marginTop: 4 }}>{Math.round(courant.grammes).toLocaleString("fr-FR")} <span style={{ fontSize: 30 }}>g</span></div>
+        ) : (
+          <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 44, lineHeight: 1.05, marginTop: 4 }}>{courant.titre}</div>
+        )}
+        <div style={{ fontSize: 17, fontWeight: 600, marginTop: 8, lineHeight: 1.3 }}>{courant.grammes != null ? `${courant.titre} · ${courant.consigne}` : courant.consigne}</div>
+      </div>
+      {suivant && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 14, color: MUTED }}>
+          <span>Ensuite à {formatDuree(suivant.t)} · {suivant.titre.toLowerCase()}</span>
+          {suivant.grammes != null && <b style={{ fontFamily: OSWALD, fontSize: 19, color: "#1a1a1a" }}>{Math.round(suivant.grammes).toLocaleString("fr-FR")} g</b>}
+        </div>
+      )}
+      <div style={{ ...CADRE, padding: 6, display: "grid", gap: 2 }}>
+        {reperes.map((r, k) => {
+          const ici = k === i, fait = k < i;
+          return (
+            <div key={k} style={{ display: "grid", gridTemplateColumns: "48px 1fr auto", gap: 8, alignItems: "baseline", padding: "7px 8px", borderRadius: 8, fontSize: 14, background: ici ? `${couleur}24` : undefined, fontWeight: ici ? 700 : 500, color: fait ? FAIBLE : "#1a1a1a", textDecoration: fait ? "line-through" : undefined }}>
+              <span style={{ fontFamily: OSWALD, fontWeight: 700, color: ici ? couleur : fait ? FAIBLE : MUTED, fontVariantNumeric: "tabular-nums" }}>{formatDuree(r.t)}</span>
+              <span>{r.titre}</span>
+              <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 16, fontVariantNumeric: "tabular-nums" }}>{r.grammes != null ? `${Math.round(r.grammes).toLocaleString("fr-FR")} g` : ""}</span>
+            </div>
+          );
+        })}
+      </div>
+      {!dernier ? (
+        <button type="button" disabled={occupe} onClick={() => void appliquer({ action: "avancer", index: i + 1 })} style={{ ...GROS, color: MUTED }}>Étape faite, passer à la suivante</button>
+      ) : (
+        <button type="button" disabled={occupe} onClick={() => void appliquer({ action: "fin_petrissage" })} style={VALIDE}>Pétrissage terminé, contrôles</button>
+      )}
+    </div>
   );
 }

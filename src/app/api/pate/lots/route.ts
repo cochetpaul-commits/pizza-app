@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { EtabError } from "@/lib/getEtablissement";
 import { acteurPate } from "@/lib/pate/acces";
 import { calculRecette, etapesRecette, recetteFigee, tbDuMoment, typeRecette, type RecetteLigne } from "@/lib/pate/lotsServeur";
-import { dateLocale, numeroLot } from "@/lib/pate/fournee";
+import { conseilBassinage, dateLocale, numeroLot } from "@/lib/pate/fournee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +35,21 @@ export async function GET(req: NextRequest) {
     const { data } = await supabaseAdmin.from("pate_lot_etapes").select("*").eq("lot_id", ouvert.id).order("ordre");
     etapes = data ?? [];
   }
-  return NextResponse.json({ lots: lots ?? [], ouvert: ouvert ? { ...ouvert, etapes } : null, acteur: { nom: acteur.nom, peutLancer: acteur.peutLancer, source: acteur.source } });
+  // Reste de bassinage relevé : au delà de 5 % deux lots de suite, conseil de répartition eau de départ / bassinage
+  let conseil = null;
+  if (recette) {
+    const [{ data: clos }, { data: r }] = await Promise.all([
+      supabaseAdmin.from("pate_lots").select("eau_bassinage_restante_g, recette_figee").eq("etablissement_id", acteur.etabId).eq("recipe_id", recette).eq("statut", "cloture").not("eau_bassinage_restante_g", "is", null).order("cloture_at", { ascending: false }).limit(2),
+      supabaseAdmin.from("recipes").select("water_start_pct").eq("id", recette).maybeSingle(),
+    ]);
+    const lotsB = (clos ?? []).map((l) => {
+      const phases = ((l.recette_figee as { calcul?: { phases?: { kind: string; water_bassinage_g?: number }[] } } | null)?.calcul?.phases ?? []);
+      const fin = phases.find((p) => p.kind !== "biga");
+      return { eau_bassinage_restante_g: Number(l.eau_bassinage_restante_g), bassinage_g: fin?.water_bassinage_g ?? null };
+    });
+    conseil = conseilBassinage(lotsB, Number(r?.water_start_pct ?? 80));
+  }
+  return NextResponse.json({ lots: lots ?? [], ouvert: ouvert ? { ...ouvert, etapes } : null, acteur: { nom: acteur.nom, peutLancer: acteur.peutLancer, source: acteur.source }, conseil_bassinage: conseil });
 }
 
 /**

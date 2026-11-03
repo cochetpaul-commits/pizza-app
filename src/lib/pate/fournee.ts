@@ -150,3 +150,93 @@ export function dateLocale(decalageJours = 0, maintenant = new Date()): string {
   const d = new Date(maintenant.getTime() + decalageJours * 86400000);
   return new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 }
+
+/* ── Pétrissage chronométré (04/11/2026, retour terrain du lot de 200 pâtons) ─────────────────────────── */
+
+/** Pâtons par bac (12 partout, décision de Paul du 02/11) */
+export const PATONS_PAR_BAC = 12;
+export const nbBacs = (patons: number, parBac = PATONS_PAR_BAC) => (patons > 0 && parBac > 0 ? Math.ceil(patons / parBac) : 0);
+/** « 16 bacs pleins et un bac de 8 » */
+export function detailBacs(patons: number, parBac = PATONS_PAR_BAC): string {
+  const pleins = Math.floor(patons / parBac), reste = patons - pleins * parBac;
+  if (reste === 0) return `${pleins} bac${pleins > 1 ? "s" : ""} pleins`;
+  if (pleins === 0) return `un bac de ${reste}`;
+  return `${pleins} bac${pleins > 1 ? "s" : ""} plein${pleins > 1 ? "s" : ""} et un bac de ${reste}`;
+}
+
+/** Eau de bassinage en trois pichets, au gramme près, le dernier prend l'arrondi */
+export function tiersBassinage(total: number): [number, number, number] {
+  const t = Math.round(total / 3);
+  return [t, t, Math.max(0, Math.round(total) - 2 * t)];
+}
+
+export type Repere = {
+  /** Secondes depuis le début de la vitesse 1 */
+  t: number;
+  titre: string;
+  consigne: string;
+  /** Quantité à verser, en grammes (null : pas de pesée à cette étape) */
+  grammes: number | null;
+  /** Repère indicatif, à valider d'un geste (premier tiers du bassinage, « dès le sel absorbé ») */
+  indicatif?: boolean;
+};
+
+export type PeseesPetrissage = { eauDepart: number; farine: number; nomFarine: string; sel: number; bassinage: number; levure?: number };
+
+/**
+ * Frise du pétrissage. Les temps viennent des étapes de la recette (minuteurs cumulés : eau de départ 2:00,
+ * farine 5:00, bassinage 3:30, vitesse 2 4:30, repos 3:00), le bassinage est coupé en trois : un tiers 30 s
+ * après le sel (repère indicatif, sel absorbé), un tiers 1:30 avant la vitesse 2, le reste au début de la
+ * vitesse 2. Avec les valeurs par défaut : 0:00, 2:00, 7:00, 7:30, 9:00, 10:30, 15:00, 18:00.
+ */
+export function reperesPetrissage(etapes: EtapeFournee[], p: PeseesPetrissage, type: EmpatementType): Repere[] {
+  const finales = etapes.filter((e) => e.phase === "final");
+  const trouve = (re: RegExp) => finales.findIndex((e) => re.test(e.texte.toLowerCase()));
+  const offsets: number[] = [];
+  let t = 0;
+  for (const e of finales) { offsets.push(t); t += e.duree_s ?? 0; }
+  const at = (i: number, defaut: number) => (i >= 0 ? offsets[i] : defaut);
+  const tFarine = at(trouve(/farine/), 120);
+  const tSel = at(trouve(/\bsel\b/), 420);
+  const tV2 = at(trouve(/vitesse 2/), 630);
+  const tRepos = at(trouve(/repos/), 900);
+  const tTour = at(trouve(/tour de vitesse 1/), 1080);
+  const [b1, b2, b3] = tiersBassinage(p.bassinage);
+  const direct = type !== "biga";
+  return [
+    { t: 0, titre: direct ? "Eau de départ et levure" : "Eau de départ et biga", grammes: p.eauDepart,
+      consigne: direct ? `Levure délayée dans l'eau de départ avec le miel${p.levure ? ` (${Math.round(p.levure)} g de levure)` : ""}, vitesse 1` : "Eau de départ avec le miel dissous, biga coupée en morceaux, vitesse 1" },
+    { t: tFarine, titre: direct ? "Toutes les farines" : p.nomFarine, grammes: p.farine, consigne: direct ? "Ajouter toutes les farines, continuer en vitesse 1" : `Ajouter la ${p.nomFarine.toLowerCase()}, continuer en vitesse 1` },
+    { t: tSel, titre: "Sel", grammes: p.sel, consigne: "Ajouter le sel" },
+    { t: tSel + 30, titre: "Bassinage, premier pichet", grammes: b1, consigne: "Dès le sel absorbé, en filet", indicatif: true },
+    { t: Math.max(tSel + 60, tV2 - 90), titre: "Bassinage, deuxième pichet", grammes: b2, consigne: "En filet, toujours en vitesse 1" },
+    { t: tV2, titre: "Vitesse 2, dernier pichet", grammes: b3, consigne: "Passer en vitesse 2 pendant 4 min 30 et finir le bassinage" },
+    { t: tRepos, titre: "Repos", grammes: null, consigne: "Arrêter le pétrin, repos 3 min" },
+    { t: tTour, titre: "Un tour de vitesse 1", grammes: null, consigne: "Un tour de vitesse 1, puis test du voile" },
+  ];
+}
+
+/** Repère en cours : le dernier atteint par le chrono, ou plus loin si on a avancé à la main */
+export function repereCourant(reperes: Repere[], ecouleS: number, avance: number): number {
+  let i = 0;
+  for (let k = 0; k < reperes.length; k++) if (reperes[k].t <= ecouleS) i = k;
+  return Math.min(reperes.length - 1, Math.max(i, avance));
+}
+
+export type LotBassinage = { eau_bassinage_restante_g: number | null; bassinage_g: number | null };
+/**
+ * Reste d'eau de bassinage au delà de 5 % deux lots de suite (décision de Paul du 04/11) : on propose de déplacer
+ * une part du bassinage vers l'eau de départ, hydratation totale inchangée (ex. 80/20 vers 85/15).
+ * Arrondi au point près ; null tant qu'il n'y a pas deux lots concernés.
+ */
+export function conseilBassinage(derniers: LotBassinage[], waterStartPct: number): { de: [number, number]; vers: [number, number]; reste_pct: number } | null {
+  const deux = derniers.slice(0, 2);
+  if (deux.length < 2) return null;
+  const parts = deux.map((l) => (l.eau_bassinage_restante_g != null && l.bassinage_g ? l.eau_bassinage_restante_g / l.bassinage_g : null));
+  if (parts.some((x) => x == null || x <= 0.05)) return null;
+  const moy = (parts as number[]).reduce((t, x) => t + x, 0) / parts.length;
+  const bassinage = 100 - waterStartPct;
+  const nouveau = Math.max(0, Math.round(bassinage * (1 - moy)));
+  if (nouveau >= bassinage) return null;
+  return { de: [waterStartPct, bassinage], vers: [100 - nouveau, nouveau], reste_pct: Math.round(moy * 1000) / 10 };
+}
