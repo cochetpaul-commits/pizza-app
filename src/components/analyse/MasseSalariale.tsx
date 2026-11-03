@@ -14,7 +14,7 @@ import { useStatsVentes } from "@/components/analyse/useStatsVentes";
 import { AMBRE, BLEU, FAIBLE, MUTED, ROUGE, VERT, euros, nombre, pct, libelleMoisLong } from "@/components/analyse/gabarit";
 import type { MoisMarge } from "@/app/api/analyse/marge/route";
 import { EtatVide } from "@/components/ui/EtatVide";
-import { heuresSupSemaine } from "@/hooks/useConventionLegale";
+import { heuresSupLissees } from "@/hooks/useConventionLegale";
 
 /**
  * Analyse › Masse salariale (10/10/2026) : « L'équipe coûte combien ? »
@@ -95,18 +95,22 @@ export function MasseSalariale() {
   const chargement = chargementVentes || etat.cle !== cle;
 
   const employes = useMemo<Employe[]>(() => {
-    // Heures sup semaine par semaine (03/11/2026) : au delà du contrat, dans les tranches de la convention
-    // (10, 20, 50 %). Avant : « heures sup » = réel moins planifié sur toute la période, sans lien avec le contrat.
+    // Heures sup lissées sur la période (03/11/2026, règle de Paul) : les semaines lundi → dimanche se compensent,
+    // une semaine à cheval compte dans le mois de son dimanche ; tranches 10 / 20 / 50 % sur la semaine moyenne.
+    // Avant : « heures sup » = réel moins planifié, sans lien avec le contrat.
     const convention = etab?.slug?.includes("piccola") ? "RAPIDE_1501" as const : "HCR_1979" as const;
-    const hsParNom = new Map<string, { hs10: number; hs20: number; hs50: number }>();
+    const semainesParNom = new Map<string, { heures: number[]; contrat: number; type: string }>();
     for (const p of etat.presences) {
       const contrat = etat.contrats.find((c) => normalise(`${c.prenom} ${c.nom}`) === normalise(p.combo_nom));
-      const heuresContrat = contrat?.heures_semaine || p.heures_contrat || 0;
-      if (!(heuresContrat > 0) && contrat?.type !== "extra") continue;
-      const b = heuresSupSemaine(p.heures_travaillees, { type: contrat?.type ?? "CDI", heures_semaine: heuresContrat, convention });
-      const t = hsParNom.get(p.combo_nom) ?? { hs10: 0, hs20: 0, hs50: 0 };
-      t.hs10 += b.heures_supp_10 + b.heures_comp_10; t.hs20 += b.heures_supp_20 + b.heures_comp_25; t.hs50 += b.heures_supp_50;
-      hsParNom.set(p.combo_nom, t);
+      const x = semainesParNom.get(p.combo_nom) ?? { heures: [], contrat: contrat?.heures_semaine || p.heures_contrat || 0, type: contrat?.type ?? "CDI" };
+      x.heures.push(p.heures_travaillees);
+      semainesParNom.set(p.combo_nom, x);
+    }
+    const hsParNom = new Map<string, { hs10: number; hs20: number; hs50: number }>();
+    for (const [nom, x] of semainesParNom) {
+      if (!(x.contrat > 0) && x.type !== "extra") continue;
+      const b = heuresSupLissees(x.heures, { type: x.type, heures_semaine: x.contrat, convention });
+      hsParNom.set(nom, { hs10: b.heures_supp_10 + b.heures_comp_10, hs20: b.heures_supp_20 + b.heures_comp_25, hs50: b.heures_supp_50 });
     }
     const parNom = new Map<string, Presence & { n: number }>();
     for (const p of etat.presences) {
@@ -306,7 +310,7 @@ export function MasseSalariale() {
               </table>
             </div>
             <div style={{ padding: "10px 16px 14px" }}>
-              <Note>Heures sup : comptées semaine par semaine au delà du contrat, selon la convention (10 % jusqu’à 39 h, 20 % jusqu’à 43 h, 50 % au delà) ; une semaine à cheval compte dans le mois de son dimanche. TNS : mensualité fixe. {totaux.sansContrat > 0 ? `${totaux.sansContrat} personne${totaux.sansContrat > 1 ? "s" : ""} sans contrat dans l'application : à compléter dans RH › Équipe.` : ""}</Note>
+              <Note>Heures sup : lissées sur la période, les semaines du lundi au dimanche se compensent ; une semaine à cheval compte dans le mois de son dimanche ; majoration 10 % jusqu’à 39 h, 20 % jusqu’à 43 h, 50 % au delà. TNS : mensualité fixe. {totaux.sansContrat > 0 ? `${totaux.sansContrat} personne${totaux.sansContrat > 1 ? "s" : ""} sans contrat dans l'application : à compléter dans RH › Équipe.` : ""}</Note>
             </div>
           </Cadre>
         </>

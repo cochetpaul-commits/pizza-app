@@ -690,3 +690,34 @@ describe('exportSilaeToCSV', () => {
     expect(lines[2]).toBe('00001;HS-HS50;9.42;01/02/2026;28/02/2026');
   });
 });
+
+
+import { heuresSupLissees } from '../useConventionLegale';
+
+describe('heures sup lissées sur le mois', () => {
+  const c35: ContratInput = { type: 'CDI', heures_semaine: 35, convention: 'HCR_1979' };
+  const c39: ContratInput = { type: 'CDI', heures_semaine: 39, convention: 'HCR_1979' };
+  it('33 h puis 37 h sur un contrat de 35 h : aucune heure sup', () => {
+    const r = heuresSupLissees([33, 37], c35);
+    expect(r.heures_supp_10 + r.heures_supp_20 + r.heures_supp_50).toBe(0);
+    expect(r.excedent_net).toBe(0);
+  });
+  it('quatre semaines, 5 h de plus au total sur 35 h : 5 h à 10 %', () => {
+    const r = heuresSupLissees([34, 38, 36, 37], c35);
+    expect(r.heures_supp_10).toBe(5);
+    expect(r.heures_supp_20).toBe(0);
+  });
+  it('excédent moyen au delà de 39 h : la part au delà passe à 20 %', () => {
+    const r = heuresSupLissees([41, 41, 41, 41], c35);
+    expect(r.heures_supp_10).toBe(16);
+    expect(r.heures_supp_20).toBe(8);
+  });
+  it('contrat 39 h, mois à 40 h de moyenne : 4 h à 20 %', () => {
+    const r = heuresSupLissees([38, 42, 40, 40], c39);
+    expect(r.heures_supp_20).toBe(4);
+    expect(r.heures_supp_10).toBe(0);
+  });
+  it('mois en dessous du contrat : rien', () => {
+    expect(heuresSupLissees([30, 32], c35).excedent_net).toBe(-8);
+  });
+});

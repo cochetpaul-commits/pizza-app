@@ -288,6 +288,27 @@ export function heuresSupSemaine(heuresTotales: number, contrat: ContratInput) {
   return calculerHeuresSup(heuresTotales, contrat);
 }
 
+/**
+ * Heures sup lissées sur le mois (03/11/2026, règle de Paul pour Bello Mio et Piccola Mia) : les semaines
+ * (lundi → dimanche) rattachées au mois se compensent. Une semaine à 33 h et une à 37 h sur un contrat de 35 h
+ * ne donnent aucune heure sup. Une semaine à cheval sur deux mois compte dans le mois de son dimanche.
+ * L'excédent net du mois est réparti sur une semaine moyenne pour les tranches de majoration (10, 20, 50 %).
+ */
+export function heuresSupLissees(heuresParSemaine: number[], contrat: ContratInput) {
+  const n = heuresParSemaine.length;
+  const vide = { heures_supp_10: 0, heures_supp_20: 0, heures_supp_50: 0, heures_comp_10: 0, heures_comp_25: 0, excedent_net: 0 };
+  if (n === 0) return vide;
+  const c = contrat.type === 'extra' && !(contrat.heures_semaine > 0) ? { ...contrat, heures_semaine: HCR_SEUIL_LEGAL } : contrat;
+  const total = heuresParSemaine.reduce((t, h) => t + h, 0);
+  const net = total - c.heures_semaine * n;
+  if (net <= 0.005) return { ...vide, excedent_net: round2(net) };
+  const b = calculerHeuresSup(c.heures_semaine + net / n, c);
+  return {
+    heures_supp_10: round2(b.heures_supp_10 * n), heures_supp_20: round2(b.heures_supp_20 * n), heures_supp_50: round2(b.heures_supp_50 * n),
+    heures_comp_10: round2(b.heures_comp_10 * n), heures_comp_25: round2(b.heures_comp_25 * n), excedent_net: round2(net),
+  };
+}
+
 function calculerHeuresSup(
   heuresTotales: number,
   contrat: ContratInput
