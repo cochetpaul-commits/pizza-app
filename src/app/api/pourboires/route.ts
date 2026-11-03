@@ -54,7 +54,8 @@ export async function GET(req: NextRequest) {
   const [{ data: etab }, { data: employes }, { data: clotures }, { data: absences }, { data: ajustements }] = await Promise.all([
     supabaseAdmin.from("etablissements").select("slug").eq("id", a.etabId).maybeSingle(),
     supabaseAdmin.from("employes").select("id, prenom, nom, matricule, poste_id, participe_pourboires, postes(nom, equipe), contrats(type, date_fin)")
-      .or(`etablissement_id.eq.${a.etabId},etablissements_ids.cs.{${a.etabId}}`).eq("actif", true),
+      // Actifs, et partis pendant ou après le mois (03/11/2026 : Élise, partie le 31/10, garde sa part d'octobre)
+      .or(`etablissement_id.eq.${a.etabId},etablissements_ids.cs.{${a.etabId}}`).or(`actif.eq.true,date_sortie.gte.${debut}`),
     supabaseAdmin.from("clotures").select("jour, statut, pourboires_paie, pourboires_especes").eq("etablissement_id", a.etabId).gte("jour", debut).lte("jour", finMois),
     supabaseAdmin.from("absences").select("employe_id, date_debut, date_fin, type").eq("statut", "valide").lte("date_debut", finMois).gte("date_fin", debut),
     supabaseAdmin.from("pourboires_ajustements").select("id, employe_id, montant, motif, type, created_at").eq("etablissement_id", a.etabId).eq("mois", debut).order("created_at"),

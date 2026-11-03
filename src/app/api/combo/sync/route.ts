@@ -1,158 +1,93 @@
 import { NextRequest, NextResponse } from "next/server";
 import { roleDenied } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getContracts, getLocations, COMBO_LOCATIONS, type ComboContract } from "@/lib/combo/api";
+import { getContracts, getLocations, COMBO_LOCATIONS } from "@/lib/combo/api";
+import { champsContrat, champsFiche, departs, trouverEmploye, type ContratCombo, type EmployeApp } from "@/lib/combo/syncEquipe";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 /**
- * POST /api/combo/sync — Synchronise les employes depuis Combo
- *
- * Pour chaque location Combo:
- * - Charge les contrats actifs
- * - Match par combo_id, puis par email, puis par nom
- * - Met a jour ou cree les employes
+ * POST /api/combo/sync : synchronise l'équipe depuis Combo (réécrite le 03/11/2026, voir src/lib/combo/syncEquipe.ts).
+ * Pour chaque établissement : les contrats actifs du jour créent ou mettent à jour les fiches et leur contrat ;
+ * les fiches reliées à Combo sans contrat aujourd'hui sont des départs, enregistrés quand le dernier contrat
+ * a une date de fin passée, signalés sinon. Chaque erreur d'écriture est remontée, plus rien n'échoue en silence.
  */
+const jourParis = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(d);
+
 export async function POST(req: NextRequest) {
   const refus = await roleDenied(req, ["group_admin"]);
   if (refus) return refus;
   try {
+    const aujourdhui = jourParis(new Date());
+    const ilYa45j = jourParis(new Date(Date.now() - 45 * 86400000));
     const locations = await getLocations();
-    const results: { location: string; created: number; updated: number; total: number }[] = [];
-
-    // Map Combo location IDs to our etablissement IDs
     const { data: etabs } = await supabaseAdmin.from("etablissements").select("id, slug");
     const etabMap: Record<string, string> = {};
-    for (const e of etabs ?? []) {
-      const slug = e.slug as string;
-      if (slug.includes("piccola")) etabMap[COMBO_LOCATIONS.piccola] = e.id;
-      else etabMap[COMBO_LOCATIONS.bello_mio] = e.id;
-    }
+    for (const e of etabs ?? []) etabMap[String(e.slug).includes("piccola") ? COMBO_LOCATIONS.piccola : COMBO_LOCATIONS.bello_mio] = e.id as string;
 
+    const results: { location: string; created: number; updated: number; total: number; departs: string[]; a_verifier: string[]; erreurs: string[]; crees: string[] }[] = [];
     for (const loc of locations) {
       const etabId = etabMap[loc.id];
       if (!etabId) continue;
+      const [actuels, anciensBruts] = await Promise.all([
+        getContracts(loc.id, aujourdhui) as unknown as Promise<ContratCombo[]>,
+        // Il y a 45 jours, puis il y a 15 jours : le dernier contrat connu des personnes parties depuis
+        Promise.all([getContracts(loc.id, ilYa45j), getContracts(loc.id, jourParis(new Date(Date.now() - 15 * 86400000)))]).then((l) => l.flat() as unknown as ContratCombo[]),
+      ]);
+      // Le plus récent d'abord : la fin du dernier contrat fait foi
+      const anciens = [...anciensBruts].sort((a, b) => String(b.start_date).localeCompare(String(a.start_date)));
 
-      const contracts = await getContracts(loc.id);
-      let created = 0;
-      let updated = 0;
-
-      // Load existing employees for this establishment
-      const { data: existing } = await supabaseAdmin
+      const { data: existants, error: errLecture } = await supabaseAdmin
         .from("employes")
-        .select("id, prenom, nom, email, combo_id, matricule")
+        .select("id, prenom, nom, email, combo_id, matricule, actif, equipes_access, etablissements_ids, date_sortie")
         .eq("etablissement_id", etabId);
-      const existingList = (existing ?? []) as { id: string; prenom: string; nom: string; email: string | null; combo_id: string | null; matricule: string | null }[];
+      if (errLecture) throw new Error(`Lecture des fiches : ${errLecture.message}`);
+      const liste = (existants ?? []) as EmployeApp[];
 
-      for (const contract of contracts) {
-        // Skip ended contracts
-        if (contract.end_date && new Date(contract.end_date) < new Date()) continue;
-
-        const match = findMatch(existingList, contract);
-        const team = loc.teams.find(t => contract.function?.toLowerCase().includes(t.name.toLowerCase()));
-
-        // Map Combo function to team name
-        const teamName = team?.name
-          ?? (contract.function?.toLowerCase().includes("salle") || contract.function?.toLowerCase().includes("rang") || contract.function?.toLowerCase().includes("barman") ? "Salle" : null)
-          ?? (contract.function?.toLowerCase().includes("cuisi") || contract.function?.toLowerCase().includes("pizza") || contract.function?.toLowerCase().includes("plong") ? "Cuisine" : null);
-
-        const employeData: Record<string, unknown> = {
-          prenom: capitalize(contract.firstname),
-          nom: contract.lastname.toUpperCase(),
-          email: contract.email || null,
-          tel_mobile: contract.mobile_phone || null,
-          matricule: contract.employee_number || null,
-          combo_id: contract.id,
-          combo_contract_id: contract.original_contract_id,
-          etablissement_id: etabId,
-          etablissements_ids: [etabId],
-          equipes_access: teamName ? [teamName] : [],
-          actif: true,
-          // Infos from Combo
-          adresse: contract.street_address || null,
-          code_postal: contract.zip || null,
-          ville: contract.city || null,
-          numero_secu: contract.social_security_number || null,
-          emploi: contract.function || null,
-        };
-
-        let employeId: string;
-        if (match) {
-          await supabaseAdmin.from("employes").update(employeData).eq("id", match.id);
-          employeId = match.id;
-          updated++;
+      let created = 0, updated = 0;
+      const erreurs: string[] = [], crees: string[] = [];
+      for (const c of actuels) {
+        if (c.end_date && c.end_date < aujourdhui) continue;
+        const nom = `${c.firstname} ${c.lastname}`.trim();
+        const fiche = trouverEmploye(liste, c);
+        const champs = champsFiche(c, fiche, etabId);
+        let employeId: string | null = null;
+        if (fiche) {
+          const { error } = await supabaseAdmin.from("employes").update(champs).eq("id", fiche.id);
+          if (error) { erreurs.push(`${nom} : ${error.message}`); continue; }
+          employeId = fiche.id; updated++;
         } else {
-          const { data: inserted } = await supabaseAdmin.from("employes").insert({
-            ...employeData,
-            role: contract.role === "main_owner" || contract.role === "owner" ? "group_admin" : "equipier",
-          }).select("id").single();
-          employeId = inserted?.id ?? "";
-          if (employeId) created++;
+          const role = c.role === "main_owner" || c.role === "owner" ? "group_admin" : c.role === "manager" ? "manager" : "equipier";
+          const { data, error } = await supabaseAdmin.from("employes").insert({ ...champs, etablissement_id: etabId, role }).select("id").single();
+          if (error || !data) { erreurs.push(`${nom} : ${error?.message ?? "création impossible"}`); continue; }
+          employeId = data.id as string; created++; crees.push(nom);
+          liste.push({ id: employeId, prenom: String(champs.prenom), nom: String(champs.nom), email: c.email, combo_id: c.id, matricule: c.employee_number, actif: true, equipes_access: (champs.equipes_access as string[]) ?? [], etablissements_ids: [etabId], date_sortie: null });
         }
-
-        // Upsert active contract
-        if (employeId) {
-          const typeMap: Record<string, string> = { CDI: "CDI", CDD: "CDD", seasonal: "extra", apprenticeship: "apprenti", internship: "stagiaire" };
-          const contratType = typeMap[contract.contract_type] ?? contract.contract_type ?? "CDI";
-          const { data: existingContrat } = await supabaseAdmin
-            .from("contrats").select("id").eq("employe_id", employeId).eq("actif", true).limit(1);
-          const contratPayload = {
-            employe_id: employeId,
-            type: contratType,
-            date_debut: contract.start_date,
-            date_fin: contract.end_date || null,
-            remuneration: contract.monthly_gross_salary,
-            emploi: contract.function || null,
-            heures_semaine: contract.contract_time,
-            jours_semaine: 5,
-            actif: !contract.end_date || new Date(contract.end_date) >= new Date(),
-          };
-          if (existingContrat && existingContrat.length > 0) {
-            await supabaseAdmin.from("contrats").update(contratPayload).eq("id", existingContrat[0].id);
-          } else {
-            await supabaseAdmin.from("contrats").insert(contratPayload);
-          }
-        }
+        // Contrat en cours : celui de Combo remplace le contrat actif de la fiche
+        const contrat = champsContrat(c, employeId, aujourdhui);
+        const { data: actif } = await supabaseAdmin.from("contrats").select("id").eq("employe_id", employeId).eq("actif", true).order("date_debut", { ascending: false }).limit(1);
+        const { error: errC } = actif && actif.length
+          ? await supabaseAdmin.from("contrats").update(contrat).eq("id", actif[0].id)
+          : await supabaseAdmin.from("contrats").insert(contrat);
+        if (errC) erreurs.push(`${nom}, contrat : ${errC.message}`);
       }
 
-      results.push({ location: loc.name, created, updated, total: contracts.length });
+      // Départs
+      const partis: string[] = [], aVerifier: string[] = [];
+      for (const d of departs(liste, actuels, anciens, aujourdhui)) {
+        const nom = `${d.employe.prenom} ${d.employe.nom}`;
+        if (!d.date) { aVerifier.push(nom); continue; }
+        const { error } = await supabaseAdmin.from("employes").update({ actif: false, date_sortie: d.date, motif_sortie: d.motif }).eq("id", d.employe.id);
+        if (error) { erreurs.push(`${nom}, départ : ${error.message}`); continue; }
+        await supabaseAdmin.from("contrats").update({ actif: false, date_fin: d.date }).eq("employe_id", d.employe.id).eq("actif", true);
+        partis.push(`${nom} (${d.motif?.toLowerCase() ?? "départ"} le ${new Date(`${d.date}T12:00:00`).toLocaleDateString("fr-FR")})`);
+      }
+      results.push({ location: loc.name, created, updated, total: actuels.length, departs: partis, a_verifier: aVerifier, erreurs, crees });
     }
-
     return NextResponse.json({ ok: true, results });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-}
-
-function findMatch(
-  existing: { id: string; prenom: string; nom: string; email: string | null; combo_id: string | null; matricule: string | null }[],
-  contract: ComboContract,
-): { id: string } | null {
-  // 1. Match by combo_id
-  const byCombo = existing.find(e => e.combo_id === contract.id);
-  if (byCombo) return byCombo;
-
-  // 2. Match by email
-  if (contract.email) {
-    const byEmail = existing.find(e => e.email?.toLowerCase() === contract.email?.toLowerCase());
-    if (byEmail) return byEmail;
-  }
-
-  // 3. Match by matricule / employee_number
-  if (contract.employee_number) {
-    const byMatricule = existing.find(e => e.matricule === contract.employee_number);
-    if (byMatricule) return byMatricule;
-  }
-
-  // 4. Match by name (fuzzy)
-  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const byName = existing.find(e =>
-    norm(e.nom) === norm(contract.lastname) && norm(e.prenom) === norm(contract.firstname)
-  );
-  if (byName) return byName;
-
-  return null;
 }

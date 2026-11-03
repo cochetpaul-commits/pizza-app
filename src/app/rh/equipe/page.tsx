@@ -107,8 +107,13 @@ export default function EquipePage() {
               const res = await fetchApi("/api/combo/sync", { method: "POST" });
               const data = await res.json();
               if (data.ok) {
-                const summary = (data.results as { location: string; created: number; updated: number }[])
-                  .map((r: { location: string; created: number; updated: number }) => `${r.location} : ${r.created} crees, ${r.updated} mis a jour`).join(" ; ");
+                type R = { location: string; created: number; updated: number; crees?: string[]; departs?: string[]; a_verifier?: string[]; erreurs?: string[] };
+                const summary = (data.results as R[]).map((r) => [
+                  `${r.location} : ${r.created} créé${r.created > 1 ? "s" : ""}${r.crees?.length ? ` (${r.crees.join(", ")})` : ""}, ${r.updated} mis à jour`,
+                  r.departs?.length ? `départs : ${r.departs.join(", ")}` : null,
+                  r.a_verifier?.length ? `plus de contrat dans Combo, à vérifier : ${r.a_verifier.join(", ")}` : null,
+                  r.erreurs?.length ? `Erreur : ${r.erreurs.join(" ; ")}` : null,
+                ].filter(Boolean).join(" · ")).join(" ; ");
                 setSyncResult(summary);
                 setTimeout(loadData, 1500);
               } else {
