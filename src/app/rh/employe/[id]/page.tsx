@@ -1720,9 +1720,11 @@ function CodeTablette({ empId }: { empId: string }) {
   const [busy, setBusy] = useState(false);
   // Le haché ne sort jamais vers le navigateur (colonne non lisible) : on demande seulement s'il existe
   const [defini, setDefini] = useState(false);
+  // Le code lui même, pour le rappeler à l'employé (03/11/2026) : rendu aux responsables seulement
+  const [actuel, setActuel] = useState<string | null>(null);
   useEffect(() => {
     let annule = false;
-    fetchApi(`/api/tablette/code?employe_id=${empId}`).then(async (r) => { const j = r.ok ? await r.json() : null; if (!annule) setDefini(!!j?.defini); }).catch(() => undefined);
+    fetchApi(`/api/tablette/code?employe_id=${empId}`).then(async (r) => { const j = r.ok ? await r.json() : null; if (!annule) { setDefini(!!j?.defini); setActuel(j?.code ?? null); } }).catch(() => undefined);
     return () => { annule = true; };
   }, [empId]);
   const onChange = (d: boolean) => setDefini(d);
@@ -1732,13 +1734,14 @@ function CodeTablette({ empId }: { empId: string }) {
     const j = await res.json().catch(() => ({}));
     setBusy(false);
     if (!res.ok) { setMsg(j?.error ?? "Erreur"); return; }
-    setCode(""); setMsg(valeur ? "Code enregistré" : "Code retiré"); onChange(!!valeur);
+    setCode(""); setMsg(valeur ? "Code enregistré" : "Code retiré"); onChange(!!valeur); setActuel(valeur || null);
   };
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: "#6f6a61", marginBottom: 6 }}>Code tablette</div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 999, background: defini ? "rgba(45,106,79,0.10)" : "rgba(0,0,0,0.06)", color: defini ? "#2D6A4F" : "#6f6a61" }}>{defini ? "Code défini" : "Aucun code"}</span>
+        {defini && actuel && <span style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontWeight: 700, fontSize: 18, letterSpacing: 3, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }} title="Visible par les responsables seulement">{actuel}</span>}
         <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder="4 chiffres" onKeyDown={(e) => { if (e.key === "Enter" && code.length === 4 && !busy) envoyer(code); }} style={{ width: 90, height: 32, padding: "0 10px", borderRadius: 8, border: "1px solid #ddd6c8", fontSize: 13, fontFamily: "inherit", letterSpacing: ".2em" }} />
         <button type="button" disabled={busy || code.length !== 4} onClick={() => envoyer(code)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#D4775A", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: busy || code.length !== 4 ? 0.5 : 1 }}>{defini ? "Changer" : "Définir"}</button>
         {defini && <button type="button" disabled={busy} onClick={() => envoyer("")} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#b4443a" }}>Retirer</button>}

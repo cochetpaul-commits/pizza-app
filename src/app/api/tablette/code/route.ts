@@ -6,14 +6,14 @@ import { CODE_VALIDE, hacherCode, verifierCode } from "@/lib/tablette/codePin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** GET /api/tablette/code?employe_id=… — l'employé a-t-il un code ? (le haché ne sort jamais vers le navigateur) */
+/** GET /api/tablette/code?employe_id=… — l'employé a-t-il un code, et lequel (responsables seulement, 03/11/2026) */
 export async function GET(req: NextRequest) {
   const refus = await roleDenied(req, ["group_admin", "manager"]);
   if (refus) return refus;
   const employeId = req.nextUrl.searchParams.get("employe_id") ?? "";
   if (!employeId) return NextResponse.json({ error: "employe_id requis" }, { status: 400 });
-  const { data } = await supabaseAdmin.from("employes").select("code_pin_hash").eq("id", employeId).maybeSingle();
-  return NextResponse.json({ defini: !!data?.code_pin_hash });
+  const { data } = await supabaseAdmin.from("employes").select("code_pin_hash, code_pin").eq("id", employeId).maybeSingle();
+  return NextResponse.json({ defini: !!data?.code_pin_hash, code: data?.code_pin_hash ? (data?.code_pin ?? null) : null });
 }
 
 /**
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     const { data: autres } = await supabaseAdmin.from("employes").select("id, code_pin_hash").eq("etablissement_id", emp.etablissement_id).eq("actif", true).neq("id", employeId).not("code_pin_hash", "is", null);
     if ((autres ?? []).some((a) => verifierCode(code, a.code_pin_hash as string))) return NextResponse.json({ error: "Ce code est déjà pris par quelqu'un d'autre : choisis-en un autre" }, { status: 409 });
   }
-  const { error } = await supabaseAdmin.from("employes").update({ code_pin_hash: code ? hacherCode(code) : null }).eq("id", employeId);
+  const { error } = await supabaseAdmin.from("employes").update({ code_pin_hash: code ? hacherCode(code) : null, code_pin: code || null }).eq("id", employeId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, defini: !!code });
 }
