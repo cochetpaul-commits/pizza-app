@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { detectCategoryFromName } from "@/lib/invoices/categoryDetector";
@@ -39,12 +40,13 @@ export async function GET(req: NextRequest) {
 
   const etabId = req.nextUrl.searchParams.get("etablissement_id");
   const [{ data: disparus, error }, { data: inactifs }] = await Promise.all([
-    supabaseAdmin.rpc("produits_disparus", { p_etab: etabId || null }),
-    supabaseAdmin
+    // 03/11/2026 : par pages (988 produits disparus, à la limite de 1 000)
+    toutesLesPages((de, a) => supabaseAdmin.rpc("produits_disparus", { p_etab: etabId || null }).order("derniere", { ascending: false, nullsFirst: false }).order("name").order("supplier_id").order("sku").range(de, a)),
+    toutesLesPages((de, a) => supabaseAdmin
       .from("ingredients")
       .select("id, name, supplier, category, supplier_sku")
       .eq("is_active", false)
-      .order("name"),
+      .order("name").order("id").range(de, a)),
   ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ disparus: disparus ?? [], inactifs: inactifs ?? [] });

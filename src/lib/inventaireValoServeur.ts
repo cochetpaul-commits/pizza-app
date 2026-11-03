@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { CAT_LABELS, type Category } from "@/types/ingredients";
 import { coutUniteComptee, type OffreValo, type RecetteValo } from "@/lib/inventaireValorisation";
 import { totalLigne } from "@/lib/inventaire";
@@ -32,9 +33,10 @@ const ordreZones = new Map<string, number>();
 
 export async function valoriserInventaire(invId: string, etabId: string): Promise<InventaireValorise> {
   const [{ data: lignes }, { data: zones }] = await Promise.all([
-    supabaseAdmin.from("inventaire_lignes")
+    // 03/11/2026 : par pages ; .limit(5000) reste coupé à 1 000 par le serveur
+    toutesLesPages((de, a) => supabaseAdmin.from("inventaire_lignes")
       .select("id, ingredient_id, zone, ordre, famille, colis, unites, quantite, unite, cond_contenu, cond_libelle, cout_unitaire, nom_feuille")
-      .eq("inventaire_id", invId).eq("retiree", false).order("ordre", { ascending: true, nullsFirst: false }).limit(5000),
+      .eq("inventaire_id", invId).eq("retiree", false).order("ordre", { ascending: true, nullsFirst: false }).order("id").range(de, a)),
     supabaseAdmin.from("storage_zones").select("name, display_order").eq("etablissement_id", etabId),
   ]);
   for (const z of zones ?? []) ordreZones.set(z.name as string, Number(z.display_order ?? 99));
@@ -47,7 +49,8 @@ export async function valoriserInventaire(invId: string, etabId: string): Promis
     const lot = ids.slice(i, i + 200);
     const [{ data: ings }, { data: offs }, { data: recs }] = await Promise.all([
       supabaseAdmin.from("ingredients").select("id, name, category, is_active, status, purchase_price, purchase_unit, purchase_unit_label, piece_weight_g, piece_volume_ml, density_g_per_ml").in("id", lot),
-      supabaseAdmin.from("supplier_offers").select("ingredient_id, is_active, valid_from, valid_to, created_at, unit, unit_price, pack_price, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, pack_unit, price_kind, piece_weight_g, density_kg_per_l").in("ingredient_id", lot),
+      // Toutes les offres (actives et fermées) : un paquet de 200 produits atteignait 1 011 lignes
+      toutesLesPages((de, a) => supabaseAdmin.from("supplier_offers").select("ingredient_id, is_active, valid_from, valid_to, created_at, unit, unit_price, pack_price, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, pack_unit, price_kind, piece_weight_g, density_kg_per_l").in("ingredient_id", lot).order("id").range(de, a)),
       supabaseAdmin.from("kitchen_recipes").select("output_ingredient_id, cost_per_kg, total_cost, yield_grams").in("output_ingredient_id", lot).eq("is_active", true),
     ]);
     for (const f of ings ?? []) fiches.set(f.id as string, f as Record<string, unknown>);

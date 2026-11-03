@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { ecrireCache, invaliderCache, lireCache } from "@/lib/cacheCourt";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { callerProfile, etabAccessDenied } from "@/lib/getEtablissement";
@@ -54,8 +55,9 @@ export async function GET(req: NextRequest) {
   const debutServices = new Date(lundi); debutServices.setUTCDate(lundi.getUTCDate() - 56);
 
   const [ventes, services, { parMois, error }, { data: param }, employes] = await Promise.all([
-    supabaseAdmin.rpc("ventes_services_periode", { p_etab: etabId, p_from: `${moisListe[0]}-01`, p_to: aujourdhui }),
-    supabaseAdmin.rpc("ventes_services_periode", { p_etab: etabId, p_from: debutServices.toISOString().slice(0, 10), p_to: finServices.toISOString().slice(0, 10) }),
+    // 03/11/2026 : par pages (830 lignes sur 24 mois, la limite de 1 000 approchait)
+    toutesLesPages((de, a) => supabaseAdmin.rpc("ventes_services_periode", { p_etab: etabId, p_from: `${moisListe[0]}-01`, p_to: aujourdhui }).order("date_service").order("service").range(de, a)),
+    toutesLesPages((de, a) => supabaseAdmin.rpc("ventes_services_periode", { p_etab: etabId, p_from: debutServices.toISOString().slice(0, 10), p_to: finServices.toISOString().slice(0, 10) }).order("date_service").order("service").range(de, a)),
     chargesParMois(etabId, moisListe),
     supabaseAdmin.from("etablissement_params").select("valeur").eq("etablissement_id", etabId).eq("cle", CLE).maybeSingle(),
     admin ? lireEquipe(etabId) : Promise.resolve([] as Personne[]),
