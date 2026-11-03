@@ -376,7 +376,7 @@ describe('calculerBilanSemaine HCR', () => {
 describe('calculerBilanSemaine IDCC 1501', () => {
   const contrat39h: ContratInput = { type: 'CDI', heures_semaine: 39, convention: 'RAPIDE_1501' };
 
-  it('40h travaillées → sup 10% = 4h, sup 20% = 1h', () => {
+  it('contrat 39h, 40h travaillées → sup 20% = 1h (structurelles dans le salaire)', () => {
     // 5 jours * 8h = 40h
     const shifts: ShiftInput[] = [];
     for (let i = 9; i <= 13; i++) {
@@ -391,15 +391,15 @@ describe('calculerBilanSemaine IDCC 1501', () => {
     const bilan = calculerBilanSemaine(shifts, contrat39h, 'test-1501');
 
     expect(bilan.heures_travaillees).toBe(40);
-    // Sup 10% = 39 - 35 = 4h
-    expect(bilan.heures_supp_10).toBe(4);
+    // 35 → 39 h : structurelles, dans le salaire de base (03/11/2026)
+    expect(bilan.heures_supp_10).toBe(0);
     // Sup 20% = 40 - 39 = 1h
     expect(bilan.heures_supp_20).toBe(1);
     expect(bilan.heures_supp_50).toBe(0);
     expect(bilan.heures_supp_25).toBe(0); // HS25 n'existe dans aucune convention
   });
 
-  it('44h travaillées → sup 10% = 4h, sup 20% = 4h, sup 50% = 1h', () => {
+  it('contrat 39h, 44h travaillées → sup 20% = 4h, sup 50% = 1h', () => {
     const shifts: ShiftInput[] = [
       { date: '2026-03-09', heure_debut: '08:00', heure_fin: '17:30', pause_minutes: 30 }, // 9h
       { date: '2026-03-10', heure_debut: '08:00', heure_fin: '17:30', pause_minutes: 30 }, // 9h
@@ -411,7 +411,7 @@ describe('calculerBilanSemaine IDCC 1501', () => {
     const bilan = calculerBilanSemaine(shifts, contrat39h, 'test-1501-sup50');
 
     expect(bilan.heures_travaillees).toBe(44);
-    expect(bilan.heures_supp_10).toBe(4);  // 35→39
+    expect(bilan.heures_supp_10).toBe(0);  // 35→39 : structurelles
     expect(bilan.heures_supp_20).toBe(4);  // 39→43
     expect(bilan.heures_supp_50).toBe(1);  // 43→44
   });
@@ -693,6 +693,15 @@ describe('exportSilaeToCSV', () => {
 
 
 import { heuresSupLissees } from '../useConventionLegale';
+
+describe('IDCC 1501, contrat 35h', () => {
+  it('38h → HS10 = 3h', () => {
+    const shifts: ShiftInput[] = [];
+    for (let i = 9; i <= 13; i++) shifts.push({ date: `2026-03-${String(i).padStart(2, '0')}`, heure_debut: '09:00', heure_fin: '17:06', pause_minutes: 30 });
+    const bilan = calculerBilanSemaine(shifts, { type: 'CDI', heures_semaine: 35, convention: 'RAPIDE_1501' }, 'test-1501-35');
+    expect(bilan.heures_supp_10).toBe(3);
+  });
+});
 
 describe('heures sup lissées sur le mois', () => {
   const c35: ContratInput = { type: 'CDI', heures_semaine: 35, convention: 'HCR_1979' };

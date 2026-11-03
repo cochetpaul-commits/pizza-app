@@ -445,15 +445,20 @@ function calculerHeuresSupRapide(
       }
     }
   } else {
-    heures_normales = Math.min(heures, RAPIDE_SEUIL_LEGAL);
+    // Comme en HCR (03/11/2026, validé par Paul et le cabinet) : les heures prévues au contrat (structurelles,
+    // 35 à 39 h pour un 39 h) sont déjà dans le salaire de base sur SILAE ; les HS se comptent au delà du contrat.
+    // Avant : un contrat de 39 h exportait 4 h de HS 10 % chaque semaine, payées en double.
+    const seuil = Math.max(RAPIDE_SEUIL_LEGAL, contrat.heures_semaine);
+    heures_normales = Math.min(heures, seuil);
 
-    if (heures > RAPIDE_SEUIL_LEGAL) {
-      // Sup 10% : de 35h01 à 39h
-      heures_supp_10 = round2(Math.min(heures, RAPIDE_SEUIL_SUP_10) - RAPIDE_SEUIL_LEGAL);
+    if (heures > seuil) {
+      // Sup 10% : de 35h01 à 39h (contrat de moins de 39 h)
+      if (seuil < RAPIDE_SEUIL_SUP_10) heures_supp_10 = round2(Math.min(heures, RAPIDE_SEUIL_SUP_10) - seuil);
       // Sup 20% : de 39h01 à 43h
-      heures_supp_20 = round2(Math.min(heures, RAPIDE_SEUIL_SUP_20) - RAPIDE_SEUIL_SUP_10);
+      const seuil20 = Math.max(seuil, RAPIDE_SEUIL_SUP_10);
+      if (heures > seuil20 && seuil20 < RAPIDE_SEUIL_SUP_20) heures_supp_20 = round2(Math.min(heures, RAPIDE_SEUIL_SUP_20) - seuil20);
       // Sup 50% : au-delà de 43h
-      heures_supp_50 = round2(Math.max(0, heures - RAPIDE_SEUIL_SUP_20));
+      heures_supp_50 = round2(Math.max(0, heures - Math.max(seuil, RAPIDE_SEUIL_SUP_20)));
     }
   }
 

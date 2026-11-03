@@ -118,7 +118,8 @@ describe('HCR 1979 — non-régression', () => {
 // ============================================================
 
 describe('RAPIDE 1501 — non-régression', () => {
-  it('40h → 4h HS10 + 1h HS20', () => {
+  // 03/11/2026 (Paul, cabinet) : les heures structurelles 35 → 39 h sont dans le salaire de base sur SILAE
+  it('contrat 39h, 40h → 1h HS20, plus de HS10 structurelles', () => {
     // 5 × 8h net = 40h (0 pause)
     const shifts = makeWeek('2026-03-09', [
       ['09:00', '17:00', 0],
@@ -129,7 +130,7 @@ describe('RAPIDE 1501 — non-régression', () => {
     ]);
     const bilan = calculerBilanSemaine(shifts, RAPIDE_CDI_39, 'emp1');
     expect(bilan.heures_travaillees).toBe(40);
-    expect(bilan.heures_supp_10).toBe(4);
+    expect(bilan.heures_supp_10).toBe(0);
     expect(bilan.heures_supp_20).toBe(1);
     expect(bilan.heures_supp_50).toBe(0);
   });
