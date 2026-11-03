@@ -283,10 +283,17 @@ export function calculerBilanSemaine(
 // Calcul heures supplémentaires / complémentaires
 // ============================================================
 
+/** Heures sup d'une semaine pour un total d'heures nettes (sans le détail des services) */
+export function heuresSupSemaine(heuresTotales: number, contrat: ContratInput) {
+  return calculerHeuresSup(heuresTotales, contrat);
+}
+
 function calculerHeuresSup(
   heuresTotales: number,
   contrat: ContratInput
 ): Omit<BilanSemaine, 'heures_travaillees' | 'delta_contrat' | 'nb_repas' | 'alertes'> {
+  // Un extra sans durée de contrat renseignée (0) se compte comme un temps plein : HS à partir de la 36e heure
+  if (contrat.type === 'extra' && !(contrat.heures_semaine > 0)) contrat = { ...contrat, heures_semaine: HCR_SEUIL_LEGAL };
   const isTempsPartiel = contrat.heures_semaine < HCR_SEUIL_LEGAL;
 
   if (contrat.convention === 'HCR_1979') {
@@ -341,10 +348,9 @@ function calculerHeuresSupHCR(
     // 43h contract: normal up to 43h, >43h = HS50
     // 39h contract: normal up to 39h, 39→43h = HS20, >43h = HS50
     // 35h contract: normal up to 35h, 35→39h = HS10, 39→43h = HS20, >43h = HS50
-    // Extra: treated as 39h threshold (normal up to 39h)
-    const seuil = contrat.type === 'extra'
-      ? HCR_SEUIL_SUP_10 // extras: seuil = 39h
-      : contrat.heures_semaine;
+    // Extra (03/11/2026) : comme tout salarié à temps plein, ses heures sup commencent après la durée de son
+    // contrat, et au plus tard à la 36e heure (avant : seuil fixé à 39 h, un extra à 38 h n'avait aucune HS 10 %)
+    const seuil = contrat.heures_semaine;
 
     heures_normales = Math.min(heures, seuil);
 

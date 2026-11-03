@@ -14,6 +14,7 @@ import { useStatsVentes } from "@/components/analyse/useStatsVentes";
 import { AMBRE, BLEU, FAIBLE, MUTED, ROUGE, VERT, euros, nombre, pct, libelleMoisLong } from "@/components/analyse/gabarit";
 import type { MoisMarge } from "@/app/api/analyse/marge/route";
 import { EtatVide } from "@/components/ui/EtatVide";
+import { heuresSupSemaine } from "@/hooks/useConventionLegale";
 
 /**
  * Analyse › Masse salariale (10/10/2026) : « L'équipe coûte combien ? »
@@ -24,7 +25,7 @@ import { EtatVide } from "@/components/ui/EtatVide";
  */
 type Presence = { periode_debut: string; combo_nom: string; equipe: string | null; employe_id: string | null; matched: boolean; heures_planifiees: number; heures_travaillees: number; heures_contrat: number; nb_repas: number; nb_jours_travailles: number; ecart_total: number };
 type Contrat = { employe_id: string; prenom: string; nom: string; type: string; heures_semaine: number; remuneration: number; emploi: string; equipes_access: string[] };
-type Employe = { nom: string; equipe: string; type: string; emploi: string; hContrat: number; hTrav: number; hs: number; brut: number; coutCharge: number; coutHS: number; repas: number; jours: number; sansContrat: boolean };
+type Employe = { nom: string; equipe: string; type: string; emploi: string; hContrat: number; hTrav: number; hs: number; hs10: number; hs20: number; hs50: number; brut: number; coutCharge: number; coutHS: number; repas: number; jours: number; sansContrat: boolean };
 const CHARGES = 0.42;
 const COULEURS_EQUIPE: Record<string, string> = { Cuisine: "#D97706", Salle: "#5e8278", Bar: "#8a6b3e", Autre: "#b0a894" };
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -64,7 +65,9 @@ export function MasseSalariale() {
     try {
       const [pres, cts, marge, obj] = await Promise.all([
         supabase.from("combo_presences").select("periode_debut, combo_nom, equipe, employe_id, matched, heures_planifiees, heures_travaillees, heures_contrat, nb_repas, nb_jours_travailles, ecart_total")
-          .eq("etablissement_id", etabId).gte("periode_debut", selection.from).lte("periode_fin", selection.to),
+          // Semaine rattachée au mois de son dimanche (03/11/2026) : avant, une semaine à cheval sur deux mois
+          // n'était comptée dans aucun des deux
+          .eq("etablissement_id", etabId).gte("periode_fin", selection.from).lte("periode_fin", selection.to),
         supabase.rpc("contrats_admin", { p_etab: etabId }).then(async (r) => {
           if (r.error) return [] as Contrat[];
           const actifs = ((r.data ?? []) as Record<string, unknown>[]).filter((c) => c.actif);
@@ -92,6 +95,19 @@ export function MasseSalariale() {
   const chargement = chargementVentes || etat.cle !== cle;
 
   const employes = useMemo<Employe[]>(() => {
+    // Heures sup semaine par semaine (03/11/2026) : au delà du contrat, dans les tranches de la convention
+    // (10, 20, 50 %). Avant : « heures sup » = réel moins planifié sur toute la période, sans lien avec le contrat.
+    const convention = etab?.slug?.includes("piccola") ? "RAPIDE_1501" as const : "HCR_1979" as const;
+    const hsParNom = new Map<string, { hs10: number; hs20: number; hs50: number }>();
+    for (const p of etat.presences) {
+      const contrat = etat.contrats.find((c) => normalise(`${c.prenom} ${c.nom}`) === normalise(p.combo_nom));
+      const heuresContrat = contrat?.heures_semaine || p.heures_contrat || 0;
+      if (!(heuresContrat > 0) && contrat?.type !== "extra") continue;
+      const b = heuresSupSemaine(p.heures_travaillees, { type: contrat?.type ?? "CDI", heures_semaine: heuresContrat, convention });
+      const t = hsParNom.get(p.combo_nom) ?? { hs10: 0, hs20: 0, hs50: 0 };
+      t.hs10 += b.heures_supp_10 + b.heures_comp_10; t.hs20 += b.heures_supp_20 + b.heures_comp_25; t.hs50 += b.heures_supp_50;
+      hsParNom.set(p.combo_nom, t);
+    }
     const parNom = new Map<string, Presence & { n: number }>();
     for (const p of etat.presences) {
       const prev = parNom.get(p.combo_nom);
@@ -104,14 +120,15 @@ export function MasseSalariale() {
       const hContrat = contrat?.heures_semaine ?? p.heures_contrat ?? 0;
       const brut = contrat?.remuneration ?? 0, type = contrat?.type ?? "?";
       const equipe = p.equipe ?? contrat?.equipes_access?.[0] ?? "Autre";
-      const hs = Math.max(0, p.ecart_total);
+      const bandes = type === "TNS" ? { hs10: 0, hs20: 0, hs50: 0 } : hsParNom.get(nom) ?? { hs10: 0, hs20: 0, hs50: 0 };
+      const hs = Math.round((bandes.hs10 + bandes.hs20 + bandes.hs50) * 100) / 100;
       const tauxH = hContrat > 0 && brut > 0 ? brut / (hContrat * 52 / 12) : 0;
-      const coutHS = hs * tauxH * 1.1 * (1 + CHARGES);
+      const coutHS = (bandes.hs10 * 1.1 + bandes.hs20 * 1.2 + bandes.hs50 * 1.5) * tauxH * (1 + CHARGES);
       const heuresNormales = Math.max(0, p.heures_travaillees - hs);
       const brutPeriode = type === "TNS" || tauxH <= 0 ? brut * prorata : heuresNormales * tauxH;
-      return { nom, equipe, type, emploi: contrat?.emploi ?? "", hContrat, hTrav: p.heures_travaillees, hs, brut: brutPeriode, coutCharge: brutPeriode * (1 + CHARGES), coutHS, repas: p.nb_repas, jours: p.nb_jours_travailles, sansContrat: !contrat };
+      return { nom, equipe, type, emploi: contrat?.emploi ?? "", hContrat, hTrav: p.heures_travaillees, hs, hs10: bandes.hs10, hs20: bandes.hs20, hs50: bandes.hs50, brut: brutPeriode, coutCharge: brutPeriode * (1 + CHARGES), coutHS, repas: p.nb_repas, jours: p.nb_jours_travailles, sansContrat: !contrat };
     }).sort((a, b) => b.coutCharge - a.coutCharge);
-  }, [etat.presences, etat.contrats, selection.mode]);
+  }, [etat.presences, etat.contrats, selection.mode, etab?.slug]);
   useEffect(() => {
     if (!etabId || selection.mode !== "mois") return;
     let annule = false;
@@ -289,7 +306,7 @@ export function MasseSalariale() {
               </table>
             </div>
             <div style={{ padding: "10px 16px 14px" }}>
-              <Note>Heures sup : au-delà des heures de contrat sur la période, payées au taux horaire majoré de 10 %. TNS : mensualité fixe. {totaux.sansContrat > 0 ? `${totaux.sansContrat} personne${totaux.sansContrat > 1 ? "s" : ""} sans contrat dans l'application : à compléter dans RH › Équipe.` : ""}</Note>
+              <Note>Heures sup : comptées semaine par semaine au delà du contrat, selon la convention (10 % jusqu’à 39 h, 20 % jusqu’à 43 h, 50 % au delà) ; une semaine à cheval compte dans le mois de son dimanche. TNS : mensualité fixe. {totaux.sansContrat > 0 ? `${totaux.sansContrat} personne${totaux.sansContrat > 1 ? "s" : ""} sans contrat dans l'application : à compléter dans RH › Équipe.` : ""}</Note>
             </div>
           </Cadre>
         </>

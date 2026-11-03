@@ -337,6 +337,17 @@ describe('calculerBilanSemaine HCR', () => {
     expect(bilan.heures_supp_50).toBe(0);
   });
 
+  // --- Test : extra au contrat de 35 h, 38 h → HS10 = 3h (03/11/2026 : avant, 0 h, seuil fixé à 39 h) ---
+  it('extra 35h, 38h → HS10 = 3h', () => {
+    const contratExtra: ContratInput = { type: 'extra', heures_semaine: 35, convention: 'HCR_1979' };
+    const shifts: ShiftInput[] = [];
+    for (let i = 9; i <= 13; i++) shifts.push({ date: `2026-03-${String(i).padStart(2, '0')}`, heure_debut: '09:00', heure_fin: '17:06', pause_minutes: 30 });
+    const bilan = calculerBilanSemaine(shifts, contratExtra, 'test-extra-35');
+    expect(bilan.heures_travaillees).toBe(38);
+    expect(bilan.heures_supp_10).toBe(3);
+    expect(bilan.heures_supp_20).toBe(0);
+  });
+
   // --- Test : 1 repas par shift ---
   it('1 repas par shift même si court', () => {
     const shifts: ShiftInput[] = [
