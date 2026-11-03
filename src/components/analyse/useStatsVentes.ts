@@ -96,7 +96,8 @@ export function useStatsVentes(range: DateRange, avecMeteo = false, equipe = fal
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cle, avecMeteo]);
 
-  // Période ou établissement changés : on affiche « chargement » sans attendre l'effet
-  if (etat.cle !== cle) return { chargement: true, erreur: null, stats: etat.stats, prec: etat.prec, meteo: etat.meteo };
+  // Période ou établissement changés : « chargement » sans attendre l'effet, et plus les chiffres de l'ancienne période
+  // (03/11/2026 : sur 4 mois le calcul prend près d'une minute, la page montrait octobre sous l'en-tête juillet à octobre)
+  if (etat.cle !== cle) return { chargement: true, erreur: null, stats: null, prec: null, meteo: {} };
   return etat;
 }

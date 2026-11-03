@@ -18,12 +18,20 @@ export async function GET(req: NextRequest) {
   if (!etabId || !from || !to) return NextResponse.json({ error: "etablissement_id, from et to requis" }, { status: 400 });
   const refus = await etabAccessDenied(req, etabId);
   if (refus) return refus;
-  const { data, error } = await supabaseAdmin.rpc("ventes_produits_periode", { p_etab: etabId, p_from: from, p_to: to });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // PostgREST coupe à 1 000 lignes : lecture par pages, dans un ordre stable (03/11/2026, 12 834 lignes sur juillet à octobre)
+  const PAGE = 1000;
+  const data: LigneAgregee[] = [];
+  for (let i = 0; ; i += PAGE) {
+    const { data: page, error } = await supabaseAdmin.rpc("ventes_produits_periode", { p_etab: etabId, p_from: from, p_to: to })
+      .order("date_service").order("service").order("categorie").order("description").range(i, i + PAGE - 1);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    data.push(...((page ?? []) as LigneAgregee[]));
+    if (!page || page.length < PAGE) break;
+  }
   const produit = sp.get("produit");
   if (produit) {
-    const detail = detailProduit((data ?? []) as LigneAgregee[], from, to, produit);
+    const detail = detailProduit(data, from, to, produit);
     return detail ? NextResponse.json({ detail }) : NextResponse.json({ error: "Produit sans vente sur la période" }, { status: 404 });
   }
-  return NextResponse.json(construireProduitsPeriode((data ?? []) as LigneAgregee[], from, to));
+  return NextResponse.json(construireProduitsPeriode(data, from, to));
 }
