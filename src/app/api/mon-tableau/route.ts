@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { verifierJeton } from "@/lib/tablette/jeton";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { normalizeRole, type Role } from "@/lib/rbac";
@@ -56,23 +57,16 @@ function shiftDays(date: string, days: number): string {
 }
 
 async function fetchRange(etabId: string, from: string, to: string): Promise<Row[]> {
-  const out: Row[] = [];
-  const PAGE = 1000;
-  let offset = 0;
-  let hasMore = true;
-  while (hasMore) {
-    const { data } = await supabaseAdmin
-      .from("ventes_lignes")
-      .select(SELECT_COLS)
-      .eq("etablissement_id", etabId)
-      .gte("date_service", from)
-      .lte("date_service", to)
-      .range(offset, offset + PAGE - 1);
-    out.push(...((data ?? []) as Row[]));
-    hasMore = (data?.length ?? 0) === PAGE;
-    offset += PAGE;
-  }
-  return out;
+  // 03/11/2026 : ordre strict et erreur remontée (sans ordre, des lignes pouvaient être lues deux fois ou sautées)
+  const { data, error } = await toutesLesPages((de, a) => supabaseAdmin
+    .from("ventes_lignes")
+    .select(SELECT_COLS)
+    .eq("etablissement_id", etabId)
+    .gte("date_service", from)
+    .lte("date_service", to)
+    .order("id").range(de, a));
+  if (error) throw new Error(`Lecture des ventes : ${error.message}`);
+  return data as unknown as Row[];
 }
 
 /** Lignes produit exploitables (hors annulations, messages, paiements). */

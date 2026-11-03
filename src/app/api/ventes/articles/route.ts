@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { etabAccessDenied } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -45,12 +46,10 @@ export async function GET(req: NextRequest) {
   }
 
   /* 2. Fetch all unique product names from ventes_lignes */
-  const { data: ventesRaw, error: ventesErr } = await supabaseAdmin
-    .from("ventes_lignes")
-    .select("description,categorie,quantite,ttc")
-    .eq("etablissement_id", etabId)
-    .eq("type_ligne", "Produit")
-    .eq("annule", false);
+  // 03/11/2026 : agrégé en base (ventes_par_produit) et lu par pages ; la lecture brute s'arrêtait à 1 000 lignes sur 183 000
+  const { data: ventesAgg, error: ventesErr } = await toutesLesPages<{ description: string; categorie: string | null; qty: number; ca_ttc: number }>((de, a) =>
+    supabaseAdmin.rpc("ventes_par_produit", { p_etab: etabId, p_from: "2000-01-01", p_to: new Date().toISOString().slice(0, 10) }).order("description").range(de, a));
+  const ventesRaw = ventesAgg.map((v) => ({ description: v.description, categorie: v.categorie, quantite: Number(v.qty), ttc: Number(v.ca_ttc) }));
 
   if (ventesErr) {
     return NextResponse.json({ error: ventesErr.message }, { status: 500 });
@@ -106,11 +105,11 @@ export async function GET(req: NextRequest) {
   recipes.sort((a, b) => a.name.localeCompare(b.name, "fr"));
 
   /* 4. Fetch ingredients for product linking */
-  const { data: ingsRaw } = await supabaseAdmin
+  const { data: ingsRaw } = await toutesLesPages<{ id: string; name: string; category: string | null; purchase_price: number | null; cost_per_unit: number | null; default_unit: string | null }>((de, a) => supabaseAdmin
     .from("ingredients")
     .select("id,name,category,purchase_price,cost_per_unit,default_unit")
     .eq("is_active", true)
-    .order("name");
+    .order("name").order("id").range(de, a));
 
   const ingredients: IngredientOption[] = (ingsRaw ?? []).map((i) => ({
     id: i.id,

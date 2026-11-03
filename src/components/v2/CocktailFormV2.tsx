@@ -1,5 +1,6 @@
 "use client";
 
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { triParLibelle } from "@/lib/tri";
 import { useRecipeDraft } from "@/lib/useRecipeDraft";
@@ -199,11 +200,12 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       if (!auth.user) { setStatus("error"); setError({ message: "NOT_LOGGED" }); return; }
 
       const myEstab = etab?.slug?.includes("piccola") ? "piccola" : "bellomio";
-      const ingsQ = supabase.from("ingredients").select("*").eq("is_active", true)
+      const ingsQ = () => supabase.from("ingredients").select("*").eq("is_active", true)
         .or(`establishments.cs.{"${myEstab}"},establishments.is.null`);
-      const offQ = supabase.from("v_latest_offers").select("*");
+      // 03/11/2026 : par pages, 1 142 ingrédients et 1 402 offres dépassaient la limite de 1 000 lignes
+      const offQ = toutesLesPages((de, a) => supabase.from("v_latest_offers").select("*").order("ingredient_id").order("supplier_id").range(de, a));
       const [{ data: ingsData, error: iErr }, { data: offers }] = await Promise.all([
-        ingsQ.order("name"),
+        toutesLesPages((de, a) => ingsQ().order("name").order("id").range(de, a)),
         offQ,
       ]);
       if (cancelled) return;

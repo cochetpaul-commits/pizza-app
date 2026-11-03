@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 
 export const ALERT_THRESHOLD = 0.05;
 export const ABERRANT_THRESHOLD = 0.50;
@@ -48,14 +49,15 @@ export async function fetchPriceAlerts(
   since?: string, // ISO date string — only alerts where the active offer was created after this date
   _etabId?: string, // kept for API compat, no longer used (unified catalog)
 ): Promise<PriceAlert[]> {
-  let q = supabase
-    .from("supplier_offers")
-    .select("ingredient_id, supplier_id, unit, unit_price, supplier_label, created_at")
-    .eq("is_active", true)
-    .not("unit_price", "is", null);
-  if (since) q = q.gte("created_at", since);
-  // No establishment filter on offers — unified catalog
-  const { data: active, error: e1 } = await q;
+  // No establishment filter on offers — unified catalog. Par pages (03/11/2026 : 1 393 offres, coupées à 1 000)
+  const { data: active, error: e1 } = await toutesLesPages((de, a) => {
+    const q = supabase
+      .from("supplier_offers")
+      .select("ingredient_id, supplier_id, unit, unit_price, supplier_label, created_at")
+      .eq("is_active", true)
+      .not("unit_price", "is", null);
+    return (since ? q.gte("created_at", since) : q).order("id").range(de, a);
+  });
 
   if (e1) throw new Error(e1.message);
   if (!active?.length) return [];

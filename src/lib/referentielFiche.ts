@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 
 /**
  * Référentiel de la fiche technique (10/10/2026) : familles, catégories, produits de la Base,
@@ -42,10 +43,10 @@ async function charger(slug: string): Promise<ReferentielFiche> {
   const [f, c, i, e, o, p, sc] = await Promise.all([
     supabase.from("familles").select("*"),
     supabase.from("categories").select("*").order("sort_order").order("nom").or(`establishments.cs.{"${etab}"},establishments.is.null`),
-    supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, cost_per_kg, purchase_price, purchase_unit, purchase_unit_label, density_g_per_ml, piece_weight_g, piece_volume_ml, establishments, source")
-      .or(`establishments.cs.{"${etab}"},establishments.is.null`),
+    toutesLesPages((de, a) => supabase.from("ingredients").select("id, name, category, allergens, cost_per_unit, cost_per_kg, purchase_price, purchase_unit, purchase_unit_label, density_g_per_ml, piece_weight_g, piece_volume_ml, establishments, source")
+      .or(`establishments.cs.{"${etab}"},establishments.is.null`).order("id").range(de, a)),
     supabase.from("recipes").select("id, name").order("name"),
-    supabase.from("v_latest_offers").select("*"),
+    toutesLesPages((de, a) => supabase.from("v_latest_offers").select("*").order("ingredient_id").order("supplier_id").range(de, a)),
     supabase.from("popina_products").select("id, name, category, price_ttc, kitchen_recipe_id").eq("active", true).order("name"),
     supabase.from("kitchen_recipes").select("category, sous_categorie").not("sous_categorie", "is", null),
   ]);

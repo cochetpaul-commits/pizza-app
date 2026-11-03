@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { supabase } from "@/lib/supabaseClient";
 import { detectDuplicates, type DuplicatePair } from "@/lib/duplicateDetection";
 import type { Ingredient, LatestOffer } from "@/types/ingredients";
@@ -24,8 +25,9 @@ export function useDoublons(ignores: Set<string>, version = 0): EtatDoublons & {
       setEtat((e) => ({ ...e, chargement: true, erreur: null }));
       try {
         const [{ data: produits, error: e1 }, { data: offres, error: e2 }, { data: fournisseurs }] = await Promise.all([
-          supabase.from("ingredients").select("id, name, category, sub_category, is_active, supplier_id").eq("is_active", true).order("name"),
-          supabase.from("supplier_offers").select("ingredient_id, supplier_id, created_at, unit_price, unit").eq("is_active", true).order("created_at", { ascending: false }),
+          // 03/11/2026 : par pages (1 550 produits, 1 414 offres)
+          toutesLesPages((de, a) => supabase.from("ingredients").select("id, name, category, sub_category, is_active, supplier_id").eq("is_active", true).order("name").order("id").range(de, a)),
+          toutesLesPages((de, a) => supabase.from("supplier_offers").select("ingredient_id, supplier_id, created_at, unit_price, unit").eq("is_active", true).order("created_at", { ascending: false }).order("id").range(de, a)),
           supabase.from("suppliers").select("id, name"),
         ]);
         if (e1) throw new Error(e1.message);

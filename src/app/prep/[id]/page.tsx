@@ -1,6 +1,7 @@
 "use client";
 
 import { offerRowToCpu } from "@/lib/offerPricing";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { compressImage } from "@/lib/compressImage";
 import { formatLiquidQtyParts } from "@/lib/formatUnit";
@@ -277,21 +278,21 @@ export default function PrepRecipeDetailPage() {
       }
       setPhotoPreview(rr.photo_url ?? null);
 
-      const { data: ing, error: eI } = await supabase
+      const { data: ing, error: eI } = await toutesLesPages((de, a) => supabase
         .from("ingredients")
         .select("id,name,cost_per_unit,is_active,category,piece_weight_g,piece_volume_ml,allergens,purchase_price,purchase_unit,purchase_unit_label")
         .eq("is_active", true)
-        .order("name");
+        .order("name").order("id").range(de, a));
 
       if (eI) throw eI;
       const ingList = (ing ?? []) as Ingredient[];
       setIngredients(ingList);
 
-      const { data: offers, error: offErr } = await supabase
+      const { data: offers, error: offErr } = await toutesLesPages((de, a) => supabase
         .from("v_latest_offers")
         .select(
           "ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g"
-        );
+        ).order("ingredient_id").order("supplier_id").range(de, a));
 
       if (offErr) {
         setError({ message: getErrMessage(offErr, "Erreur offers"), details: offErr });

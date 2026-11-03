@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { triParLibelle } from "@/lib/tri";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
@@ -191,31 +192,31 @@ export default function InventairePage() {
 
   useEffect(() => {
     (async () => {
-      let q = supabase
+      // 03/11/2026 : fabriques de requêtes, lues par pages (1 142 produits et 1 414 offres dépassaient 1 000 lignes)
+      const qBase = () => supabase
         .from("ingredients")
         .select("*, " + ZONES_EMBED)
-        .eq("is_active", true)
-        .order("name");
+        .eq("is_active", true);
       // Visibilité par établissement (establishments), PAS établissement de
       // création : 379 produits créés côté Piccola mais ouverts à Bello Mio
       // (ex. Molecola Carniato) manquaient à l'inventaire de Bello.
       const etabKey = etab?.slug?.includes("piccola") ? "piccola" : etab?.slug?.includes("bello") ? "bellomio" : null;
-      if (etabKey) {
-        q = q.or(`establishments.cs.{"${etabKey}"},establishments.is.null`);
-      }
+      const q = toutesLesPages((de, a) => (etabKey ? qBase().or(`establishments.cs.{"${etabKey}"},establishments.is.null`) : qBase()).order("name").order("id").range(de, a));
       let zq = supabase.from("storage_zones").select("*").order("display_order").order("name");
       if (etabId) zq = zq.eq("etablissement_id", etabId);
-      const packQ = supabase
+      const packQ = toutesLesPages((de, a) => supabase
         .from("supplier_offers")
         .select("ingredient_id, supplier_id, pack_count, pack_each_qty, pack_each_unit")
-        .eq("is_active", true);
+        .eq("is_active", true).order("id").range(de, a));
       let supQ = supabase.from("suppliers").select("id, name").eq("is_active", true).order("name");
       if (etabId) supQ = supQ.eq("etablissement_id", etabId);
       // Tous les fournisseurs (les 2 etablissements) pour la pastille produit
       const supAllQ = supabase.from("suppliers").select("id, name, color").eq("is_active", true);
       // Emplacements supplémentaires (rang null) et zone secondaire (rang 2) ; la zone principale (rang 1) vient avec la fiche
-      let xzQ = supabase.from("ingredient_zones").select("ingredient_id, zone").or("rang.is.null,rang.eq.2");
-      if (etabId) xzQ = xzQ.eq("etablissement_id", etabId);
+      const xzQ = toutesLesPages((de, a) => {
+        const r = supabase.from("ingredient_zones").select("ingredient_id, zone").or("rang.is.null,rang.eq.2");
+        return (etabId ? r.eq("etablissement_id", etabId) : r).order("ingredient_id").order("zone").order("etablissement_id").order("rang").range(de, a);
+      });
       const [{ data, error }, { data: zData }, { data: packData }, { data: supData }, { data: supAllData }, { data: xzData }] = await Promise.all([q, zq, packQ, supQ, supAllQ, xzQ]);
       const xz: ExtraZones = {};
       for (const r of (xzData ?? []) as { ingredient_id: string; zone: string }[]) (xz[r.ingredient_id] ??= []).push(r.zone);
@@ -287,10 +288,10 @@ export default function InventairePage() {
         // Load previous closed inventory for comparison + theoretical stock
         const prevClosed = list.find(i => i.statut === "cloture");
         if (prevClosed && !cancelled) {
-          const { data: prevLignes } = await supabase
+          const { data: prevLignes } = await toutesLesPages((de, a) => supabase
             .from("inventaire_lignes")
             .select("ingredient_id, quantite")
-            .eq("inventaire_id", prevClosed.id);
+            .eq("inventaire_id", prevClosed.id).order("id").range(de, a));
           const pMap: Record<string, number> = {};
           for (const l of prevLignes ?? []) {
             if (l.ingredient_id && l.quantite > 0) pMap[l.ingredient_id] = (pMap[l.ingredient_id] ?? 0) + l.quantite;
@@ -299,11 +300,11 @@ export default function InventairePage() {
 
           // Theoretical stock = prev qty + receptions - ventes since prev inventory date
           const prevDate = prevClosed.date;
-          const { data: movements } = await supabase
+          const { data: movements } = await toutesLesPages((de, a) => supabase
             .from("stock_movements")
             .select("ingredient_id, type, quantity")
             .eq("etablissement_id", reloadKey)
-            .gte("created_at", prevDate);
+            .gte("created_at", prevDate).order("id").range(de, a));
           if (!cancelled && movements) {
             const theo: Record<string, number> = { ...pMap };
             for (const m of movements as { ingredient_id: string; type: string; quantity: number }[]) {
@@ -605,9 +606,10 @@ export default function InventairePage() {
     await supabase.from("storage_zones").delete().eq("id", zone.id);
     const zList = await loadZones();
     if (count > 0) {
-      let q = supabase.from("ingredients").select("*").eq("is_active", true).order("name");
-      if (etab?.id) q = q.eq("etablissement_id", etab.id);
-      const { data } = await q;
+      const { data } = await toutesLesPages((de, a) => {
+        const r = supabase.from("ingredients").select("*").eq("is_active", true);
+        return (etab?.id ? r.eq("etablissement_id", etab.id) : r).order("name").order("id").range(de, a);
+      });
       setIngredients((data ?? []) as Ingredient[]);
     }
     if (activeZone === zone.name) {

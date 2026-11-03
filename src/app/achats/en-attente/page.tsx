@@ -52,7 +52,7 @@ function Contenu() {
     if (fiches) return;
     const out: Array<{ id: string; name: string; category: string | null; supplier_sku: string | null }> = [];
     for (let from = 0; ; from += 1000) {
-      const { data } = await supabase.from("ingredients").select("id, name, category, supplier_sku").eq("is_active", true).order("name").range(from, from + 999);
+      const { data } = await supabase.from("ingredients").select("id, name, category, supplier_sku").eq("is_active", true).order("name").order("id").range(from, from + 999);
       out.push(...((data ?? []) as typeof out));
       if (!data || data.length < 1000) break;
     }

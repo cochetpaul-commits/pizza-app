@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -82,7 +83,7 @@ export function CoursesPersonnel({ bureau }: { bureau: boolean }) {
       const ids = liste.map((x) => x.id);
       const res: Ligne[] = [];
       for (let i = 0; i < ids.length && cles.size; i += 200) {
-        const { data } = await supabase.from("supplier_invoice_lines").select("name, quantity, unit, total_price, invoice_id").in("invoice_id", ids.slice(i, i + 200));
+        const { data } = await toutesLesPages((de, a) => supabase.from("supplier_invoice_lines").select("name, quantity, unit, total_price, invoice_id").in("invoice_id", ids.slice(i, i + 200)).order("id").range(de, a));
         for (const l of (data ?? []) as { name: string | null; quantity: number | null; unit: string | null; total_price: number | null; invoice_id: string }[]) {
           if (!estLignePersonnel(l.name, cles)) continue;
           const f = parFacture.get(l.invoice_id);

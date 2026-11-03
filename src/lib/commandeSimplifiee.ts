@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { zonesPour, type ZoneEtabRow } from "@/lib/zonesEtablissement";
 import { libelleColisage, libelleElement, nomUnite, prixUniteCommande, type CommandeArticle, type OffrePrix, type UniteCommande } from "@/lib/commandeArticles";
 import { calculerHabituels, lignesCommandesNonFacturees, type AchatBrut, type FactureCouvrante, type RegleArticle } from "@/lib/commandeHabituels";
@@ -175,9 +176,14 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
   const dateFacture = new Map((factures ?? []).map((x) => [x.id as string, String(x.invoice_date)]));
   const couvrantes = new Map<string, FactureCouvrante>();
   if (dateFacture.size) {
-    const { data: lignesFact } = await supabaseAdmin.from("supplier_invoice_lines")
-      .select("invoice_id, sku, total_price").in("invoice_id", [...dateFacture.keys()]);
-    for (const l of lignesFact ?? []) {
+    // 03/11/2026 : par pages et par paquets d'identifiants (Mael, 90 jours : 1 023 lignes)
+    const idsFact = [...dateFacture.keys()], lignesFact: { invoice_id: string; sku: string | null; total_price: number | null }[] = [];
+    for (let i = 0; i < idsFact.length; i += 150) {
+      const { data } = await toutesLesPages<{ invoice_id: string; sku: string | null; total_price: number | null }>((de, a) => supabaseAdmin.from("supplier_invoice_lines")
+        .select("invoice_id, sku, total_price").in("invoice_id", idsFact.slice(i, i + 150)).order("id").range(de, a));
+      lignesFact.push(...data);
+    }
+    for (const l of lignesFact) {
       const ing = l.sku ? offres.produitParRef.get(l.sku) : undefined;
       const date = dateFacture.get(l.invoice_id as string);
       if (!ing || !date) continue;

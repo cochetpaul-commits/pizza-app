@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { etabAccessDenied } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -33,23 +34,18 @@ export async function GET(req: NextRequest) {
     // Paginate to get all rows (Supabase max ~1000 per request)
     const PAGE = 1000;
     const allRows: { date_service: string; ht: number; ttc: number; couverts: number; num_fiscal: string }[] = [];
-    let offset = 0;
-    let hasMore = true;
-    while (hasMore) {
-      const { data: page } = await supabase.from("ventes_lignes")
-        .select("date_service, ht, ttc, couverts, num_fiscal")
-        .eq("etablissement_id", etabId)
-        .gte("date_service", from)
-        .lte("date_service", to)
-        .eq("type_ligne", "Produit")
-        .eq("annule", false)
-        .order("date_service")
-        .range(offset, offset + PAGE - 1);
-      const batch = (page ?? []) as typeof allRows;
-      allRows.push(...batch);
-      hasMore = batch.length === PAGE;
-      offset += PAGE;
-    }
+    // 03/11/2026 : ordre strict (date_service seul n'est pas unique) et erreur remontée
+    const lu = await toutesLesPages<(typeof allRows)[number]>((de, a) => supabase.from("ventes_lignes")
+      .select("date_service, ht, ttc, couverts, num_fiscal")
+      .eq("etablissement_id", etabId)
+      .gte("date_service", from)
+      .lte("date_service", to)
+      .eq("type_ligne", "Produit")
+      .eq("annule", false)
+      .order("date_service").order("id")
+      .range(de, a), PAGE);
+    if (lu.error) return NextResponse.json({ error: lu.error.message }, { status: 500 });
+    allRows.push(...lu.data);
 
     const rows = allRows;
 

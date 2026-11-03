@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
@@ -38,12 +39,12 @@ export async function GET(req: NextRequest) {
   // 2. Get inventory lines (starting quantities)
   let invLines: { ingredient_id: string; quantite: number; unite: string | null }[] = [];
   if (invId) {
-    let q = supabaseAdmin
-      .from("inventaire_lignes")
-      .select("ingredient_id, quantite, unite")
-      .eq("inventaire_id", invId);
-    if (ingredientId) q = q.eq("ingredient_id", ingredientId);
-    const { data } = await q;
+    // 03/11/2026 : par pages (1 456 lignes au dernier inventaire, 4 210 mouvements depuis : tout passait au delà de 1 000)
+    const q = () => {
+      const r = supabaseAdmin.from("inventaire_lignes").select("ingredient_id, quantite, unite").eq("inventaire_id", invId);
+      return ingredientId ? r.eq("ingredient_id", ingredientId) : r;
+    };
+    const { data } = await toutesLesPages((de, a) => q().order("id").range(de, a));
     invLines = (data ?? []).map((l) => ({
       ingredient_id: l.ingredient_id,
       quantite: Number(l.quantite),
@@ -52,13 +53,13 @@ export async function GET(req: NextRequest) {
   }
 
   // 3. Get all stock movements since the inventory (or all if no inventory)
-  let movQ = supabaseAdmin
-    .from("stock_movements")
-    .select("ingredient_id, type, quantity, unit")
-    .eq("etablissement_id", etabId);
-  if (invDate) movQ = movQ.gte("created_at", invDate);
-  if (ingredientId) movQ = movQ.eq("ingredient_id", ingredientId);
-  const { data: movements } = await movQ;
+  const movQ = () => {
+    let r = supabaseAdmin.from("stock_movements").select("ingredient_id, type, quantity, unit").eq("etablissement_id", etabId);
+    if (invDate) r = r.gte("created_at", invDate);
+    if (ingredientId) r = r.eq("ingredient_id", ingredientId);
+    return r;
+  };
+  const { data: movements } = await toutesLesPages((de, a) => movQ().order("id").range(de, a));
 
   // 4. Build stock map: ingredient_id → { stock, unit, receptions, ventes }
   const stockMap = new Map<string, { stock: number; unit: string | null; receptions: number; ventes: number }>();

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import { inChunks } from "@/lib/supabaseChunks";
@@ -30,14 +31,16 @@ export async function POST(req: NextRequest) {
   }
 
   // 1. Get all sales lines for the period
-  const { data: ventes, error: ventesErr } = await supabaseAdmin
+  // 03/11/2026 : lu par pages (1 000 lignes sur 7 400 en 30 jours, les mouvements « vente » étaient réécrits à partir de 13 % des ventes)
+  const { data: ventes, error: ventesErr } = await toutesLesPages<{ description: string | null; quantite: number | null }>((de, a) => supabaseAdmin
     .from("ventes_lignes")
     .select("description, quantite")
     .eq("etablissement_id", etabId)
     .eq("type_ligne", "Produit")
     .eq("annule", false)
     .gte("date_service", date_from)
-    .lte("date_service", date_to);
+    .lte("date_service", date_to)
+    .order("id").range(de, a));
 
   if (ventesErr) return NextResponse.json({ error: ventesErr.message }, { status: 500 });
 

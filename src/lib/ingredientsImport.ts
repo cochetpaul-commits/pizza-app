@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { CATEGORIES } from "@/types/ingredients";
 import { COLS, EDITABLE, HEADER_TO_KEY, SHEET_PRODUITS, UNITES_BASE, boolIn, numIn, estabsIn, allergensIn, statusIn, norm, prixDepuisOffre, prixBaseIn, dateIn, type ColKey, type PrixBase } from "@/lib/ingredientsSheet";
 
@@ -38,7 +39,9 @@ export async function importerClasseur(sheetRows: Record<string, unknown>[], mod
   // Zones PAR ÉTABLISSEMENT : `${etabId}|${nom normalisé}` → nom exact
   const { data: zones } = await supabaseAdmin.from("storage_zones").select("name, etablissement_id");
   const zoneByNorm = new Map((zones ?? []).map((z) => [`${z.etablissement_id}|${norm(z.name)}`, z.name as string]));
-  const { data: offersAll } = await supabaseAdmin.from("supplier_offers").select("*").eq("is_active", true).order("created_at", { ascending: false }).range(0, 4999);
+  const { data: offersAll, error: errOffres } = await toutesLesPages((de, a) => supabaseAdmin.from("supplier_offers").select("*").eq("is_active", true).order("created_at", { ascending: false }).order("id").range(de, a));
+  // 03/11/2026 : par pages (1 414 offres) ; sans la liste complète, le rapprochement des références serait faux
+  if (errOffres) throw new Error(`Lecture des offres : ${errOffres.message}`);
   const offerBy = new Map<string, Record<string, unknown>>();
   for (const o of (offersAll ?? []) as Record<string, unknown>[]) if (!offerBy.has(o.ingredient_id as string)) offerBy.set(o.ingredient_id as string, o);
   const nbOffresActives = new Map<string, number>();

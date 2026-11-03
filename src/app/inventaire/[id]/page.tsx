@@ -7,7 +7,7 @@ import { RequireRole } from "@/components/RequireRole";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { ModalNonComptes } from "@/components/inventaire/ModalNonComptes";
-import { inChunks } from "@/lib/supabaseChunks";
+import { inChunks, toutesLesPages } from "@/lib/supabaseChunks";
 import { useProfile } from "@/lib/ProfileContext";
 import { libelleZone } from "@/lib/commandeArticles";
 import { articleDeFiche, categorieDeFamille, choisirConditionnement, conditionnementDArticle, ficheDepuisCreation, totalLigne, type ArticleFournisseur, type Conditionnement, type CreationProduit, type FicheConditionnement, type OffreActive } from "@/lib/inventaire";
@@ -126,8 +126,9 @@ function Feuille() {
     const [{ data: z }, { data: e }, { data: ls }, { data: ry }] = await Promise.all([
       supabase.from("storage_zones").select("name, display_order").eq("etablissement_id", invRow.etablissement_id).order("display_order"),
       supabase.from("etablissements").select("nom, slug").eq("id", invRow.etablissement_id).maybeSingle(),
-      supabase.from("inventaire_lignes").select("id, ingredient_id, zone, ordre, famille, colis, unites, quantite, unite, cond_contenu, cond_libelle, retiree, nom_feuille, rattachement")
-        .eq("inventaire_id", id).order("ordre", { ascending: true, nullsFirst: false }).limit(5000),
+      // 03/11/2026 : par pages, l'inventaire du 30/09 a 1 456 lignes (les 456 dernières manquaient)
+      toutesLesPages((de, a) => supabase.from("inventaire_lignes").select("id, ingredient_id, zone, ordre, famille, colis, unites, quantite, unite, cond_contenu, cond_libelle, retiree, nom_feuille, rattachement")
+        .eq("inventaire_id", id).order("ordre", { ascending: true, nullsFirst: false }).order("id").range(de, a)),
       supabase.from("rayons_commande").select("code, libelle, ordre").order("ordre"),
     ]);
     const ids = [...new Set((ls ?? []).map((l) => l.ingredient_id as string))];

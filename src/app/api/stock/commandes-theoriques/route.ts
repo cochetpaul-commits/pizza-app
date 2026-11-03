@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
@@ -47,22 +48,22 @@ export async function GET(req: NextRequest) {
   // Inventory lines
   const stockMap = new Map<string, number>();
   if (invId) {
-    const { data: invLines } = await supabaseAdmin
+    const { data: invLines } = await toutesLesPages((de, a) => supabaseAdmin
       .from("inventaire_lignes")
       .select("ingredient_id, quantite")
-      .eq("inventaire_id", invId);
+      .eq("inventaire_id", invId).order("id").range(de, a));
     for (const l of invLines ?? []) {
       stockMap.set(l.ingredient_id, Number(l.quantite));
     }
   }
 
   // Stock movements since inventory
-  let movQ = supabaseAdmin
-    .from("stock_movements")
-    .select("ingredient_id, quantity")
-    .eq("etablissement_id", etabId);
-  if (invDate) movQ = movQ.gte("created_at", invDate);
-  const { data: movements } = await movQ;
+  // 03/11/2026 : par pages, les lectures dépassaient 1 000 lignes
+  const movQ = () => {
+    const r = supabaseAdmin.from("stock_movements").select("ingredient_id, quantity").eq("etablissement_id", etabId);
+    return invDate ? r.gte("created_at", invDate) : r;
+  };
+  const { data: movements } = await toutesLesPages((de, a) => movQ().order("id").range(de, a));
   for (const m of movements ?? []) {
     stockMap.set(m.ingredient_id, (stockMap.get(m.ingredient_id) ?? 0) + Number(m.quantity));
   }
@@ -74,13 +75,13 @@ export async function GET(req: NextRequest) {
   const from30 = thirtyDaysAgo.toISOString().slice(0, 10);
   const toNow = now.toISOString().slice(0, 10);
 
-  const { data: recentMovements } = await supabaseAdmin
+  const { data: recentMovements } = await toutesLesPages((de, a) => supabaseAdmin
     .from("stock_movements")
     .select("ingredient_id, quantity")
     .eq("etablissement_id", etabId)
     .eq("type", "vente")
     .gte("created_at", `${from30}T00:00:00`)
-    .lte("created_at", `${toNow}T23:59:59`);
+    .lte("created_at", `${toNow}T23:59:59`).order("id").range(de, a));
 
   const consumption30 = new Map<string, number>();
   for (const m of recentMovements ?? []) {

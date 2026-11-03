@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { createClient } from "@supabase/supabase-js";
 import React from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
@@ -142,7 +143,7 @@ export async function GET() {
     ] = await Promise.all([
       supabase.from("kitchen_recipes").select("id, name, category, description_courte, in_catalogue, is_active, output_ingredient_id"),
       supabase.from("kitchen_recipe_lines").select("recipe_id, ingredient_id"),
-      supabase.from("ingredients").select("id, name, allergens, category"),
+      toutesLesPages((de, a) => supabase.from("ingredients").select("id, name, allergens, category").order("id").range(de, a)), // 03/11 : 1 933 ingrédients, allergènes manquants au delà de 1 000
       supabase.from("popina_products").select("id, price_ttc, kitchen_recipe_id").eq("active", true),
       supabase.from("recipe_pairings").select("recipe_id, recipe_type, ingredient_id"),
     ]);

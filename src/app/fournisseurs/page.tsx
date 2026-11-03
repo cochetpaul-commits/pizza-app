@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { getSupplierColor } from "@/lib/supplierColors";
@@ -189,7 +190,7 @@ export default function FournisseursPage() {
 
     const [supRes, offRes, invRes] = await Promise.all([
       supQuery,
-      supabase.from("v_latest_offers").select("supplier_id"),
+      toutesLesPages((de, a) => supabase.from("v_latest_offers").select("supplier_id").order("ingredient_id").order("supplier_id").range(de, a)),
       invQuery,
     ]);
 

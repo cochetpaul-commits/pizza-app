@@ -36,3 +36,23 @@ export async function inChunks<T>(
   }
   return { data, error };
 }
+
+/**
+ * Toutes les lignes d'une requête, page par page (03/11/2026). PostgREST rend au plus 1 000 lignes par appel,
+ * `.limit(5000)` ou `.range(0, 4999)` compris : au-delà, la fin manque sans erreur. `run(de, a)` renvoie la requête
+ * avec un ordre unique (par exemple `.order("id")`) et `.range(de, a)`. Une page en erreur arrête la lecture et
+ * remonte l'erreur : jamais de liste partielle présentée comme complète.
+ */
+export async function toutesLesPages<T>(
+  run: (de: number, a: number) => PromiseLike<Res<T>>,
+  page = 1000,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const data: T[] = [];
+  for (let de = 0; ; de += page) {
+    const r = await run(de, de + page - 1);
+    if (r.error) return { data, error: { message: r.error.message } };
+    const lot = r.data ?? [];
+    data.push(...lot);
+    if (lot.length < page) return { data, error: null };
+  }
+}

@@ -64,12 +64,14 @@ async function fetchRange(etabId: string, from: string, to: string): Promise<Row
     .order("ouvert_a", { ascending: true })
     .order("id", { ascending: true });
 
-  const { count } = await supabase
+  const { count, error: errCompte } = await supabase
     .from("ventes_lignes")
     .select("id", { count: "exact", head: true })
     .eq("etablissement_id", etabId)
     .gte("date_service", from)
     .lte("date_service", to);
+  // 03/11/2026 : un comptage en échec donnait « aucune vente », mis en cache
+  if (errCompte) throw new Error(`Comptage des ventes : ${errCompte.message}`);
   const total = count ?? 0;
   if (total === 0) return [];
 

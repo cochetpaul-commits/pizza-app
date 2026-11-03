@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   getParisDate, dateToISOWeek, isoWeekToMonday, fmtDateUTC,
@@ -95,20 +96,18 @@ export async function GET(request: NextRequest) {
   // ── Fetch sales from ventes_lignes ──
   const PAGE = 1000;
   const allVentes: { date_service: string; description: string; categorie: string; quantite: number; ttc: number }[] = [];
-  let vOff = 0;
-  let vMore = true;
-  while (vMore) {
-    const { data: vd } = await supabaseAdmin
+  {
+    // 03/11/2026 : ordre strict et erreur remontée
+    const lu = await toutesLesPages<(typeof allVentes)[number]>((de, a) => supabaseAdmin
       .from("ventes_lignes")
       .select("date_service,description,categorie,quantite,ttc")
       .eq("etablissement_id", etabId)
       .eq("type_ligne", "Produit")
       .gte("date_service", weekDates[0])
       .lte("date_service", fetchTo)
-      .range(vOff, vOff + PAGE - 1);
-    allVentes.push(...(vd ?? []));
-    vMore = (vd?.length ?? 0) === PAGE;
-    vOff += PAGE;
+      .order("id").range(de, a), PAGE);
+    if (lu.error) return NextResponse.json({ error: lu.error.message }, { status: 500 });
+    allVentes.push(...lu.data);
   }
 
   const prodSales = new Map<string, { quantity: number; totalSales: number; category: string }>();
@@ -202,20 +201,18 @@ export async function GET(request: NextRequest) {
 
   // Fetch prev week from ventes_lignes
   const prevVentes: typeof allVentes = [];
-  let pvOff = 0;
-  let pvMore = true;
-  while (pvMore) {
-    const { data: pvd } = await supabaseAdmin
+  {
+    // 03/11/2026 : ordre strict et erreur remontée
+    const lu = await toutesLesPages<(typeof allVentes)[number]>((de, a) => supabaseAdmin
       .from("ventes_lignes")
       .select("date_service,description,categorie,quantite,ttc")
       .eq("etablissement_id", etabId)
       .eq("type_ligne", "Produit")
       .gte("date_service", prevWeekDates[0])
       .lte("date_service", prevFetchTo)
-      .range(pvOff, pvOff + PAGE - 1);
-    prevVentes.push(...(pvd ?? []));
-    pvMore = (pvd?.length ?? 0) === PAGE;
-    pvOff += PAGE;
+      .order("id").range(de, a), PAGE);
+    if (lu.error) return NextResponse.json({ error: lu.error.message }, { status: 500 });
+    prevVentes.push(...lu.data);
   }
 
   let prevTotalCA = 0;

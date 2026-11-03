@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { etabAccessDenied } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { pennylaneConfigured } from "@/lib/pennylane/api";
@@ -192,10 +193,11 @@ export async function GET(req: NextRequest) {
   // ── 6b. Détail Pennylane : poste → catégorie → factures / transactions ──
   type DetailRow = { date: string | null; poste: string; categorie: string; fournisseur: string | null; libelle: string | null; montant_ht: number; type: string };
   const [{ data: detailHorsPaie }, { data: detailPaie }] = await Promise.all([
-    supabaseAdmin.from("charges_detail").select("date, poste, categorie, fournisseur, libelle, montant_ht, type").eq("etablissement_id", etabId)
-      .neq("poste", "masse_salariale").gte("mois", moisFrom).lte("mois", to).order("date", { ascending: false }),
-    supabaseAdmin.from("charges_detail").select("date, poste, categorie, fournisseur, libelle, montant_ht, type").eq("etablissement_id", etabId)
-      .eq("poste", "masse_salariale").gte("mois", moisPlus(moisFrom, 1)).lte("mois", moisPlus(to, 1)).order("date", { ascending: false }),
+    // 03/11/2026 : par pages, environ 100 lignes par mois : sur 12 mois, les plus anciens mois manquaient
+    toutesLesPages<DetailRow>((de, a) => supabaseAdmin.from("charges_detail").select("date, poste, categorie, fournisseur, libelle, montant_ht, type").eq("etablissement_id", etabId)
+      .neq("poste", "masse_salariale").gte("mois", moisFrom).lte("mois", to).order("date", { ascending: false }).order("id").range(de, a)),
+    toutesLesPages<DetailRow>((de, a) => supabaseAdmin.from("charges_detail").select("date, poste, categorie, fournisseur, libelle, montant_ht, type").eq("etablissement_id", etabId)
+      .eq("poste", "masse_salariale").gte("mois", moisPlus(moisFrom, 1)).lte("mois", moisPlus(to, 1)).order("date", { ascending: false }).order("id").range(de, a)),
   ]);
   const detailRows = [...(detailHorsPaie ?? []), ...(detailPaie ?? [])];
   const postesMap = new Map<string, { poste: string; libelle: string; total: number; cats: Map<string, { categorie: string; total: number; lignes: { date: string | null; fournisseur: string | null; libelle: string | null; montant: number; type: string }[] }> }>();

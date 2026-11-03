@@ -1,5 +1,6 @@
 "use client";
 
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRecipeDraft } from "@/lib/useRecipeDraft";
 import { useRouter } from "next/navigation";
@@ -295,12 +296,13 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       if (!auth.user) { setStatus("error"); setError({ message: "NOT_LOGGED" }); return; }
 
       const myEstab = etab.current?.slug?.includes("piccola") ? "piccola" : "bellomio";
-      const ingsQ = supabase.from("ingredients").select("*").eq("is_active", true)
+      const ingsQ = () => supabase.from("ingredients").select("*").eq("is_active", true)
         .or(`establishments.cs.{"${myEstab}"},establishments.is.null`);
       const doughQ = supabase.from("recipes").select("id,name,type,total_cost,yield_grams,ball_weight");
-      const offQ = supabase.from("v_latest_offers").select("*");
+      // 03/11/2026 : par pages, 1 142 ingrédients et 1 402 offres dépassaient la limite de 1 000 lignes
+      const offQ = toutesLesPages((de, a) => supabase.from("v_latest_offers").select("*").order("ingredient_id").order("supplier_id").range(de, a));
       const [{ data: ingsData, error: iErr }, { data: offers }, { data: doughs }] = await Promise.all([
-        ingsQ.order("name"),
+        toutesLesPages((de, a) => ingsQ().order("name").order("id").range(de, a)),
         offQ,
         doughQ.order("created_at", { ascending: false }),
       ]);

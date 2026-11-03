@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 
 import React, { Suspense, useEffect, useState, useMemo, type CSSProperties } from "react";
 import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleSousCategorie, styleTitreCategorie, couleurTexteSur } from "@/lib/styleCategories";
@@ -203,12 +204,13 @@ function AchatsContent() {
     (async () => {
       setLoading(true);
       // Couleurs et factures en parallèle (30/10/2026)
-      const [, { data }] = await Promise.all([loadSupplierColors(supabase), supabase
+      // 03/11/2026 : par pages (range(0, 4999) reste coupé à 1 000 par le serveur)
+      const [, { data }] = await Promise.all([loadSupplierColors(supabase), toutesLesPages((de, a) => supabase
         .from("supplier_invoices")
         .select("id, invoice_number, invoice_date, total_ht, total_ttc, supplier_id, suppliers(name)")
         .eq("etablissement_id", etabId)
         .order("invoice_date", { ascending: false })
-        .range(0, 4999)]);
+        .order("id").range(de, a))]);
       setAllInvoices((data ?? []) as unknown as InvoiceRow[]);
       setLoading(false);
     })();
@@ -251,11 +253,11 @@ function AchatsContent() {
       type LigneFacture = { name: string | null; quantity: number | null; unit: string | null; unit_price: number | null; total_price: number | null; invoice_id: string };
       const paquets: string[][] = [];
       for (let i = 0; i < ids.length; i += chunkSize) paquets.push(ids.slice(i, i + chunkSize));
-      const reponses = await Promise.all(paquets.map((chunk) => supabase
+      const reponses = await Promise.all(paquets.map((chunk) => toutesLesPages((de, a) => supabase
         .from("supplier_invoice_lines")
         .select("name, quantity, unit, unit_price, total_price, invoice_id")
         .in("invoice_id", chunk)
-        .range(0, 4999)));
+        .order("id").range(de, a))));
       const allLines: LigneFacture[] = reponses.flatMap((r) => (r.data ?? []) as LigneFacture[]);
       const invSupplierMap: Record<string, string> = {};
       for (const inv of rangeInvoices) {

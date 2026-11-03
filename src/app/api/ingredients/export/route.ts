@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import * as XLSX from "xlsx";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { roleDenied } from "@/lib/getEtablissement";
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
   }
 
   const [{ data: offers }, { data: suppliers }, { data: zones }, { data: etabsRows }] = await Promise.all([
-    supabaseAdmin.from("supplier_offers").select("*").eq("is_active", true).order("created_at", { ascending: false }).range(0, 4999),
+    toutesLesPages((de, a) => supabaseAdmin.from("supplier_offers").select("*").eq("is_active", true).order("created_at", { ascending: false }).order("id").range(de, a)), // 03/11 : 1 414 offres actives, coupées à 1 000
     supabaseAdmin.from("suppliers").select("id, name"),
     supabaseAdmin.from("storage_zones").select("name, etablissement_id").order("display_order"),
     supabaseAdmin.from("etablissements").select("id, slug"),
@@ -50,7 +51,8 @@ export async function GET(req: NextRequest) {
   const etabKey = new Map((etabsRows ?? []).map((e) => [e.id as string, String(e.slug).includes("piccola") ? "piccola" : "bellomio"]));
   const acheteChez = new Map<string, Set<string>>();
   for (let from = 0; ; from += 1000) {
-    const { data } = await supabaseAdmin.from("supplier_offers").select("ingredient_id, etablissement_id").not("etablissement_id", "is", null).range(from, from + 999);
+    const { data, error } = await supabaseAdmin.from("supplier_offers").select("ingredient_id, etablissement_id").not("etablissement_id", "is", null).order("id").range(from, from + 999);
+    if (error) throw new Error(`Lecture des offres : ${error.message}`);
     for (const o of (data ?? []) as { ingredient_id: string; etablissement_id: string }[]) {
       const k = etabKey.get(o.etablissement_id);
       if (!k) continue;
@@ -63,7 +65,8 @@ export async function GET(req: NextRequest) {
   // Zones de stockage PAR ÉTABLISSEMENT (ingredient_zones, rang 1 / 2)
   const zonesParEtab = new Map<string, string>(); // `${ingredient_id}|${bellomio|piccola}|${rang}` → zone
   for (let from = 0; ; from += 1000) {
-    const { data } = await supabaseAdmin.from("ingredient_zones").select("ingredient_id, etablissement_id, zone, rang").not("rang", "is", null).range(from, from + 999);
+    const { data, error } = await supabaseAdmin.from("ingredient_zones").select("ingredient_id, etablissement_id, zone, rang").not("rang", "is", null).order("ingredient_id").order("etablissement_id").order("rang").order("zone").range(from, from + 999);
+    if (error) throw new Error(`Lecture des zones : ${error.message}`);
     for (const z of (data ?? []) as { ingredient_id: string; etablissement_id: string; zone: string; rang: number }[]) {
       const k = etabKey.get(z.etablissement_id);
       if (k) zonesParEtab.set(`${z.ingredient_id}|${k}|${z.rang}`, z.zone);

@@ -1,5 +1,6 @@
 "use client";
 
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -249,13 +250,14 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { setStatus("error"); setError({ message: "NOT_LOGGED" }); return; }
 
-      const ingsQ = supabase
+      const ingsQ = () => supabase
         .from("ingredients")
         .select("*")
         .eq("is_active", true);
-      const offQ = supabase.from("v_latest_offers").select("*");
+      // 03/11/2026 : par pages, 1 142 ingrédients et 1 402 offres dépassaient la limite de 1 000 lignes
+      const offQ = toutesLesPages((de, a) => supabase.from("v_latest_offers").select("*").order("ingredient_id").order("supplier_id").range(de, a));
       const [{ data: ingsData }, { data: offersData }] = await Promise.all([
-        ingsQ.order("name"),
+        toutesLesPages((de, a) => ingsQ().order("name").order("id").range(de, a)),
         offQ,
       ]);
       if (cancelled) return;

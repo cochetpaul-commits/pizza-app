@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -146,8 +147,10 @@ async function fetchCaTickets(etabId: string, from: string, to: string): Promise
 }
 
 async function fetchJourCategorie(etabId: string, from: string, to: string): Promise<{ jour: string; categorie: string; ca_ttc: number }[]> {
-  const { data } = await supabase.rpc("ventes_par_jour_categorie", { p_etab: etabId, p_from: from, p_to: to });
-  return (data ?? []) as { jour: string; categorie: string; ca_ttc: number }[];
+  // 03/11/2026 : par pages ; sur une année (2 166 lignes) plus de la moitié du graphique manquait
+  const { data } = await toutesLesPages<{ jour: string; categorie: string; ca_ttc: number }>((de, a) =>
+    supabase.rpc("ventes_par_jour_categorie", { p_etab: etabId, p_from: from, p_to: to }).order("jour").order("categorie").range(de, a));
+  return data;
 }
 
 function GroupContent() {

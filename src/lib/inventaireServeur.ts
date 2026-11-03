@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { CAT_LABELS, type Category } from "@/types/ingredients";
 import { articleDeFiche, categorieDeFamille, choisirConditionnement, comptageFeuille, conditionnementDArticle, ficheDepuisCreation, lireFeuille, totalLigne, uniteFicheDe, UUID, type ArticleFournisseur, type Conditionnement, type CreationProduit, type FicheConditionnement, type OffreActive } from "@/lib/inventaire";
 import { figerValorisation } from "@/lib/inventaireValoServeur";
@@ -60,13 +61,10 @@ const normNom = (x: unknown) => String(x ?? "").normalize("NFD").replace(/[̀-ͯ
 type FicheCourte = { id: string; name: string; is_active: boolean; etablissement_id: string; updated_at: string; status_note: string | null };
 
 async function toutesLesFiches(): Promise<FicheCourte[]> {
-  const toutes: FicheCourte[] = [];
-  for (let p = 0; p < 50; p++) {
-    const { data } = await supabaseAdmin.from("ingredients").select("id, name, is_active, etablissement_id, updated_at, status_note").range(p * 1000, p * 1000 + 999);
-    toutes.push(...((data ?? []) as FicheCourte[]));
-    if (!data || data.length < 1000) break;
-  }
-  return toutes;
+  // 03/11/2026 : ordre strict et erreur remontée (une liste partielle créerait des fiches en double)
+  const { data, error } = await toutesLesPages<FicheCourte>((de, a) => supabaseAdmin.from("ingredients").select("id, name, is_active, etablissement_id, updated_at, status_note").order("id").range(de, a));
+  if (error) throw new Error(`Lecture des fiches : ${error.message}`);
+  return data;
 }
 
 /**

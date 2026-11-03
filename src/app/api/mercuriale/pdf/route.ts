@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { toutesLesPages } from "@/lib/supabaseChunks";
 import { createClient } from "@supabase/supabase-js";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
@@ -59,11 +60,11 @@ export async function POST(req: Request) {
     if (!auth2?.user) return NextResponse.json({ message: "Non authentifié" }, { status: 401 });
 
     // Fetch ingrédients
-    const { data: ings, error: ingErr } = await supabase
+    const { data: ings, error: ingErr } = await toutesLesPages((de, a) => supabase
       .from("ingredients")
       .select("id,name,category,is_active")
       .eq("is_active", true)
-      .order("name", { ascending: true });
+      .order("name", { ascending: true }).order("id").range(de, a));
     if (ingErr) return NextResponse.json({ message: ingErr.message }, { status: 500 });
 
     // Fetch fournisseurs (all, not just this etab, to resolve names)
@@ -91,18 +92,18 @@ export async function POST(req: Request) {
     // (v_latest_offers only keeps ONE offer per ingredient, which may be from another supplier)
     let offers: Record<string, unknown>[];
     if (filterSupplier !== "all") {
-      const { data, error: offErr } = await supabase
+      const { data, error: offErr } = await toutesLesPages((de, a) => supabase
         .from("supplier_offers")
         .select("ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,updated_at,establishment")
         .eq("is_active", true)
         .in("supplier_id", supplierIds)
-        .order("updated_at", { ascending: false });
+        .order("updated_at", { ascending: false }).order("id").range(de, a));
       if (offErr) return NextResponse.json({ message: offErr.message }, { status: 500 });
       offers = (data ?? []) as Record<string, unknown>[];
     } else {
-      const { data, error: offErr } = await supabase
+      const { data, error: offErr } = await toutesLesPages((de, a) => supabase
         .from("v_latest_offers")
-        .select("ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,updated_at");
+        .select("ingredient_id,supplier_id,unit,unit_price,pack_price,pack_total_qty,pack_unit,pack_count,pack_each_qty,pack_each_unit,density_kg_per_l,piece_weight_g,updated_at").order("ingredient_id").order("supplier_id").range(de, a));
       if (offErr) return NextResponse.json({ message: offErr.message }, { status: 500 });
       offers = (data ?? []) as Record<string, unknown>[];
     }
