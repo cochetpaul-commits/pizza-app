@@ -138,36 +138,37 @@ export function AccueilEtablissement({ slug, couleur, evenements = false }: { sl
     if (!etab) return;
     let annule = false;
     (async () => {
-      const [deuxSemaines, cpt, achatsPl, shiftsRes, meteoRes, produits, cmd, evts] = await Promise.all([
-        canSeePilotage ? supabase.rpc("accueil_ventes_jour", { p_etab: etab.id, p_from: shift(semaineDebut, -7), p_to: today }) : Promise.resolve({ data: [] }),
-        supabase.rpc("accueil_compteurs", { p_etab: etab.id, p_debut_mois: moisDebut }),
-        // Achats matières Pennylane du mois : le même chiffre que Marge et Résultat (29/10)
-        canSeePilotage ? supabase.from("charges_detail").select("montant_ht").eq("etablissement_id", etab.id).eq("poste", "achats_matieres").eq("mois", moisDebut) : Promise.resolve({ data: [] }),
-        fetchApi(`/api/combo/planning-jour?date=${today}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-        fetchApi(`/api/meteo?from=${today}&to=${shift(today, 2)}`).then((r) => r.json()).catch(() => null),
-        canSeePilotage ? supabase.rpc("ventes_par_produit", { p_etab: etab.id, p_from: semaineDebut, p_to: today }) : Promise.resolve({ data: [] }),
-        supabase.from("commande_sessions").select("status, created_at, suppliers(name)").eq("etablissement_id", etab.id)
-          .in("status", ["brouillon", "en_attente", "validee", "envoyee"]).order("created_at", { ascending: false }).limit(12),
-        evenements ? supabase.from("events").select("id, name, date, covers, type").gte("date", today).order("date").limit(6) : Promise.resolve({ data: [] }),
-      ]);
-      if (annule) return;
-      setVentes((deuxSemaines.data ?? []) as VenteJour[]);
-      const c = Array.isArray(cpt.data) ? cpt.data[0] : cpt.data;
-      setCompteurs((c ?? null) as Compteurs | null);
-      const pl = (achatsPl.data ?? []) as { montant_ht: number | string | null }[];
-      setAchatsPennylane(pl.length ? { total: pl.reduce((t, r) => t + Number(r.montant_ht ?? 0), 0), nb: pl.length } : null);
-
+      // Par blocs (03/11/2026) : chaque bloc s'affiche dès que ses données arrivent, sans attendre le plus lent (Combo, météo)
+      const quand = <T,>(p: PromiseLike<T>, f: (v: T) => void) => { Promise.resolve(p).then((v) => { if (!annule) f(v); }).catch(() => undefined); };
+      if (canSeePilotage) quand(supabase.rpc("accueil_ventes_jour", { p_etab: etab.id, p_from: shift(semaineDebut, -7), p_to: today }), (r) => setVentes((r.data ?? []) as VenteJour[]));
+      quand(supabase.rpc("accueil_compteurs", { p_etab: etab.id, p_debut_mois: moisDebut }), (cpt) => {
+        const c = Array.isArray(cpt.data) ? cpt.data[0] : cpt.data;
+        setCompteurs((c ?? null) as Compteurs | null);
+      });
+      // Achats matières Pennylane du mois : le même chiffre que Marge et Résultat (29/10)
+      if (canSeePilotage) quand(supabase.from("charges_detail").select("montant_ht").eq("etablissement_id", etab.id).eq("poste", "achats_matieres").eq("mois", moisDebut), (r) => {
+        const pl = (r.data ?? []) as { montant_ht: number | string | null }[];
+        setAchatsPennylane(pl.length ? { total: pl.reduce((t, x) => t + Number(x.montant_ht ?? 0), 0), nb: pl.length } : null);
+      });
       // Équipe du jour : le planning Combo du jour (le planning n'est pas tenu dans l'application)
-      setShifts(((shiftsRes?.shifts ?? []) as Shift[]).map((r) => ({ employe: r.employe, debut: r.debut, fin: r.fin, poste: r.poste })));
-      setPlanningIndispo(!shiftsRes);
-
-      setMeteo(((meteoRes?.meteo ?? []) as { date_service: string; service: string; emoji: string; description: string; temp: number }[])
-        .map((m) => ({ date: m.date_service, service: m.service, emoji: m.emoji, desc: m.description, temp: m.temp })));
-      setTop(((produits.data ?? []) as Produit[]).filter((p) => p.categorie !== "MESSAGES").sort((x, y) => num(y.ca_ttc) - num(x.ca_ttc)).slice(0, 6));
-      setCommandes(((cmd.data ?? []) as { status: string; created_at: string; suppliers: { name: string } | { name: string }[] | null }[]).map((s) => ({
-        fournisseur: (Array.isArray(s.suppliers) ? s.suppliers[0]?.name : s.suppliers?.name) ?? "?", status: s.status, created_at: s.created_at,
-      })));
-      setEvents((evts.data ?? []) as Evenement[]);
+      quand(fetchApi(`/api/combo/planning-jour?date=${today}`).then((r) => (r.ok ? r.json() : null)).catch(() => null), (shiftsRes) => {
+        setShifts(((shiftsRes?.shifts ?? []) as Shift[]).map((r) => ({ employe: r.employe, debut: r.debut, fin: r.fin, poste: r.poste })));
+        setPlanningIndispo(!shiftsRes);
+      });
+      quand(fetchApi(`/api/meteo?from=${today}&to=${shift(today, 2)}`).then((r) => r.json()).catch(() => null), (meteoRes) => {
+        setMeteo(((meteoRes?.meteo ?? []) as { date_service: string; service: string; emoji: string; description: string; temp: number }[])
+          .map((m) => ({ date: m.date_service, service: m.service, emoji: m.emoji, desc: m.description, temp: m.temp })));
+      });
+      if (canSeePilotage) quand(supabase.rpc("ventes_par_produit", { p_etab: etab.id, p_from: semaineDebut, p_to: today }), (produits) => {
+        setTop(((produits.data ?? []) as Produit[]).filter((p) => p.categorie !== "MESSAGES").sort((x, y) => num(y.ca_ttc) - num(x.ca_ttc)).slice(0, 6));
+      });
+      quand(supabase.from("commande_sessions").select("status, created_at, suppliers(name)").eq("etablissement_id", etab.id)
+        .in("status", ["brouillon", "en_attente", "validee", "envoyee"]).order("created_at", { ascending: false }).limit(12), (cmd) => {
+        setCommandes(((cmd.data ?? []) as { status: string; created_at: string; suppliers: { name: string } | { name: string }[] | null }[]).map((x) => ({
+          fournisseur: (Array.isArray(x.suppliers) ? x.suppliers[0]?.name : x.suppliers?.name) ?? "?", status: x.status, created_at: x.created_at,
+        })));
+      });
+      if (evenements) quand(supabase.from("events").select("id, name, date, covers, type").gte("date", today).order("date").limit(6), (evts) => setEvents((evts.data ?? []) as Evenement[]));
     })();
     return () => { annule = true; };
   }, [etab, canSeePilotage, semaineDebut, moisDebut, today, evenements]);

@@ -60,7 +60,9 @@ async function fetchRange(etabId: string, from: string, to: string): Promise<Row
     .eq("etablissement_id", etabId)
     .gte("date_service", from)
     .lte("date_service", to)
-    .order("ouvert_a", { ascending: true });
+    // Ordre strict (03/11/2026) : ouvert_a seul n'est pas unique, des lignes pouvaient être lues deux fois ou sautées d'une page à l'autre
+    .order("ouvert_a", { ascending: true })
+    .order("id", { ascending: true });
 
   const { count } = await supabase
     .from("ventes_lignes")
@@ -84,7 +86,11 @@ async function fetchRange(etabId: string, from: string, to: string): Promise<Row
         return base().range(i * PAGE, i * PAGE + PAGE - 1);
       }),
     );
-    for (const p of paquet) rows.push(...((p.data ?? []) as Row[]));
+    // Une page en erreur ne donne pas un résultat partiel (qui partirait ensuite en cache) : on échoue franchement
+    for (const p of paquet) {
+      if (p.error) throw new Error(`Lecture des ventes : ${p.error.message}`);
+      rows.push(...((p.data ?? []) as Row[]));
+    }
   }
   return rows;
 }
@@ -127,15 +133,24 @@ export async function GET(req: NextRequest) {
   if (comparer === "precedente" || comparer === "an_dernier") {
     const nbJours = Math.round((Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10)) - Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10))) / 86_400_000) + 1;
     const dFrom = comparer === "an_dernier" ? fromA1 : shiftDays(from, -nbJours), dTo = comparer === "an_dernier" ? toA1 : shiftDays(to, -nbJours);
-    const stats = await statsPeriode(etabId, from, to);
     // « an_dernier » : les mêmes dates un an plus tôt (29/10/2026)
     const resume = (s: unknown) => (equipe ? resumeEquipe(s as Record<string, unknown> | null) : s);
+    // Chargement par blocs (03/11/2026) : `partie=courante` rend la période seule, tout de suite affichée,
+    // puis `partie=precedente` la période comparée (même source que la période courante)
+    const partie = searchParams.get("partie");
+    if (partie === "precedente") {
+      const prec = searchParams.get("source") === "daily_sales" ? await buildFromDailySales(etabId, dFrom, dTo) : await statsPeriode(etabId, dFrom, dTo);
+      return NextResponse.json({ prec: resume(prec) });
+    }
+    const stats = await statsPeriode(etabId, from, to);
+    if (stats && partie === "courante") return NextResponse.json({ empty: false, stats: resume(stats), prec: null, source: "lignes" });
     if (stats) {
       const prec = await statsPeriode(etabId, dFrom, dTo);
       return NextResponse.json({ empty: false, stats: resume(stats), prec: resume(prec), prev: null, prevWeek: null });
     }
     // Pas de lignes de caisse (Piccola Mia : journaux Kezia) : les ventes journalières, même comparaison (30/10/2026)
     const daily = await buildFromDailySales(etabId, from, to);
+    if (daily && partie === "courante") return NextResponse.json({ empty: false, stats: resume(daily), prec: null, source: "daily_sales" });
     if (daily) {
       const prec = await buildFromDailySales(etabId, dFrom, dTo);
       return NextResponse.json({ empty: false, stats: resume(daily), prec: resume(prec), prev: null, prevWeek: null, source: "daily_sales" });
@@ -173,7 +188,7 @@ type Stats = ReturnType<typeof aggregate>;
  * relu tel quel ; sinon les lignes sont chargées, agrégées, et le résultat remplace le cache.
  * Vécu 08/10 : chaque ouverture de la page rechargeait trois périodes complètes de lignes.
  */
-const VERSION_CALCUL = "2026-10-31a";
+const VERSION_CALCUL = "2026-11-03a"; // 03/11 : pagination à ordre strict, plus de résultat partiel en cache
 
 /** Ce que le tableau de l'équipe a le droit de voir : CA, tickets, couverts et ticket moyen par service, à emporter. Rien d'autre. */
 function resumeEquipe(s: Record<string, unknown> | null): Record<string, unknown> | null {

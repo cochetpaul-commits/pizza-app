@@ -67,18 +67,19 @@ export function useStatsVentes(range: DateRange, avecMeteo = false, equipe = fal
     if (!etabId) return;
     let annule = false;
     (async () => {
-      // Un seul appel : la période et les N jours d'avant (calculés côté serveur, mis en cache)
-      const charge = async (r: DateRange): Promise<{ stats: StatsVentes | null; prec: StatsVentes | null }> => {
-        const res = await fetchApi(`/api/ventes/stats?etablissement_id=${etabId}&from=${r.from}&to=${r.to}&comparer=${mode}${equipe ? "&equipe=1" : ""}`);
+      // Par blocs (03/11/2026) : la période d'abord, affichée dès qu'elle arrive, puis la période comparée
+      const url = (r: DateRange, suite: string) => `/api/ventes/stats?etablissement_id=${etabId}&from=${r.from}&to=${r.to}&comparer=${mode}${equipe ? "&equipe=1" : ""}${suite}`;
+      const lire = async (u: string) => {
+        const res = await fetchApi(u);
         if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Chargement impossible");
-        const j = await res.json();
-        return { stats: (j?.stats ?? null) as StatsVentes | null, prec: (j?.prec ?? null) as StatsVentes | null };
+        return res.json();
       };
       try {
-        const [{ stats, prec: precStats }, meteoRes] = await Promise.all([
-          charge(effective),
+        const [j, meteoRes] = await Promise.all([
+          lire(url(effective, "&partie=courante")),
           avecMeteo ? fetchApi(`/api/meteo?from=${range.from}&to=${range.to}`).catch(() => null) : Promise.resolve(null),
         ]);
+        const stats = (j?.stats ?? null) as StatsVentes | null;
         const meteo: Record<string, MeteoJour> = {};
         if (meteoRes && meteoRes.ok) {
           const mj = await meteoRes.json().catch(() => null);
@@ -87,7 +88,11 @@ export function useStatsVentes(range: DateRange, avecMeteo = false, equipe = fal
           }
         }
         if (annule) return;
-        setEtat({ cle, chargement: false, erreur: null, stats, prec: precStats, meteo });
+        setEtat({ cle, chargement: false, erreur: null, stats, prec: null, meteo });
+        if (!stats) return;
+        // La comparaison ensuite : en cas d'échec, la période reste affichée, sans les écarts
+        const p = await lire(url(effective, `&partie=precedente${j?.source === "daily_sales" ? "&source=daily_sales" : ""}`)).catch(() => null);
+        if (!annule) setEtat((e) => (e.cle === cle ? { ...e, prec: (p?.prec ?? null) as StatsVentes | null } : e));
       } catch (e) {
         if (!annule) setEtat({ cle, chargement: false, erreur: e instanceof Error ? e.message : "Chargement impossible", stats: null, prec: null, meteo: {} });
       }

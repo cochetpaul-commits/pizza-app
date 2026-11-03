@@ -16,13 +16,14 @@ import { SidebarContent } from "./Sidebar";
  */
 export function MenuLateral() {
   const pathname = usePathname();
-  // Ouvert « pour » une page : un changement de page le referme sans effet de synchronisation
-  const [ouvertPour, setOuvertPour] = useState<string | null>(null);
-  const ouvert = ouvertPour === pathname;
+  // Ouvert « pour » des pages : un changement de page le referme sans effet de synchronisation,
+  // sauf vers la page annoncée par un changement d'établissement (le tiroir reste ouvert, sans clignoter)
+  const [ouvertPour, setOuvertPour] = useState<string[] | null>(null);
+  const ouvert = !!ouvertPour?.includes(pathname);
   const fermer = () => setOuvertPour(null);
 
   useEffect(() => {
-    const ouvrir = () => setOuvertPour(window.location.pathname);
+    const ouvrir = () => setOuvertPour([window.location.pathname]);
     const touche = (e: KeyboardEvent) => { if (e.key === "Escape") setOuvertPour(null); };
     window.addEventListener("open-menu-lateral", ouvrir);
     window.addEventListener("keydown", touche);
@@ -38,7 +39,7 @@ export function MenuLateral() {
 
   return (
     <>
-      <button type="button" onClick={() => setOuvertPour(pathname)} aria-label="Ouvrir le menu" aria-expanded={ouvert}
+      <button type="button" onClick={() => setOuvertPour([pathname])} aria-label="Ouvrir le menu" aria-expanded={ouvert}
         style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid rgba(0,0,0,0.08)", background: "#fff", color: "#1a1a1a", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}>
         <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" /></svg>
       </button>
@@ -54,7 +55,7 @@ export function MenuLateral() {
           }}>
             <button type="button" onClick={fermer} aria-label="Fermer le menu"
               style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 10px)", right: 10, width: 32, height: 32, borderRadius: 16, border: "none", background: "rgba(0,0,0,0.06)", color: "#1a1a1a", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>×</button>
-            <SidebarContent onNaviguer={fermer} />
+            <SidebarContent onNaviguer={fermer} garderOuvert={(page) => setOuvertPour((p) => [...(p ?? [pathname]), page])} />
           </aside>
         </>,
         document.body,

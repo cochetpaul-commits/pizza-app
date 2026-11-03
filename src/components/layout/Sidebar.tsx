@@ -71,7 +71,9 @@ function isRoleAllowed(roles: Role[] | undefined, role: Role | null): boolean {
    CONTENU
    ═══════════════════════════════════════════════════════ */
 
-export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {}) {
+/** `garderOuvert` (tiroir du téléphone, 03/11/2026) : changer d'établissement ne referme pas le menu, il montre tout de suite
+ *  le menu de l'établissement choisi pour aller directement à la bonne page ; le tiroir suit la nouvelle page. */
+export function SidebarContent({ onNaviguer, garderOuvert }: { onNaviguer?: () => void; garderOuvert?: (page: string) => void } = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const { role, can } = useProfile();
@@ -117,15 +119,19 @@ export function SidebarContent({ onNaviguer }: { onNaviguer?: () => void } = {})
 
   /* ── Choix de l'établissement ── */
   const choisirEtab = (etab: (typeof etablissements)[number]) => {
-    onNaviguer?.();
+    if (!garderOuvert) onNaviguer?.();
     const depuisGroupe = isGroupView || pathname === "/dashboard" || pathname === "/groupe";
     setGroupView(false);
     setCurrent(etab);
     // On garde la page ouverte ; depuis la vue groupe, on ouvre l'accueil de l'établissement
-    if (depuisGroupe) router.push(etab.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio");
+    if (depuisGroupe) {
+      const page = etab.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio";
+      garderOuvert?.(page);
+      router.push(page);
+    }
   };
   const choisirGroupe = () => {
-    onNaviguer?.();
+    if (garderOuvert) garderOuvert("/dashboard"); else onNaviguer?.();
     setGroupView(true);
     router.push("/dashboard");
   };
