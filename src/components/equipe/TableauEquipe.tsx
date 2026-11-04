@@ -1,5 +1,6 @@
 "use client";
 
+import { VoletEquipe, type JourEquipe, type MesureEquipe } from "@/components/equipe/DetailTuiles";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
@@ -72,9 +73,24 @@ export function TableauEquipe() {
   const meteoJour = meteo.pour === etabId ? meteo.services : [];
   const libellePeriode = periode === "hier" ? "hier" : periode === "7j" ? "7 derniers jours" : "ce mois";
   const vide = !chargement && (!stats || stats.ca_ht === 0);
+  // Détail au clic sur une tuile (04/11/2026) : les chiffres jour par jour
+  const [detail, setDetail] = useState<MesureEquipe | null>(null);
+  const jours = useMemo<JourEquipe[]>(() => {
+    const capJ = capacitesParJour(stats, cap);
+    const m = new Map<string, JourEquipe>();
+    for (const x of stats?.services ?? []) {
+      const j = m.get(x.date) ?? { date: x.date, covMidi: 0, covSoir: 0, ht: 0, emp: 0, placesMidi: capJ.get(x.date)?.midi ?? 0, placesSoir: capJ.get(x.date)?.soir ?? 0 };
+      if (x.svc === "midi") j.covMidi += x.sp_cov; else if (x.svc === "soir") j.covSoir += x.sp_cov;
+      j.ht += x.ht; j.emp += x.emp_ht;
+      m.set(x.date, j);
+    }
+    return [...m.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }, [stats, cap]);
+  const clic = (k: MesureEquipe) => (jours.length ? () => setDetail(k) : undefined);
 
   return (
     <div style={{ display: "grid", gap: 12, marginBottom: 18 }}>
+      {detail && <VoletEquipe mesure={detail} jours={jours} onFermer={() => setDetail(null)} />}
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
         <span style={INTERTITRE}>L&apos;équipe · {etab?.nom ?? ""}</span>
         <span style={{ display: "inline-flex", gap: 6, marginLeft: "auto" }}>
@@ -92,17 +108,17 @@ export function TableauEquipe() {
       {vide && <div style={{ ...CADRE, padding: 16, fontSize: 13, color: FAIBLE, textAlign: "center" }}>Pas encore de vente {libellePeriode === "hier" ? "hier" : `sur ${libellePeriode}`}.</div>}
       {stats && stats.ca_ht > 0 && (estPiccola ? (
         <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(3, 1fr)" : "repeat(2, 1fr)", gap: 8, opacity: chargement ? 0.6 : 1 }}>
-          <Tuile compacte={!bureau} icone="euro" libelle={`CA HT · ${libellePeriode}`} valeur={euros(stats.ca_ht)} sous={`${euros(stats.ca_ttc)} TTC${prec?.ca_ht ? ` · avant ${euros(prec.ca_ht)}` : ""}`} />
+          <Tuile onClick={clic("ca")} compacte={!bureau} icone="euro" libelle={`CA HT · ${libellePeriode}`} valeur={euros(stats.ca_ht)} sous={`${euros(stats.ca_ttc)} TTC${prec?.ca_ht ? ` · avant ${euros(prec.ca_ht)}` : ""}`} />
           <Tuile compacte={!bureau} icone="ticket" libelle="Tickets" valeur={nombre(stats.tickets)} sous={prec?.tickets ? `avant ${nombre(prec.tickets)}` : ""} />
           <Tuile compacte={!bureau} icone="couverts" libelle="Panier moyen" valeur={stats.tickets ? euros(stats.ca_ttc / stats.tickets, 1) : "—"} sous="TTC par ticket" />
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(5, 1fr)" : "repeat(2, 1fr)", gap: 8, opacity: chargement ? 0.6 : 1 }}>
-          <Tuile compacte={!bureau} icone="euro" libelle={`CA HT · ${libellePeriode}`} valeur={euros(stats.ca_ht)} sous={`${euros(stats.ca_ttc)} TTC${prec?.ca_ht ? ` · avant ${euros(prec.ca_ht)}` : ""}`} />
-          <Tuile compacte={!bureau} icone="couverts" couleur={COULEUR_MIDI} libelle="Couverts midi" valeur={nombre(midi.cov)} sous={`${midi.tm ? euros(midi.tm, 1) : "—"} TTC par couvert · ${euros(midi.ht)} HT`} />
-          <Tuile compacte={!bureau} icone="couverts" couleur={COULEUR_SOIR} libelle="Couverts soir" valeur={nombre(soir.cov)} sous={`${soir.tm ? euros(soir.tm, 1) : "—"} TTC par couvert · ${euros(soir.ht)} HT`} />
-          <Tuile compacte={!bureau} icone="camion" couleur={COULEUR_EMPORTER} libelle="À emporter" valeur={euros(stats.place_emp_ht)} sous={stats.ca_ht ? `${pct((stats.place_emp_ht / stats.ca_ht) * 100)} du CA` : ""} />
-          <Tuile compacte={!bureau} icone="ticket" couleur={couleurTaux(rGlobal)} libelle="Remplissage" valeur={rGlobal != null ? pct(rGlobal) : "—"} sous={rGlobal != null ? `midi ${rMidi != null ? pct(rMidi) : "—"} · soir ${rSoir != null ? pct(rSoir) : "—"}` : "capacité non réglée"} />
+          <Tuile onClick={clic("ca")} compacte={!bureau} icone="euro" libelle={`CA HT · ${libellePeriode}`} valeur={euros(stats.ca_ht)} sous={`${euros(stats.ca_ttc)} TTC${prec?.ca_ht ? ` · avant ${euros(prec.ca_ht)}` : ""}`} />
+          <Tuile onClick={clic("midi")} compacte={!bureau} icone="couverts" couleur={COULEUR_MIDI} libelle="Couverts midi" valeur={nombre(midi.cov)} sous={`${midi.tm ? euros(midi.tm, 1) : "—"} TTC par couvert · ${euros(midi.ht)} HT`} />
+          <Tuile onClick={clic("soir")} compacte={!bureau} icone="couverts" couleur={COULEUR_SOIR} libelle="Couverts soir" valeur={nombre(soir.cov)} sous={`${soir.tm ? euros(soir.tm, 1) : "—"} TTC par couvert · ${euros(soir.ht)} HT`} />
+          <Tuile onClick={clic("emporter")} compacte={!bureau} icone="camion" couleur={COULEUR_EMPORTER} libelle="À emporter" valeur={euros(stats.place_emp_ht)} sous={stats.ca_ht ? `${pct((stats.place_emp_ht / stats.ca_ht) * 100)} du CA` : ""} />
+          <Tuile onClick={clic("remplissage")} compacte={!bureau} icone="ticket" couleur={couleurTaux(rGlobal)} libelle="Remplissage" valeur={rGlobal != null ? pct(rGlobal) : "—"} sous={rGlobal != null ? `midi ${rMidi != null ? pct(rMidi) : "—"} · soir ${rSoir != null ? pct(rSoir) : "—"}` : "capacité non réglée"} />
         </div>
       ))}
 

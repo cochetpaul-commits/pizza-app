@@ -12,6 +12,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { couleurTexte } from "@/lib/styleCategories";
 import { TableauEquipe } from "@/components/equipe/TableauEquipe";
 import { useTablette } from "@/lib/tablette/store";
+import { VoletSalle, type DetailSalle, type MesureSalle } from "@/components/equipe/DetailTuiles";
 
 /* ── Types (réponse /api/mon-tableau) ─────────────────────── */
 
@@ -34,7 +35,7 @@ type ApiData = {
   error?: string;
   bar?: { caBoissons: number; prevCaBoissons: number; caTotal: number; pctBoissons: number; parCategorie: CatLine[]; topProduits: ProdLine[]; detail?: ProdLine[] };
   cuisine?: { caFood: number; prevCaFood: number; caTotal: number; pctFood: number; parCategorie: CatLine[]; topProduits: ProdLine[]; detail?: ProdLine[] };
-  salle?: { me: OpStats | null; team: OpStats | null; teamSize: number; attacheGroups: AttacheGroup[]; hasOperateur: boolean };
+  salle?: { me: OpStats | null; team: OpStats | null; teamSize: number; attacheGroups: AttacheGroup[]; hasOperateur: boolean; detail?: DetailSalle | null };
   manager?: {
     totals: { ca: number; prevCa: number; tickets: number; couverts: number; ticketMoyen: number; caParCouvert: number };
     operateurs: ({ op: string } & OpStats)[];
@@ -73,21 +74,23 @@ function delta(cur: number, prev: number): { txt: string; color: string } | null
 
 /* ── UI blocks ────────────────────────────────────────────── */
 
-function KpiCard({ label, value, sub, subColor }: { label: string; value: string; sub?: string; subColor?: string }) {
+function KpiCard({ label, value, sub, subColor, onClick }: { label: string; value: string; sub?: string; subColor?: string; onClick?: () => void }) {
+  // Cliquable (04/11/2026) : ouvre le détail de la tuile
+  const Tag = onClick ? "button" : "div";
   return (
-    <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: "14px 16px" }}>
+    <Tag type={onClick ? "button" : undefined} onClick={onClick} style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: "14px 16px", textAlign: "left", font: "inherit", cursor: onClick ? "pointer" : undefined, width: "100%" }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), Oswald, sans-serif", marginTop: 2 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, fontWeight: 600, color: subColor ?? "#999", marginTop: 2 }}>{sub}</div>}
-    </div>
+    </Tag>
   );
 }
 
 /** Barre comparant ma valeur à la moyenne équipe. */
-function VsBar({ label, mine, team, fmt }: { label: string; mine: number; team: number | null; fmt: (n: number) => string }) {
+function VsBar({ label, mine, team, fmt, onClick }: { label: string; mine: number; team: number | null; fmt: (n: number) => string; onClick?: () => void }) {
   const max = Math.max(mine, team ?? 0, 1);
   return (
-    <div style={{ marginBottom: 12 }}>
+    <div onClick={onClick} role={onClick ? "button" : undefined} style={{ marginBottom: 12, cursor: onClick ? "pointer" : undefined }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
         <span style={{ color: "#1a1a1a" }}>{label}</span>
         <span style={{ color: ACCENT }}>{fmt(mine)}</span>
@@ -241,6 +244,7 @@ export default function MonTableauPage() {
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [detailOuvert, setDetailOuvert] = useState<{ mesure: MesureSalle | null; attache: string | null } | null>(null);
 
   // Même date-ranker que Pilotage/Ventes : dans le bandeau du haut sur
   // mobile, barre sticky sur ordinateur.
@@ -518,21 +522,26 @@ export default function MonTableauPage() {
         }
         const me = s.me;
         const team = s.team;
+        const ouvrir = s.detail ? (mesure: MesureSalle) => () => setDetailOuvert({ mesure, attache: null }) : () => undefined;
         return (
           <>
+            {detailOuvert && s.detail && (
+              <VoletSalle mesure={detailOuvert.mesure} attache={detailOuvert.attache} detail={s.detail} me={me} team={team} teamSize={s.teamSize}
+                libelleAttache={(k) => s.attacheGroups.find((g) => g.key === k)?.label ?? k} onFermer={() => setDetailOuvert(null)} />
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-              <KpiCard label="Mes ventes" value={fmtEur(me.ca)} sub={team ? `équipe (moy.) : ${fmtEur(team.ca)}` : undefined} />
-              <KpiCard label="Mes tickets" value={String(me.tickets)} sub={team ? `équipe (moy.) : ${Math.round(team.tickets)}` : undefined} />
-              <KpiCard label="Mes couverts" value={String(me.couverts)} sub={team ? `équipe (moy.) : ${Math.round(team.couverts)}` : undefined} />
+              <KpiCard onClick={ouvrir("ca")} label="Mes ventes" value={fmtEur(me.ca)} sub={team ? `équipe (moy.) : ${fmtEur(team.ca)}` : undefined} />
+              <KpiCard onClick={ouvrir("tickets")} label="Mes tickets" value={String(me.tickets)} sub={team ? `équipe (moy.) : ${Math.round(team.tickets)}` : undefined} />
+              <KpiCard onClick={ouvrir("couverts")} label="Mes couverts" value={String(me.couverts)} sub={team ? `équipe (moy.) : ${Math.round(team.couverts)}` : undefined} />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginTop: 10 }}>
-              <KpiCard label="Ticket moyen" value={fmtEur2(me.ticketMoyen)} sub={team ? `équipe : ${fmtEur2(team.ticketMoyen)}` : undefined}
+              <KpiCard onClick={ouvrir("ticket")} label="Ticket moyen" value={fmtEur2(me.ticketMoyen)} sub={team ? `équipe : ${fmtEur2(team.ticketMoyen)}` : undefined}
                 subColor={team ? (me.ticketMoyen >= team.ticketMoyen ? "#2D6A4F" : "#DC2626") : undefined} />
-              <KpiCard label="Panier / couvert" value={fmtEur2(me.caParCouvert)} sub={team ? `équipe : ${fmtEur2(team.caParCouvert)}` : undefined}
+              <KpiCard onClick={ouvrir("panier")} label="Panier / couvert" value={fmtEur2(me.caParCouvert)} sub={team ? `équipe : ${fmtEur2(team.caParCouvert)}` : undefined}
                 subColor={team ? (me.caParCouvert >= team.caParCouvert ? "#2D6A4F" : "#DC2626") : undefined} />
             </div>
 
-            <SectionTitle>Mes attaches (% de mes tables) — trait noir = moyenne équipe</SectionTitle>
+            <SectionTitle>Mes attaches (% de mes tables) · trait noir = moyenne équipe · touche une ligne pour le détail</SectionTitle>
             <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: "14px 16px" }}>
               {s.attacheGroups.map(g => (
                 <VsBar
@@ -541,6 +550,7 @@ export default function MonTableauPage() {
                   mine={me.attaches[g.key] ?? 0}
                   team={team ? (team.attaches[g.key] ?? 0) : null}
                   fmt={fmtPct}
+                  onClick={s.detail ? () => setDetailOuvert({ mesure: null, attache: g.key }) : undefined}
                 />
               ))}
             </div>

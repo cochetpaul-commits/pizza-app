@@ -33,9 +33,10 @@ type Row = {
   num_fiscal: string | null;
   type_ligne: string | null;
   date_service: string;
+  service: string | null;
 };
 
-const SELECT_COLS = "operateur,categorie,sous_categorie,description,quantite,annule,ttc,couverts,num_fiscal,type_ligne,date_service";
+const SELECT_COLS = "operateur,categorie,sous_categorie,description,quantite,annule,ttc,couverts,num_fiscal,type_ligne,date_service,service";
 
 const DRINK_CATS = new Set(["VINI", "ALCOOL", "BEVANDE", "BEVANDE CALDE", "DIGESTIVI"]);
 const FOOD_CATS = new Set(["PIZZE", "CUCINA", "ANTIPASTI", "DOLCI"]);
@@ -82,16 +83,21 @@ type Ticket = {
   couverts: number;
   ca: number;             // CA produits du ticket
   cats: Set<string>;      // catégories présentes
+  date: string;
+  service: string | null;
+  lignes: { categorie: string; description: string; qty: number; ttc: number }[];
 };
 
 /** Regroupe les lignes produit en tickets, attribués à l'opérateur dominant. */
 function buildTickets(lines: Row[]): Map<string, Ticket> {
-  const byTicket = new Map<string, { lineCount: Map<string, number>; couverts: number; ca: number; cats: Set<string> }>();
+  const byTicket = new Map<string, { lineCount: Map<string, number>; couverts: number; ca: number; cats: Set<string>; date: string; service: string | null; lignes: Ticket["lignes"] }>();
   for (const l of lines) {
     const key = `${l.date_service}|${l.num_fiscal ?? ""}`;
     if (!l.num_fiscal) continue;
     let t = byTicket.get(key);
-    if (!t) { t = { lineCount: new Map(), couverts: 0, ca: 0, cats: new Set() }; byTicket.set(key, t); }
+    if (!t) { t = { lineCount: new Map(), couverts: 0, ca: 0, cats: new Set(), date: l.date_service, service: l.service ?? null, lignes: [] }; byTicket.set(key, t); }
+    if (!t.service && l.service) t.service = l.service;
+    t.lignes.push({ categorie: l.categorie ?? "", description: (l.description ?? "").trim(), qty: Number(l.quantite) || 1, ttc: l.ttc ?? 0 });
     const op = (l.operateur ?? "").trim();
     if (op) t.lineCount.set(op, (t.lineCount.get(op) ?? 0) + 1);
     t.couverts = Math.max(t.couverts, l.couverts ?? 0);
@@ -105,7 +111,7 @@ function buildTickets(lines: Row[]): Map<string, Ticket> {
     for (const [op, n] of t.lineCount) {
       if (n > max) { max = n; owner = op; }
     }
-    out.set(key, { owner, couverts: t.couverts, ca: t.ca, cats: t.cats });
+    out.set(key, { owner, couverts: t.couverts, ca: t.ca, cats: t.cats, date: t.date, service: t.service, lignes: t.lignes });
   }
   return out;
 }
@@ -144,6 +150,36 @@ function statsForOperator(tickets: Map<string, Ticket>, op: string): OperateurSt
     ticketMoyen: count > 0 ? ca / count : 0,
     caParCouvert: couverts > 0 ? ca / couverts : 0,
     attaches,
+  };
+}
+
+type Chiffres = { ca: number; tickets: number; couverts: number };
+/** Détail des tuiles de la salle (04/11/2026, clic sur une tuile) : par jour, par service, par catégorie, et chaque attache */
+function detailOperateur(tickets: Map<string, Ticket>, op: string) {
+  const jours = new Map<string, Chiffres>(), services = new Map<string, Chiffres>(), cats = new Map<string, { ca: number; qty: number }>();
+  const attaches: Record<string, { tables: number; total: number; produits: Map<string, number> }> = {};
+  for (const g of ATTACHE_GROUPS) attaches[g.key] = { tables: 0, total: 0, produits: new Map() };
+  const ajoute = (m: Map<string, Chiffres>, k: string, t: Ticket) => { const c = m.get(k) ?? { ca: 0, tickets: 0, couverts: 0 }; c.ca += t.ca; c.tickets++; c.couverts += t.couverts; m.set(k, c); };
+  for (const t of tickets.values()) {
+    if (t.owner !== op) continue;
+    ajoute(jours, t.date, t);
+    ajoute(services, (t.service ?? "").toLowerCase().includes("midi") ? "midi" : (t.service ?? "").toLowerCase().includes("soir") ? "soir" : "autre", t);
+    for (const l of t.lignes) { const c = cats.get(l.categorie) ?? { ca: 0, qty: 0 }; c.ca += l.ttc; c.qty += l.qty; cats.set(l.categorie, c); }
+    for (const g of ATTACHE_GROUPS) {
+      const a = attaches[g.key]; a.total++;
+      const lignes = t.lignes.filter((l) => g.cats.includes(l.categorie));
+      if (lignes.length) { a.tables++; for (const l of lignes) a.produits.set(l.description, (a.produits.get(l.description) ?? 0) + l.qty); }
+    }
+  }
+  const arrondi = (c: Chiffres) => ({ ...c, ca: Math.round(c.ca * 100) / 100 });
+  return {
+    jours: [...jours.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, c]) => ({ date, ...arrondi(c) })),
+    services: Object.fromEntries([...services.entries()].map(([k, c]) => [k, arrondi(c)])),
+    categories: [...cats.entries()].filter(([c]) => c).map(([categorie, c]) => ({ categorie, ca: Math.round(c.ca * 100) / 100, qty: c.qty })).sort((a, b) => b.ca - a.ca),
+    attaches: Object.fromEntries(ATTACHE_GROUPS.map((g) => [g.key, {
+      tables: attaches[g.key].tables, total: attaches[g.key].total,
+      produits: [...attaches[g.key].produits.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([n, qty]) => ({ n, qty })),
+    }])),
   };
 }
 
@@ -428,6 +464,7 @@ export async function GET(req: NextRequest) {
       teamSize: teamOps.length,
       attacheGroups: ATTACHE_GROUPS.map(g => ({ key: g.key, label: g.label })),
       hasOperateur: !!myOp,
+      detail: myOp ? detailOperateur(tickets, myOp) : null,
     },
   });
 }
