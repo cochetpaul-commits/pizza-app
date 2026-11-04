@@ -6,7 +6,7 @@ import { useTablette } from "@/lib/tablette/store";
 import { BON, ATTENTION, MAUVAIS, INFO, BORD, MUTED, FAIBLE, CADRE, INTERTITRE, OSWALD, BTN, CHAMP, pastille } from "@/components/ui/charte";
 import type { PateResult, Phase } from "@/lib/pateEngine";
 import { formatG, lignesPesee, nomFarine, nomPhase } from "@/lib/pateAffichage";
-import { alerteBiga, alertePate, conseilEau, detailBacs, eauBiga, eauPetrissage, etatBiga, formatDuree, lireEtapesFournee, nbBacs, repereCourant, reperesPetrissage, tiersBassinage, CIBLE_BIGA, CIBLE_PATE, PATONS_PAR_BAC, type Repere, type TbCalculee } from "@/lib/pate/fournee";
+import { alerteBiga, alertePate, conseilEau, detailBacs, eauBiga, eauPetrissage, etatBiga, formatDuree, lireEtapesFournee, nbBacs, reperesPetrissage, tiersBassinage, CIBLE_BIGA, CIBLE_PATE, PATONS_PAR_BAC, type Repere, type TbCalculee } from "@/lib/pate/fournee";
 
 /**
  * Fournée (module pâte, phase 2, 02/11/2026) : la fabrication par lot dans le Mode production de la fiche d'empâtement.
@@ -24,7 +24,7 @@ type Lot = {
   t_farine: number | null; t_cuisine: number | null; t_biga: number | null; t_eau_calc: number | null; t_eau_utilisee: number | null; tb_utilisee: number | null; tb_source: string | null;
   t_pate_sortie: number | null; voile_ok: boolean | null;
   /* Pétrissage chronométré (04/11/2026) */
-  chrono_debut_at: string | null; chrono_avance: number | null; petrissage_fin_at: string | null; biga_confirmee: boolean | null; eau_bassinage_restante_g: number | null;
+  chrono_debut_at: string | null; chrono_avance: number | null; reperes_faits?: number[] | null; petrissage_fin_at: string | null; biga_confirmee: boolean | null; eau_bassinage_restante_g: number | null;
   etapes: Etape[];
 };
 type Acteur = { nom: string; peutLancer: boolean; source: "tablette" | "compte" };
@@ -44,10 +44,14 @@ const temp = (v: number | null | undefined) => (v == null ? "—" : `${Number(v)
 const heure = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "—");
 const dateHeure = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—");
 
-export function Fournee({ recipeId, recetteNom, type, nbPatonsDefaut, poidsPaton, calcul }: {
+export function Fournee({ recipeId, recetteNom, type, nbPatonsDefaut, poidsPaton, calcul, integre = false, onLotOuvert }: {
   recipeId: string; recetteNom: string; type: "biga" | "direct" | "focaccia"; nbPatonsDefaut: number; poidsPaton: number;
   /** calcul courant de la fiche (pour l'aperçu avant lancement) */
   calcul: ((nb: number) => PateResult | null) | null;
+  /** Dans la page Empâtements (05/11/2026) : pâtons et pesées sont déjà au-dessus, un seul bouton « Lancer l'empâtement » */
+  integre?: boolean;
+  /** Prévient la page quand un lot est ouvert (elle masque alors ses pesées) */
+  onLotOuvert?: (ouvert: boolean) => void;
 }) {
   const tablette = useTablette();
   const jeton = tablette.actif ? tablette.employe?.jeton ?? null : null;
@@ -73,6 +77,10 @@ export function Fournee({ recipeId, recetteNom, type, nbPatonsDefaut, poidsPaton
     } catch { setErreur("Réseau indisponible"); }
   }, [recipeId, entetes]);
   useEffect(() => { void charger(); }, [charger]);
+  const ouvertId = etat?.ouvert?.id ?? null;
+  useEffect(() => { if (etat) onLotOuvert?.(!!ouvertId); }, [ouvertId, etat, onLotOuvert]);
+  // Intégré : les pâtons viennent de la page
+  const nbLance = integre ? nbPatonsDefaut : patons;
 
   const appliquer = async (lotId: string, corps: Record<string, unknown>) => {
     setOccupe(true);
@@ -93,7 +101,7 @@ export function Fournee({ recipeId, recetteNom, type, nbPatonsDefaut, poidsPaton
   const lancer = async () => {
     setOccupe(true);
     try {
-      const r = await fetchApi("/api/pate/lots", { method: "POST", headers: { "Content-Type": "application/json", ...entetes }, body: JSON.stringify({ recipe_id: recipeId, nb_patons: patons, poids_paton: poidsPaton, essai, essai_variable: essai ? essaiVariable : null, essai_valeur: essai ? essaiValeur : null }) });
+      const r = await fetchApi("/api/pate/lots", { method: "POST", headers: { "Content-Type": "application/json", ...entetes }, body: JSON.stringify({ recipe_id: recipeId, nb_patons: nbLance, poids_paton: poidsPaton, essai, essai_variable: essai ? essaiVariable : null, essai_valeur: essai ? essaiValeur : null }) });
       const j = await r.json();
       if (!r.ok) { setErreur(j.error ?? "Erreur"); if (j.lot_id) void charger(); return; }
       setErreur(null);
@@ -115,7 +123,24 @@ export function Fournee({ recipeId, recetteNom, type, nbPatonsDefaut, poidsPaton
       </div>
       {erreur && <div style={ALERTE("forte")}>{erreur}</div>}
       {!lot && dernier && <div style={ALERTE("ok")}>{dernier}</div>}
-      {!lot ? (
+      {!lot && integre ? (
+        <div style={{ display: "grid", gap: 8 }}>
+          <button type="button" onClick={() => void lancer()} disabled={!etat.acteur.peutLancer || occupe || nbLance < 1} style={{ ...PRINCIPAL, opacity: !etat.acteur.peutLancer || occupe ? 0.5 : 1, display: "grid", gap: 2, justifyItems: "center" }}>
+            <span>Lancer l&apos;empâtement</span>
+            <span style={{ fontSize: 13, fontWeight: 500, opacity: 0.9 }}>{nbLance} pâtons · {type === "biga" ? "biga aujourd'hui, pétrissage demain" : "pétrissage"}</span>
+          </button>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: MUTED, cursor: "pointer", justifySelf: "center" }}>
+            <input type="checkbox" checked={essai} onChange={(e) => setEssai(e.target.checked)} /> Fournée d&apos;essai
+          </label>
+          {essai && (
+            <div style={{ display: "grid", gap: 8 }}>
+              <select value={essaiVariable} onChange={(e) => setEssaiVariable(e.target.value)} style={{ ...CHAMP, height: 44 }}>{VARIABLES_ESSAI.map((v) => <option key={v}>{v}</option>)}</select>
+              <input value={essaiValeur} onChange={(e) => setEssaiValeur(e.target.value)} placeholder="ex. 0,4 % au lieu de 0,5 %" style={{ ...CHAMP, height: 44 }} />
+            </div>
+          )}
+          {!etat.acteur.peutLancer && <div style={{ fontSize: 12.5, color: MUTED, textAlign: "center" }}>Lancer un empâtement est réservé aux pizzaiolos formés et aux responsables.</div>}
+        </div>
+      ) : !lot ? (
         <Demarrage type={type} recetteNom={recetteNom} patons={patons} setPatons={setPatons} poidsPaton={poidsPaton} calcul={calcul} peutLancer={etat.acteur.peutLancer} occupe={occupe} onLancer={lancer}
           essai={essai} setEssai={setEssai} essaiVariable={essaiVariable} setEssaiVariable={setEssaiVariable} essaiValeur={essaiValeur} setEssaiValeur={setEssaiValeur} />
       ) : (
@@ -206,11 +231,12 @@ function Deroule({ lot, tb, occupe, peutLancer, conseil, appliquer }: { lot: Lot
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <div style={{ ...CADRE, padding: "12px 16px", boxShadow: `inset 6px 0 0 ${couleur}`, display: "flex", flexWrap: "wrap", gap: "4px 14px", alignItems: "baseline" }}>
-        <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 20 }}>{lot.numero}</span>
+        <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 30, lineHeight: 1 }}>{lot.nb_patons} <span style={{ fontSize: 16 }}>pâtons</span></span>
+        <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 16, color: MUTED }}>{lot.numero}</span>
         <span style={pastille(couleur)}>{lot.type === "biga" ? "biga" : "directe"}</span>
-        <span style={{ fontSize: 13, color: MUTED }}>{lot.nb_patons} pâtons × {lot.poids_paton} g · {lot.operateur_nom ?? ""}</span>
+        <span style={{ fontSize: 13, color: MUTED }}>pâton {lot.poids_paton} g · {lot.operateur_nom ?? ""}</span>
         {lot.essai && <span style={pastille(INFO)}>essai : {lot.essai_variable}{lot.essai_valeur ? ` (${lot.essai_valeur})` : ""}</span>}
-        <span style={{ fontSize: 12.5, color: MUTED }}>{lot.statut === "biga_en_cours" ? `Biga lancée ${dateHeure(lot.biga_debut_at)}` : lot.statut === "biga_au_froid" ? `Biga au froid depuis ${dateHeure(lot.biga_froid_at)}` : `Pétrissage ${dateHeure(lot.petrissage_debut_at)}`}</span>
+        <span style={{ fontSize: 12.5, color: MUTED }}>{lot.statut === "biga_en_cours" ? `Biga lancée à ${heure(lot.biga_debut_at)}` : lot.statut === "biga_au_froid" ? `Biga au froid depuis ${dateHeure(lot.biga_froid_at)}` : `Pétrissage ${dateHeure(lot.petrissage_debut_at)}`}</span>
       </div>
 
       {lot.statut === "biga_au_froid" && <EtatBiga froidAt={lot.biga_froid_at} />}
@@ -224,17 +250,23 @@ function Deroule({ lot, tb, occupe, peutLancer, conseil, appliquer }: { lot: Lot
         </>
       ) : phaseCourante === "final" && !lot.chrono_debut_at ? (
         <>
+          {/* Le chrono ne part que sur ce geste (05/11/2026) */}
+          <div style={{ ...CADRE, padding: 16, textAlign: "center" }}>
+            <div style={INTERTITRE}>Eau de départ à</div>
+            <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 52, lineHeight: 1.1, color: INFO }}>{temp(lot.t_eau_calc)}</div>
+            <div style={{ fontSize: 13, color: MUTED }}>Eau et biga dans la cuve : quand tu lances la vitesse 1, appuie.</div>
+          </div>
+          <button type="button" disabled={occupe} onClick={() => void appliquer({ action: "demarrer_chrono" })} style={PRINCIPAL}>Je lance la vitesse 1</button>
           {calcul && <MiseEnPlace lot={lot} calcul={calcul} conseil={conseil} />}
-          <button type="button" disabled={occupe} onClick={() => void appliquer({ action: "demarrer_chrono" })} style={PRINCIPAL}>Lancer la vitesse 1 et le chrono</button>
         </>
       ) : phaseCourante === "final" && !lot.petrissage_fin_at ? (
         <ChronoPetrissage lot={lot} calcul={calcul} occupe={occupe} appliquer={appliquer} />
       ) : phaseCourante === "final" ? (
         <Cloture lot={lot} occupe={occupe} peutLancer={peutLancer} appliquer={appliquer} />
-      ) : courante ? (
-        <EtapeEnCours key={courante.id} lot={lot} etape={courante} index={etapes.indexOf(courante)} total={etapes.length} faites={faites} calcul={calcul} occupe={occupe} appliquer={appliquer} />
       ) : phaseCourante === "biga" ? (
-        <BigaAuFroid lot={lot} occupe={occupe} appliquer={appliquer} />
+        <EtapesBiga lot={lot} calcul={calcul} occupe={occupe} appliquer={appliquer} />
+      ) : courante ? (
+        <EtapeEnCours key={courante.id} lot={lot} etape={courante} index={etapes.indexOf(courante)} total={etapes.length} calcul={calcul} occupe={occupe} appliquer={appliquer} />
       ) : (
         <Cloture lot={lot} occupe={occupe} peutLancer={peutLancer} appliquer={appliquer} />
       )}
@@ -323,16 +355,16 @@ function Temperatures({ lot, phase, tb, occupe, appliquer }: { lot: Lot; phase: 
         </div>
         {conseil?.message && <div style={{ ...ALERTE(conseil.niveau), marginTop: 8 }}>{conseil.message}</div>}
       </div>
-      <button type="button" disabled={!complet || occupe} onClick={() => void appliquer(phase === "biga" ? { action: "temps_biga", t_farine: f, t_cuisine: c } : { action: "temps_final", t_farine: f, t_cuisine: c, t_biga: b, demarrer_chrono: true })}
+      <button type="button" disabled={!complet || occupe} onClick={() => void appliquer(phase === "biga" ? { action: "temps_biga", t_farine: f, t_cuisine: c } : { action: "temps_final", t_farine: f, t_cuisine: c, t_biga: b })}
         style={{ ...PRINCIPAL, opacity: !complet || occupe ? 0.5 : 1 }}>
-        {phase === "biga" ? "Eau réglée, commencer la biga" : "Eau réglée, lancer la vitesse 1 et le chrono"}
+        {phase === "biga" ? "Eau prête, commencer la biga" : "Eau prête"}
       </button>
     </div>
   );
 }
 
 /* ── Étape en cours avec minuteur ───────────────────────────────────────── */
-function EtapeEnCours({ lot, etape, index, total, faites, calcul, occupe, appliquer }: { lot: Lot; etape: Etape; index: number; total: number; faites: number; calcul: PateResult | null; occupe: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
+function EtapeEnCours({ lot, etape, index, total, calcul, occupe, appliquer }: { lot: Lot; etape: Etape; index: number; total: number; calcul: PateResult | null; occupe: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
   const [maintenant, setMaintenant] = useState(() => Date.now());
   const [ajout, setAjout] = useState(0);
   const sonne = useRef(false);
@@ -364,10 +396,20 @@ function EtapeEnCours({ lot, etape, index, total, faites, calcul, occupe, appliq
   const couleur = lot.type === "biga" ? "#b8601f" : "#4a6741";
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      <span style={INTERTITRE}>{etape.phase === "biga" ? "Biga" : "Pétrissage"} · étape {index + 1} sur {total} · {faites} faite{faites > 1 ? "s" : ""}</span>
-      <div style={{ ...CADRE, padding: 16, boxShadow: `inset 6px 0 0 ${couleur}` }}>
-        <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22, lineHeight: 1.2, textWrap: "balance" }}>{etape.libelle}</div>
-        {rappel.length > 0 && <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>{rappel.map((l) => <span key={l.libelle} style={pastille("#1a1a1a")}>{l.libelle} {formatG(l.grammes, l.precis)}</span>)}</div>}
+      <div style={{ ...CADRE, padding: 16, boxShadow: `inset 6px 0 0 ${couleur}`, background: `${couleur}10` }}>
+        <div style={{ ...INTERTITRE, color: couleur }}>Étape {index + 1} sur {total} · maintenant</div>
+        <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22, lineHeight: 1.2, textWrap: "balance", marginTop: 2 }}>{etape.libelle}</div>
+        {/* Les quantités de l'étape, en grand (05/11/2026) */}
+        {rappel.length > 0 && (
+          <div style={{ display: "grid", gap: 4, marginTop: 10 }}>
+            {rappel.map((l) => (
+              <div key={l.libelle} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 6 }}>
+                <span style={{ fontSize: 16, fontWeight: 600 }}>{l.libelle}</span>
+                <b style={{ fontFamily: OSWALD, fontSize: 38, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{formatG(l.grammes, l.precis)}</b>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       {etape.duree_prevue_s ? (
         <div style={{ ...CADRE, padding: 16, textAlign: "center" }}>
@@ -393,30 +435,56 @@ function EtapeEnCours({ lot, etape, index, total, faites, calcul, occupe, appliq
   );
 }
 
-/* ── Fin de la biga : au froid ──────────────────────────────────────────── */
-function BigaAuFroid({ lot, occupe, appliquer }: { lot: Lot; occupe: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
+/* ── Biga : les étapes en liste (05/11/2026) ────────────────────────────── */
+function EtapesBiga({ lot, calcul, occupe, appliquer }: { lot: Lot; calcul: PateResult | null; occupe: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
+  const etapes = lot.etapes.filter((e) => e.phase === "biga").sort((a, b) => a.ordre - b.ordre);
+  const courante = etapes.find((e) => !e.termine_at) ?? null;
+  const ligne = (e: Etape, etat: "faite" | "avenir") => (
+    <div key={e.id} style={{ ...CADRE, padding: "10px 14px 10px 18px", display: "grid", gridTemplateColumns: "34px 1fr auto", gap: 12, alignItems: "center", boxShadow: `inset 6px 0 0 ${etat === "faite" ? BON : BORD}` }}>
+      <span aria-hidden style={{ width: 30, height: 30, borderRadius: 15, border: `2px solid ${etat === "faite" ? BON : BORD}`, background: etat === "faite" ? BON : "#fff", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, fontWeight: 700 }}>{etat === "faite" ? "✓" : ""}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: etat === "faite" ? MUTED : "#1a1a1a" }}>{e.libelle}</span>
+      <span style={{ fontSize: 12.5, color: FAIBLE, whiteSpace: "nowrap" }}>{etat === "faite" ? heure(e.termine_at) : e.duree_prevue_s ? formatDuree(e.duree_prevue_s) : ""}</span>
+    </div>
+  );
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      <span style={INTERTITRE}>Biga · étape {courante ? etapes.indexOf(courante) + 1 : etapes.length} sur {etapes.length}</span>
+      {etapes.map((e, k) => {
+        if (e.termine_at) return ligne(e, "faite");
+        if (e !== courante) return ligne(e, "avenir");
+        // La dernière étape (bac au froid) se valide par la mise au froid
+        if (k === etapes.length - 1 || /froid/i.test(e.libelle)) return <AuFroid key={e.id} lot={lot} etape={e} index={k} total={etapes.length} occupe={occupe} appliquer={appliquer} />;
+        return <EtapeEnCours key={e.id} lot={lot} etape={e} index={k} total={etapes.length} calcul={calcul} occupe={occupe} appliquer={appliquer} />;
+      })}
+      {!courante && <AuFroid lot={lot} etape={null} index={etapes.length - 1} total={etapes.length} occupe={occupe} appliquer={appliquer} />}
+    </div>
+  );
+}
+
+/* ── Fin de la biga : au froid, en un geste ─────────────────────────────── */
+function AuFroid({ lot, etape, index, total, occupe, appliquer }: { lot: Lot; etape: Etape | null; index: number; total: number; occupe: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
   const [tSortie, setTSortie] = useBrouillon(`${lot.id}:biga:sortie`, "");
-  const [tEau, setTEau] = useBrouillon(`${lot.id}:biga:eau`, lot.t_eau_biga_calc != null ? String(lot.t_eau_biga_calc) : "");
   const t = tSortie.trim() === "" ? null : Number(tSortie.replace(",", "."));
   const a = t != null && Number.isFinite(t) ? alerteBiga(t) : null;
+  const couleur = "#b8601f";
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      <span style={INTERTITRE}>Biga · au froid</span>
-      <div style={{ ...CADRE, padding: 14, display: "grid", gap: 10 }}>
-        <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 15 }}>
-          <span>Biga en sortie de pétrin <span style={{ color: MUTED, fontSize: 12.5 }}>(cible {CIBLE_BIGA.min} à {CIBLE_BIGA.max} °C, facultatif)</span></span>
-          <span><input type="number" inputMode="decimal" step={0.5} value={tSortie} onChange={(e) => setTSortie(e.target.value)} style={{ width: 80, textAlign: "right", fontFamily: OSWALD, fontWeight: 700, fontSize: 24, border: "none", borderBottom: `1px solid ${BORD}`, outline: "none" }} /> <span style={{ color: MUTED }}>°C</span></span>
-        </label>
-        {a?.message && <div style={ALERTE(a.niveau)}>{a.message}</div>}
-        <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 15 }}>
-          <span>Eau réellement utilisée</span>
-          <span><input type="number" inputMode="decimal" step={0.5} value={tEau} onChange={(e) => setTEau(e.target.value)} style={{ width: 80, textAlign: "right", fontFamily: OSWALD, fontWeight: 700, fontSize: 24, border: "none", borderBottom: `1px solid ${BORD}`, outline: "none" }} /> <span style={{ color: MUTED }}>°C</span></span>
-        </label>
+      <div style={{ ...CADRE, padding: 16, boxShadow: `inset 6px 0 0 ${couleur}`, background: `${couleur}10` }}>
+        <div style={{ ...INTERTITRE, color: couleur }}>Étape {index + 1} sur {total} · maintenant</div>
+        <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22, lineHeight: 1.2, marginTop: 2 }}>{etape?.libelle ?? "Bac légèrement huilé, couvert, au froid à 4 °C"}</div>
+        <details style={{ marginTop: 10 }}>
+          <summary style={{ fontSize: 13, color: MUTED, cursor: "pointer" }}>Température de la biga (facultatif)</summary>
+          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 15, marginTop: 8 }}>
+            <span>Biga en fin de mélange <span style={{ color: MUTED, fontSize: 12.5 }}>(cible {CIBLE_BIGA.min} à {CIBLE_BIGA.max} °C)</span></span>
+            <span><input type="number" inputMode="decimal" step={0.5} value={tSortie} onChange={(e) => setTSortie(e.target.value)} aria-label="Température de la biga" style={{ width: 80, textAlign: "right", fontFamily: OSWALD, fontWeight: 700, fontSize: 24, border: "none", borderBottom: `1px solid ${BORD}`, outline: "none", background: "transparent" }} /> <span style={{ color: MUTED }}>°C</span></span>
+          </label>
+          {a?.message && <div style={{ ...ALERTE(a.niveau), marginTop: 8 }}>{a.message}</div>}
+        </details>
       </div>
-      <button type="button" disabled={occupe} onClick={() => void appliquer({ action: "biga_froid", t_biga_sortie: t, t_eau_utilisee: tEau.trim() === "" ? null : Number(tEau.replace(",", ".")) })} style={PRINCIPAL}>
-        Biga au froid à 4 °C, heure enregistrée
+      <button type="button" disabled={occupe} onClick={() => void appliquer({ action: "biga_froid", t_biga_sortie: t })} style={VALIDE}>
+        Biga au froid, heure enregistrée
       </button>
-      <div style={{ fontSize: 12.5, color: MUTED, textAlign: "center" }}>Le pétrissage final se fait demain : la fournée reste ouverte, avec l&apos;âge de la biga affiché.</div>
+      <div style={{ fontSize: 12.5, color: MUTED, textAlign: "center" }}>Le pétrissage se fait demain : la fournée reste ouverte et compte l&apos;âge de la biga.</div>
     </div>
   );
 }
@@ -426,7 +494,6 @@ function Cloture({ lot, occupe, peutLancer, appliquer }: { lot: Lot; occupe: boo
   const [voileTxt, setVoileTxt] = useBrouillon(`${lot.id}:final:voile`, "");
   const voile = voileTxt === "1", setVoile = (v: boolean) => setVoileTxt(v ? "1" : "");
   const [tPate, setTPate] = useBrouillon(`${lot.id}:final:pate`, "");
-  const [tEau, setTEau] = useBrouillon(`${lot.id}:final:eau`, lot.t_eau_calc != null ? String(lot.t_eau_calc) : "");
   const [commentaire, setCommentaire] = useBrouillon(`${lot.id}:final:commentaire`, lot.commentaire ?? "");
   const [reste, setReste] = useBrouillon(`${lot.id}:final:reste`, "");
   const t = tPate.trim() === "" ? null : Number(tPate.replace(",", "."));
@@ -447,10 +514,6 @@ function Cloture({ lot, occupe, peutLancer, appliquer }: { lot: Lot; occupe: boo
         <span><input type="number" inputMode="decimal" step={0.5} value={tPate} onChange={(e) => setTPate(e.target.value)} aria-label="Température de la pâte" style={{ width: 84, textAlign: "right", fontFamily: OSWALD, fontWeight: 700, fontSize: 26, border: "none", borderBottom: `1px solid ${BORD}`, outline: "none" }} /> <span style={{ color: MUTED }}>°C</span></span>
       </label>
       {a && <div style={ALERTE(a.niveau)}>{a.message ?? `Pâte à ${t} °C, dans la cible ${CIBLE_PATE.min} à ${CIBLE_PATE.max} °C.`}</div>}
-      <label style={{ ...CADRE, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 15 }}>
-        <span>Eau réellement utilisée <span style={{ color: MUTED, fontSize: 12.5 }}>(conseillée {temp(lot.t_eau_calc)})</span></span>
-        <span><input type="number" inputMode="decimal" step={0.5} value={tEau} onChange={(e) => setTEau(e.target.value)} style={{ width: 84, textAlign: "right", fontFamily: OSWALD, fontWeight: 700, fontSize: 24, border: "none", borderBottom: `1px solid ${BORD}`, outline: "none" }} /> <span style={{ color: MUTED }}>°C</span></span>
-      </label>
       {bassinage > 0 && (
         <label style={{ ...CADRE, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 15 }}>
           <span>Eau de bassinage restante <span style={{ color: MUTED, fontSize: 12.5 }}>(facultatif, sur {Math.round(bassinage).toLocaleString("fr-FR")} g)</span></span>
@@ -465,7 +528,7 @@ function Cloture({ lot, occupe, peutLancer, appliquer }: { lot: Lot; occupe: boo
         <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>Grosses boules, rabats, filet d&apos;huile d&apos;olive, détaillage, boulage.</div>
       </div>
       <textarea value={commentaire} onChange={(e) => setCommentaire(e.target.value)} placeholder="Commentaire (facultatif)" rows={2} style={{ ...CHAMP, height: "auto", resize: "vertical" }} />
-      <button type="button" disabled={!pret || occupe || !peutLancer} onClick={() => void appliquer({ action: "cloture", voile_ok: voile, t_pate_sortie: t, t_eau_utilisee: tEau.trim() === "" ? null : Number(tEau.replace(",", ".")), commentaire, eau_bassinage_restante_g: resteG })} style={{ ...VALIDE, opacity: !pret || occupe || !peutLancer ? 0.5 : 1 }}>
+      <button type="button" disabled={!pret || occupe || !peutLancer} onClick={() => void appliquer({ action: "cloture", voile_ok: voile, t_pate_sortie: t, commentaire, eau_bassinage_restante_g: resteG })} style={{ ...VALIDE, opacity: !pret || occupe || !peutLancer ? 0.5 : 1 }}>
         Boulé, lot clôturé
       </button>
       {!peutLancer && <div style={{ fontSize: 12.5, color: MUTED, textAlign: "center" }}>Clôturer un lot est réservé aux pizzaiolos formés et aux responsables.</div>}
@@ -576,7 +639,11 @@ function MiseEnPlace({ lot, calcul, conseil }: { lot: Lot; calcul: PateResult; c
   );
 }
 
-/** Un seul chrono continu depuis le début de la vitesse 1, frise des repères, bascule automatique avec son et vibration */
+/**
+ * Pétrissage (05/11/2026, retour de Paul) : un chrono continu lancé sur un geste, et une frise verticale par créneaux
+ * (0:00 → 2:00, 2:00 → 7:00…). Le chrono surligne le créneau en cours, avec bip et vibration au changement ;
+ * chaque ligne se coche à la main. Une ligne non cochée à l'heure de la suivante passe en orange, sans rien bloquer.
+ */
 function ChronoPetrissage({ lot, calcul, occupe, appliquer }: { lot: Lot; calcul: PateResult | null; occupe: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
   const reperes = useMemo<Repere[]>(() => {
     const fin = calcul?.phases.find((p) => p.kind !== "biga");
@@ -590,10 +657,10 @@ function ChronoPetrissage({ lot, calcul, occupe, appliquer }: { lot: Lot; calcul
   const debut = lot.chrono_debut_at ? new Date(lot.chrono_debut_at).getTime() : maintenant;
   useEffect(() => { const t = setInterval(() => setMaintenant(Date.now()), 250); return () => clearInterval(t); }, []);
   const ecoule = Math.max(0, Math.floor((maintenant - debut) / 1000));
-  const i = repereCourant(reperes, ecoule, Number(lot.chrono_avance ?? 0));
-  const courant = reperes[i], suivant = reperes[i + 1] ?? null;
-  const dernier = i === reperes.length - 1;
-  const fin = reperes[reperes.length - 1].t + 30;
+  // Le créneau en cours d'après le chrono seul : il surligne, il ne coche rien
+  const i = Math.max(0, reperes.reduce((k, r, j) => (r.t <= ecoule ? j : k), 0));
+  const faits = new Set((lot.reperes_faits ?? []).map(Number));
+  const toutFait = reperes.every((_, k) => faits.has(k));
 
   // Écran allumé pendant tout le pétrissage (navigateurs qui le permettent)
   useEffect(() => {
@@ -607,7 +674,7 @@ function ChronoPetrissage({ lot, calcul, occupe, appliquer }: { lot: Lot; calcul
     return () => { document.removeEventListener("visibilitychange", vis); void verrou?.release().catch(() => undefined); };
   }, []);
 
-  // Son et vibration à chaque bascule (pas au premier affichage)
+  // Son et vibration à chaque changement de créneau (pas au premier affichage)
   const precedent = useRef<number | null>(null);
   useEffect(() => {
     if (precedent.current !== null && precedent.current !== i) {
@@ -625,49 +692,47 @@ function ChronoPetrissage({ lot, calcul, occupe, appliquer }: { lot: Lot; calcul
   }, [i]);
 
   const couleur = lot.type === "biga" ? "#b8601f" : "#4a6741";
+  const courant = reperes[i];
   const vitesse = courant.titre === "Repos" ? "Repos" : /vitesse 2/i.test(courant.titre) ? "Vitesse 2" : "Vitesse 1";
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, color: MUTED }}>
-        <span style={{ fontWeight: 700, color: "#1a1a1a" }}>{vitesse}</span><span>écran gardé allumé</span>
-      </div>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 76, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{formatDuree(ecoule)}</div>
-        <div style={{ fontSize: 12, color: MUTED }}>depuis le début de la vitesse 1</div>
-      </div>
-      <div style={{ height: 10, borderRadius: 5, background: "#f0ebe3", overflow: "hidden" }}><div style={{ width: `${Math.min(100, (ecoule / fin) * 100)}%`, height: "100%", background: couleur, transition: "width .25s linear" }} /></div>
-      <div style={{ ...CADRE, padding: 16, boxShadow: `inset 6px 0 0 ${couleur}` }}>
-        <div style={{ ...INTERTITRE, color: couleur }}>Maintenant · {formatDuree(courant.t)}{courant.indicatif ? " · repère indicatif" : ""}</div>
-        {courant.grammes != null ? (
-          <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 64, lineHeight: 1, fontVariantNumeric: "tabular-nums", marginTop: 4 }}>{Math.round(courant.grammes).toLocaleString("fr-FR")} <span style={{ fontSize: 30 }}>g</span></div>
-        ) : (
-          <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 44, lineHeight: 1.05, marginTop: 4 }}>{courant.titre}</div>
-        )}
-        <div style={{ fontSize: 17, fontWeight: 600, marginTop: 8, lineHeight: 1.3 }}>{courant.grammes != null ? `${courant.titre} · ${courant.consigne}` : courant.consigne}</div>
-      </div>
-      {suivant && (
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 14, color: MUTED }}>
-          <span>Ensuite à {formatDuree(suivant.t)} · {suivant.titre.toLowerCase()}</span>
-          {suivant.grammes != null && <b style={{ fontFamily: OSWALD, fontSize: 19, color: "#1a1a1a" }}>{Math.round(suivant.grammes).toLocaleString("fr-FR")} g</b>}
+      <div style={{ ...CADRE, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, position: "sticky", top: 8, zIndex: 5 }}>
+        <div>
+          <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 54, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{formatDuree(ecoule)}</div>
+          <div style={{ fontSize: 12, color: MUTED }}>depuis le début de la vitesse 1 · écran gardé allumé</div>
         </div>
-      )}
-      <div style={{ ...CADRE, padding: 6, display: "grid", gap: 2 }}>
+        <span style={{ ...pastille(couleur), fontSize: 14, padding: "6px 12px" }}>{vitesse}</span>
+      </div>
+      <span style={INTERTITRE}>Pétrissage · coche chaque ligne quand c&apos;est fait</span>
+      <div style={{ display: "grid", gap: 6 }}>
         {reperes.map((r, k) => {
-          const ici = k === i, fait = k < i;
+          const finT = reperes[k + 1]?.t ?? null;
+          const fait = faits.has(k);
+          const enCours = k === i && !fait;
+          const enRetard = !fait && finT != null && ecoule >= finT;
+          const teinte = fait ? BON : enRetard ? ATTENTION : enCours ? couleur : BORD;
           return (
-            <div key={k} style={{ display: "grid", gridTemplateColumns: "48px 1fr auto", gap: 8, alignItems: "baseline", padding: "7px 8px", borderRadius: 8, fontSize: 14, background: ici ? `${couleur}24` : undefined, fontWeight: ici ? 700 : 500, color: fait ? FAIBLE : "#1a1a1a", textDecoration: fait ? "line-through" : undefined }}>
-              <span style={{ fontFamily: OSWALD, fontWeight: 700, color: ici ? couleur : fait ? FAIBLE : MUTED, fontVariantNumeric: "tabular-nums" }}>{formatDuree(r.t)}</span>
-              <span>{r.titre}</span>
-              <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 16, fontVariantNumeric: "tabular-nums" }}>{r.grammes != null ? `${Math.round(r.grammes).toLocaleString("fr-FR")} g` : ""}</span>
-            </div>
+            <button key={k} type="button" disabled={occupe} onClick={() => void appliquer({ action: "cocher", index: k, fait: !fait })}
+              style={{ ...CADRE, textAlign: "left", fontFamily: "inherit", cursor: "pointer", padding: enCours ? "14px 14px 14px 18px" : "10px 14px 10px 18px", display: "grid", gridTemplateColumns: "34px 1fr auto", gap: 12, alignItems: "center",
+                boxShadow: `inset 6px 0 0 ${teinte}`, background: enCours ? `${couleur}14` : enRetard ? `${ATTENTION}12` : "#fff", color: "#1a1a1a", touchAction: "manipulation" }}>
+              <span aria-hidden style={{ width: 30, height: 30, borderRadius: 15, border: `2px solid ${fait ? BON : enRetard ? ATTENTION : BORD}`, background: fait ? BON : "#fff", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, fontWeight: 700 }}>{fait ? "✓" : ""}</span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontFamily: OSWALD, fontWeight: 700, fontSize: 14, color: fait ? BON : enRetard ? ATTENTION : enCours ? couleur : MUTED, fontVariantNumeric: "tabular-nums" }}>
+                  {formatDuree(r.t)}{finT != null ? ` → ${formatDuree(finT)}` : ""}{enRetard ? " · en retard" : enCours ? " · maintenant" : ""}
+                </span>
+                <span style={{ display: "block", fontSize: enCours ? 18 : 15, fontWeight: 700, marginTop: 2, textDecoration: fait ? "line-through" : undefined, color: fait ? MUTED : "#1a1a1a" }}>{r.titre}</span>
+                {(enCours || enRetard) && <span style={{ display: "block", fontSize: 14, color: "#1a1a1a", marginTop: 2 }}>{r.consigne}{r.indicatif ? " (repère indicatif)" : ""}</span>}
+              </span>
+              <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: enCours ? 34 : 20, fontVariantNumeric: "tabular-nums", color: fait ? MUTED : "#1a1a1a", whiteSpace: "nowrap" }}>
+                {r.grammes != null ? `${Math.round(r.grammes).toLocaleString("fr-FR")} g` : ""}
+              </span>
+            </button>
           );
         })}
       </div>
-      {!dernier ? (
-        <button type="button" disabled={occupe} onClick={() => void appliquer({ action: "avancer", index: i + 1 })} style={{ ...GROS, color: MUTED }}>Étape faite, passer à la suivante</button>
-      ) : (
-        <button type="button" disabled={occupe} onClick={() => void appliquer({ action: "fin_petrissage" })} style={VALIDE}>Pétrissage terminé, contrôles</button>
-      )}
+      <button type="button" disabled={occupe} onClick={() => void appliquer({ action: "fin_petrissage" })} style={toutFait ? VALIDE : { ...GROS, color: MUTED }}>
+        Pétrissage terminé, passer aux contrôles
+      </button>
     </div>
   );
 }

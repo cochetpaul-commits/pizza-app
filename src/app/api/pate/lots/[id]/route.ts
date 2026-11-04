@@ -56,6 +56,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   } else if (action === "biga_froid") {
     if (type !== "biga") return NextResponse.json({ error: "Pas de biga sur une pâte directe." }, { status: 400 });
     Object.assign(maj, { biga_froid_at: maintenant, statut: "biga_au_froid", t_eau_biga_utilisee: num(body.t_eau_utilisee) ?? lot.t_eau_biga_calc ?? null, t_biga_sortie: num(body.t_biga_sortie) });
+    // La mise au froid termine la biga (05/11/2026) : la dernière étape est ce geste
+    await supabaseAdmin.from("pate_lot_etapes").update({ termine_at: maintenant, valide_par: acteur.employeId, valide_par_nom: acteur.nom }).eq("lot_id", id).eq("phase", "biga").is("termine_at", null);
   } else if (action === "temps_final") {
     const tf = num(body.t_farine), tc = num(body.t_cuisine), tb_ = num(body.t_biga);
     if (tf == null || tc == null || (type === "biga" && tb_ == null)) return NextResponse.json({ error: "Températures de la farine, de la cuisine et de la biga attendues." }, { status: 400 });
@@ -63,15 +65,21 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     const eau = eauPetrissage(tb.tb, tf, tc, type === "biga" ? tb_ : null);
     Object.assign(maj, { t_farine: tf, t_cuisine: tc, t_biga: type === "biga" ? tb_ : null, tb_utilisee: tb.tb, tb_source: tb.source, t_eau_calc: eau, statut: "petrissage", petrissage_debut_at: lot.petrissage_debut_at ?? maintenant });
     // Le chrono démarre avec la vitesse 1 (04/11/2026) : un seul chrono continu pour tout le pétrissage
-    if (body.demarrer_chrono === true) Object.assign(maj, { chrono_debut_at: maintenant, chrono_avance: 0, petrissage_fin_at: null });
+    if (body.demarrer_chrono === true) Object.assign(maj, { chrono_debut_at: maintenant, chrono_avance: 0, petrissage_fin_at: null, reperes_faits: [] });
   } else if (action === "confirmer_biga") {
     maj.biga_confirmee = true;
   } else if (action === "demarrer_chrono") {
     if (lot.t_eau_calc == null) return NextResponse.json({ error: "Températures du pétrissage d'abord." }, { status: 400 });
-    Object.assign(maj, { chrono_debut_at: maintenant, chrono_avance: 0, petrissage_fin_at: null });
+    Object.assign(maj, { chrono_debut_at: maintenant, chrono_avance: 0, petrissage_fin_at: null, reperes_faits: [] });
   } else if (action === "avancer") {
     const i = Math.max(0, Math.min(50, Math.round(Number(body.index) || 0)));
     maj.chrono_avance = Math.max(Number(lot.chrono_avance ?? 0), i);
+  } else if (action === "cocher") {
+    // Frise du pétrissage (05/11/2026) : un repère coché ou décoché à la main
+    const i = Math.max(0, Math.min(50, Math.round(Number(body.index) || 0)));
+    const faits = new Set<number>(((lot.reperes_faits as number[] | null) ?? []).map(Number));
+    if (body.fait === false) faits.delete(i); else faits.add(i);
+    maj.reperes_faits = [...faits].sort((a, b) => a - b);
   } else if (action === "fin_petrissage") {
     if (!lot.chrono_debut_at) return NextResponse.json({ error: "Le chrono n'a pas été lancé." }, { status: 400 });
     maj.petrissage_fin_at = maintenant;
@@ -113,11 +121,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       // Fin du pétrissage appuyée trop tôt : le chrono reprend là où il en était
       maj.petrissage_fin_at = null;
       await supabaseAdmin.from("pate_lot_etapes").update({ termine_at: null, valide_par: null, valide_par_nom: null }).eq("lot_id", id).eq("phase", "final").gte("termine_at", lot.petrissage_fin_at);
-    } else if (phase === "final" && Number(lot.chrono_avance ?? 0) > 0) {
-      maj.chrono_avance = Number(lot.chrono_avance) - 1;
     } else if (phase === "final" && lot.chrono_debut_at) {
       // Chrono lancé trop tôt : retour à la mise en place, températures gardées
-      Object.assign(maj, { chrono_debut_at: null, chrono_avance: 0 });
+      Object.assign(maj, { chrono_debut_at: null, chrono_avance: 0, reperes_faits: [] });
     } else if (faites.length) {
       const { error } = await supabaseAdmin.from("pate_lot_etapes").update({ termine_at: null, demarre_at: null, valide_par: null, valide_par_nom: null }).eq("id", faites[0].id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
