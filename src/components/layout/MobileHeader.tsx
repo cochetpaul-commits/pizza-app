@@ -2,14 +2,13 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { EmployeTabletteBouton } from "@/components/tablette/EmployeTabletteBouton";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTopBar } from "@/components/layout/TopBarContext";
 import { supabase } from "@/lib/supabaseClient";
 import { MenuLateral } from "./MenuLateral";
-import { createPortal } from "react-dom";
 
 /* ── Helpers ────────────────────────────────────── */
 
@@ -272,99 +271,6 @@ function UserAvatar() {
   );
 }
 
-/* ── Sub: Sélecteur d'entreprise (Bello Mio / Piccola Mia / Groupe) ── */
-
-function EtabPill() {
-  const { current, etablissements, isGroupView, isGroupAdmin, setCurrent, setGroupView } = useEtablissement();
-  const router = useRouter();
-  const pathname = usePathname();
-  const [ouvert, setOuvert] = useState(false);
-  const canSwitch = isGroupAdmin || etablissements.length > 1;
-  const label = isGroupView ? "iFratelli Group" : (current?.nom ?? "Entreprise");
-  const color = isGroupView ? "#b45f57" : (current?.couleur ?? "#b45f57");
-  // Le choix se fait ici, en un geste (28/10 : il fallait ouvrir le menu, déplier le groupe, puis choisir).
-  const choisirEtab = (e: (typeof etablissements)[number]) => {
-    setOuvert(false);
-    const depuisGroupe = isGroupView || pathname === "/dashboard" || pathname === "/groupe";
-    setGroupView(false);
-    setCurrent(e);
-    if (depuisGroupe) router.push(e.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio");
-  };
-  const choisirGroupe = () => { setOuvert(false); setGroupView(true); router.push("/dashboard"); };
-  const ligne = (actif: boolean, couleur: string, texte: string, onClick: () => void) => (
-    <button type="button" role="option" aria-selected={actif} onClick={onClick} key={texte} style={{
-      display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "12px 10px", border: "none", borderRadius: 10,
-      background: actif ? "rgba(0,0,0,0.05)" : "transparent", color: "#1a1a1a", cursor: "pointer", textAlign: "left",
-      fontFamily: "inherit", fontSize: 16, fontWeight: actif ? 700 : 500,
-    }}>
-      <span style={{ width: 12, height: 12, borderRadius: "50%", background: couleur, flexShrink: 0 }} />
-      <span style={{ flex: 1 }}>{texte}</span>
-      {actif && <span style={{ color: couleur, fontSize: 13, fontWeight: 600 }}>actuel</span>}
-    </button>
-  );
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => { if (canSwitch) setOuvert(true); }}
-        aria-label="Changer d'entreprise"
-        aria-haspopup="listbox"
-        aria-expanded={ouvert}
-        disabled={!canSwitch}
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          maxWidth: 170, height: 34, padding: "0 10px 0 12px",
-          borderRadius: 17, border: `1px solid ${color}33`,
-          background: `${color}12`, color,
-          cursor: canSwitch ? "pointer" : "default",
-          fontFamily: "var(--font-oswald), 'Oswald', sans-serif",
-          fontSize: 13, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase",
-          flexShrink: 0,
-        }}
-      >
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-        {canSwitch && (
-          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        )}
-      </button>
-      {ouvert && createPortal(
-        // Rendu dans le body : le bandeau a un flou de fond, ce qui piège tout élément fixé à l'intérieur
-        // (28/10 : la feuille s'ouvrait dans les 52 px du bandeau, invisible).
-        <>
-          <div onClick={() => setOuvert(false)} style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(26,26,26,0.25)" }} />
-          <div role="listbox" aria-label="Entreprise" style={{
-            position: "fixed", zIndex: 301, left: 12, top: "calc(env(safe-area-inset-top, 0px) + 58px)", width: "min(300px, calc(100vw - 24px))",
-            background: "#fff", borderRadius: 14, boxShadow: "0 12px 40px rgba(0,0,0,0.22)", padding: 6, display: "grid", gap: 2,
-          }}>
-            {/* 02/11/2026 : le groupe en tête (c'est l'accueil), les établissements côte à côte, un seul geste */}
-            {isGroupAdmin && ligne(isGroupView, "#b45f57", "iFratelli Group", choisirGroupe)}
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(etablissements.length, 3)}, 1fr)`, gap: 6, padding: "4px 4px 2px" }}>
-              {etablissements.map((e) => {
-                const actif = !isGroupView && current?.id === e.id;
-                const c = e.couleur ?? "#b45f57";
-                return (
-                  <button key={e.id} type="button" role="option" aria-selected={actif} onClick={() => choisirEtab(e)} style={{
-                    display: "grid", justifyItems: "center", gap: 6, padding: "14px 6px", border: `1px solid ${actif ? c : "rgba(0,0,0,0.1)"}`, borderRadius: 12,
-                    background: actif ? `${c}1a` : "#fff", color: "#1a1a1a", cursor: "pointer", fontFamily: "inherit", fontSize: 15, fontWeight: actif ? 700 : 500, minWidth: 0,
-                  }}>
-                    <span style={{ width: 14, height: 14, borderRadius: "50%", background: c }} />
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{e.nom}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </>,
-        document.body,
-      )}
-    </>
-  );
-}
-
-/* ── Main component ──────────────────────────────── */
-
 export function MobileHeader() {
   // Zone pilotee par les pages (ex. date-ranker de Ventes), sur une 2e ligne
   const { state } = useTopBar();
@@ -390,9 +296,8 @@ export function MobileHeader() {
         display: "flex", alignItems: "center",
         height: 52, padding: "0 12px", gap: 10,
       }}>
-        {/* Gauche : burger du menu latéral, puis entreprise courante (Bello Mio / Piccola Mia / Groupe) */}
+        {/* Gauche : burger du menu latéral ; le choix de l'établissement se fait dans le menu (04/11/2026, la pastille est retirée) */}
         <MenuLateral />
-        <EtabPill />
         <div style={{ flex: 1 }} />
         {/* Right: bell + avatar */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
