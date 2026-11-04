@@ -1,5 +1,6 @@
 "use client";
 
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 
@@ -97,7 +98,7 @@ export interface RecipeKpisProps {
   onSellCoeffChange?: (coeff: number) => void;
 }
 
-export function RecipeKpis({
+function RecipeKpisInterne({
   costPerPortion, foodCostPct, sellPriceHT, sellPriceTTC, margeBrute,
   foodCostTarget = 30, portionLabel = "portion", accent = "#D4775A",
   onSellPriceChange, vatRate, onVatChange, onFoodCostTargetChange,
@@ -625,4 +626,10 @@ export function HeroDangerBtn({ onClick, children }: { onClick: () => void; chil
       color: "rgba(255,255,255,0.8)",
     }}>{children}</button>
   );
+}
+
+/** Montants réservés aux administrateurs et managers, jamais sur la tablette (05/11/2026) */
+export function RecipeKpis(props: RecipeKpisProps) {
+  const voir = useVoirMontants();
+  return voir ? <RecipeKpisInterne {...props} /> : null;
 }

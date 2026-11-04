@@ -1,5 +1,6 @@
 "use client";
 
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import { toutesLesPages } from "@/lib/supabaseChunks";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { triParLibelle } from "@/lib/tri";
@@ -56,6 +57,8 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
   const router = useRouter();
   const { can } = useProfile();
   const userCanWrite = can("operations.edit_recettes");
+  // Montants réservés aux administrateurs et managers, jamais sur la tablette (05/11/2026)
+  const voirMontants = useVoirMontants();
   const { current: etab } = useEtablissement();
   const isEdit = !!cocktailId;
 
@@ -767,7 +770,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
                     onPivotChange={setPivotIngredientId}
                     returnUrl={typeof window !== "undefined" ? window.location.pathname + window.location.search : ""}
                   />
-                  {totalCostEur > 0 && (
+                  {voirMontants && totalCostEur > 0 && (
                     <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: "#2f3a33" }}>
                       Coût total : {fmtMoney(round2(totalCostEur))} €
                     </div>
@@ -835,7 +838,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
 }
 
 // ── Cocktail Pricing Panel — Hero KPI + Tiroir ──────────────────
-function CocktailPricing({
+function CocktailPricingInterne({
   costPerCocktail, sellCoeff, onSellCoeffChange,
   derivedSellPrice, foodCostPct, fcTarget, onFcTargetChange,
   margePerCocktail, prixTTC,
@@ -1123,4 +1126,10 @@ function CocktailPricing({
       </div>
     </div>
   );
+}
+
+/** Montants réservés aux administrateurs et managers, jamais sur la tablette (05/11/2026) */
+function CocktailPricing(props: React.ComponentProps<typeof CocktailPricingInterne>) {
+  const voir = useVoirMontants();
+  return voir ? <CocktailPricingInterne {...props} /> : null;
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { montantsAutorises } from "@/lib/montantsServeur";
 import { createClient } from "@supabase/supabase-js";
 import React from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
@@ -221,6 +222,7 @@ export async function POST(req: Request) {
       logoBase64,
       photoUrl,
       accentColor: POLE_COLORS.cocktail,
+      montants: await montantsAutorises(req),
     };
 
     const documentElement = CocktailPdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;

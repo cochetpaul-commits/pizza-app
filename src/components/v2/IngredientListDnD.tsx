@@ -1,5 +1,6 @@
 "use client";
 
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import type { CSSProperties } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { SmartSelect, type SmartSelectOption } from "@/components/SmartSelect";
@@ -111,10 +112,12 @@ export function IngredientListDnD({
   metaByIngredient, pivotId, onPivotChange, externalDragContext, returnUrl, mode = "cartes",
 }: Props) {
   const tableau = mode === "tableau";
+  // Montants réservés aux administrateurs et managers (05/11/2026)
+  const voirMontants = useVoirMontants();
   const ingredientOptions: SmartSelectOption[] = ingredients.map(i => {
     const isMaison = i.source === "recette_maison";
-    let rightBottom = priceLabelByIngredient?.[i.id] ?? undefined;
-    if (isMaison && i.purchase_price && i.purchase_price > 0) {
+    let rightBottom = voirMontants ? priceLabelByIngredient?.[i.id] ?? undefined : undefined;
+    if (voirMontants && isMaison && i.purchase_price && i.purchase_price > 0) {
       const pul = (i.purchase_unit_label ?? "kg").toLowerCase().trim();
       const unitLabel = pul === "l" ? "€/L" : pul === "pc" || pul === "pcs" ? "€/pc" : "€/kg";
       rightBottom = `maison · ${i.purchase_price.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unitLabel}`;
@@ -162,7 +165,7 @@ export function IngredientListDnD({
               {items.map((line, i) => {
                 const cpu = priceByIngredient[line.ingredient_id];
                 const ing = ingredients.find(ig => ig.id === line.ingredient_id);
-                const cost = computeCost(line, cpu, ing);
+                const cost = voirMontants ? computeCost(line, cpu, ing) : null;
                 const densityMissing = isMissingDensity(ing, line);
                 const meta = line.ingredient_id ? metaByIngredient?.[line.ingredient_id] : undefined;
                 const changerIngredient = (id: string) => {
@@ -199,7 +202,7 @@ export function IngredientListDnD({
                               {meta.fournisseur && <span className="pastille" style={{ "--pastille-c": meta.fournisseurColor ?? "#b0a894", flexShrink: 0 } as CSSProperties}>{meta.fournisseur}</span>}
                               {densityMissing && <span title="Densité manquante : prix estimé avec 1 g/ml" style={{ color: "#d97706", flexShrink: 0 }}>⚠</span>}
                             </>
-                          ) : line.ingredient_id && priceLabelByIngredient?.[line.ingredient_id] ? (
+                          ) : voirMontants && line.ingredient_id && priceLabelByIngredient?.[line.ingredient_id] ? (
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{priceLabelByIngredient[line.ingredient_id]}</span>
                           ) : <span>—</span>}
                         </div>
@@ -210,7 +213,7 @@ export function IngredientListDnD({
                           {units.map(u => <option key={u} value={u}>{u}</option>)}
                         </select>
                         <span style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: cost != null ? "#1a1a1a" : "#9a8f84", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                          {cost != null ? `${fmtMoney(cost)} €` : "—"}
+                          {cost != null ? `${fmtMoney(cost)} €` : voirMontants ? "—" : ""}
                         </span>
                         <button type="button" onClick={() => removeLine(line.id)} aria-label="Retirer" style={{ width: 26, height: HAUTEUR, borderRadius: 6, border: "none", background: "transparent", color: "#b0a89a", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>✕</button>
                       </div>
@@ -308,7 +311,7 @@ export function IngredientListDnD({
                               )}
                             </div>
                           );
-                        })() : line.ingredient_id && priceLabelByIngredient?.[line.ingredient_id] ? (
+                        })() : voirMontants && line.ingredient_id && priceLabelByIngredient?.[line.ingredient_id] ? (
                           <div style={{ fontSize: 11, color: "#9a8f84", paddingLeft: 24, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {priceLabelByIngredient[line.ingredient_id]}
                           </div>
@@ -332,7 +335,7 @@ export function IngredientListDnD({
                           </select>
 
                           <span className={cost != null ? "pastille-ronde" : undefined} style={{ fontSize: 11, height: HAUTEUR, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: cost != null ? "0 9px" : undefined, color: cost != null ? undefined : "#9a8f84", fontWeight: 700, flexShrink: 0 }}>
-                            {cost != null ? `${fmtMoney(cost)} €` : "—"}
+                            {cost != null ? `${fmtMoney(cost)} €` : voirMontants ? "—" : ""}
                           </span>
 
                           <button

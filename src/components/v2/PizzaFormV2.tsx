@@ -1,5 +1,6 @@
 "use client";
 
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import { toutesLesPages } from "@/lib/supabaseChunks";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRecipeDraft } from "@/lib/useRecipeDraft";
@@ -56,6 +57,8 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
   const router = useRouter();
   const { can } = useProfile();
   const userCanWrite = can("operations.edit_recettes");
+  // Montants réservés aux administrateurs et managers, jamais sur la tablette (05/11/2026)
+  const voirMontants = useVoirMontants();
   const etab = useEtablissement();
   const isEdit = !!pizzaId;
 
@@ -846,7 +849,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
                           onChange={setBallWeightG}
                           step={1} min={0}
                         />
-                        {doughCostPerBall != null && (
+                        {voirMontants && doughCostPerBall != null && (
                           <span style={{ marginLeft: 10, fontSize: 13, color: "#6f6a61" }}>
                             → Cout paton : {fmtMoney(doughCostPerBall)} €
                           </span>
@@ -974,7 +977,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
 }
 
 // ── Pizza Pricing Panel — Hero KPI + Tiroir ─────────────────────
-function PizzaPricing({
+function PizzaPricingInterne({
   costPerPizza, totalWeightG, cookedWeightG, onCookedWeightChange, sellPriceEmporter, onSellPriceEmporterChange, vatEmporter, onVatEmporterChange, sellPricePerKg, onSellPricePerKgChange, sellPricePerPortion, onSellPricePerPortionChange, nbParts, onNbPartsChange, costPerPart,
   sellCoeff, onSellCoeffChange,
   derivedSellPerPart, derivedSellPerPizza,
@@ -1403,4 +1406,10 @@ function PizzaPricing({
       </div>
     </div>
   );
+}
+
+/** Montants réservés aux administrateurs et managers, jamais sur la tablette (05/11/2026) */
+function PizzaPricing(props: React.ComponentProps<typeof PizzaPricingInterne>) {
+  const voir = useVoirMontants();
+  return voir ? <PizzaPricingInterne {...props} /> : null;
 }

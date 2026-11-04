@@ -1,5 +1,6 @@
 "use client";
 
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import { toutesLesPages } from "@/lib/supabaseChunks";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -73,6 +74,8 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
   const router = useRouter();
   const { can } = useProfile();
   const userCanWrite = can("operations.edit_recettes");
+  // Montants réservés aux administrateurs et managers, jamais sur la tablette (05/11/2026)
+  const voirMontants = useVoirMontants();
   const { current: etab } = useEtablissement();
   const isEdit = !!recipeId;
 
@@ -728,7 +731,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
         await supabase.from("kitchen_recipes").update({ output_ingredient_id: newIng.id }).eq("id", recipeId);
       }
 
-      setIndexMsg(costPerKg ? `Index mis à jour — ${fmtMoney(costPerKg)} €/kg` : "Ajouté à l'index (prix non calculé)");
+      setIndexMsg(!voirMontants ? "Index mis à jour" : costPerKg ? `Index mis à jour — ${fmtMoney(costPerKg)} €/kg` : "Ajouté à l'index (prix non calculé)");
       setTimeout(() => setIndexMsg(null), 5000);
     } catch (err) {
       setIndexMsg("Erreur : " + (err instanceof Error ? err.message : String(err)));
@@ -1070,10 +1073,10 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                     <h3 style={{ margin: 0, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#777" }}>
                       Ingrédients
                     </h3>
-                    {(totalWeightG > 0 || totalCost > 0) && (
+                    {(totalWeightG > 0 || (voirMontants && totalCost > 0)) && (
                       <div style={{ fontSize: 11, color: "#9a8f84", display: "flex", gap: 12, alignItems: "baseline" }}>
                         {totalWeightG > 0 && <span><strong style={{ color: "#4a6741", fontSize: 13 }}>{Math.round(totalWeightG).toLocaleString("fr-FR")}</strong> g</span>}
-                        {totalCost > 0 && <span><strong style={{ color: "#D4775A", fontSize: 13 }}>{round2(totalCost).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> €</span>}
+                        {voirMontants && totalCost > 0 && <span><strong style={{ color: "#D4775A", fontSize: 13 }}>{round2(totalCost).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> €</span>}
                       </div>
                     )}
                   </div>
@@ -1112,7 +1115,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
                           Index ingrédient
                         </p>
                         <p className="muted" style={{ margin: "2px 0 0", fontSize: 11 }}>
-                          {costPerKg ? `Prix calculé : ${fmtMoney(costPerKg)} €/kg` : "Prix non calculé (rendement manquant)"}
+                          {!voirMontants ? "Ajouté à l'index des produits" : costPerKg ? `Prix calculé : ${fmtMoney(costPerKg)} €/kg` : "Prix non calculé (rendement manquant)"}
                         </p>
                       </div>
                       <button
@@ -1576,7 +1579,7 @@ function StepsGhostSlots({ onAdd }: { onAdd: (label: string) => void }) {
 }
 
 // ── Cuisine Pricing Panel — Hero KPI + Tiroir ───────────────────
-function CuisinePricing({
+function CuisinePricingInterne({
   pricingMode, onPricingModeChange,
   totalCost, costPerKg: _costPerKg, baseCost,
   portions, onPortionsChange,
@@ -1954,4 +1957,10 @@ function CuisinePricing({
       </div>
     </div>
   );
+}
+
+/** Montants réservés aux administrateurs et managers, jamais sur la tablette (05/11/2026) */
+function CuisinePricing(props: React.ComponentProps<typeof CuisinePricingInterne>) {
+  const voir = useVoirMontants();
+  return voir ? <CuisinePricingInterne {...props} /> : null;
 }

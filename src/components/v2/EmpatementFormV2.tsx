@@ -1,5 +1,6 @@
 "use client";
 
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import { toutesLesPages } from "@/lib/supabaseChunks";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -59,6 +60,8 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
   const router = useRouter();
   const { can } = useProfile();
   const userCanWrite = can("operations.edit_recettes");
+  // Montants réservés aux administrateurs et managers, jamais sur la tablette (05/11/2026)
+  const voirMontants = useVoirMontants();
   const { current: etab } = useEtablissement();
   const isEdit = !!recipeId;
 
@@ -140,7 +143,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       id: i.id,
       name: i.name,
       category: i.category,
-      rightBottom: epg != null ? `${fmtMoney(epg * 1000)} €/kg` : undefined,
+      rightBottom: voirMontants && epg != null ? `${fmtMoney(epg * 1000)} €/kg` : undefined,
     };
   });
 
@@ -865,12 +868,12 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
                       ))}
                     </div>
 
-                    {liveCost && !liveCost.complet && (() => { const n = liveCost.nonLies.length + liveCost.sansPrix.length; return (
+                    {voirMontants && liveCost && !liveCost.complet && (() => { const n = liveCost.nonLies.length + liveCost.sansPrix.length; return (
                       <div style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(183,121,31,0.1)", color: "#b7791f", fontSize: 12.5, fontWeight: 600, marginBottom: 8 }}>
                         Coût incomplet : {n} ingrédient{n > 1 ? "s" : ""} {liveCost.nonLies.length ? `non lié${liveCost.nonLies.length > 1 ? "s" : ""} (${liveCost.nonLies.join(", ")})` : ""}{liveCost.nonLies.length && liveCost.sansPrix.length ? " et " : ""}{liveCost.sansPrix.length ? `sans prix au catalogue (${liveCost.sansPrix.join(", ")})` : ""}. Lie chaque ingrédient à un article qui a un prix pour un coût juste.
                       </div>
                     ); })()}
-                    {liveCost && liveCost.hasAnyCost && (
+                    {voirMontants && liveCost && liveCost.hasAnyCost && (
                       <div style={{
                         display: "flex", gap: 12, padding: "10px 12px", borderRadius: 8,
                         background: "rgba(180,83,9,0.06)", border: "1px solid rgba(180,83,9,0.2)",

@@ -1,5 +1,6 @@
 "use client";
 
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import { useMemo } from "react";
 import type { CpuByUnit } from "@/lib/offerPricing";
 import type { Ingredient } from "@/types/ingredients";
@@ -56,7 +57,7 @@ function round2(n: number) { return Math.round(n * 100) / 100; }
 
 // ── Component ────────────────────────────────────────────────
 
-export function GestionFoodCost({
+function GestionFoodCostInterne({
   lines, ingredients, priceByIngredient,
   supplierByIngredient, totalCost, yieldGrams,
   multiplier = 1,
@@ -252,4 +253,10 @@ function formatCpu(cpu: CpuByUnit, unit: string): string {
   if (cpu.ml) return `${(cpu.ml * 1000).toFixed(2)}/L`;
   if (cpu.pcs) return `${cpu.pcs.toFixed(2)}/pc`;
   return "-";
+}
+
+/** Montants réservés aux administrateurs et managers, jamais sur la tablette (05/11/2026) */
+export function GestionFoodCost(props: GestionFoodCostProps) {
+  const voir = useVoirMontants();
+  return voir ? <GestionFoodCostInterne {...props} /> : null;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import React, { useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { triParLibelle } from "@/lib/tri";
 import { useRouter } from "next/navigation";
@@ -146,6 +147,8 @@ const Kpi = ({ l, val, s, couleur }: { l: string; val: string; s: string; couleu
 function VoletLecture({ fiche, groupe, peutEcrire, onFermer, onEditer }: { fiche: FicheCarte; groupe: Groupe; peutEcrire: boolean; onFermer: () => void; onEditer: (e: EditionFiche) => void }) {
   const v = verdict(fiche.food_cost);
   const prep = CATEGORIES_PREP.has(fiche.categorie);
+  // Montants réservés aux administrateurs et managers (05/11/2026)
+  const voir = useVoirMontants();
   const sousTitre = [groupe.libelle, fiche.sous_categorie, fiche.statut ? STATUTS[fiche.statut]?.libelle : null, `${fiche.lignes.length} ingrédient${fiche.lignes.length > 1 ? "s" : ""}`].filter(Boolean).join(" · ");
   const pied = (
     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -158,7 +161,9 @@ function VoletLecture({ fiche, groupe, peutEcrire, onFermer, onEditer }: { fiche
       <div style={{ display: "grid", gap: 10, alignContent: "start" }}>
         {fiche.photo_url && <div style={{ height: 160, borderRadius: 12, background: `url(${fiche.photo_url}) center/cover` }} />}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          {prep ? (
+          {!voir ? (
+            <Kpi l="Ingrédients" val={String(fiche.lignes.length)} s={fiche.allergenes.length ? `${fiche.allergenes.length} allergène${fiche.allergenes.length > 1 ? "s" : ""}` : "aucun allergène"} />
+          ) : prep ? (
             <>
               <Kpi l="Coût de la recette" val={fiche.total_cost != null ? euros(fiche.total_cost) : "—"} s={fiche.poids_g ? `${fiche.poids_g} g produits` : fiche.nb_parts > 1 ? `${fiche.nb_parts} parts` : "au prix d'achat du moment"} />
               <Kpi l="Ingrédients" val={String(fiche.lignes.length)} s={fiche.allergenes.length ? `${fiche.allergenes.length} allergène${fiche.allergenes.length > 1 ? "s" : ""}` : "aucun allergène"} />
@@ -189,9 +194,9 @@ function VoletLecture({ fiche, groupe, peutEcrire, onFermer, onEditer }: { fiche
             <span style={{ color: MUTED, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{qte(l.qty, l.unit)}</span>
           </div>
         ))}
-        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, paddingTop: 8 }}>
+        {voir && <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, paddingTop: 8 }}>
           <span>Coût matière de la recette</span><span>{fiche.total_cost != null ? euros(fiche.total_cost) : "—"}</span>
-        </div>
+        </div>}
       </div>
     </VoletDroit>
   );
@@ -204,6 +209,7 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
 }) {
   const router = useRouter();
   const { donnees, erreur } = source;
+  const voir = useVoirMontants();
   const affichage = useSyncExternalStore(abonner, lire, () => "cat" as const);
   const [q, setQ] = useState("");
   const [groupeFiltre, setGroupeFiltre] = useState("tous");
@@ -250,9 +256,9 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
       {!enSection && <th style={TH}>Catégorie</th>}
       <th style={TH}>Statut</th>
       <th style={{ ...TH, textAlign: "right" }}>Ingrédients</th>
-      <th style={{ ...TH, textAlign: "right" }}>{mode === "fiches" ? "Coût matière" : "Coût recette"}</th>
-      {mode === "fiches" && <th style={{ ...TH, textAlign: "right" }}>Prix TTC</th>}
-      {mode === "fiches" && <th style={{ ...TH, textAlign: "right" }}>Food cost</th>}
+      {voir && <th style={{ ...TH, textAlign: "right" }}>{mode === "fiches" ? "Coût matière" : "Coût recette"}</th>}
+      {voir && mode === "fiches" && <th style={{ ...TH, textAlign: "right" }}>Prix TTC</th>}
+      {voir && mode === "fiches" && <th style={{ ...TH, textAlign: "right" }}>Food cost</th>}
       <th style={TH} />
     </tr>
   );
@@ -269,13 +275,13 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
         {!enSection && <td style={TD}><span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}><Point couleur={g?.couleur ?? FAIBLE} />{g?.libelle}</span></td>}
         <td style={TD}><Statut s={l.statut} /></td>
         <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", color: l.nbIngredients == null ? FAIBLE : "#1a1a1a" }}>{l.nbIngredients ?? "—"}</td>
-        <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: l.cout == null ? FAIBLE : "#1a1a1a" }}>
+        {voir && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: l.cout == null ? FAIBLE : "#1a1a1a" }}>
           {l.cout != null ? euros(l.cout) : "—"}{l.coutLibelle && <div style={{ fontSize: 11, color: FAIBLE }}>{l.coutLibelle}</div>}
-        </td>
-        {mode === "fiches" && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: l.prix == null ? FAIBLE : "#1a1a1a" }}>
+        </td>}
+        {voir && mode === "fiches" && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: l.prix == null ? FAIBLE : "#1a1a1a" }}>
           {l.prix != null ? euros(l.prix) : "—"}{l.prixLibelle && <div style={{ fontSize: 11, color: FAIBLE }}>{l.prixLibelle}</div>}
         </td>}
-        {mode === "fiches" && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>
+        {voir && mode === "fiches" && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>
           {v && l.foodCost != null ? <span style={{ fontWeight: 600, color: v.couleur, fontVariantNumeric: "tabular-nums" }}><Point couleur={v.couleur} />{pct(l.foodCost)}</span> : <span style={{ color: FAIBLE }}>—</span>}
         </td>}
         <td style={{ ...TD, textAlign: "right", width: 40, color: FAIBLE, fontWeight: 700 }}>→</td>
@@ -286,8 +292,8 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
   const ligneMobile = (l: Ligne, enSection: boolean) => {
     const g = groupeParCle.get(l.groupe);
     const v = verdict(l.foodCost);
-    const valeur = mode === "fiches" ? (l.prix != null ? euros(l.prix) : l.cout != null ? euros(l.cout) : "—") : (l.cout != null ? euros(l.cout) : "—");
-    const detail = v && l.foodCost != null ? <span style={{ color: v.couleur, fontWeight: 600 }}>{pct(l.foodCost)}</span> : l.cout != null && mode === "fiches" && l.prix != null ? <span style={{ color: FAIBLE }}>coût {euros(l.cout)}</span> : l.coutLibelle ? <span style={{ color: FAIBLE }}>{l.coutLibelle}</span> : null;
+    const valeur = !voir ? (l.nbIngredients != null ? `${l.nbIngredients} ingr.` : "") : mode === "fiches" ? (l.prix != null ? euros(l.prix) : l.cout != null ? euros(l.cout) : "—") : (l.cout != null ? euros(l.cout) : "—");
+    const detail = !voir ? null : v && l.foodCost != null ? <span style={{ color: v.couleur, fontWeight: 600 }}>{pct(l.foodCost)}</span> : l.cout != null && mode === "fiches" && l.prix != null ? <span style={{ color: FAIBLE }}>coût {euros(l.cout)}</span> : l.coutLibelle ? <span style={{ color: FAIBLE }}>{l.coutLibelle}</span> : null;
     return (
       <tr key={l.id} className="cf-ligne" onClick={() => ouvrir(l)} style={{ cursor: "pointer" }}>
         <td style={{ ...TD, padding: 0, width: 4, background: g?.couleur }} />
@@ -300,7 +306,7 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
     );
   };
   const tableauMobile = (liste: Ligne[], enSection: boolean) => (
-    <TableauMobile enSection={enSection} colonnes={[{ libelle: mode === "fiches" ? "Fiche" : "Préparation" }, { libelle: mode === "fiches" ? "Prix · food cost" : "Coût", align: "right", largeur: 136 }, { largeur: 24 }]}>
+    <TableauMobile enSection={enSection} colonnes={[{ libelle: mode === "fiches" ? "Fiche" : "Préparation" }, { libelle: !voir ? "Ingrédients" : mode === "fiches" ? "Prix · food cost" : "Coût", align: "right", largeur: 136 }, { largeur: 24 }]}>
       {liste.map((l) => ligneMobile(l, enSection))}
     </TableauMobile>
   );
@@ -314,8 +320,8 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
       <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", gap: 10 }}>
         <Tuile couleur="#1a1a1a" icone="fiche" libelle={mode === "fiches" ? "Fiches techniques" : "Préparations"} valeur={String(compteurs.total)} sous={compteurs.autres ? `+ ${compteurs.autres} ${mode === "fiches" ? "vins" : "empâtements et anciennes fiches"}` : mode === "fiches" ? "pizze, cuisine, cocktails" : "sauces, bases, pâtes"} active={statut === "tous"} onClick={() => setStatut("tous")} />
         <Tuile icone="recu" couleur={BON} libelle="Publiées" valeur={String(compteurs.publiees)} sous="visibles par l'équipe dans la Carte" active={statut === "publiee"} onClick={() => setStatut(statut === "publiee" ? "tous" : "publiee")} />
-        <Tuile icone="sans" couleur={compteurs.sansCout ? MAUVAIS : BON} libelle="Sans coût" valeur={String(compteurs.sansCout)} sous="ingrédients sans prix d'achat" active={statut === "sans_cout"} onClick={() => setStatut(statut === "sans_cout" ? "tous" : "sans_cout")} />
-        {mode === "fiches"
+        {voir && <Tuile icone="sans" couleur={compteurs.sansCout ? MAUVAIS : BON} libelle="Sans coût" valeur={String(compteurs.sansCout)} sous="ingrédients sans prix d'achat" active={statut === "sans_cout"} onClick={() => setStatut(statut === "sans_cout" ? "tous" : "sans_cout")} />}
+        {mode === "fiches" && voir
           ? <Tuile icone="foodcost" couleur={compteurs.fcMoyen != null ? (verdict(compteurs.fcMoyen)?.couleur ?? undefined) : undefined} libelle="Food cost moyen" valeur={compteurs.fcMoyen != null ? pct(compteurs.fcMoyen) : "—"} sous={compteurs.sansPrix ? `${compteurs.sansPrix} fiche${compteurs.sansPrix > 1 ? "s" : ""} sans prix de vente` : "sur les fiches avec prix et coût"} active={statut === "sans_prix"} onClick={() => setStatut(statut === "sans_prix" ? "tous" : "sans_prix")} />
           : <Tuile icone="alerte" couleur={ATTENTION} libelle="Brouillons" valeur={String(fiches.filter((l) => l.statut === "brouillon").length)} sous="à valider ou à publier" active={statut === "brouillon"} onClick={() => setStatut(statut === "brouillon" ? "tous" : "brouillon")} />}
       </div>
@@ -328,7 +334,7 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
           {triParLibelle(groupes, (g) => g.libelle).map((g) => <option key={g.cle} value={g.cle}>{g.libelle}</option>)}
         </select>
         <select value={statut} onChange={(e) => setStatut(e.target.value)} style={SELECT}>
-          <option value="tous">Statut : tous</option><option value="publiee">Publiées</option><option value="validee">Validées</option><option value="brouillon">Brouillons</option><option value="sans_cout">Sans coût</option>{mode === "fiches" && <option value="sans_prix">Sans prix de vente</option>}
+          <option value="tous">Statut : tous</option><option value="publiee">Publiées</option><option value="validee">Validées</option><option value="brouillon">Brouillons</option>{voir && <option value="sans_cout">Sans coût</option>}{voir && mode === "fiches" && <option value="sans_prix">Sans prix de vente</option>}
         </select>
         {bureau && <span style={{ marginLeft: "auto", color: MUTED, fontSize: 12.5 }}>{filtrees.length} {mode === "fiches" ? "fiche" : "préparation"}{filtrees.length > 1 ? "s" : ""}</span>}
         <span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3, marginLeft: bureau ? 0 : "auto" }}>
@@ -384,8 +390,8 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
             const sansCout = liste.filter((l) => l.fiche && l.cout == null).length;
             const brouillons = liste.filter((l) => l.statut === "brouillon").length;
             const etat = [
-              mode === "fiches" && avecFc.length ? `food cost ${pct(avecFc.reduce((s, l) => s + (l.foodCost ?? 0), 0) / avecFc.length)}` : null,
-              sansCout ? `${sansCout} sans coût` : null,
+              voir && mode === "fiches" && avecFc.length ? `food cost ${pct(avecFc.reduce((s, l) => s + (l.foodCost ?? 0), 0) / avecFc.length)}` : null,
+              voir && sansCout ? `${sansCout} sans coût` : null,
               brouillons ? `${brouillons} brouillon${brouillons > 1 ? "s" : ""}` : null,
             ].filter(Boolean).join(" · ");
             return (

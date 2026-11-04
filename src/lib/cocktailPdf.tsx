@@ -22,6 +22,8 @@ export type CocktailPdfData = {
   logoBase64: string | null;
   photoUrl: string | null;
   accentColor?: string;
+  /** Montants réservés aux administrateurs et managers (05/11/2026) */
+  montants?: boolean;
 };
 
 const DEFAULT_ACCENT = "#8B1A1A";
@@ -318,11 +320,11 @@ export function CocktailPdfDocument({ data }: { data: CocktailPdfData }) {
                   <Text style={styles.infoValue}>{data.garnish}</Text>
                 </View>
               ) : null}
-              <View style={styles.infoRow}>
+              {data.montants !== false && <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Coût matière</Text>
                 <Text style={styles.infoValue}>{fmtMoney(data.totalCost)}</Text>
-              </View>
-              {data.sellPrice != null && data.sellPrice > 0 ? (
+              </View>}
+              {data.montants !== false && data.sellPrice != null && data.sellPrice > 0 ? (
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Prix de vente</Text>
                   <Text style={styles.infoValue}>{fmtMoney(data.sellPrice)}</Text>
@@ -348,7 +350,7 @@ export function CocktailPdfDocument({ data }: { data: CocktailPdfData }) {
           <Text style={[styles.th, styles.colIngredient]}>Ingrédient</Text>
           <Text style={[styles.th, styles.colQty]}>Qté</Text>
           <Text style={[styles.th, styles.colUnit]}>Unité</Text>
-          <Text style={[styles.th, styles.colCost]}>Coût</Text>
+          {data.montants !== false && <Text style={[styles.th, styles.colCost]}>Coût</Text>}
         </View>
         {data.lines.map((i, idx) => {
           const [qStr, uStr] = formatLiquidQtyParts(i.qty, i.unit);
@@ -357,7 +359,7 @@ export function CocktailPdfDocument({ data }: { data: CocktailPdfData }) {
               <Text style={styles.colIngredient}>{i.name ?? "—"}</Text>
               <Text style={styles.colQty}>{qStr}</Text>
               <Text style={styles.colUnit}>{uStr}</Text>
-              <Text style={styles.colCost}>{fmtMoney(i.cost)}</Text>
+              {data.montants !== false && <Text style={styles.colCost}>{fmtMoney(i.cost)}</Text>}
             </View>
           );
         })}

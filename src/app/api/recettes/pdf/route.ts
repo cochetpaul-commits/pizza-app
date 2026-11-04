@@ -4,6 +4,7 @@ import type { DocumentProps } from "@react-pdf/renderer";
 import React from "react";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { RecettePDFDoc } from "./RecettePDFDoc";
+import { montantsAutorises } from "@/lib/montantsServeur";
 
 export const runtime = "nodejs";
 
@@ -82,6 +83,7 @@ export async function GET(req: NextRequest) {
     }),
     steps,
     notes: !steps.length ? (recipe.notes ?? null) : null,
+    montants: await montantsAutorises(req),
   };
 
   // Compute totals

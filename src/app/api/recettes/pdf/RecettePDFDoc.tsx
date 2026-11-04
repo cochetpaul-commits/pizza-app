@@ -42,6 +42,8 @@ type RecipeData = {
   lines: { name: string; qty: number; unit: string; stage: string; cost: number | null }[];
   steps: string[];
   notes: string | null;
+  /** Montants réservés aux administrateurs et managers (05/11/2026) : sans eux, ni coûts, ni prix, ni food cost */
+  montants?: boolean;
 };
 
 export function RecettePDFDoc(data: RecipeData) {
@@ -65,7 +67,7 @@ export function RecettePDFDoc(data: RecipeData) {
             <Text style={{ flex: 3, fontSize: 8, fontFamily: "Helvetica-Bold", color: c.muted }}>INGREDIENT</Text>
             <Text style={{ width: 50, fontSize: 8, fontFamily: "Helvetica-Bold", color: c.muted, textAlign: "right" }}>QTE</Text>
             <Text style={{ width: 30, fontSize: 8, fontFamily: "Helvetica-Bold", color: c.muted, textAlign: "right" }}>UNITE</Text>
-            <Text style={{ width: 50, fontSize: 8, fontFamily: "Helvetica-Bold", color: c.muted, textAlign: "right" }}>COUT</Text>
+            {data.montants !== false && <Text style={{ width: 50, fontSize: 8, fontFamily: "Helvetica-Bold", color: c.muted, textAlign: "right" }}>COUT</Text>}
           </View>
           {lines.map((l, i) => (
             <View key={i} style={{ ...s.row, backgroundColor: i % 2 === 0 ? c.white : c.bg }}>
@@ -76,9 +78,9 @@ export function RecettePDFDoc(data: RecipeData) {
               <Text style={{ width: 30, fontSize: 9, textAlign: "right", color: c.muted }}>
                 {l.unit === "g" && l.qty >= 1000 ? "kg" : l.unit}
               </Text>
-              <Text style={{ width: 50, fontSize: 9, textAlign: "right", color: c.bordeaux }}>
+              {data.montants !== false && <Text style={{ width: 50, fontSize: 9, textAlign: "right", color: c.bordeaux }}>
                 {l.cost != null ? `${fmtMoney(l.cost)}\u20AC` : "-"}
-              </Text>
+              </Text>}
             </View>
           ))}
         </View>
@@ -107,7 +109,7 @@ export function RecettePDFDoc(data: RecipeData) {
         </View>
 
         {/* KPIs */}
-        <View style={s.kpiRow}>
+        {data.montants !== false && <View style={s.kpiRow}>
           <View style={s.kpi}>
             <Text style={s.kpiLabel}>Cout {data.portions > 1 ? "/ portion" : "total"}</Text>
             <Text style={{ ...s.kpiVal, color: c.bordeaux }}>{fmtMoney(costPerPortion)}{"\u20AC"}</Text>
@@ -130,7 +132,7 @@ export function RecettePDFDoc(data: RecipeData) {
               <Text style={{ ...s.kpiVal, color: c.green }}>{fmtMoney(marge)}{"\u20AC"}</Text>
             </View>
           )}
-        </View>
+        </View>}
 
         {/* Poids */}
         {data.totalWeightG > 0 && (
