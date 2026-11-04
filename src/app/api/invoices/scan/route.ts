@@ -139,7 +139,7 @@ export async function POST(req: Request) {
       inserted: {
         supplier_id: result.supplierId,
         ingredients_created: result.ingredientsCreated,
-        offers_inserted: result.offersInserted,
+        offers_inserted: result.offersInserted, offres_a_valider: result.offresAValider ?? 0, changements: result.changements ?? [],
       },
       parsed: invoice,
     });

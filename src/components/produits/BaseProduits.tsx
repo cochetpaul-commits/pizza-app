@@ -274,6 +274,8 @@ export type BaseProduitsProps = {
   aCommander: number;
   /** Produits cochés « repas du personnel » (avantage en nature) */
   nbPersonnel: number;
+  /** Fiches créées depuis 30 jours */
+  nbNouveaux: number;
   onToggleActif?: (x: Ingredient) => void;
   q: string;
   setQ: (v: string) => void;
@@ -489,6 +491,7 @@ export function BaseProduits(p: BaseProduitsProps) {
           <Tuile compacte icone="alerte" libelle="À contrôler" valeur={nombre(p.aControler)} sous="" active={p.tab === "to_check"} couleur={ATTENTION} onClick={() => p.setTab("to_check")} />
           <Tuile compacte icone="sans" libelle="Sans prix" valeur={nombre(p.sansPrix)} sous="" active={p.tab === "sans_prix"} couleur={MAUVAIS} onClick={() => p.setTab("sans_prix")} />
           {tuileCommander(true)}
+          <Tuile compacte icone="produit" libelle="Nouveaux produits" valeur={nombre(p.nbNouveaux)} sous="" active={p.tab === "nouveaux"} couleur={INFO} onClick={() => p.setTab(p.tab === "nouveaux" ? "all" : "nouveaux")} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {ligneInventaire}
@@ -593,11 +596,12 @@ export function BaseProduits(p: BaseProduitsProps) {
       </div>
 
       {/* Tuiles : elles changent la vue (Tous / À contrôler / Sans prix / À commander) ; la dernière ouvre les doublons */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
         <Tuile couleur="#1a1a1a" icone="produit" libelle="Produits actifs" valeur={nombre(p.total)} sous={`dans ${nbCategories} catégorie${nbCategories > 1 ? "s" : ""} affichée${nbCategories > 1 ? "s" : ""}`} active={p.tab === "all"} onClick={() => p.setTab("all")} />
         <Tuile icone="alerte" libelle="À contrôler" valeur={nombre(p.aControler)} sous="unité, contenance ou prix à vérifier" active={p.tab === "to_check"} couleur={ATTENTION} onClick={() => p.setTab("to_check")} />
         <Tuile icone="sans" libelle="Sans prix d'achat" valeur={nombre(p.sansPrix)} sous="aucune offre fournisseur active" active={p.tab === "sans_prix"} couleur={MAUVAIS} onClick={() => p.setTab("sans_prix")} />
         {tuileCommander(false)}
+        <Tuile icone="produit" libelle="Nouveaux produits" valeur={nombre(p.nbNouveaux)} sous="créés depuis 30 jours (factures, ajouts)" active={p.tab === "nouveaux"} couleur={INFO} onClick={() => p.setTab(p.tab === "nouveaux" ? "all" : "nouveaux")} />
         <Tuile icone="equipe" libelle="Repas du personnel" valeur={nombre(p.nbPersonnel)} sous="avantages en nature, hors achats matières" active={p.tab === "personnel"} couleur="#1a1a1a" onClick={() => p.setTab(p.tab === "personnel" ? "all" : "personnel")} />
         <Tuile icone="doublon" libelle="Doublons probables" valeur={nombre(p.nbDoublons)} sous="paires de fiches aux noms proches" couleur={ATTENTION} onClick={p.onDoublons} />
       </div>

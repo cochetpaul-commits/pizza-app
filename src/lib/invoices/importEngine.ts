@@ -47,7 +47,20 @@ export interface ImportResult {
   offresAValider?: number;
   /** Lignes sans fiche correspondante (mode sans création : mises en attente, pas d'offre) */
   lignesSansFiche: string[];
+  /** Ce que l'import a changé, produit par produit (04/11/2026) : affiché après l'import */
+  changements?: Changement[];
 }
+
+export type Changement = {
+  /** nouveau : fiche créée ; prix : prix modifié ; premier_prix : premier prix chez ce fournisseur ;
+   *  a_valider : baisse de plus de 20 % non appliquée ; reactive : fiche désactivée remise en service */
+  type: "nouveau" | "prix" | "premier_prix" | "a_valider" | "reactive";
+  nom: string;
+  ingredient_id?: string | null;
+  ancien?: number | null;
+  nouveau?: number | null;
+  unite?: string | null;
+};
 
 // ── Utilitaires ────────────────────────────────────────────────────────────────
 
@@ -171,6 +184,7 @@ export async function runImport(options: {
   } = options;
   const lignesSansFiche: string[] = [];
   let offresAValider = 0;
+  const changements: Changement[] = [];
   if (estFournisseurInterne(supplierName)) throw new Error("Fournisseur interne (sans facture) : aucun import possible");
   // Établissement d'import (30/10/2026) : une fiche créée par une facture appartient à l'établissement qui l'importe,
   // pas aux deux. Les stocks, commandes et prix ne sont pas les mêmes à Bello Mio et à Piccola Mia.
@@ -411,9 +425,10 @@ export async function runImport(options: {
     if (toCreate.length) {
       let created = 0;
       for (const row of toCreate) {
-        const ins = await supabase.from("ingredients").insert(row);
+        const ins = await supabase.from("ingredients").insert(row).select("id").single();
         if (!ins.error) {
           created++;
+          changements.push({ type: "nouveau", nom: String(row.name ?? ""), ingredient_id: (ins.data as { id: string } | null)?.id ?? null });
         } else if ((ins.error as { code?: string }).code !== "23505") {
           throw new Error(ins.error.message);
         } else {
@@ -606,6 +621,7 @@ export async function runImport(options: {
           const ecart = (nouveau / a.unit_price - 1) * 100;
           if (ecart < -20) {
             aValider.add(ing);
+            changements.push({ type: "a_valider", nom: String(x.supplier_label ?? ""), ingredient_id: ing, ancien: a.unit_price, nouveau, unite: (x.unit as string | null) ?? null });
             lignesAValider.push({ ingredient_id: ing, supplier_id: supplierId, etablissement_id: etabId ?? null, offre: { ...x, valid_from: (x.valid_from as string | undefined) ?? dateFacture },
               ancien_prix: a.unit_price, nouveau_prix: nouveau, ecart_pct: Math.round(ecart * 10) / 10, unite: (x.unit as string | null) ?? null,
               source: `${normalizedName}${invoiceNumber ? " " + invoiceNumber : ""}${payload.invoice_date ? " du " + payload.invoice_date : ""}` });
@@ -656,6 +672,13 @@ export async function runImport(options: {
 
         if (r.error) throw new Error(r.error.message);
         offersInserted += 1;
+        {
+          const avant = activesMemeFournisseur.find((a) => a.ingredient_id === ingId);
+          const nouveau = Number(row.unit_price ?? NaN);
+          const nom = String(row.supplier_label ?? "");
+          if (!avant || avant.unit_price == null) changements.push({ type: "premier_prix", nom, ingredient_id: ingId, nouveau: Number.isFinite(nouveau) ? nouveau : null, unite: (row.unit as string | null) ?? null });
+          else if (Number.isFinite(nouveau) && Math.abs(nouveau - avant.unit_price) > 0.005) changements.push({ type: "prix", nom, ingredient_id: ingId, ancien: avant.unit_price, nouveau, unite: (row.unit as string | null) ?? null });
+        }
       }
     }
 
@@ -666,11 +689,13 @@ export async function runImport(options: {
     {
       const allIngIds = Array.from(offerByIngredient.keys());
       if (allIngIds.length) {
-        await supabase
+        const { data: reactives } = await supabase
           .from("ingredients")
           .update({ is_active: true })
           .in("id", allIngIds)
-          .eq("is_active", false);
+          .eq("is_active", false)
+          .select("id, name");
+        for (const r of (reactives ?? []) as { id: string; name: string }[]) changements.push({ type: "reactive", nom: r.name, ingredient_id: r.id });
         const { data: estabRows } = await supabase
           .from("ingredients")
           .select("id,establishments")
@@ -692,5 +717,5 @@ export async function runImport(options: {
     }
   }
 
-  return { supplierId, invoiceId, invoiceAlreadyImported, ingredientsCreated, offersInserted, offresAValider, lignesSansFiche };
+  return { supplierId, invoiceId, invoiceAlreadyImported, ingredientsCreated, offersInserted, offresAValider, lignesSansFiche, changements };
 }

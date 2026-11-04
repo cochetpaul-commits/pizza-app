@@ -26,7 +26,7 @@ export type Category = (typeof CATEGORIES)[number];
 export type PriceKind = "unit" | "pack_simple" | "pack_composed";
 export type IngredientStatus = "to_check" | "validated";
 /** Vue de la Base produits : tous, à contrôler, validés (statut en base) ou sans prix d'achat (calculé) */
-export type Tab = IngredientStatus | "all" | "sans_prix" | "a_commander" | "personnel";
+export type Tab = IngredientStatus | "all" | "sans_prix" | "a_commander" | "personnel" | "nouveaux";
 
 export const CAT_LABELS: Record<Category, string> = {
   cremerie_fromage:   "Crémerie / Fromage",
@@ -102,6 +102,8 @@ export type Supplier = {
 export type Ingredient = {
   id: string;
   name: string;
+  /** Date de création de la fiche (tuile « Nouveaux produits », 04/11/2026) */
+  created_at?: string | null;
   /** Clé stable utilisée pour le matching lors des imports de factures.
    *  Ne jamais modifier automatiquement. Fallback sur `name` si null. */
   import_name?: string | null;

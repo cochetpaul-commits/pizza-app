@@ -1,5 +1,6 @@
 "use client";
 
+import { ChangementsImport, resumeChangements, type Changement } from "@/components/invoices/ChangementsImport";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { RequireRole } from "@/components/RequireRole";
@@ -41,6 +42,8 @@ type ImportResult = {
     supplier_id: string;
     ingredients_created?: number;
     offers_inserted?: number;
+    offres_a_valider?: number;
+    changements?: Changement[];
   };
 };
 
@@ -75,7 +78,7 @@ type BatchItem = {
   supplier?: string;
   detectedSupplier?: string;
   detectedEtab?: string;
-  result?: { ingredients_created?: number; offers_inserted?: number; already_imported?: boolean };
+  result?: { ingredients_created?: number; offers_inserted?: number; already_imported?: boolean; changements?: Changement[] };
   error?: string;
 };
 
@@ -448,6 +451,7 @@ export default function InvoicesPage() {
             ingredients_created: data.inserted?.ingredients_created ?? 0,
             offers_inserted: data.inserted?.offers_inserted ?? 0,
             already_imported: data.invoice?.already_imported ?? false,
+            changements: (data.inserted?.changements ?? []) as Changement[],
           },
         } : p));
       } catch (e) {
@@ -800,9 +804,14 @@ export default function InvoicesPage() {
                     </div>
                     {item.status === "done" && item.supplier && (
                       <div style={{ fontSize: 11, color: "#4a6741" }}>
-                        {item.supplier}
-                        {`${item.result?.ingredients_created ?? 0} ingredients, ${item.result?.offers_inserted ?? 0} offres`}{item.result?.already_imported ? " (facture deja connue)" : ""}
+                        {item.supplier} · {resumeChangements(item.result?.changements ?? [])}{item.result?.already_imported ? " (facture déjà connue)" : ""}
                       </div>
+                    )}
+                    {item.status === "done" && (item.result?.changements?.length ?? 0) > 0 && (
+                      <details style={{ marginTop: 4 }}>
+                        <summary style={{ fontSize: 11.5, color: "#D4775A", cursor: "pointer", fontWeight: 600 }}>Voir les produits</summary>
+                        <ChangementsImport changements={item.result?.changements ?? []} />
+                      </details>
                     )}
                     {item.status === "error" && (
                       <div style={{ fontSize: 11, color: "#DC2626" }}>{item.error}</div>
@@ -883,6 +892,7 @@ export default function InvoicesPage() {
                 </div>
               </div>
             )}
+            {commitResult.inserted && <ChangementsImport changements={commitResult.inserted.changements ?? []} dejaImportee={commitResult.invoice?.already_imported} />}
             <div style={{ marginTop: 24 }}>
               <button type="button" onClick={reset} style={primaryBtnStyle}>
                 Importer une autre facture

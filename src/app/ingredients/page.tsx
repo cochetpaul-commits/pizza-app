@@ -215,6 +215,7 @@ function IngredientsPageInner() {
     if (tab === "sans_prix") base = base.filter((x) => !(offerHasPrice(offersByIngredientId.get(x.id), { piece_volume_ml: x.piece_volume_ml }) || legacyHasPrice(x)));
     else if (tab === "a_commander") base = base.filter((x) => stockMap.get(x.id)?.alerte);
     else if (tab === "personnel") base = base.filter((x) => !!x.pour_personnel);
+    else if (tab === "nouveaux") base = base.filter((x) => estNouveau(x.created_at));
     else if (tab !== "all") base = base.filter((x) => ((x.status ?? "to_check") as IngredientStatus) === tab);
     if (filterCategory !== "all") base = base.filter((x) => x.category === filterCategory);
     if (filterSupplier !== "all") {
@@ -1200,6 +1201,7 @@ function IngredientsPageInner() {
   // Compteurs en base (toute la base, pas seulement les pages chargées) : Tous = Validés + À contrôler
   const aCommander = useMemo(() => visibleItems.filter((x) => stockMap.get(x.id)?.alerte).length, [visibleItems, stockMap]);
   const nbPersonnel = useMemo(() => visibleItems.filter((x) => !!x.pour_personnel).length, [visibleItems]);
+  const nbNouveaux = useMemo(() => visibleItems.filter((x) => estNouveau(x.created_at)).length, [visibleItems]);
   const compteurs = {
     tous: totalCount ?? counts.all,
     aControler: totalCount != null && validatedCount != null ? totalCount - validatedCount : counts.to_check,
@@ -1394,6 +1396,7 @@ function IngredientsPageInner() {
                 inventaireDate={stock?.inventoryDate ?? null}
                 aCommander={aCommander}
                 nbPersonnel={nbPersonnel}
+                nbNouveaux={nbNouveaux}
                 onToggleActif={toggleActif}
                 q={q}
                 setQ={setQ}
@@ -1751,6 +1754,10 @@ function IngredientsPageInner() {
     </div>
   );
 }
+
+/** Nouveaux produits (04/11/2026) : fiches créées depuis 30 jours, pour les retrouver vite en montant une recette */
+const JOURS_NOUVEAU = 30;
+const estNouveau = (creeLe: string | null | undefined) => !!creeLe && Date.now() - new Date(creeLe).getTime() < JOURS_NOUVEAU * 86400000;
 
 export default function IngredientsPage() {
   return (

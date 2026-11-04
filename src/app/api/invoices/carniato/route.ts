@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true, kind: "carniato", filename: file.name, bytes: bytes.byteLength,
       invoice: { id: result.invoiceId, already_imported: result.invoiceAlreadyImported },
-      inserted: { supplier_id: result.supplierId, ingredients_created: result.ingredientsCreated, offers_inserted: result.offersInserted },
+      inserted: { supplier_id: result.supplierId, ingredients_created: result.ingredientsCreated, offers_inserted: result.offersInserted, offres_a_valider: result.offresAValider ?? 0, changements: result.changements ?? [] },
       parsed: payload,
     });
   } catch (e: unknown) {

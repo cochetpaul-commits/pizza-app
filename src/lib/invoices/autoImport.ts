@@ -379,7 +379,7 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
       await log(
         inv, fournisseur,
         r.invoiceAlreadyImported ? "deja_connue" : "importee",
-        `${Number(inv.currency_amount ?? 0) < 0 ? "AVOIR · " : ""}${payload.lines.length} lignes · ${payload.total_ht != null ? `${payload.total_ht.toFixed(2)} € HT · ` : ""}${r.ingredientsCreated} produit(s) créé(s), ${r.offersInserted} prix mis à jour${r.offresAValider ? ` · ${r.offresAValider} baisse(s) de prix à valider` : ""}${r.lignesSansFiche.length ? ` · ${r.lignesSansFiche.length} ligne(s) sans fiche en attente : ${r.lignesSansFiche.join(" | ").slice(0, 1500)}` : ""}`,
+        `${Number(inv.currency_amount ?? 0) < 0 ? "AVOIR · " : ""}${payload.lines.length} lignes · ${payload.total_ht != null ? `${payload.total_ht.toFixed(2)} € HT · ` : ""}${r.ingredientsCreated} produit(s) créé(s), ${r.offersInserted} prix mis à jour${r.offresAValider ? ` · ${r.offresAValider} baisse(s) de prix à valider` : ""}${detailChangements(r.changements ?? [])}${r.lignesSansFiche.length ? ` · ${r.lignesSansFiche.length} ligne(s) sans fiche en attente : ${r.lignesSansFiche.join(" | ").slice(0, 1500)}` : ""}`,
         parserUtilise, payload.lines.length,
       );
     } catch (e) {
@@ -388,4 +388,12 @@ export async function autoImportFactures(etabId: string, days = 30, dossier: PlD
   }
 
   return res;
+}
+
+/** Journal (04/11/2026) : le nom des produits créés et les prix modifiés, pas seulement leur nombre */
+function detailChangements(c: { type: string; nom: string; ancien?: number | null; nouveau?: number | null }[]): string {
+  const p = (n: number | null | undefined) => (n == null ? "?" : n.toFixed(2).replace(".", ","));
+  const nouveaux = c.filter((x) => x.type === "nouveau").map((x) => x.nom);
+  const prix = c.filter((x) => x.type === "prix" || x.type === "a_valider").map((x) => `${x.nom} ${p(x.ancien)} → ${p(x.nouveau)} €${x.type === "a_valider" ? " (à valider)" : ""}`);
+  return `${nouveaux.length ? ` · nouveaux : ${nouveaux.join(", ")}` : ""}${prix.length ? ` · prix : ${prix.join(" ; ")}` : ""}`.slice(0, 2000);
 }
