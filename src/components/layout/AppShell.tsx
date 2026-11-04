@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { canAccess } from "@/lib/rbac";
 import { Sidebar } from "./Sidebar";
+import { OngletsPilotage } from "./OngletsPilotage";
 import { MobileHeader } from "./MobileHeader";
 import { TopBarDesktop } from "./TopBarDesktop";
 import { useTablette } from "@/lib/tablette/store";
@@ -66,7 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="app-main">
         <TopBarDesktop />
         <MobileHeader />
-        <main>{allowed ? children : <AccessDenied />}</main>
+        <main>{allowed ? <><OngletsPilotage />{children}</> : <AccessDenied />}</main>
       </div>
     </>
   );
