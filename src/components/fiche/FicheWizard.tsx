@@ -19,6 +19,7 @@ import {
 import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { openApiFile } from "@/lib/fetchApi";
+import { ProduireFiche } from "./ProduireFiche";
 import { couleurTexte } from "@/lib/styleCategories";
 import { useBureau } from "@/hooks/useBureau";
 import { fermerOffresActives } from "@/lib/offerClosing";
@@ -123,6 +124,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const [empatements, setEmpatements] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [produire, setProduire] = useState(false);
   const [toast, setToast] = useState("");
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -336,6 +338,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
             paton_poids: (rec.ball_weight_g as number) ?? 264,
             empatement: (rec.empatement as string) ?? "FOCACCIA",
             lignes: ficheLines,
+            pivot_ingredient_id: (rec.pivot_ingredient_id as string) ?? null,
             etapes: (() => { try { return typeof rec.procedure === "string" ? JSON.parse(rec.procedure as string) : ((rec.procedure as string[]) ?? []); } catch { return []; } })(),
             notes: (rec.notes as string) ?? "",
             portions: (rec.portions_count as number) ?? 1,
@@ -588,6 +591,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       procedure: JSON.stringify(fiche.etapes.filter(Boolean)),
       notes: fiche.notes || null,
       portions_count: fiche.portions,
+      pivot_ingredient_id: fiche.pivot_ingredient_id,
       cost_per_portion: saveCostPerPortion > 0 ? saveCostPerPortion : null,
       total_cost: saveTotalCost > 0 ? saveTotalCost : null,
       sell_price: saveHt > 0 ? saveHt : null,
@@ -999,7 +1003,12 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
 
         {/* RECETTE */}
         <div style={SEC}>
-          <h2 style={H2}>Recette {fiche.id && <button type="button" onClick={() => openApiFile(`/api/recettes/pdf?id=${fiche.id}`)} style={{ border: "none", background: "transparent", fontWeight: 600, fontSize: 13, color: "#1a1a1a", textDecoration: "underline", textDecorationColor: BORD, textUnderlineOffset: 3, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Imprimer</button>}</h2>
+          <h2 style={H2}>Recette <span style={{ display: "inline-flex", gap: 12 }}>
+            {/* Produire (05/11/2026) : la fiche mise à l'échelle pour N portions, un poids ou l'ingrédient phare */}
+            <button type="button" onClick={() => setProduire(true)} style={{ border: "none", background: "transparent", fontWeight: 700, fontSize: 13, color: "#D4775A", textDecoration: "underline", textDecorationColor: "#D4775A", textUnderlineOffset: 3, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Produire</button>
+            {fiche.id && <button type="button" onClick={() => openApiFile(`/api/recettes/pdf?id=${fiche.id}`)} style={{ border: "none", background: "transparent", fontWeight: 600, fontSize: 13, color: "#1a1a1a", textDecoration: "underline", textDecorationColor: BORD, textUnderlineOffset: 3, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Imprimer</button>}
+          </span></h2>
+          {produire && <ProduireFiche fiche={fiche} fam={fam} poidsCru={poidsCru} totalCost={totalCost} voirMontants={canSeeMoney} estPizza={isPizza} onFermer={() => setProduire(false)} />}
           <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "#6f6a61", flexWrap: "wrap" }}>
             Quantités pour
             <button type="button" onClick={() => update({ portions: Math.max(1, fiche.portions - 1) })} style={{ width: 30, height: 30, boxSizing: "border-box", borderRadius: 8, border: "1px solid #ddd6c8", background: "#fff", color: "#6f6a61", fontSize: 15, fontWeight: 500, lineHeight: 1, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>−</button>
@@ -1011,11 +1020,12 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           {isPizza && (
             <>
               <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: couleurCat }}>Avant four</div>
-              <IngredientListDnD mode={modeIngredients} droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "avant_four")} returnUrl={currentUrl} />
+              <IngredientListDnD mode={modeIngredients} droppableId="avant_four" items={toLines("avant_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "avant_four")} returnUrl={currentUrl} pivotId={fiche.pivot_ingredient_id} onPivotChange={(id) => update({ pivot_ingredient_id: id })} />
             </>
           )}
           <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: couleurCat }}>{isPizza ? "Après four" : isBar ? "Composition" : "Ingrédients"}</div>
-          <IngredientListDnD mode={modeIngredients} droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "apres_four")} returnUrl={currentUrl} />
+          <IngredientListDnD mode={modeIngredients} droppableId="apres_four" items={toLines("apres_four")} ingredients={ingList} priceByIngredient={priceMap} priceLabelByIngredient={priceLabelByIngredient} metaByIngredient={metaByIngredient} units={units} onChange={lines => updateZone(lines, "apres_four")} returnUrl={currentUrl} pivotId={fiche.pivot_ingredient_id} onPivotChange={(id) => update({ pivot_ingredient_id: id })} />
+          <div style={NOTE}>☆ devant un ingrédient : l&apos;ingrédient phare, celui sur lequel on se cale pour produire (« j&apos;ai 3 kg de basilic »).</div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, paddingTop: 4, fontSize: 15 }}>
             <span>Coût matière{isPizza && patonCost > 0 ? <span style={NOTE}> · dont pâton {eur(patonCost)}</span> : null}</span>
             <span><b style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20 }}>{eur(totalCost)}</b>{canSeeMoney && ht > 0 && <span style={{ color: fcCouleur, fontWeight: 700 }}> &nbsp;{fc.toFixed(1).replace(".", ",")} %</span>}</span>

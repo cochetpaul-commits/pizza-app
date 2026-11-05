@@ -15,6 +15,9 @@ export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
   const portions = parseInt(req.nextUrl.searchParams.get("portions") ?? "1") || 1;
+  // « Produire » (05/11/2026) : facteur décimal appliqué à toute la fiche (40 portions au lieu de 6, 3 kg de pesto…)
+  const facteurParam = parseFloat(req.nextUrl.searchParams.get("facteur") ?? "");
+  const facteur = Number.isFinite(facteurParam) && facteurParam > 0 ? facteurParam : portions;
 
   if (!id) return NextResponse.json({ error: "id requis" }, { status: 400 });
 
@@ -64,7 +67,7 @@ export async function GET(req: NextRequest) {
     name: recipe.name ?? "Recette",
     category: recipe.category ?? "",
     photoUrl: recipe.photo_url ?? null,
-    portions,
+    portions: Number.isFinite(facteurParam) && facteurParam > 0 ? Math.max(1, Math.round((Number(recipe.portions_count) || 1) * facteur)) : portions,
     ballWeightG: recipe.ball_weight_g ?? null,
     doughName,
     totalCost: recipe.total_cost ?? null,
@@ -75,10 +78,10 @@ export async function GET(req: NextRequest) {
       const ing = ingMap.get(l.ingredient_id);
       return {
         name: ing?.name ?? "?",
-        qty: (l.qty ?? 0) * portions,
+        qty: (l.qty ?? 0) * facteur,
         unit: l.unit ?? "g",
         stage: l.stage ?? "pre",
-        cost: ing?.cost_per_unit ? (ing.cost_per_unit * (l.qty ?? 0) * portions) : null,
+        cost: ing?.cost_per_unit ? (ing.cost_per_unit * (l.qty ?? 0) * facteur) : null,
       };
     }),
     steps,
@@ -92,14 +95,14 @@ export async function GET(req: NextRequest) {
     if (u === "g") return acc + l.qty;
     if (u === "kg") return acc + l.qty * 1000;
     return acc;
-  }, 0) + (pdfData.ballWeightG ? pdfData.ballWeightG * portions : 0);
+  }, 0) + (pdfData.ballWeightG ? pdfData.ballWeightG * facteur : 0);
 
-  const totalCost = pdfData.totalCost ? pdfData.totalCost * portions : pdfData.lines.reduce((s, l) => s + (l.cost ?? 0), 0);
+  const totalCost = pdfData.totalCost ? pdfData.totalCost * facteur : pdfData.lines.reduce((s, l) => s + (l.cost ?? 0), 0);
 
   const el = RecettePDFDoc({ ...pdfData, totalWeightG, totalCost }) as unknown as React.ReactElement<DocumentProps>;
   const buffer = await renderToBuffer(el);
 
-  const filename = `fiche-${pdfData.name.replace(/[^a-zA-Z0-9]/g, "_")}${portions > 1 ? `-x${portions}` : ""}.pdf`;
+  const filename = `fiche-${pdfData.name.replace(/[^a-zA-Z0-9]/g, "_")}${pdfData.portions > 1 ? `-${pdfData.portions}p` : ""}.pdf`;
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

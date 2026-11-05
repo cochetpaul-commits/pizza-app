@@ -63,6 +63,8 @@ export type FicheState = {
   empatement: string;
   // Ingrédients
   lignes: LigneIngredient[];
+  /** Ingrédient phare (étoile, 05/11/2026) : celui sur lequel on se cale pour produire (« j'ai 3 kg de basilic ») */
+  pivot_ingredient_id: string | null;
   // Étapes
   etapes: string[];
   notes: string;
@@ -216,6 +218,7 @@ export function defaultFiche(etabSlug: string): FicheState {
     paton_poids: 264,
     empatement: "FOCACCIA",
     lignes: [],
+    pivot_ingredient_id: null,
     etapes: [],
     notes: "",
     portions: 1,
