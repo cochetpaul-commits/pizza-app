@@ -60,6 +60,9 @@ export function verrouillerTablette() {
   try { sessionStorage.removeItem(CLE_EMPLOYE); } catch { /* stockage indisponible */ }
   notifier();
 }
+/** L'état lu tout de suite (hors rendu) : pour décider d'une redirection sans attendre l'hydratation */
+export function etatTablette(): EtatTablette { return snapshot(); }
+
 /** Nom court pour signer une écriture faite directement en base (« Gwendal B. ») */
 export function nomTablette(e: EmployeTablette): string {
   return `${e.prenom}${e.nom ? ` ${e.nom.charAt(0).toUpperCase()}.` : ""}`;
