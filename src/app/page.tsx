@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { LoadingWithRescue } from "@/components/RequireRole";
+import { useTablette } from "@/lib/tablette/store";
 
 export default function RootPage() {
   const router = useRouter();
+  const tabletteActive = useTablette().actif;
   const { role, isGroupAdmin, loading: profileLoading } = useProfile();
   const { etablissements, setCurrent, setGroupView, loading: etabLoading } = useEtablissement();
 
@@ -34,7 +36,9 @@ export default function RootPage() {
       const etab = etablissements[0];
       setGroupView(false);
       setCurrent(etab);
-      if (role === "manager") {
+      if (tabletteActive) {
+        router.replace("/tablette");
+      } else if (role === "manager") {
         router.replace(etab.slug?.includes("piccola") ? "/piccola-mia" : "/bello-mio");
       } else {
         router.replace("/mon-tableau");
@@ -44,7 +48,7 @@ export default function RootPage() {
 
     // Fallback
     router.replace("/dashboard");
-  }, [profileLoading, etabLoading, role, isGroupAdmin, etablissements, setCurrent, setGroupView, router]);
+  }, [profileLoading, etabLoading, role, isGroupAdmin, etablissements, setCurrent, setGroupView, router, tabletteActive]);
 
   // Même écran de secours que les pages protégées : bouton Recharger après
   // 12 s, rechargement automatique après 20 s (app bureau coincée au démarrage).

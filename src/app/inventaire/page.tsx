@@ -1,5 +1,7 @@
 "use client";
 
+import { employeTabletteActif, nomTablette } from "@/lib/tablette/store";
+import { useProfile } from "@/lib/ProfileContext";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toutesLesPages } from "@/lib/supabaseChunks";
 import { triParLibelle } from "@/lib/tri";
@@ -106,6 +108,11 @@ export default function InventairePage() {
   }, []);
 
   const userId = authSession?.user?.id ?? null;
+  // Qui compte (05/11/2026) : sur la tablette, l'employé identifié par son code ; sinon le compte connecté
+  const { displayName } = useProfile();
+  const auteurRef = useRef<{ nom: string | null; employe: string | null; user: string | null }>({ nom: null, employe: null, user: null });
+  { const e = employeTabletteActif(); auteurRef.current = { nom: e ? nomTablette(e) : displayName ?? null, employe: e?.id ?? null, user: userId }; }
+  const [erreurSauvegarde, setErreurSauvegarde] = useState<string | null>(null);
 
   const [session, setSession] = useState<Inventaire | null>(null);
   const [historique, setHistorique] = useState<Inventaire[]>([]);
@@ -369,6 +376,7 @@ export default function InventairePage() {
     const { data, error } = await supabase.from("inventaires").insert({
       etablissement_id: etab.id,
       created_by: userId,
+      created_by_nom: auteurRef.current.nom,
       date: new Date().toISOString().slice(0, 10),
     }).select().single();
 
@@ -383,20 +391,26 @@ export default function InventairePage() {
   const upsertLigne = useCallback(async (sessionId: string, ingredientId: string, qty: number, ing: Ingredient, zoneDb: string) => {
     localWriteRef.current.add(`${ingredientId}|${zoneDb}`);
     if (qty <= 0) {
-      await supabase.from("inventaire_lignes")
+      const { error: errSuppr } = await supabase.from("inventaire_lignes")
         .delete()
         .eq("inventaire_id", sessionId)
         .eq("ingredient_id", ingredientId)
         .eq("zone", zoneDb);
+      setErreurSauvegarde(errSuppr ? `${ing.name} : effacement non enregistré (${errSuppr.message})` : null);
       return;
     }
     // Plus d'unicité produit × zone en base (feuilles papier : un produit peut y être deux fois) : mise à jour, sinon création
-    const valeurs = { quantite: qty, unite: ing.default_unit ?? null, cout_unitaire: ing.cost_per_unit ?? null, updated_at: new Date().toISOString() };
-    const { data: maj } = await supabase.from("inventaire_lignes").update(valeurs)
+    const a = auteurRef.current;
+    const valeurs = { quantite: qty, unite: ing.default_unit ?? null, cout_unitaire: ing.cost_per_unit ?? null, updated_at: new Date().toISOString(), saisi_par: a.user, saisi_par_nom: a.nom, saisi_par_employe: a.employe };
+    // Une écriture refusée se voit (05/11/2026) : avant, un comptage sur la tablette se perdait sans message
+    const { data: maj, error: errMaj } = await supabase.from("inventaire_lignes").update(valeurs)
       .eq("inventaire_id", sessionId).eq("ingredient_id", ingredientId).eq("zone", zoneDb).select("id");
-    if (!maj?.length) {
-      await supabase.from("inventaire_lignes").insert({ inventaire_id: sessionId, ingredient_id: ingredientId, zone: zoneDb, ...valeurs });
+    let erreur = errMaj?.message ?? null;
+    if (!erreur && !maj?.length) {
+      const { error: errIns } = await supabase.from("inventaire_lignes").insert({ inventaire_id: sessionId, ingredient_id: ingredientId, zone: zoneDb, ...valeurs });
+      erreur = errIns?.message ?? null;
     }
+    setErreurSauvegarde(erreur ? `${ing.name} : quantité non enregistrée (${erreur}). Recompte-la ou préviens un responsable.` : null);
   }, []);
 
   // Références à jour pour des rappels stables (30/10/2026) : les lignes mémorisées ne se redessinent pas à chaque frappe
@@ -477,6 +491,7 @@ export default function InventairePage() {
       statut: "cloture",
       total_valeur: Math.round(total * 100) / 100,
       cloture_par: userId,
+      cloture_par_nom: auteurRef.current.nom,
       cloture_at: new Date().toISOString(),
     }).eq("id", session.id);
 
@@ -875,6 +890,11 @@ export default function InventairePage() {
     <RequireRole permission="achats.inventaire">
       <div style={{ maxWidth: 900, margin: "0 auto", padding: bureau ? "18px 28px 60px" : "12px 14px 60px" }}>
         <style>{`.inv-ligne:hover td{background:#f7f3ec} .inv-article:hover{background:#f7f3ec}`}</style>
+        {erreurSauvegarde && (
+          <div role="alert" style={{ position: "sticky", top: 8, zIndex: 20, marginBottom: 10, padding: "10px 14px", borderRadius: 12, background: "#fbeceb", color: "#b4443a", fontWeight: 600, fontSize: 13.5, boxShadow: "inset 6px 0 0 #b4443a" }}>
+            {erreurSauvegarde}
+          </div>
+        )}
 
         {/* Header */}
         {isViewing && (

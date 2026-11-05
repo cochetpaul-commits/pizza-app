@@ -244,6 +244,8 @@ export default function MonTableauPage() {
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  // Tablette (05/11/2026) : pas de tableau personnel sur le poste partagé, on renvoie à l'accueil du service
+  useEffect(() => { if (tablette.actif) router.replace("/tablette"); }, [tablette.actif, router]);
   const [detailOuvert, setDetailOuvert] = useState<{ mesure: MesureSalle | null; attache: string | null } | null>(null);
 
   // Même date-ranker que Pilotage/Ventes : dans le bandeau du haut sur

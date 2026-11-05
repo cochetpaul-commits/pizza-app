@@ -7,6 +7,7 @@
  */
 
 import { supabase } from "@/lib/supabaseClient";
+import { employeTabletteActif } from "@/lib/tablette/store";
 
 const LS_KEY = "etab_current_id";
 
@@ -33,6 +34,12 @@ export async function fetchApi(
     : null;
   if (etabId && !existing["x-etablissement-id"]) {
     existing["x-etablissement-id"] = etabId;
+  }
+
+  // Tablette (05/11/2026) : l'employé identifié par son code signe chaque action côté serveur
+  if (typeof window !== "undefined" && !existing["x-employe-tablette"]) {
+    const emp = employeTabletteActif();
+    if (emp?.jeton) existing["x-employe-tablette"] = emp.jeton;
   }
 
   // Inject auth token from Supabase session

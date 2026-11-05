@@ -22,7 +22,9 @@ function lire(): EtatTablette {
     const actif = localStorage.getItem(CLE_ACTIF) === "1";
     const delai = Number(localStorage.getItem(CLE_DELAI) ?? "60");
     const brut = sessionStorage.getItem(CLE_EMPLOYE);
-    const employe = brut ? (JSON.parse(brut) as EmployeTablette) : null;
+    let employe = brut ? (JSON.parse(brut) as EmployeTablette) : null;
+    // Le jeton vaut 16 h (05/11/2026) : au-delà, la tablette se reverrouille au lieu de signer au nom du compte tablette
+    if (employe && Date.now() - (employe.depuis ?? 0) > 16 * 3600000) { sessionStorage.removeItem(CLE_EMPLOYE); employe = null; }
     return { actif, delai: Number.isFinite(delai) ? delai : 60, employe };
   } catch { return VIDE; }
 }
@@ -58,6 +60,11 @@ export function verrouillerTablette() {
   try { sessionStorage.removeItem(CLE_EMPLOYE); } catch { /* stockage indisponible */ }
   notifier();
 }
+/** Nom court pour signer une écriture faite directement en base (« Gwendal B. ») */
+export function nomTablette(e: EmployeTablette): string {
+  return `${e.prenom}${e.nom ? ` ${e.nom.charAt(0).toUpperCase()}.` : ""}`;
+}
+
 /** L'employé actif sur la tablette, ou null (poste de travail normal) : pour signer une action */
 export function employeTabletteActif(): EmployeTablette | null {
   return snapshot().actif ? snapshot().employe : null;

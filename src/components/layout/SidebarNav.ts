@@ -98,7 +98,8 @@ export function navTablette(liste: NavEntry[]): NavEntry[] {
     if (e.kind === "divider") garder = SECTIONS_TABLETTE.has(e.label ?? "");
     if (garder) sortie.push(e);
   }
-  return sortie;
+  // L'accueil de la tablette (05/11/2026) : les grosses touches du service, pas de tableau personnel
+  return [{ kind: "page", label: "Accueil", href: "/tablette", icon: "dashboard" }, ...sortie];
 }
 
 /** Managers et admins, dans un établissement. `accueil` = page d'accueil de l'établissement. */

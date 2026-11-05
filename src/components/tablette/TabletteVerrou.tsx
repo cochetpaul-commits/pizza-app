@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { fetchApi } from "@/lib/fetchApi";
 import { identifierEmploye } from "@/lib/tablette/store";
@@ -9,6 +10,7 @@ import { OSWALD } from "@/components/ui/charte";
 /** Écran de verrouillage de la tablette : pavé numérique, 4 chiffres, comme l'ouverture d'un compte Popina. */
 export function TabletteVerrou() {
   const { current: etab } = useEtablissement();
+  const router = useRouter();
   const [code, setCode] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
   const [occupe, setOccupe] = useState(false);
@@ -27,10 +29,12 @@ export function TabletteVerrou() {
         const j = await r.json().catch(() => ({}));
         if (!r.ok) { setErreur(j?.error ?? "Code inconnu"); setCode(""); return; }
         identifierEmploye(j.employe);
+        // Chacun commence sur l'accueil du service, pas sur la page laissée ouverte par le précédent (05/11/2026)
+        router.push("/tablette");
       } catch { setErreur("Connexion impossible"); setCode(""); }
       finally { enCours.current = false; setOccupe(false); }
     })();
-  }, [code]);
+  }, [code, router]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
