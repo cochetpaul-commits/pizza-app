@@ -21,6 +21,7 @@ import { useEtablissement } from "@/lib/EtablissementContext";
 import { getSupplierColor } from "@/lib/supplierColors";
 import { ColorPicker } from "@/components/ColorPicker";
 import { fetchApi } from "@/lib/fetchApi";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 
 /**
  * SQL to add new columns:
@@ -72,6 +73,8 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
   const router = useRouter();
   const { current: etab } = useEtablissement();
   const etabId = etab?.id ?? null;
+  // Montants réservés aux administrateurs et managers (05/11/2026) : franco en euros, totaux des factures
+  const voirMontants = useVoirMontants();
 
   const [supplier, setSupplier] = useState<SupplierFull | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -447,12 +450,12 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
         <div style={{ background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 12, padding: 16, marginBottom: 16 }}>
           {/* Franco row */}
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
-            <div>
+            {voirMontants && <div>
               <div style={labelStyle}>Franco de port (EUR HT)</div>
               <input style={{ ...inputStyle, width: 120 }} value={form.franco_minimum} onChange={(e) => setForm((f) => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 200" type="number" min="0" step="10" />
-            </div>
+            </div>}
             <div>
-              <div style={labelStyle}>ou franco en bouteilles</div>
+              <div style={labelStyle}>{voirMontants ? "ou franco en bouteilles" : "Franco en bouteilles"}</div>
               <input style={{ ...inputStyle, width: 120 }} value={form.franco_bouteilles} onChange={(e) => setForm((f) => ({ ...f, franco_bouteilles: e.target.value }))} placeholder="ex: 36" type="number" min="0" step="6" />
             </div>
             <div>
@@ -703,7 +706,7 @@ export default function FournisseurDetailPage({ params }: { params: Promise<{ id
                   {inv.invoice_number ? `N° ${inv.invoice_number}` : "—"}
                   {inv.invoice_date ? ` · ${inv.invoice_date}` : ""}
                 </span>
-                <span style={{ fontWeight: 600 }}>{fmtMoney(inv.total_ht)}</span>
+                {voirMontants && <span style={{ fontWeight: 600 }}>{fmtMoney(inv.total_ht)}</span>}
               </div>
             ))}
           </div>

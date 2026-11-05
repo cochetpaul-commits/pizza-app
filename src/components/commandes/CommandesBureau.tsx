@@ -7,6 +7,7 @@ import { Tuile } from "@/components/ui/Tuile";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { TableauMobile } from "@/components/ui/TableauMobile";
 import { BoutonLitiges } from "@/components/commandes/Litiges";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 
 /**
  * Commandes, présentation bureau (09/10/2026, maquette validée) : compteurs détaillés, puis un tableau plat
@@ -90,6 +91,8 @@ export type CommandesBureauProps = {
 
 export function CommandesBureau(p: CommandesBureauProps) {
   const bureau = p.bureau ?? true;
+  // Montants réservés aux administrateurs et managers (05/11/2026)
+  const voirMontants = useVoirMontants();
   const affichage = useSyncExternalStore(abonner, lire, () => "plat" as const);
   const [ouverteId, setOuverteId] = useState<string | null>(null);
   const [sectionsFermees, setSectionsFermees] = useState<Set<Section>>(() => new Set(["historique"]));
@@ -131,7 +134,7 @@ export function CommandesBureau(p: CommandesBureauProps) {
       <td style={TD}>{statut(c)}</td>
       <td style={{ ...TD, color: MUTED }}>{p.fmtDate(c.created_at)}</td>
       <td style={{ ...TD, color: MUTED }}>{c.nb_articles != null ? `${c.nb_articles} article${c.nb_articles > 1 ? "s" : ""}` : "—"}</td>
-      <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: c.total_ht > 0 ? "#1a1a1a" : FAIBLE }}>{c.total_ht > 0 ? euros(c.total_ht) : "—"}</td>
+      {voirMontants && <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: c.total_ht > 0 ? "#1a1a1a" : FAIBLE }}>{c.total_ht > 0 ? euros(c.total_ht) : "—"}</td>}
       <td style={{ ...TD, color: MUTED, fontSize: 12.5 }}>{section(c) === "a_recevoir" ? (c.email_sent_at ? "✓ envoyée par mail" : "à envoyer") : ""}</td>
       <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>{actionLigne(c)}</td>
     </tr>
@@ -152,26 +155,26 @@ export function CommandesBureau(p: CommandesBureauProps) {
             </span>
           </div>
         </td>
-        <td style={{ ...TD, padding: "10px 4px 10px 0", textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: c.total_ht > 0 ? "#1a1a1a" : FAIBLE }}>{c.total_ht > 0 ? euros(c.total_ht) : "—"}</td>
+        {voirMontants && <td style={{ ...TD, padding: "10px 4px 10px 0", textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: c.total_ht > 0 ? "#1a1a1a" : FAIBLE }}>{c.total_ht > 0 ? euros(c.total_ht) : "—"}</td>}
         <td style={{ ...TD, padding: "10px 10px 10px 2px", width: 18, color: FAIBLE, fontSize: 18, textAlign: "right" }} aria-hidden>›</td>
       </tr>
     );
   };
   const tableau = (liste: CommandeLigne[], vide: string, enSection = false) => { const TH = enSection ? TH_SEC : TH_PLAT; const TD = enSection ? TD_SEC : TD_PLAT; if (!bureau) return (
-    <TableauMobile sansCadre colonnes={[{ libelle: "Fournisseur" }, { libelle: "Total HT", align: "right", largeur: 92 }, { largeur: 22 }]}>
+    <TableauMobile sansCadre colonnes={voirMontants ? [{ libelle: "Fournisseur" }, { libelle: "Total HT", align: "right", largeur: 92 }, { largeur: 22 }] : [{ libelle: "Fournisseur" }, { largeur: 22 }]}>
       {liste.map(ligneMobile)}
-      {liste.length === 0 && <tr><td style={{ padding: 0 }} colSpan={4}><EtatVide compact icone="commande" titre={vide.split(". ")[0].replace(/\.$/, "")} texte={vide.split(". ").slice(1).join(". ") || undefined} /></td></tr>}
+      {liste.length === 0 && <tr><td style={{ padding: 0 }} colSpan={voirMontants ? 4 : 3}><EtatVide compact icone="commande" titre={vide.split(". ")[0].replace(/\.$/, "")} texte={vide.split(". ").slice(1).join(". ") || undefined} /></td></tr>}
     </TableauMobile>
   ); return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 760 }}>
         <thead><tr>
           <th style={TH}>Fournisseur</th><th style={TH}>Statut</th><th style={TH}>Créée</th><th style={TH}>Articles</th>
-          <th style={{ ...TH, textAlign: "right" }}>Total HT</th><th style={TH}>Envoi</th><th style={TH} />
+          {voirMontants && <th style={{ ...TH, textAlign: "right" }}>Total HT</th>}<th style={TH}>Envoi</th><th style={TH} />
         </tr></thead>
         <tbody>
           {liste.map((c) => ligne(c, enSection))}
-          {liste.length === 0 && <tr><td style={{ ...TD, padding: 0 }} colSpan={7}><EtatVide compact icone="commande" titre={vide.split(". ")[0].replace(/\.$/, "")} texte={vide.split(". ").slice(1).join(". ") || undefined} /></td></tr>}
+          {liste.length === 0 && <tr><td style={{ ...TD, padding: 0 }} colSpan={voirMontants ? 7 : 6}><EtatVide compact icone="commande" titre={vide.split(". ")[0].replace(/\.$/, "")} texte={vide.split(". ").slice(1).join(". ") || undefined} /></td></tr>}
         </tbody>
       </table>
     </div>
@@ -244,8 +247,8 @@ export function CommandesBureau(p: CommandesBureauProps) {
       <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, 1fr)" : "repeat(2, 1fr)", gap: bureau ? 10 : 8 }}>
         <Tuile compacte={!bureau} icone="brouillon" libelle="Brouillons" valeur={nombre(brouillons.length)} couleur={brouillons.length ? BRUN : FAIBLE} sous={!bureau ? "" : brouillons.length ? noms(brouillons) : "aucun brouillon"} />
         <Tuile compacte={!bureau} icone="attente" libelle={bureau ? "En attente de validation" : "À valider"} valeur={nombre(enAttente.length)} couleur={enAttente.length ? "#2563EB" : FAIBLE} sous={!bureau ? "" : enAttente.length ? noms(enAttente) : "aucune commande d'équipier à valider"} />
-        <Tuile compacte={!bureau} icone="camion" libelle="À recevoir" valeur={nombre(p.aRecevoir.length)} couleur={p.aRecevoir.length ? VERT : FAIBLE} sous={!bureau ? "" : p.aRecevoir.length ? p.aRecevoir.map((c) => `${c.supplier_name} ${euros(c.total_ht)}`).join(" · ") : "rien en attente de livraison"} />
-        <Tuile compacte={!bureau} icone="recu" libelle="Reçues ce mois" valeur={euros(recuesMois.reduce((t, c) => t + c.total_ht, 0))} couleur={recuesMois.length ? "#16a34a" : FAIBLE} sous={!bureau ? "" : `${recuesMois.length} commande${recuesMois.length > 1 ? "s" : ""} depuis le 1er du mois`} />
+        <Tuile compacte={!bureau} icone="camion" libelle="À recevoir" valeur={nombre(p.aRecevoir.length)} couleur={p.aRecevoir.length ? VERT : FAIBLE} sous={!bureau ? "" : p.aRecevoir.length ? p.aRecevoir.map((c) => (voirMontants ? `${c.supplier_name} ${euros(c.total_ht)}` : c.supplier_name)).join(" · ") : "rien en attente de livraison"} />
+        <Tuile compacte={!bureau} icone="recu" libelle="Reçues ce mois" valeur={voirMontants ? euros(recuesMois.reduce((t, c) => t + c.total_ht, 0)) : nombre(recuesMois.length)} couleur={recuesMois.length ? "#16a34a" : FAIBLE} sous={!bureau ? "" : `${recuesMois.length} commande${recuesMois.length > 1 ? "s" : ""} depuis le 1er du mois`} />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -280,7 +283,7 @@ export function CommandesBureau(p: CommandesBureauProps) {
       {ouverte && (
         <VoletDroit
           titre={`${ouverte.supplier_name} · ${(sectionOuverte === "a_recevoir" ? "à recevoir" : (p.libelleStatut[ouverte.status] ?? ouverte.status)).toLowerCase()}`}
-          sousTitre={`Créée le ${p.fmtDate(ouverte.created_at)}${ouverte.nb_articles != null ? ` · ${ouverte.nb_articles} article${ouverte.nb_articles > 1 ? "s" : ""}` : ""}${ouverte.total_ht > 0 ? ` · ${euros(ouverte.total_ht)} HT` : ""}`}
+          sousTitre={`Créée le ${p.fmtDate(ouverte.created_at)}${ouverte.nb_articles != null ? ` · ${ouverte.nb_articles} article${ouverte.nb_articles > 1 ? "s" : ""}` : ""}${voirMontants && ouverte.total_ht > 0 ? ` · ${euros(ouverte.total_ht)} HT` : ""}`}
           onFermer={() => setOuverteId(null)}
           pied={pied}
         >
@@ -297,15 +300,15 @@ export function CommandesBureau(p: CommandesBureauProps) {
           ) : (
             <div>
               {lignesOuverte.map((l) => (
-                <div key={l.id} style={{ display: "grid", gridTemplateColumns: "1fr 90px 90px", gap: 8, alignItems: "center", padding: "7px 0", borderBottom: "1px solid #ece6db", fontSize: 13 }}>
+                <div key={l.id} style={{ display: "grid", gridTemplateColumns: voirMontants ? "1fr 90px 90px" : "1fr 90px", gap: 8, alignItems: "center", padding: "7px 0", borderBottom: "1px solid #ece6db", fontSize: 13 }}>
                   <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</span>
                   <span style={{ textAlign: "right", color: MUTED, fontVariantNumeric: "tabular-nums" }}>{l.quantite} {l.unite}</span>
-                  <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{l.total_ligne_ht != null ? euros(l.total_ligne_ht) : "—"}</span>
+                  {voirMontants && <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{l.total_ligne_ht != null ? euros(l.total_ligne_ht) : "—"}</span>}
                 </div>
               ))}
-              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, paddingTop: 10 }}>
+              {voirMontants && <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, paddingTop: 10 }}>
                 <span>Total HT</span><span>{ouverte.total_ht > 0 ? euros(ouverte.total_ht) : "—"}</span>
-              </div>
+              </div>}
             </div>
           )}
           {sectionOuverte === "a_recevoir" && (

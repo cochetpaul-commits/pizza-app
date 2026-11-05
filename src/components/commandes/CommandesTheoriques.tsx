@@ -7,6 +7,7 @@ import { OSWALD } from "@/components/TuileProduit";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { couleurTexteSur, styleBarreCategorie } from "@/lib/styleCategories";
 import { fmtQte } from "@/lib/stockTypes";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 
 /**
  * Proposition de commande (ex-onglet « Commandes à passer » de la page Stock, déplacée le 10/10/2026) :
@@ -27,6 +28,8 @@ const BTN: CSSProperties = { height: 36, padding: "0 14px", borderRadius: 10, bo
 const euros = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
 export function CommandesTheoriques({ bureau }: { bureau: boolean }) {
+  // Montants réservés aux administrateurs et managers (05/11/2026)
+  const voirMontants = useVoirMontants();
   const [orders, setOrders] = useState<SupplierOrder[] | null>(null);
   const [calculeA, setCalculeA] = useState<string | null>(null);
   const [chargement, setChargement] = useState(false);
@@ -56,7 +59,7 @@ export function CommandesTheoriques({ bureau }: { bureau: boolean }) {
         <span style={{ color: MUTED, fontSize: 12.5 }}>
           {orders ? `${orders.length} fournisseur${orders.length > 1 ? "s" : ""} avec des produits à commander` : "Calcul…"}
           {urgents > 0 && <b style={{ color: "#b4443a" }}> · {urgents} urgent{urgents > 1 ? "s" : ""}</b>}
-          {total > 0 && <> · {euros(total)} estimés</>}
+          {voirMontants && total > 0 && <> · {euros(total)} estimés</>}
           {calculeA && <> · calculé à {calculeA}</>}
         </span>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
@@ -76,7 +79,7 @@ export function CommandesTheoriques({ bureau }: { bureau: boolean }) {
         const texte = couleurTexteSur(couleur);
         const ouvert = ouverts.has(o.supplier_id);
         const nbUrgents = o.lines.filter((l) => l.urgent).length;
-        const franco = o.franco_minimum != null && o.franco_minimum > 0 ? (o.total_estimated >= o.franco_minimum ? "franco atteint" : `franco ${euros(o.franco_minimum)} : il manque ${euros(o.franco_minimum - o.total_estimated)}`) : null;
+        const franco = o.franco_minimum != null && o.franco_minimum > 0 ? (o.total_estimated >= o.franco_minimum ? "franco atteint" : voirMontants ? `franco ${euros(o.franco_minimum)} : il manque ${euros(o.franco_minimum - o.total_estimated)}` : "franco non atteint") : null;
         return (
           <div key={o.supplier_id}>
             <button type="button" aria-expanded={ouvert} onClick={() => basculer(o.supplier_id)} className={`barre-categorie${ouvert ? " ouverte" : ""}`}
@@ -84,7 +87,7 @@ export function CommandesTheoriques({ bureau }: { bureau: boolean }) {
               <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".04em", color: texte }}>{o.supplier_name}</span>
               <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, color: texte, opacity: 0.7, marginLeft: -4 }}>{o.lines.length}</span>
               <span style={{ flex: 1, textAlign: "right", fontSize: 12, fontWeight: 500, color: texte, opacity: 0.9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {[o.next_delivery_in != null ? `livraison dans ${o.next_delivery_in} j` : null, nbUrgents ? `${nbUrgents} urgent${nbUrgents > 1 ? "s" : ""}` : null, o.total_estimated > 0 ? euros(o.total_estimated) : null, franco].filter(Boolean).join(" · ")}
+                {[o.next_delivery_in != null ? `livraison dans ${o.next_delivery_in} j` : null, nbUrgents ? `${nbUrgents} urgent${nbUrgents > 1 ? "s" : ""}` : null, voirMontants && o.total_estimated > 0 ? euros(o.total_estimated) : null, franco].filter(Boolean).join(" · ")}
               </span>
               <span style={{ color: texte, fontSize: 12, opacity: 0.85, transform: ouvert ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
             </button>
@@ -95,7 +98,7 @@ export function CommandesTheoriques({ bureau }: { bureau: boolean }) {
                     <thead><tr>
                       <th style={{ ...TH, padding: 0, width: 4 }} /><th style={TH}>Produit</th>
                       <th style={{ ...TH, textAlign: "right" }}>Stock</th><th style={{ ...TH, textAlign: "right" }}>Conso / jour</th>
-                      <th style={{ ...TH, textAlign: "right" }}>À la livraison</th><th style={{ ...TH, textAlign: "right" }}>À commander</th><th style={{ ...TH, textAlign: "right" }}>Coût estimé</th>
+                      <th style={{ ...TH, textAlign: "right" }}>À la livraison</th><th style={{ ...TH, textAlign: "right" }}>À commander</th>{voirMontants && <th style={{ ...TH, textAlign: "right" }}>Coût estimé</th>}
                     </tr></thead>
                   )}
                   <tbody>
@@ -112,7 +115,7 @@ export function CommandesTheoriques({ bureau }: { bureau: boolean }) {
                         <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
                           <b style={{ fontFamily: OSWALD, fontSize: 16, color: l.urgent ? "#b4443a" : "#1a1a1a" }}>{fmtQte(l.qty_to_order)}</b> <span style={{ color: MUTED, fontSize: 12 }}>{l.unit}</span>
                         </td>
-                        <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: l.estimated_cost != null ? "#1a1a1a" : FAIBLE }}>{l.estimated_cost != null ? euros(l.estimated_cost) : "—"}</td>
+                        {voirMontants && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: l.estimated_cost != null ? "#1a1a1a" : FAIBLE }}>{l.estimated_cost != null ? euros(l.estimated_cost) : "—"}</td>}
                       </tr>
                     ))}
                   </tbody>

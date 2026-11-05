@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useProfile } from "@/lib/ProfileContext";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import { BarreCommande, MenuCommande } from "@/components/commandes/BarreCommande";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { CelluleProduit, TableauMobile } from "@/components/ui/TableauMobile";
@@ -305,6 +306,8 @@ export default function CommandesPageWrapper() {
 function CommandesPage() {
   const { current: etab } = useEtablissement();
   const { can } = useProfile();
+  // Montants réservés aux administrateurs et managers (05/11/2026) : prix, totaux, franco en euros, historique
+  const voirMontants = useVoirMontants();
   const canValidateOrders = can("commandes.valider");
   /** Valider / envoyer : manager et admin partout ; équipier seulement chez un fournisseur réglé « envoi_equipier » */
   const peutEnvoyer = (supplierId: string | null | undefined) => {
@@ -1457,20 +1460,20 @@ function CommandesPage() {
           {objG > 0 && <span style={{ fontSize: 11, color: "#999", marginLeft: 6 }}>/ obj. {objG}</span>}
           {si && si.qty_to_order > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#2563EB", marginLeft: 8 }}>à commander {si.qty_to_order}</span>}
         </td>
-        <td style={{ ...TDL, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+        {voirMontants && <td style={{ ...TDL, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
           {item.prix_commande != null
             ? <><span style={{ fontWeight: 700 }}>{item.prix_commande.toFixed(2).replace(".", ",")} € HT</span>{item.order_unit && <span style={{ fontSize: 11, color: "#999" }}> · {item.prix_par_colis ? "colis" : item.order_unit}</span>}</>
             : <span style={{ color: "#a39d92" }}>—</span>}
-        </td>
+        </td>}
         <td style={TDL}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
             {packCount > 0 && unitToggle(item)}
           </div>
         </td>
-        <td style={{ ...TDL, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: total != null ? "#1a1a1a" : "#a39d92" }}>
+        {voirMontants && <td style={{ ...TDL, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: total != null ? "#1a1a1a" : "#a39d92" }}>
           {total != null ? `${total.toFixed(2).replace(".", ",")} €` : "—"}
-        </td>
+        </td>}
         <td style={{ ...TDL, textAlign: "right", width: 40 }}>
           <a href={`/ingredients?edit=${item.id}&back=${encodeURIComponent("/commandes")}`} title="Modifier la fiche produit"
             style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 8, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", textDecoration: "none", fontWeight: 700, fontSize: 13 }}>→</a>
@@ -1492,7 +1495,7 @@ function CommandesPage() {
     const couleurStock = si == null ? "#999" : si.stock <= min ? "#DC2626" : objG > 0 && si.stock < objG ? "#b45309" : "#2D6A4F";
     const total = hasQty && item.prix_commande != null ? qty * item.prix_commande : null;
     const TDL: React.CSSProperties = { padding: "9px 6px 9px 10px", borderBottom: "1px solid #f0ebe2", verticalAlign: "middle", fontSize: 13, background: hasQty ? "rgba(212,119,90,0.08)" : undefined };
-    const sous = [condLabel ?? (item.order_unit ? `cmd : ${item.order_unit}` : null), item.storage_zone, item.prix_commande != null ? `${item.prix_commande.toFixed(2).replace(".", ",")} € HT${item.order_unit ? ` / ${item.prix_par_colis ? "colis" : item.order_unit}` : ""}` : null].filter(Boolean).join(" · ");
+    const sous = [condLabel ?? (item.order_unit ? `cmd : ${item.order_unit}` : null), item.storage_zone, voirMontants && item.prix_commande != null ? `${item.prix_commande.toFixed(2).replace(".", ",")} € HT${item.order_unit ? ` / ${item.prix_par_colis ? "colis" : item.order_unit}` : ""}` : null].filter(Boolean).join(" · ");
     return (
       <tr key={item.id}>
         <td style={{ ...TDL, padding: 0, width: 4, background: couleur }} />
@@ -1506,7 +1509,7 @@ function CommandesPage() {
           <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
             <StepperInput value={getDisplayQty(item.id)} onChange={(v) => handleQtyChange(item.id, v)} step={1} min={0} placeholder="0" />
             {packCount > 0 && unitToggle(item)}
-            {total != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{total.toFixed(2).replace(".", ",")} €</span>}
+            {voirMontants && total != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{total.toFixed(2).replace(".", ",")} €</span>}
           </div>
         }>
           {sous && <div style={{ fontSize: 11.5, color: "#6f6a61" }}>{sous}</div>}
@@ -1539,7 +1542,7 @@ function CommandesPage() {
           <thead><tr>
             <th style={{ ...THL, padding: 0, width: 4 }} /><th style={{ ...THL, width: 32, paddingRight: 0 }} />
             <th style={THL}>Produit</th><th style={THL}>Conditionnement</th><th style={THL}>Zone</th><th style={THL}>Stock</th>
-            <th style={{ ...THL, textAlign: "right" }}>Prix</th><th style={THL}>Quantité</th><th style={{ ...THL, textAlign: "right" }}>Total HT</th><th style={THL} />
+            {voirMontants && <th style={{ ...THL, textAlign: "right" }}>Prix</th>}<th style={THL}>Quantité</th>{voirMontants && <th style={{ ...THL, textAlign: "right" }}>Total HT</th>}<th style={THL} />
           </tr></thead>
           <tbody>{items.map((item) => renderLigneProduit(item, fav, couleur))}</tbody>
         </table>
@@ -1622,7 +1625,7 @@ function CommandesPage() {
         </div>
         {mode === "carton" && rawQty > 0 && item.prix_commande != null && (
           <span style={{ fontSize: 10, color: "#666" }}>
-            {getDisplayQty(item.id)} carton{(getDisplayQty(item.id) as number) > 1 ? "s" : ""} = {rawQty} {indivLabel}{rawQty > 1 ? "s" : ""} = {(rawQty * item.prix_commande).toFixed(2).replace(".", ",")}&#8239;&#8364;
+            {getDisplayQty(item.id)} carton{(getDisplayQty(item.id) as number) > 1 ? "s" : ""} = {rawQty} {indivLabel}{rawQty > 1 ? "s" : ""}{voirMontants && <> = {(rawQty * item.prix_commande).toFixed(2).replace(".", ",")}&#8239;&#8364;</>}
           </span>
         )}
       </div>
@@ -1669,7 +1672,7 @@ function CommandesPage() {
         title="Modifier l'unité de commande"
       >
         <span>{u || "unité"}</span>
-        {price != null && (
+        {voirMontants && price != null && (
           <span style={{ color: "#1a1a1a", fontWeight: 700 }}>
             {price.toFixed(2)}€
           </span>
@@ -1800,14 +1803,14 @@ function CommandesPage() {
                     return (
                       <div key={i} style={{ ...tile }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", flex: 1 }}>{item.name}</span>
-                        {item.prixUnitaire != null && (
+                        {voirMontants && item.prixUnitaire != null && (
                           <span style={{ fontSize: 11, color: "#999", flexShrink: 0 }}>{item.prixUnitaire.toFixed(2)}€</span>
                         )}
                         <span style={{ fontSize: 14, fontWeight: 700, color: "#D4775A", flexShrink: 0 }}>× {item.qty}</span>
                         {item.unit && (
                           <span style={{ fontSize: 11, color: "#999", flexShrink: 0 }}>{item.unit}</span>
                         )}
-                        {lineTotal != null && (
+                        {voirMontants && lineTotal != null && (
                           <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", flexShrink: 0, minWidth: 55, textAlign: "right" }}>{lineTotal.toFixed(2)}€</span>
                         )}
                       </div>
@@ -1824,7 +1827,7 @@ function CommandesPage() {
               return (
                 <div style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: "#D4775A", marginTop: 12 }}>
                   {selected.length} article{selected.length > 1 ? "s" : ""} commandé{selected.length > 1 ? "s" : ""}
-                  {total > 0 && <span style={{ marginLeft: 12, color: "#1a1a1a" }}>Total : {total.toFixed(2)} € HT</span>}
+                  {voirMontants && total > 0 && <span style={{ marginLeft: 12, color: "#1a1a1a" }}>Total : {total.toFixed(2)} € HT</span>}
                 </div>
               );
             })()}
@@ -1863,7 +1866,7 @@ function CommandesPage() {
                 <span style={{ fontWeight: 700, color: "#D4775A" }}>
                   {activeCount} article{activeCount > 1 ? "s" : ""}
                 </span>
-                {orderTotal > 0 && (
+                {voirMontants && orderTotal > 0 && (
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>
                     {orderTotal.toFixed(2)} € HT
                   </span>
@@ -2258,14 +2261,14 @@ function CommandesPage() {
             </div>
 
             {/* Total HT estimé */}
-            <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
+            {voirMontants && <div style={{ flex: "1 1 calc(50% - 5px)", minWidth: 140, background: "#fff", borderRadius: 12, border: "1px solid #e0d8ce", padding: "16px 18px" }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#999", marginBottom: 6 }}>
                 Total HT estimé
               </div>
               <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: "#1a1a1a" }}>
                 {orderTotal > 0 ? `${orderTotal.toFixed(2)} €` : "—"}
               </div>
-            </div>
+            </div>}
             </>}
 
             {/* Dernière commande */}
@@ -2298,7 +2301,11 @@ function CommandesPage() {
                     }} />
                   </div>
                 </>)}
-                {(francoL == null || francoL <= 0) && francoMin != null && francoMin > 0 && (<>
+                {/* Franco en euros : montant et progression réservés aux managers ; les équipiers voient seulement s'il est atteint */}
+                {!voirMontants && (francoL == null || francoL <= 0) && francoMin != null && francoMin > 0 && !francoAtteint && (francoBtl == null || francoBtl <= 0) && (
+                  <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 18, color: "#D4775A" }}>Non atteint</div>
+                )}
+                {voirMontants && (francoL == null || francoL <= 0) && francoMin != null && francoMin > 0 && (<>
                   <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: 24, color: francoAtteint ? "#16a34a" : "#D4775A" }}>
                     {orderTotal.toFixed(0)} € / {francoMin} €
                   </div>
@@ -2313,8 +2320,8 @@ function CommandesPage() {
                   </div>
                 </>)}
                 {(francoL == null || francoL <= 0) && francoBtl != null && francoBtl > 0 && (<>
-                  <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: francoMin ? 17 : 24, marginTop: francoMin ? 10 : 0, color: francoAtteint ? "#16a34a" : "#D4775A" }}>
-                    {francoMin ? "ou " : ""}{orderBottles} / {francoBtl} bouteilles
+                  <div style={{ fontFamily: "var(--font-oswald), 'Oswald', sans-serif", fontWeight: 700, fontSize: voirMontants && francoMin ? 17 : 24, marginTop: voirMontants && francoMin ? 10 : 0, color: francoAtteint ? "#16a34a" : "#D4775A" }}>
+                    {voirMontants && francoMin ? "ou " : ""}{orderBottles} / {francoBtl} bouteilles
                   </div>
                   <div style={{ height: 4, background: "#f0ebe2", borderRadius: 2, overflow: "hidden", marginTop: 6 }}>
                     <div style={{
@@ -2445,7 +2452,7 @@ function CommandesPage() {
                         <span style={{ fontSize: 12, fontWeight: 600, color: "#666" }}>
                           {h.nb_articles} article{h.nb_articles > 1 ? "s" : ""}
                         </span>
-                        {h.total_ht > 0 && (
+                        {voirMontants && h.total_ht > 0 && (
                           <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", fontFamily: "var(--font-oswald), 'Oswald', sans-serif" }}>
                             {h.total_ht.toFixed(2)} €
                           </span>
@@ -2516,7 +2523,7 @@ function CommandesPage() {
               </div>
               {a && (
                 <div style={{ display: "grid", gap: 8, fontSize: 15, color: "#1a1a1a", marginBottom: 14 }}>
-                  <div><strong>{a.nb_produits}</strong> produit{a.nb_produits > 1 ? "s" : ""} · <strong>{a.total_ht.toFixed(2).replace(".", ",")} € HT</strong></div>
+                  <div><strong>{a.nb_produits}</strong> produit{a.nb_produits > 1 ? "s" : ""}{voirMontants && <> · <strong>{a.total_ht.toFixed(2).replace(".", ",")} € HT</strong></>}</div>
                   <div>Livraison : <strong>{a.livraison?.libelle ?? "date non définie"}</strong></div>
                   <div style={{ fontSize: 13, color: "#6f6656" }}>{a.adresse}</div>
                   {a.canal === "whatsapp"

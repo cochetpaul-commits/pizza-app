@@ -8,6 +8,7 @@ import { fetchApi } from "@/lib/fetchApi";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { useBureau } from "@/hooks/useBureau";
 import { ETATS, type EtatReception } from "@/lib/reception";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 
 /**
  * Réclamations fournisseur (10/10/2026) : les écarts relevés au contrôle de réception
@@ -41,19 +42,20 @@ const qte = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 
 const u = (l: { unite: string | null }) => (l.unite ?? "").trim() || "unité";
 const dateFr = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }) : "");
 
-/** Ce qui s'est passé sur la ligne, en une phrase (mail et liste) */
-export function detailLitige(l: Ligne): string {
+/** Ce qui s'est passé sur la ligne, en une phrase (mail et liste) ; sans prix pour les équipiers (05/11/2026) */
+export function detailLitige(l: Ligne, montants = true): string {
   switch (l.etat) {
     case "manquant": return `commandé ${qte(l.quantite)} ${u(l)}, rien livré`;
     case "partiel": return `commandé ${qte(l.quantite)} ${u(l)}, reçu ${qte(l.qty_received ?? 0)}`;
     case "abime": return `commandé ${qte(l.quantite)} ${u(l)}, ${qte(l.qty_received ?? 0)} utilisable${(l.qty_received ?? 0) > 1 ? "s" : ""} (abîmé)`;
     case "refuse": return `refusé à la livraison (${qte(l.quantite)} ${u(l)})`;
-    case "prix": return `facturé ${l.prix_recu != null ? eur(l.prix_recu) : "?"} au lieu de ${l.prix_unitaire_ht != null ? eur(l.prix_unitaire_ht) : "?"} HT / ${u(l)} (× ${qte(l.quantite)})`;
+    case "prix": if (!montants) return `prix facturé différent du prix convenu (× ${qte(l.quantite)} ${u(l)})`;
+      return `facturé ${l.prix_recu != null ? eur(l.prix_recu) : "?"} au lieu de ${l.prix_unitaire_ht != null ? eur(l.prix_unitaire_ht) : "?"} HT / ${u(l)} (× ${qte(l.quantite)})`;
     default: return "écart à la réception";
   }
 }
 
-function texteMail(f: Fournisseur, lignes: Ligne[], etab: string): { sujet: string; texte: string } {
+function texteMail(f: Fournisseur, lignes: Ligne[], etab: string, montants: boolean): { sujet: string; texte: string } {
   const total = lignes.reduce((t, l) => t + l.montant, 0);
   const commandes = [...new Set(lignes.map((l) => [l.commande_du ? `du ${dateFr(l.commande_du)}` : null, l.document_numero ? `bon n° ${l.document_numero}` : null].filter(Boolean).join(", ")))].filter(Boolean);
   const texte = [
@@ -61,20 +63,21 @@ function texteMail(f: Fournisseur, lignes: Ligne[], etab: string): { sujet: stri
     "",
     `À la réception de notre commande${commandes.length ? ` ${commandes.join(" et ")}` : ""}, nous avons relevé les écarts suivants :`,
     "",
-    ...lignes.map((l) => `- ${l.produit} : ${detailLitige(l)} → ${eur(l.montant)} HT${l.commentaire ? ` (${l.commentaire})` : ""}`),
+    ...lignes.map((l) => `- ${l.produit} : ${detailLitige(l, montants)}${montants ? ` → ${eur(l.montant)} HT` : ""}${l.commentaire ? ` (${l.commentaire})` : ""}`),
     "",
-    `Total à régulariser : ${eur(total)} HT.`,
-    "",
+    ...(montants ? [`Total à régulariser : ${eur(total)} HT.`, ""] : []),
     "Merci de nous adresser un avoir correspondant.",
     "",
     "Cordialement,",
     etab,
   ].join("\n");
-  return { sujet: `Réclamation livraison ${f.nom} — ${etab} — ${eur(total)} HT`, texte };
+  return { sujet: `Réclamation livraison ${f.nom} — ${etab}${montants ? ` — ${eur(total)} HT` : ""}`, texte };
 }
 
 /** Bouton d'accès (en-tête de la page Commandes) : nombre et montant à réclamer */
 export function BoutonLitiges({ bureau, style }: { bureau: boolean; style?: CSSProperties }) {
+  // Montants réservés aux administrateurs et managers (05/11/2026)
+  const voirMontants = useVoirMontants();
   const [ouvert, setOuvert] = useState(false);
   const [resume, setResume] = useState<{ n: number; total: number } | null>(null);
   const charger = useCallback(async () => {
@@ -90,7 +93,7 @@ export function BoutonLitiges({ bureau, style }: { bureau: boolean; style?: CSSP
       <button type="button" onClick={() => setOuvert(true)} title="Écarts relevés à la réception, à réclamer aux fournisseurs"
         style={{ ...BTN, ...style, display: "inline-flex", alignItems: "center", gap: 6, ...(resume?.n ? { borderColor: ROUGE, color: ROUGE } : {}) }}>
         {bureau ? "Réclamations" : "Litiges"}
-        {resume?.n ? <span style={{ fontWeight: 700 }}>{bureau ? `· ${eur(resume.total)}` : `· ${resume.n}`}</span> : null}
+        {resume?.n ? <span style={{ fontWeight: 700 }}>{bureau && voirMontants ? `· ${eur(resume.total)}` : `· ${resume.n}`}</span> : null}
       </button>
       {ouvert && <Litiges onFermer={() => { setOuvert(false); void charger(); }} />}
     </>
@@ -99,6 +102,8 @@ export function BoutonLitiges({ bureau, style }: { bureau: boolean; style?: CSSP
 
 export function Litiges({ onFermer }: { onFermer: () => void }) {
   const bureau = useBureau();
+  // Montants réservés aux administrateurs et managers (05/11/2026)
+  const voirMontants = useVoirMontants();
   const { current: etab } = useEtablissement();
   const [lignes, setLignes] = useState<Ligne[]>([]);
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
@@ -135,7 +140,7 @@ export function Litiges({ onFermer }: { onFermer: () => void }) {
   const totalAvoirs = lignes.filter((l) => l.statut === "avoir_recu").reduce((t, l) => t + l.montant, 0);
 
   return (
-    <VoletDroit titre="Réclamations fournisseurs" sousTitre={chargement ? "Chargement…" : `${eur(totalOuvert)} HT en cours · ${eur(totalAvoirs)} HT d'avoirs reçus`} largeur={760} onFermer={onFermer}>
+    <VoletDroit titre="Réclamations fournisseurs" sousTitre={chargement ? "Chargement…" : voirMontants ? `${eur(totalOuvert)} HT en cours · ${eur(totalAvoirs)} HT d'avoirs reçus` : "Écarts relevés à la réception"} largeur={760} onFermer={onFermer}>
       {erreur && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(180,68,58,0.08)", color: ROUGE, fontSize: 13, marginBottom: 12 }}>{erreur}</div>}
       {info && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(74,103,65,0.10)", color: "#4a6741", fontSize: 13, marginBottom: 12 }}>{info}</div>}
       <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
@@ -155,10 +160,11 @@ export function Litiges({ onFermer }: { onFermer: () => void }) {
             <section key={f.id} style={{ border: `1px solid ${BORD}`, borderRadius: 14, overflow: "hidden", background: "#fff" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "#f7f3ec", flexWrap: "wrap" }}>
                 <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 15, textTransform: "uppercase", letterSpacing: ".03em" }}>{f.nom}</span>
-                <span style={{ fontSize: 12.5, color: MUTED }}>{ls.length} ligne{ls.length > 1 ? "s" : ""} · <strong style={{ color: "#1a1a1a" }}>{eur(total)} HT</strong></span>
+                <span style={{ fontSize: 12.5, color: MUTED }}>{ls.length} ligne{ls.length > 1 ? "s" : ""}{voirMontants && <> · <strong style={{ color: "#1a1a1a" }}>{eur(total)} HT</strong></>}</span>
                 {vue === "ouverts" && (
                   <span style={{ marginLeft: "auto", display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {aReclamer.length > 0 && <button type="button" onClick={() => setMail({ f, lignes: aReclamer })} style={{ ...BTN, height: 32, background: ROUGE, color: "#fff", border: "none", fontWeight: 700 }}>Réclamer par mail</button>}
+                    {/* Réclamer au fournisseur engage des montants : réservé aux responsables (05/11/2026) */}
+                    {voirMontants && aReclamer.length > 0 && <button type="button" onClick={() => setMail({ f, lignes: aReclamer })} style={{ ...BTN, height: 32, background: ROUGE, color: "#fff", border: "none", fontWeight: 700 }}>Réclamer par mail</button>}
                     <button type="button" onClick={() => void changer(ls.map((l) => l.id), "avoir_recu")} style={{ ...BTN, height: 32 }}>Tout : avoir reçu</button>
                   </span>
                 )}
@@ -166,16 +172,16 @@ export function Litiges({ onFermer }: { onFermer: () => void }) {
               {ls.map((l) => {
                 const s = STATUTS_LITIGE[l.statut];
                 return (
-                  <div key={l.id} style={{ display: "grid", gridTemplateColumns: bureau ? "1fr auto auto" : "1fr auto", gap: bureau ? 12 : 6, alignItems: "center", padding: "10px 14px", borderTop: "1px solid #f0ebe2" }}>
+                  <div key={l.id} style={{ display: "grid", gridTemplateColumns: bureau && voirMontants ? "1fr auto auto" : "1fr auto", gap: bureau ? 12 : 6, alignItems: "center", padding: "10px 14px", borderTop: "1px solid #f0ebe2" }}>
                     <div style={{ minWidth: 0, gridColumn: bureau ? undefined : "1 / -1" }}>
                       <div style={{ fontWeight: 600, fontSize: 13.5 }}>{l.produit}{l.etat && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: ETATS[l.etat].couleur }}>{ETATS[l.etat].libelle}</span>}</div>
                       <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.4 }}>
-                        {detailLitige(l)}{l.commande_du ? ` · commande du ${dateFr(l.commande_du)}` : ""}{l.document_numero ? ` · bon ${l.document_numero}` : ""}
+                        {detailLitige(l, voirMontants)}{l.commande_du ? ` · commande du ${dateFr(l.commande_du)}` : ""}{l.document_numero ? ` · bon ${l.document_numero}` : ""}
                         {l.commentaire && <span style={{ fontStyle: "italic" }}> · {l.commentaire}</span>}
                         {l.statut === "reclame" && l.reclame_at && <div style={{ color: "#b7791f" }}>Réclamé le {dateFr(l.reclame_at)}{l.note ? ` · ${l.note}` : ""}</div>}
                       </div>
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: 14, fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{eur(l.montant)}</div>
+                    {voirMontants && <div style={{ fontWeight: 700, fontSize: 14, fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{eur(l.montant)}</div>}
                     <select value={l.statut} onChange={(e) => void changer([l.id], e.target.value as Statut)} style={{ height: 32, borderRadius: 8, border: `1px solid ${s.couleur}66`, color: s.couleur, fontWeight: 700, fontSize: 12.5, fontFamily: "inherit", background: "#fff", padding: "0 6px" }}>
                       {(Object.keys(STATUTS_LITIGE) as Statut[]).map((k) => <option key={k} value={k}>{STATUTS_LITIGE[k].libelle}</option>)}
                     </select>
@@ -187,15 +193,15 @@ export function Litiges({ onFermer }: { onFermer: () => void }) {
         })}
       </div>
       {mail && (
-        <MailReclamation f={mail.f} lignes={mail.lignes} etab={etab?.nom ?? "Bello Mio"} bureau={bureau} onFermer={() => setMail(null)}
+        <MailReclamation f={mail.f} lignes={mail.lignes} etab={etab?.nom ?? "Bello Mio"} bureau={bureau} montants onFermer={() => setMail(null)}
           onEnvoye={(dest) => { setMail(null); setInfo(`Réclamation envoyée à ${dest.join(", ")}.`); void charger(); }} />
       )}
     </VoletDroit>
   );
 }
 
-function MailReclamation({ f, lignes, etab, bureau, onFermer, onEnvoye }: { f: Fournisseur; lignes: Ligne[]; etab: string; bureau: boolean; onFermer: () => void; onEnvoye: (dest: string[]) => void }) {
-  const modele = useMemo(() => texteMail(f, lignes, etab), [f, lignes, etab]);
+function MailReclamation({ f, lignes, etab, bureau, montants, onFermer, onEnvoye }: { f: Fournisseur; lignes: Ligne[]; etab: string; bureau: boolean; montants: boolean; onFermer: () => void; onEnvoye: (dest: string[]) => void }) {
+  const modele = useMemo(() => texteMail(f, lignes, etab, montants), [f, lignes, etab, montants]);
   const [dest, setDest] = useState(f.emails.slice(0, 1).join(", "));
   const [sujet, setSujet] = useState(modele.sujet);
   const [texte, setTexte] = useState(modele.texte);
@@ -221,7 +227,7 @@ function MailReclamation({ f, lignes, etab, bureau, onFermer, onEnvoye }: { f: F
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 17, textTransform: "uppercase" }}>Réclamation {f.nom}</div>
-            <div style={{ fontSize: 12.5, color: MUTED }}>{lignes.length} ligne{lignes.length > 1 ? "s" : ""} · {eur(lignes.reduce((t, l) => t + l.montant, 0))} HT · le texte est modifiable</div>
+            <div style={{ fontSize: 12.5, color: MUTED }}>{lignes.length} ligne{lignes.length > 1 ? "s" : ""}{montants && <> · {eur(lignes.reduce((t, l) => t + l.montant, 0))} HT</>} · le texte est modifiable</div>
           </div>
           <button type="button" onClick={onFermer} aria-label="Fermer" style={{ border: "none", background: "transparent", fontSize: 22, color: MUTED, cursor: "pointer" }}>×</button>
         </div>

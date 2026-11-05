@@ -9,6 +9,7 @@ import { fetchApi, openApiFile } from "@/lib/fetchApi";
 import { ModalNonComptes } from "@/components/inventaire/ModalNonComptes";
 import { inChunks, toutesLesPages } from "@/lib/supabaseChunks";
 import { useProfile } from "@/lib/ProfileContext";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import { libelleZone } from "@/lib/commandeArticles";
 import { articleDeFiche, categorieDeFamille, choisirConditionnement, conditionnementDArticle, ficheDepuisCreation, totalLigne, type ArticleFournisseur, type Conditionnement, type CreationProduit, type FicheConditionnement, type OffreActive } from "@/lib/inventaire";
 import { libelleType, TYPES_COLISAGE } from "@/lib/commandeArticles";
@@ -84,6 +85,8 @@ function Feuille() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { isGroupAdmin } = useProfile();
+  // Montants réservés aux administrateurs et managers (05/11/2026) : valorisation, « sans prix », PDF comptable
+  const voirMontants = useVoirMontants();
   const [inv, setInv] = useState<Inventaire | null>(null);
   const [etabNom, setEtabNom] = useState("");
   const [etabSlug, setEtabSlug] = useState("");
@@ -369,6 +372,7 @@ function Feuille() {
     const vus = new Set<string>();
     const oublies = lignes.filter((l) => !l.inactive && (l.retiree || !compte(l)) && l.ingredient_id && !vus.has(l.ingredient_id) && vus.add(l.ingredient_id)).map((l) => ({ id: l.ingredient_id as string, nom: l.nom }));
     const resultat = await action("cloture", { action: "cloturer" }, (j) => j.avertissement ? String(j.avertissement)
+      : !voirMontants ? `Inventaire clôturé (${j.mouvements} produits dans les mouvements de stock).`
       : `Inventaire clôturé : ${Number(j.total ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € HT${Number(j.sans_prix) ? `, ${j.sans_prix} ligne(s) sans prix` : ""} (${j.mouvements} produits dans les mouvements de stock).`);
     if (resultat && !("error" in resultat) && oublies.length > 0) setNonComptes(oublies);
   }
@@ -488,11 +492,11 @@ function Feuille() {
           <div style={{ fontSize: 11.5, color: "#6f6656", marginTop: 2 }}>
             <CondLibelle>{c?.libelle ?? l.cond_libelle ?? l.unite ?? "unité"}</CondLibelle>{!c && detailPiece ? ` · ${detailPiece}` : ""}
             {fournisseur ? ` · ${fournisseur.name}` : recettes[l.ingredient_id] ? " · recette maison" : ""}
-            {valo.cout == null && <span style={{ color: "#b45309" }}> · sans prix{valo.raison ? ` (${valo.raison})` : ""}</span>}
+            {voirMontants && valo.cout == null && <span style={{ color: "#b45309" }}> · sans prix{valo.raison ? ` (${valo.raison})` : ""}</span>}
           </div>
           <div style={{ fontSize: 11.5, marginTop: 2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             {total != null
-              ? <span><strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong>{valo.cout != null && <span style={{ color: "#6f6656" }}> · {eur(total * valo.cout)}</span>}</span>
+              ? <span><strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong>{voirMontants && valo.cout != null && <span style={{ color: "#6f6656" }}> · {eur(total * valo.cout)}</span>}</span>
               : <span style={{ color: "#c4bcae" }}>non compté</span>}
             {!lectureSeule && peutColis && !deuxChamps && (
               <button type="button" onClick={() => void basculerComptage(l)} style={{ ...lien, fontSize: 11.5 }}>compter par {c!.libelle.split(" ")[0]}</button>
@@ -548,7 +552,7 @@ function Feuille() {
               </span>
             )}
           </div>
-          {valo.cout == null && <div style={{ fontSize: 11.5, color: "#b45309" }}>sans prix{valo.raison ? ` (${valo.raison})` : ""}</div>}
+          {voirMontants && valo.cout == null && <div style={{ fontSize: 11.5, color: "#b45309" }}>sans prix{valo.raison ? ` (${valo.raison})` : ""}</div>}
         </td>
         <td style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>
           <CondLibelle>{c?.libelle ?? l.cond_libelle ?? l.unite ?? "unité"}</CondLibelle>{!c && detailPiece ? ` · ${detailPiece}` : ""}
@@ -571,7 +575,7 @@ function Feuille() {
         </td>
         <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
           {total != null
-            ? <><strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong>{valo.cout != null && <div style={{ fontSize: 11.5, color: "#6f6656" }}>{eur(total * valo.cout)}</div>}</>
+            ? <><strong style={{ color: "#1a1a1a" }}>{txt(total)} {pluriel(l.unite, total)}</strong>{voirMontants && valo.cout != null && <div style={{ fontSize: 11.5, color: "#6f6656" }}>{eur(total * valo.cout)}</div>}</>
             : <span style={{ color: "#c4bcae" }}>non compté</span>}
         </td>
         <td style={{ ...TD, textAlign: "right", width: 90 }}>
@@ -641,7 +645,7 @@ function Feuille() {
             {" "}· {totalComptees} / {actives.length} comptées
             {direct && <span title="Les comptages des autres personnes apparaissent ici en direct" style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 700, color: "#2D6A4F" }}>● en direct</span>}
           </div>
-          {totalComptees > 0 && (
+          {voirMontants && totalComptees > 0 && (
             <div style={{ marginTop: 6, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: "#8a7e6b", textTransform: "uppercase", letterSpacing: "0.06em" }}>Total en cours</span>
               <span style={{ fontFamily: OSWALD, fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{eur(valeurTotale)}</span>
@@ -656,7 +660,7 @@ function Feuille() {
               {enCours === "cloture" ? "Clôture…" : "Clôturer"}
             </button>
           )}
-          {lignes.length > 0 && (
+          {voirMontants && lignes.length > 0 && (
             <button type="button" onClick={() => openApiFile(`/api/inventaire/pdf?id=${id}`)} style={boutonBas("#fff", "#1a1a1a")} title="Export comptable : valorisation HT par zone, famille et catégorie">
               PDF comptable
             </button>
@@ -712,7 +716,7 @@ function Feuille() {
                 ? <span style={{ fontWeight: 500, color: "#a12b2b" }}>retirée</span>
                 : <span style={{ fontWeight: 500, color: n === ls.length && ls.length ? "#2D6A4F" : "#999" }}>{n}/{ls.length}</span>}
               {/* Valeur comptée de la zone, sous le nom */}
-              <div style={{ fontSize: 11, fontWeight: 600, color: n > 0 ? "#6f6656" : "#c4bcae", marginTop: 1 }}>{retiree ? `${toutes.length} à remettre` : n > 0 ? eur(valeur) : "—"}</div>
+              {(retiree || voirMontants) && <div style={{ fontSize: 11, fontWeight: 600, color: n > 0 ? "#6f6656" : "#c4bcae", marginTop: 1 }}>{retiree ? `${toutes.length} à remettre` : n > 0 ? eur(valeur) : "—"}</div>}
             </button>
           );
         })}
@@ -757,7 +761,7 @@ function Feuille() {
           )}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "0 4px 6px" }}>
             <span style={{ fontSize: 12.5, color: "#6f6656" }}>
-              {lignesZone.length} produit{lignesZone.length > 1 ? "s" : ""}{enRecherche ? " trouvés" : ""}{valeurZone > 0 ? <> · valeur comptée <strong style={{ color: "#1a1a1a" }}>{eur(valeurZone)}</strong> HT</> : null}
+              {lignesZone.length} produit{lignesZone.length > 1 ? "s" : ""}{enRecherche ? " trouvés" : ""}{voirMontants && valeurZone > 0 ? <> · valeur comptée <strong style={{ color: "#1a1a1a" }}>{eur(valeurZone)}</strong> HT</> : null}
             </span>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {(() => {

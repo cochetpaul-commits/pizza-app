@@ -17,6 +17,7 @@ import { EtatVide } from "@/components/ui/EtatVide";
 import { CelluleProduit, TableauMobile } from "@/components/ui/TableauMobile";
 import { articleDeFiche, type FicheConditionnement } from "@/lib/inventaire";
 import { libelleColisage } from "@/lib/commandeArticles";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 
 /**
  * Base produits (étape 3 de la refonte inspirée de ComandR, 08/10/2026), bureau et téléphone.
@@ -91,6 +92,8 @@ type LigneProps = {
   stock?: StockItem | null;
   /** Interrupteur actif / inactif (bureau) : un produit inactif sort des listes, des commandes et du prochain inventaire */
   onToggleActif?: (x: Ingredient) => void;
+  /** Prix d'achat et variation de prix : administrateurs et managers seulement (05/11/2026) */
+  voirMontants: boolean;
 };
 
 function Interrupteur({ actif, onChange, titre }: { actif: boolean; onChange: () => void; titre: string }) {
@@ -132,7 +135,7 @@ function affichageProduit(x: Ingredient, offer: LatestOffer | undefined) {
 
 /** Ligne produit sur téléphone (10/10/2026) : liseré de la catégorie, case, nom sur toute la largeur,
  * puis catégorie · sous-catégorie · fournisseur · zone + état à gauche et prix + stock à droite, chevron */
-const LigneMobile = React.memo(function LigneMobile({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, sansCategorie, stock }: LigneProps) {
+const LigneMobile = React.memo(function LigneMobile({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, sansCategorie, stock, voirMontants }: LigneProps) {
   const a = affichageProduit(x, offer);
   const sous = [x.sub_category, fournisseur?.name, x.storage_zone].filter(Boolean).join(" · ");
   return (
@@ -146,9 +149,9 @@ const LigneMobile = React.memo(function LigneMobile({ x, offer, fournisseur, ale
       <CelluleProduit style={{ ...TD, padding: "9px 4px 9px 10px" }}
         titre={<span style={{ color: a.inactive ? "#999" : undefined }}>{x.name}{x.is_derived && <span style={{ marginLeft: 6, fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", verticalAlign: "middle" }}>DÉRIVÉ</span>}</span>}
         droite={<>
-          <div style={{ fontWeight: 700, fontSize: 13, color: a.aUnPrix ? "#1a1a1a" : FAIBLE }}>{a.aUnPrix ? a.prix : "Aucun prix"}</div>
-          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>
-            {alerte ? <span style={{ fontWeight: 700, color: alerte.direction === "up" ? "#DC2626" : "#16A34A" }}>{alerte.direction === "up" ? "+" : "-"}{(Math.abs(alerte.change_pct) * 100).toFixed(0)} %</span>
+          {voirMontants && <div style={{ fontWeight: 700, fontSize: 13, color: a.aUnPrix ? "#1a1a1a" : FAIBLE }}>{a.aUnPrix ? a.prix : "Aucun prix"}</div>}
+          <div style={{ fontSize: 11.5, color: MUTED, marginTop: voirMontants ? 2 : 0 }}>
+            {voirMontants && alerte ? <span style={{ fontWeight: 700, color: alerte.direction === "up" ? "#DC2626" : "#16A34A" }}>{alerte.direction === "up" ? "+" : "-"}{(Math.abs(alerte.change_pct) * 100).toFixed(0)} %</span>
               : stock ? <>stock <Stock s={stock} compact /></> : a.colisage}
           </div>
         </>}>
@@ -177,7 +180,7 @@ function BarreCategorie({ cat, couleur, n, ouverte, onToggle }: { cat: Category;
   );
 }
 
-const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, onOpenSupplier, sansCategorie, stock, onToggleActif }: LigneProps) {
+const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, alerte, selectionnee, enEdition, peutEcrire, onOuvrir, onToggleSelect, onOpenSupplier, sansCategorie, stock, onToggleActif, voirMontants }: LigneProps) {
   const { couleurCat, texteCat, inactive, aUnPrix, prix, colisage, maj, etat } = affichageProduit(x, offer);
   const sousProduit = [x.sub_category, maj ? `mis à jour le ${maj}` : null].filter(Boolean).join(" · ");
 
@@ -216,14 +219,14 @@ const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, a
         ) : <span style={{ color: FAIBLE }}>—</span>}
       </td>
       <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-        <div style={{ fontWeight: 700, color: aUnPrix ? "#1a1a1a" : FAIBLE }}>{prix}</div>
-        {alerte ? (
+        {voirMontants && <div style={{ fontWeight: 700, color: aUnPrix ? "#1a1a1a" : FAIBLE }}>{prix}</div>}
+        {voirMontants && alerte ? (
           <div style={{ fontSize: 11.5, fontWeight: 700, color: alerte.direction === "up" ? "#DC2626" : "#16A34A", whiteSpace: "normal", maxWidth: 150, marginLeft: "auto" }}>
             {alerte.direction === "up" ? "+" : "-"}{(Math.abs(alerte.change_pct) * 100).toFixed(0)} % sur la dernière facture
           </div>
         ) : colisage ? (
           <div style={{ fontSize: 11.5, color: MUTED }}>{colisage}</div>
-        ) : !aUnPrix && !inactive ? (
+        ) : voirMontants && !aUnPrix && !inactive ? (
           <div style={{ fontSize: 11.5, color: MUTED }}>aucune offre active</div>
         ) : null}
       </td>
@@ -301,6 +304,8 @@ export type BaseProduitsProps = {
 };
 
 export function BaseProduits(p: BaseProduitsProps) {
+  // Montants réservés aux administrateurs et managers (05/11/2026)
+  const voirMontants = useVoirMontants();
   const [menuOuvert, setMenuOuvert] = useState(false);
   // A → Z ou par catégorie (mémorisé sur l'appareil) ; volets repliés par défaut, tous ouverts pendant une recherche
   const affichage = useSyncExternalStore(abonnerAffichage, lireAffichage, () => "az" as const);
@@ -407,19 +412,19 @@ export function BaseProduits(p: BaseProduitsProps) {
   const ligneMobile = (l: Ligne, sansCategorie = false) => (
     <LigneMobile key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)} stock={p.stockMap.get(l.x.id) ?? null}
       selectionnee={p.selectedIds.has(l.x.id)} enEdition={p.editingId === l.x.id} peutEcrire={p.peutEcrire} sansCategorie={sansCategorie}
-      onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} />
+      onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} voirMontants={voirMontants} />
   );
   const nbColonnesMobile = 4 + (p.peutEcrire ? 1 : 0);
   /** Cadre blanc du tableau téléphone : accroché sous une barre de catégorie (coins du haut droits) ou autonome */
   const tableauMobile = (corps: ReactNode, enSection: boolean) => (
-    <TableauMobile enSection={enSection} colonnes={[...(p.peutEcrire ? [{ largeur: 30 }] : []), { libelle: "Produit" }, { libelle: "Prix · stock", align: "right", largeur: 112 }, { largeur: 22 }]}>
+    <TableauMobile enSection={enSection} colonnes={[...(p.peutEcrire ? [{ largeur: 30 }] : []), { libelle: "Produit" }, { libelle: voirMontants ? "Prix · stock" : "Stock", align: "right", largeur: 112 }, { largeur: 22 }]}>
       {corps}
     </TableauMobile>
   );
   const ligne = (l: Ligne, sansCategorie = false) => (
     <LigneProduit key={l.x.id} x={l.x} offer={l.offer} fournisseur={l.fournisseur} alerte={p.alertMap.get(l.x.id)} stock={p.stockMap.get(l.x.id) ?? null} onToggleActif={p.peutEcrire ? p.onToggleActif : undefined}
       selectionnee={p.selectedIds.has(l.x.id)} enEdition={p.editingId === l.x.id} peutEcrire={p.peutEcrire} sansCategorie={sansCategorie}
-      onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} />
+      onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} voirMontants={voirMontants} />
   );
   const nbColonnes = (sansCategorie: boolean) => 9 + (p.peutEcrire ? 1 : 0) + (p.peutEcrire && p.onToggleActif ? 1 : 0) - (sansCategorie ? 1 : 0);
   const enTete = (sansCategorie: boolean) => (
@@ -430,7 +435,8 @@ export function BaseProduits(p: BaseProduitsProps) {
         <th style={TH}>Produit</th>
         {!sansCategorie && <th className="bp-col-cat" style={TH}>Catégorie</th>}
         <th style={TH}>Fournisseur</th>
-        <th style={{ ...TH, textAlign: "right" }}>Prix d&apos;achat</th>
+        {/* Sans les montants, la colonne ne garde que le colisage */}
+        <th style={{ ...TH, textAlign: "right" }}>{voirMontants ? "Prix d'achat" : "Colisage"}</th>
         <th style={{ ...TH, textAlign: "right" }}>Stock</th>
         <th className="bp-col-zone" style={TH}>Zone</th>
         <th className="bp-col-etat" style={TH}>État</th>

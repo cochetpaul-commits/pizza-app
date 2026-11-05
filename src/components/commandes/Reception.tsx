@@ -9,6 +9,7 @@ import { fetchApi } from "@/lib/fetchApi";
 import { useBureau } from "@/hooks/useBureau";
 import { ETATS, erreurLigne, montantReclame, quantiteEnStock, resumeReception, type EtatReception, type LigneControle } from "@/lib/reception";
 import { rapprocher, totalLigneDoc, type DocumentLu } from "@/lib/rapprochementReception";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 
 /**
  * Contrôle de réception d'une commande (10/10/2026, sur le modèle du contrôle des livraisons
@@ -52,6 +53,8 @@ function Badge({ etat }: { etat: EtatReception }) {
 
 export function Reception({ sessionId, onFermer, onValidee }: { sessionId: string; onFermer: () => void; onValidee: () => void }) {
   const bureau = useBureau();
+  // Montants réservés aux administrateurs et managers (05/11/2026) : prix, totaux, écart de prix et montant à réclamer
+  const voirMontants = useVoirMontants();
   const [lignes, setLignes] = useState<Ligne[]>([]);
   const [session, setSession] = useState<Session | null>(null);
   const [chargement, setChargement] = useState(true);
@@ -193,7 +196,7 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
         <span style={{ color: VERT, fontWeight: 700 }}>{resume.conformes} conforme{resume.conformes > 1 ? "s" : ""}</span>
         {resume.problemes > 0 && <> · <span style={{ color: "#b4443a", fontWeight: 700 }}>{resume.problemes} problème{resume.problemes > 1 ? "s" : ""}</span></>}
         {nbAControler > 0 && <> · {nbAControler} à contrôler</>}
-        {resume.aReclamer > 0 && <div style={{ fontWeight: 700, color: "#1a1a1a" }}>À réclamer : {eur(resume.aReclamer)} HT</div>}
+        {voirMontants && resume.aReclamer > 0 && <div style={{ fontWeight: 700, color: "#1a1a1a" }}>À réclamer : {eur(resume.aReclamer)} HT</div>}
         {enregistrement && <div style={{ color: FAIBLE }}>Enregistrement…</div>}
       </div>
       <button type="button" disabled={validation || enregistrement} onClick={() => (nbAControler > 0 || resume.problemes > 0 ? setConfirmation(true) : void valider())}
@@ -215,7 +218,7 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
           <div style={{ display: "grid", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 999, border: `1px solid ${lue ? VERT : ACCENT}`, color: lue ? VERT : ACCENT, background: "#fff" }}>{lue ? "Reçue" : "À contrôler"}</span>
-              {session?.total_ht != null && session.total_ht > 0 && <span style={{ fontSize: 12.5, color: MUTED }}>Commande {eur(session.total_ht)} HT</span>}
+              {voirMontants && session?.total_ht != null && session.total_ht > 0 && <span style={{ fontSize: 12.5, color: MUTED }}>Commande {eur(session.total_ht)} HT</span>}
               <span style={{ marginLeft: "auto", fontSize: 12.5, color: MUTED, fontVariantNumeric: "tabular-nums" }}>{resume.controlees}/{resume.total} contrôlée{resume.controlees > 1 ? "s" : ""}</span>
             </div>
             <div style={{ height: 6, borderRadius: 3, background: "#ece6db", overflow: "hidden" }}>
@@ -245,8 +248,8 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
                 </div>
                 {document.lu ? (
                   <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.45 }}>
-                    {[document.lu.numero ? `N° ${document.lu.numero}` : null, document.lu.date ? new Date(document.lu.date).toLocaleDateString("fr-FR") : null, `${document.lu.lignes.length} ligne${document.lu.lignes.length > 1 ? "s" : ""} lue${document.lu.lignes.length > 1 ? "s" : ""}`, document.lu.total_ht != null ? `${eur(document.lu.total_ht)} HT` : null].filter(Boolean).join(" · ")}
-                    {session?.total_ht != null && document.lu.total_ht != null && Math.abs(document.lu.total_ht - session.total_ht) > 0.05 && (
+                    {[document.lu.numero ? `N° ${document.lu.numero}` : null, document.lu.date ? new Date(document.lu.date).toLocaleDateString("fr-FR") : null, `${document.lu.lignes.length} ligne${document.lu.lignes.length > 1 ? "s" : ""} lue${document.lu.lignes.length > 1 ? "s" : ""}`, voirMontants && document.lu.total_ht != null ? `${eur(document.lu.total_ht)} HT` : null].filter(Boolean).join(" · ")}
+                    {voirMontants && session?.total_ht != null && document.lu.total_ht != null && Math.abs(document.lu.total_ht - session.total_ht) > 0.05 && (
                       <div style={{ color: document.lu.total_ht > session.total_ht ? "#b4443a" : "#b7791f", fontWeight: 700 }}>
                         {document.lu.total_ht > session.total_ht ? "+" : "−"}{eur(Math.abs(document.lu.total_ht - session.total_ht))} par rapport à la commande ({eur(session.total_ht)} HT)
                       </div>
@@ -288,8 +291,8 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
                       <div style={{ fontWeight: 600, fontSize: 13.5, lineHeight: 1.25, color: "#1a1a1a" }}><span style={{ color: FAIBLE, fontWeight: 500, fontSize: 12 }}>{num}.</span> {l.ingredient_name}</div>
                       <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
                         Commandé : <strong style={{ color: "#1a1a1a" }}>{qte(l.quantite)} {unite(l, l.quantite)}</strong>
-                        {l.prix_unitaire_ht != null ? ` · ${eur(l.prix_unitaire_ht)} HT / ${unite(l)}` : <span style={{ color: "#b7791f" }}> · prix inconnu</span>}
-                        {total != null && <span style={{ fontVariantNumeric: "tabular-nums" }}> · {eur(total)}</span>}
+                        {voirMontants && (l.prix_unitaire_ht != null ? ` · ${eur(l.prix_unitaire_ht)} HT / ${unite(l)}` : <span style={{ color: "#b7791f" }}> · prix inconnu</span>)}
+                        {voirMontants && total != null && <span style={{ fontVariantNumeric: "tabular-nums" }}> · {eur(total)}</span>}
                       </div>
                     </div>
                     {e && <Badge etat={l.etat_reception!} />}
@@ -302,12 +305,12 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
                       <div style={{ fontSize: 12.5, borderRadius: 8, padding: "6px 10px", lineHeight: 1.4, border: `1px dashed ${coul}66`, color: "#1a1a1a" }}>
                         <span style={{ fontWeight: 700, color: coul }}>Sur le bon : </span>
                         {r.doc
-                          ? <>{r.doc.quantite != null ? `${qte(r.doc.quantite)}${r.doc.unite ? ` ${r.doc.unite}` : ""}` : "quantité ?"}{r.doc.prix_unitaire != null ? ` × ${eur(r.doc.prix_unitaire)}` : ""}{r.totalDoc != null ? ` = ${eur(r.totalDoc)}` : ""}
-                              {r.ecart != null && r.statut === "ecart" && <strong style={{ color: r.ecart > 0 ? "#b4443a" : "#b7791f" }}> ({r.ecart > 0 ? "+" : "−"}{eur(Math.abs(r.ecart))})</strong>}
+                          ? <>{r.doc.quantite != null ? `${qte(r.doc.quantite)}${r.doc.unite ? ` ${r.doc.unite}` : ""}` : "quantité ?"}{voirMontants && r.doc.prix_unitaire != null ? ` × ${eur(r.doc.prix_unitaire)}` : ""}{voirMontants && r.totalDoc != null ? ` = ${eur(r.totalDoc)}` : ""}
+                              {voirMontants && r.ecart != null && r.statut === "ecart" && <strong style={{ color: r.ecart > 0 ? "#b4443a" : "#b7791f" }}> ({r.ecart > 0 ? "+" : "−"}{eur(Math.abs(r.ecart))})</strong>}
                               {r.statut === "conforme" && <span style={{ color: VERT }}> · conforme</span>}
                               {r.doc.nom && r.doc.nom.toLowerCase() !== l.ingredient_name.toLowerCase() && <div style={{ fontSize: 11.5, color: FAIBLE }}>{r.doc.nom}</div>}</>
                           : <span style={{ color: "#b4443a" }}>absent</span>}
-                        {r.suggestion && !lue && l.etat_reception !== r.suggestion.patch.etat_reception && (
+                        {r.suggestion && !lue && (voirMontants || r.suggestion.patch.etat_reception !== "prix") && l.etat_reception !== r.suggestion.patch.etat_reception && (
                           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
                             <span style={{ color: MUTED }}>{r.suggestion.libelle}</span>
                             <button type="button" onClick={() => appliquer(l.id, { ...r.suggestion!.patch, qty_received: r.suggestion!.patch.qty_received ?? (r.suggestion!.patch.etat_reception === "prix" ? l.quantite : null), prix_recu: r.suggestion!.patch.prix_recu ?? null, facture_sur_bon: r.suggestion!.patch.facture_sur_bon ?? true })} style={{ ...GESTE, height: 28, fontSize: 12, borderColor: coul, color: coul }}>Appliquer</button>
@@ -319,9 +322,9 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
                   {e && e.probleme && (
                     <div style={{ fontSize: 12.5, color: "#1a1a1a", background: "#f7f3ec", borderRadius: 8, padding: "6px 10px", lineHeight: 1.4 }}>
                       {l.etat_reception === "prix"
-                        ? <>Facturé {l.prix_recu != null ? eur(l.prix_recu) : "—"} HT / {unite(l)} au lieu de {l.prix_unitaire_ht != null ? eur(l.prix_unitaire_ht) : "—"}</>
+                        ? voirMontants ? <>Facturé {l.prix_recu != null ? eur(l.prix_recu) : "—"} HT / {unite(l)} au lieu de {l.prix_unitaire_ht != null ? eur(l.prix_unitaire_ht) : "—"}</> : <>Prix facturé différent du prix convenu</>
                         : <>Entre en stock : <strong>{qte(enStock)} {unite(l, enStock)}</strong> sur {qte(l.quantite)}{!l.facture_sur_bon && <span style={{ color: MUTED }}> · non facturé</span>}</>}
-                      {l.montant_reclame > 0 && <> · <strong style={{ color: "#b4443a" }}>à réclamer {eur(l.montant_reclame)} HT</strong></>}
+                      {voirMontants && l.montant_reclame > 0 && <> · <strong style={{ color: "#b4443a" }}>à réclamer {eur(l.montant_reclame)} HT</strong></>}
                       {l.reception_note && <div style={{ color: MUTED, fontStyle: "italic" }}>{l.reception_note}</div>}
                     </div>
                   )}
@@ -333,7 +336,7 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
                       <button type="button" className="rc-geste" aria-label="Plus d'options" onClick={(ev) => { ev.stopPropagation(); setMenuId(menuId === l.id ? null : l.id); }} style={{ ...GESTE, padding: "0 10px", fontSize: 16, letterSpacing: 1 }}>···</button>
                       {menuId === l.id && (
                         <div onClick={(ev) => ev.stopPropagation()} style={{ position: "absolute", left: 0, top: 38, zIndex: 5, background: "#fff", border: `1px solid ${BORD}`, borderRadius: 12, boxShadow: "0 10px 30px rgba(0,0,0,0.14)", padding: 6, minWidth: 220, display: "grid" }}>
-                          {(["abime", "refuse", "prix"] as EtatReception[]).map((et) => (
+                          {((voirMontants ? ["abime", "refuse", "prix"] : ["abime", "refuse"]) as EtatReception[]).map((et) => (
                             <button key={et} type="button" onClick={() => { setMenuId(null); setSignalement({ ligne: l, etat: et }); }} style={{ textAlign: "left", border: "none", background: "transparent", padding: "9px 10px", borderRadius: 8, fontSize: 13.5, fontFamily: "inherit", cursor: "pointer", color: "#1a1a1a" }}>{ETATS[et].libelle}…<span style={{ display: "block", fontSize: 11.5, color: MUTED }}>{ETATS[et].detail}</span></button>
                           ))}
                           {l.etat_reception && <button type="button" onClick={() => { setMenuId(null); retirer(l); }} style={{ textAlign: "left", border: "none", borderTop: `1px solid ${BORD}`, background: "transparent", padding: "9px 10px", fontSize: 13, fontFamily: "inherit", cursor: "pointer", color: MUTED }}>Retirer le contrôle</button>}
@@ -362,7 +365,7 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
                         {candidates.map((l) => <option key={l.id} value={l.id}>{l.ingredient_name}</option>)}
                       </select>
                     )}
-                    <div style={{ color: MUTED }}>{d.quantite != null ? `${qte(d.quantite)}${d.unite ? ` ${d.unite}` : ""}` : ""}{d.prix_unitaire != null ? ` × ${eur(d.prix_unitaire)}` : ""}{t != null ? ` = ${eur(t)}` : ""} · facturé sans avoir été commandé : à vérifier (livré ? consigne ? frais ?)</div>
+                    <div style={{ color: MUTED }}>{d.quantite != null ? `${qte(d.quantite)}${d.unite ? ` ${d.unite}` : ""}` : ""}{voirMontants && d.prix_unitaire != null ? ` × ${eur(d.prix_unitaire)}` : ""}{voirMontants && t != null ? ` = ${eur(t)}` : ""} · facturé sans avoir été commandé : à vérifier (livré ? consigne ? frais ?)</div>
                   </div>
                 );
               })}
@@ -373,7 +376,7 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
       )}
 
       {signalement && (
-        <Signalement ligne={signalement.ligne} etatInitial={signalement.etat} bureau={bureau} onFermer={() => setSignalement(null)}
+        <Signalement ligne={signalement.ligne} etatInitial={signalement.etat} bureau={bureau} montants={voirMontants} onFermer={() => setSignalement(null)}
           onEnregistrer={(patch) => { appliquer(signalement.ligne.id, patch); setSignalement(null); }} />
       )}
       {confirmation && (
@@ -381,7 +384,7 @@ export function Reception({ sessionId, onFermer, onValidee }: { sessionId: strin
           <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 18, textTransform: "uppercase", color: "#1a1a1a" }}>Valider la réception ?</div>
           <div style={{ fontSize: 13.5, color: "#1a1a1a", lineHeight: 1.5, marginTop: 8 }}>
             {nbAControler > 0 && <div>{nbAControler} ligne{nbAControler > 1 ? "s" : ""} non contrôlée{nbAControler > 1 ? "s" : ""} : comptée{nbAControler > 1 ? "s" : ""} reçue{nbAControler > 1 ? "s" : ""} conforme{nbAControler > 1 ? "s" : ""}.</div>}
-            {resume.problemes > 0 && <div>{resume.problemes} problème{resume.problemes > 1 ? "s" : ""} signalé{resume.problemes > 1 ? "s" : ""}{resume.aReclamer > 0 ? <> · <strong>{eur(resume.aReclamer)} HT à réclamer</strong> au fournisseur</> : null}.</div>}
+            {resume.problemes > 0 && <div>{resume.problemes} problème{resume.problemes > 1 ? "s" : ""} signalé{resume.problemes > 1 ? "s" : ""}{voirMontants && resume.aReclamer > 0 ? <> · <strong>{eur(resume.aReclamer)} HT à réclamer</strong> au fournisseur</> : null}.</div>}
             <div style={{ color: MUTED, marginTop: 6 }}>Le stock est mis à jour avec ce qui est réellement entré.</div>
           </div>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
@@ -406,8 +409,8 @@ function Feuille({ bureau, onFermer, children }: { bureau: boolean; onFermer: ()
 }
 
 /** Fiche de signalement d'un problème sur une ligne */
-function Signalement({ ligne, etatInitial, bureau, onFermer, onEnregistrer }: {
-  ligne: Ligne; etatInitial: EtatReception; bureau: boolean; onFermer: () => void;
+function Signalement({ ligne, etatInitial, bureau, montants, onFermer, onEnregistrer }: {
+  ligne: Ligne; etatInitial: EtatReception; bureau: boolean; montants: boolean; onFermer: () => void;
   onEnregistrer: (patch: Partial<Ligne>) => void;
 }) {
   const dejaCeType = ligne.etat_reception === etatInitial;
@@ -421,7 +424,8 @@ function Signalement({ ligne, etatInitial, bureau, onFermer, onEnregistrer }: {
   const erreur = erreurLigne(ctrl);
   const montant = montantReclame(ctrl);
   const enStock = quantiteEnStock(ctrl);
-  const TYPES: EtatReception[] = ["manquant", "partiel", "abime", "refuse", "prix"];
+  // « Prix différent » : saisie d'un prix, réservée aux administrateurs et managers (05/11/2026)
+  const TYPES: EtatReception[] = montants || etatInitial === "prix" ? ["manquant", "partiel", "abime", "refuse", "prix"] : ["manquant", "partiel", "abime", "refuse"];
   const demandeQte = etat === "partiel" || etat === "abime";
 
   return (
@@ -429,7 +433,7 @@ function Signalement({ ligne, etatInitial, bureau, onFermer, onEnregistrer }: {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
         <div>
           <div style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 17, textTransform: "uppercase", color: "#1a1a1a", lineHeight: 1.15 }}>Problème sur « {ligne.ingredient_name} »</div>
-          <div style={{ fontSize: 12.5, color: MUTED, marginTop: 3 }}>Commandé : {qte(ligne.quantite)} {unite(ligne, ligne.quantite)}{ligne.prix_unitaire_ht != null ? ` · ${eur(ligne.prix_unitaire_ht)} HT / ${unite(ligne)}` : ""}</div>
+          <div style={{ fontSize: 12.5, color: MUTED, marginTop: 3 }}>Commandé : {qte(ligne.quantite)} {unite(ligne, ligne.quantite)}{montants && ligne.prix_unitaire_ht != null ? ` · ${eur(ligne.prix_unitaire_ht)} HT / ${unite(ligne)}` : ""}</div>
         </div>
         <button type="button" onClick={onFermer} aria-label="Fermer" style={{ border: "none", background: "transparent", fontSize: 22, lineHeight: 1, color: MUTED, cursor: "pointer", padding: "0 4px", fontFamily: "inherit" }}>×</button>
       </div>
@@ -460,7 +464,7 @@ function Signalement({ ligne, etatInitial, bureau, onFermer, onEnregistrer }: {
           <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginBottom: 6 }}>Prix facturé, HT par {unite(ligne)}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <input inputMode="decimal" value={prixRecu} onChange={(e) => setPrixRecu(e.target.value)} placeholder="0,00" autoFocus style={{ ...CHAMP, width: 140, fontSize: 18, fontFamily: OSWALD, fontWeight: 700, textAlign: "center" }} />
-            <span style={{ fontSize: 13, color: MUTED }}>{ligne.prix_unitaire_ht != null ? `convenu ${eur(ligne.prix_unitaire_ht)}` : "prix convenu inconnu"}</span>
+            {montants && <span style={{ fontSize: 13, color: MUTED }}>{ligne.prix_unitaire_ht != null ? `convenu ${eur(ligne.prix_unitaire_ht)}` : "prix convenu inconnu"}</span>}
           </div>
         </label>
       )}
@@ -486,7 +490,7 @@ function Signalement({ ligne, etatInitial, bureau, onFermer, onEnregistrer }: {
             {etat === "prix"
               ? <div>Tout entre en stock ({qte(ligne.quantite)} {unite(ligne, ligne.quantite)}).</div>
               : <div>{enStock > 0 ? <>Entre en stock : <strong>{qte(enStock)} {unite(ligne, enStock)}</strong> sur {qte(ligne.quantite)}.</> : "Rien de cette ligne n'entre en stock."}</div>}
-            <div style={{ fontWeight: 700 }}>À réclamer : {montant > 0 ? `${eur(montant)} HT` : ligne.prix_unitaire_ht == null ? "prix inconnu" : "rien"}</div>
+            {montants && <div style={{ fontWeight: 700 }}>À réclamer : {montant > 0 ? `${eur(montant)} HT` : ligne.prix_unitaire_ht == null ? "prix inconnu" : "rien"}</div>}
           </>
         )}
       </div>

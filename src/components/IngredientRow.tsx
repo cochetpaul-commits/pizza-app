@@ -25,6 +25,7 @@ import { BoutonCrayon, BoutonCroix, Conditionnement, TuileProduit, cadreTuile } 
 import { articleDeFiche, type FicheConditionnement } from "@/lib/inventaire";
 import { ALLERGENS, ALLERGEN_SHORT, parseAllergens } from "@/lib/allergens";
 import type { PriceAlert } from "@/lib/priceAlerts";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 
 // ─── shared input style helpers ─────────────────────────────────────────────
 const inputStyle: CSSProperties = {
@@ -358,6 +359,9 @@ export const IngredientRow = React.memo(function IngredientRow({
   selected, onToggleSelect, duplicateMatch, onMergeDuplicate, onIgnoreDuplicate, subCategorySuggestions, presentation = "liste",
 }: IngredientRowProps) {
   const volet = presentation === "volet";
+  // Prix d'achat, comparaison et variation de prix : administrateurs et managers, jamais la tablette (05/11/2026)
+  const voirMontants = useVoirMontants();
+  const titrePrix = voirMontants ? "Prix d'achat" : "Unité et conditionnement";
   const [mobileSection, setMobileSection] = React.useState<string>("prix"); // mobile accordion: only one open at a time
   const toggleMobileSection = React.useCallback((key: string) => {
     setMobileSection(prev => prev === key ? "" : key);
@@ -422,7 +426,7 @@ export const IngredientRow = React.memo(function IngredientRow({
         badges={<>
           {inactive && <> {inactiveBadge}</>}
           {x.is_derived && <> <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 4, background: "rgba(124,58,237,0.10)", color: "#7C3AED", verticalAlign: "middle" }}>DÉRIVÉ</span></>}
-          {alert && <> <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, verticalAlign: "middle", color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)" }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span></>}
+          {voirMontants && alert && <> <span style={{ fontSize: 10, fontWeight: 800, padding: "1px 5px", borderRadius: 6, verticalAlign: "middle", color: alert.direction === "up" ? "#DC2626" : "#16A34A", background: alert.direction === "up" ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)" }}>{alert.direction === "up" ? "+" : "-"}{(Math.abs(alert.change_pct) * 100).toFixed(0)}%</span></>}
         </>}
         actions={<>
           {st !== "validated" && canValidate && (
@@ -445,13 +449,13 @@ export const IngredientRow = React.memo(function IngredientRow({
               {ALLERGEN_SHORT[a as keyof typeof ALLERGEN_SHORT] ?? a}
             </span>
           ))}
-          {priceComparison && !priceComparison.isCheapest && priceComparison.cheapestName && (
+          {voirMontants && priceComparison && !priceComparison.isCheapest && priceComparison.cheapestName && (
             <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>moins cher : {priceComparison.cheapestName} ({priceComparison.cheapest.unit_price!.toFixed(2)}{"\u00A0\u20AC"}/{priceComparison.cheapest.unit ?? "kg"})</span>
           )}
-          {priceComparison && priceComparison.isCheapest && priceComparison.count > 1 && (
+          {voirMontants && priceComparison && priceComparison.isCheapest && priceComparison.count > 1 && (
             <span style={{ fontSize: 10, color: "#16A34A", fontWeight: 600 }}>Meilleur prix ({priceComparison.count} fournisseurs)</span>
           )}
-          {!hasPrice && !inactive && <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626" }}>prix manquant</span>}
+          {voirMontants && !hasPrice && !inactive && <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626" }}>prix manquant</span>}
         </>}
         gauche={<>
           {supplierName && supplierIdForDisplay
@@ -462,7 +466,7 @@ export const IngredientRow = React.memo(function IngredientRow({
           <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: sb.bg, color: sb.color }}>{sb.label}</span>
         </>}
         droite={<>
-          {hasPrice && <span className="pastille-ronde">{price}</span>}
+          {voirMontants && hasPrice && <span className="pastille-ronde">{price}</span>}
           {isEditing && <button type="button" onClick={(e) => { e.stopPropagation(); onSaveEdit(); }} style={{ ...BTN_ACTION, width: "auto", padding: "0 10px", background: "#4a6741", color: "white", fontSize: 11, fontWeight: 700 }}>OK</button>}
         </>}
       />}
@@ -704,7 +708,7 @@ export const IngredientRow = React.memo(function IngredientRow({
           </div>
 
           {/* Price inputs */}
-          <div style={{ display: "flex", gap: 6, alignItems: "end", flexWrap: "wrap", marginBottom: 8 }}>
+          {voirMontants && <div style={{ display: "flex", gap: 6, alignItems: "end", flexWrap: "wrap", marginBottom: 8 }}>
             <div>
               <div style={{ fontSize: 10, color: "#888", marginBottom: 2 }}>EUR / {baseLabel}</div>
               <input style={{ ...inputStyle, width: 90, borderColor: edit.priceSource === "base" ? "#D4775A" : undefined }}
@@ -724,10 +728,10 @@ export const IngredientRow = React.memo(function IngredientRow({
                   value={edit.pricePerKgOrL} onChange={(e) => handlePriceChange("kgL", e.target.value)} placeholder="0.00" />
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Summary */}
-          {summary && (
+          {voirMontants && summary && (
             <div style={{ fontSize: 11, color: "#4a6741", fontWeight: 600, padding: "6px 10px", background: "rgba(74,103,65,0.06)", borderRadius: 6 }}>
               {summary}
             </div>
@@ -932,7 +936,7 @@ export const IngredientRow = React.memo(function IngredientRow({
                 {ligneImport(36, 11)}
                 {champCodeFournisseur(36, 11)}
               </div>
-              <div style={titreSection}>Prix d&apos;achat</div>
+              <div style={titreSection}>{titrePrix}</div>
               {renderPrixContent()}
               <div style={titreSection}>Commande &amp; stock</div>
               {renderCommandeContent()}
@@ -974,7 +978,7 @@ export const IngredientRow = React.memo(function IngredientRow({
           {/* ═══ DESKTOP: 2 columns, no accordions ═══ */}
           <div className="hidden md:grid md:grid-cols-2 gap-3" style={{ alignItems: "start" }}>
             <div style={{ background: "#fff", borderRadius: 10, border: "1.5px solid #e5ddd0", padding: 12 }}>
-              <div style={sectionLabel}>Prix d&apos;achat</div>
+              <div style={sectionLabel}>{titrePrix}</div>
               {renderPrixContent()}
             </div>
             <div style={{ background: "#fff", borderRadius: 10, border: "1.5px solid #e5ddd0", padding: 12 }}>
@@ -988,7 +992,7 @@ export const IngredientRow = React.memo(function IngredientRow({
 
           {/* ═══ MOBILE: stacked accordions ═══ */}
           <div className="md:hidden">
-            <MobileAccordion label="Prix d'achat" sectionKey="prix" isOpen={mobileSection === "prix"} onToggleSection={toggleMobileSection}>
+            <MobileAccordion label={titrePrix} sectionKey="prix" isOpen={mobileSection === "prix"} onToggleSection={toggleMobileSection}>
               {renderPrixContent()}
             </MobileAccordion>
             <MobileAccordion label="Commande & stock" sectionKey="commande" isOpen={mobileSection === "commande"} onToggleSection={toggleMobileSection}>

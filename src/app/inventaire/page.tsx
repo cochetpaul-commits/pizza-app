@@ -2,6 +2,7 @@
 
 import { employeTabletteActif, nomTablette } from "@/lib/tablette/store";
 import { useProfile } from "@/lib/ProfileContext";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toutesLesPages } from "@/lib/supabaseChunks";
 import { triParLibelle } from "@/lib/tri";
@@ -99,6 +100,8 @@ export default function InventairePage() {
   const { current: etab } = useEtablissement();
   const [authSession, setAuthSession] = useState<Session | null>(null);
   const bureau = useBureau();
+  // Montants réservés aux administrateurs et managers (05/11/2026) : valeur du stock, écarts en euros
+  const voirMontants = useVoirMontants();
 
   useEffect(() => {
     (async () => {
@@ -854,18 +857,18 @@ export default function InventairePage() {
           {historique.length > 0 && (
             <div style={CADRE}>
               <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-                <colgroup><col style={{ width: 6 }} /><col /><col style={{ width: 110 }} /><col style={{ width: 70 }} /></colgroup>
+                <colgroup><col style={{ width: 6 }} /><col />{voirMontants && <col style={{ width: 110 }} />}<col style={{ width: 70 }} /></colgroup>
                 <thead>
-                  <tr><th style={{ ...TH, padding: 0 }} /><th style={TH}>Inventaires précédents</th><th style={{ ...TH, textAlign: "right" }}>Valeur</th><th style={TH} /></tr>
+                  <tr><th style={{ ...TH, padding: 0 }} /><th style={TH}>Inventaires précédents</th>{voirMontants && <th style={{ ...TH, textAlign: "right" }}>Valeur</th>}<th style={TH} /></tr>
                 </thead>
                 <tbody>
                   {historique.map((inv) => (
                     <tr key={inv.id} className="inv-ligne" onClick={() => viewInventaire(inv)} style={{ cursor: "pointer" }}>
                       <td style={liseret(BON)} />
                       <td style={TD}><span style={{ fontWeight: 600, fontSize: 13.5 }}>{fmtDate(inv.date)}</span> <span style={{ ...pastille(BON), marginLeft: 6 }}>Clôturé</span></td>
-                      <td style={{ ...TD, textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{inv.total_valeur != null ? fmtMoney(inv.total_valeur) : "-"}</td>
+                      {voirMontants && <td style={{ ...TD, textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{inv.total_valeur != null ? fmtMoney(inv.total_valeur) : "-"}</td>}
                       <td style={{ ...TD, textAlign: "right" }}>
-                        <button type="button" onClick={(e) => { e.stopPropagation(); openApiFile(`/api/inventaire/pdf?id=${inv.id}`); }} style={{ ...BTN, padding: "3px 10px", fontSize: 11, color: MUTED }}>PDF</button>
+                        {voirMontants && <button type="button" onClick={(e) => { e.stopPropagation(); openApiFile(`/api/inventaire/pdf?id=${inv.id}`); }} style={{ ...BTN, padding: "3px 10px", fontSize: 11, color: MUTED }}>PDF</button>}
                       </td>
                     </tr>
                   ))}
@@ -982,12 +985,12 @@ export default function InventairePage() {
             if (cur > 0 && prev > 0 && ing.cost_per_unit) delta += (cur - prev) * ing.cost_per_unit;
           }
           const alertes = ingredients.filter((ing) => { const qty = ingTotals.totals[ing.id] ?? 0; return qty > 0 && ing.stock_min != null && qty < ing.stock_min; }).length;
-          const nb = 2 + (aPrec ? 1 : 0) + (alertes > 0 ? 1 : 0);
+          const nb = 1 + (voirMontants ? 1 + (aPrec ? 1 : 0) : 0) + (alertes > 0 ? 1 : 0);
           return (
             <div style={{ display: "grid", gridTemplateColumns: bureau ? `repeat(${nb}, 1fr)` : "repeat(2, 1fr)", gap: 8, marginBottom: 14 }}>
               <Tuile compacte icone="produit" libelle="Saisis" valeur={`${totalSummary.saisis} / ${ingredients.length}`} couleur="#1a1a1a" />
-              <Tuile compacte icone="euro" libelle="Valeur comptée" valeur={totalSummary.value > 0 ? fmtMoney(totalSummary.value) : "-"} couleur={ACCENT} />
-              {aPrec && <Tuile compacte libelle="Écart vs précédent" valeur={`${delta >= 0 ? "+" : ""}${fmtMoney(delta)}`} couleur={delta >= 0 ? BON : MAUVAIS} />}
+              {voirMontants && <Tuile compacte icone="euro" libelle="Valeur comptée" valeur={totalSummary.value > 0 ? fmtMoney(totalSummary.value) : "-"} couleur={ACCENT} />}
+              {voirMontants && aPrec && <Tuile compacte libelle="Écart vs précédent" valeur={`${delta >= 0 ? "+" : ""}${fmtMoney(delta)}`} couleur={delta >= 0 ? BON : MAUVAIS} />}
               {alertes > 0 && <Tuile compacte icone="alerte" libelle="Sous le minimum" valeur={alertes} couleur={MAUVAIS} />}
             </div>
           );
@@ -1290,7 +1293,7 @@ export default function InventairePage() {
               {zoneSummary.saisis} / {zoneSummary.articles} articles saisis
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {zoneSummary.value > 0 && (
+              {voirMontants && zoneSummary.value > 0 && (
                 <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT, fontVariantNumeric: "tabular-nums" }}>
                   {fmtMoney(zoneSummary.value)}
                 </span>
@@ -1349,7 +1352,7 @@ export default function InventairePage() {
                     <span style={{ ...styleTitreCategorie(color), flex: "0 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
                     <span style={stylePastilleBarre(color)}>{catSaisis}/{items.length}</span>
                     <span style={{ fontSize: 12, color: couleurTexteSurBarre(color), opacity: 0.85, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {catValue > 0 ? fmtMoney(catValue) : ""}
+                      {voirMontants && catValue > 0 ? fmtMoney(catValue) : ""}
                     </span>
                     {/* Tout à 0 — span cliquable (un <button> ne peut pas etre imbrique dans le <button> d'en-tete) */}
                     {isActive && catNonSaisis > 0 && (
@@ -1374,7 +1377,7 @@ export default function InventairePage() {
                       {items.map((ing) => (
                         <LigneInventaire key={ing.id} ing={ing} pack={packInfo[ing.id]} rawQty={quantities[qk(ing.id, activeZone)]} totalAllZones={ingTotals.totals[ing.id] ?? 0}
                           prevQty={prevQuantities[ing.id]} theo={theoreticalStock[ing.id]} zoneCouleur={ing.storage_zone ? (zones.find((zz) => zz.name === ing.storage_zone)?.couleur ?? "#b0a894") : "#b0a894"}
-                          supplier={ingSupplier[ing.id]} isActive={isActive} readOnly={readOnly} color={color} onQty={handleQtyChange} onRetirer={retirerProduit} />
+                          supplier={ingSupplier[ing.id]} isActive={isActive} readOnly={readOnly} color={color} voirMontants={voirMontants} onQty={handleQtyChange} onRetirer={retirerProduit} />
                       ))}
                     </div>
                   )}

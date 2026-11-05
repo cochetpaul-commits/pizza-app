@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { fetchApi } from "@/lib/fetchApi";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import { useBureau } from "@/hooks/useBureau";
 import { VoletDroit } from "@/components/produits/BaseProduits";
 import type { VinCave } from "@/app/api/cave/route";
@@ -65,6 +66,8 @@ function Fiche({ v, donnees, onFermer, onRecharger }: { v: VinCave; donnees: Don
   const [accordPlat, setAccordPlat] = useState("");
   const [accordRaison, setAccordRaison] = useState("");
   const [etat, setEtat] = useState<string | null>(null);
+  // Prix d'achat et coefficient : administrateurs et managers, jamais la tablette (05/11/2026) ; les prix de vente restent visibles
+  const voirMontants = useVoirMontants();
   const champs: [keyof VinCave, string, boolean][] = [["nom", "Nom", false], ["nom_complet", "Nom complet", false], ["domaine", "Domaine", false], ["region", "Région", false], ["appellation", "Appellation", false], ["cepages", "Cépages", false], ["millesime", "Millésime", false], ["degre", "Degré", false], ["garde", "Garde", false], ["service", "Service", false], ["carafage", "Carafage", false], ["pitch", "Pitch à table", true], ["astuce", "Astuce salle", true], ["oeil", "Œil", true], ["nez", "Nez", true], ["bouche", "Bouche", true], ["histoire", "Histoire", true], ["vinification", "Vinification", true], ["accords_generiques", "Accords génériques", true], ["note", "À vérifier (direction)", true]];
   const commencer = () => { setForm(Object.fromEntries(champs.map(([k]) => [k, String(v[k] ?? "")]))); setEdit(true); };
   const envoyer = async (extra: Record<string, unknown> = {}) => {
@@ -127,7 +130,7 @@ function Fiche({ v, donnees, onFermer, onRecharger }: { v: VinCave; donnees: Don
           {v.pitch && <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.3 }}>{v.pitch}</div>}
           {v.astuce && <div style={{ fontSize: 14, padding: "10px 12px", borderLeft: `3px solid ${ACCENT}`, background: "#f2ede4", borderRadius: "0 8px 8px 0" }}><b>Astuce salle.</b> {v.astuce}</div>}
           <Prix v={v} />
-          {v.achat && <div style={{ border: `1px dashed ${BORD}`, borderRadius: 10, padding: "8px 12px", fontSize: 13 }}><span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", color: MUTED, fontWeight: 700 }}>Direction</span><br />{v.achat.prix_ht != null ? <>Prix d&apos;achat {eur(v.achat.prix_ht)} HT{v.achat.coefficient != null && <> · coefficient {v.achat.coefficient.toLocaleString("fr-FR")} sur la bouteille</>}</> : "Prix d'achat inconnu (produit sans prix)"}{v.note && <><br /><b>À vérifier :</b> {v.note}</>}</div>}
+          {voirMontants && donnees.argent && v.achat && <div style={{ border: `1px dashed ${BORD}`, borderRadius: 10, padding: "8px 12px", fontSize: 13 }}><span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", color: MUTED, fontWeight: 700 }}>Direction</span><br />{v.achat.prix_ht != null ? <>Prix d&apos;achat {eur(v.achat.prix_ht)} HT{v.achat.coefficient != null && <> · coefficient {v.achat.coefficient.toLocaleString("fr-FR")} sur la bouteille</>}</> : "Prix d'achat inconnu (produit sans prix)"}{v.note && <><br /><b>À vérifier :</b> {v.note}</>}</div>}
           <div style={{ borderTop: `1px solid ${BORD}` }}>
             {([["Cépages", v.cepages], ["Région", v.region], ["Millésime", v.millesime ?? "à compléter"], ["Degré", v.degre], ["Garde", v.garde], ["Service", v.service], ["Carafage", v.carafage]] as [string, string | null][]).filter(([, x]) => x).map(([l, x]) => (
               <div key={l} style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: 8, padding: "6px 0", borderBottom: `1px solid ${BORD}`, fontSize: 13 }}><span style={{ color: MUTED, fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", paddingTop: 2 }}>{l}</span><span>{x}</span></div>

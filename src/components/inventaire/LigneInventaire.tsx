@@ -14,15 +14,17 @@ export type LigneInventaireProps = {
   ing: Ingredient; pack: PackInfo | undefined; rawQty: number | "" | undefined; totalAllZones: number;
   prevQty: number | null | undefined; theo: number | null | undefined; zoneCouleur: string; supplier: { name: string; color: string | null } | undefined;
   isActive: boolean; readOnly: boolean; color: string;
+  /** Valeur de la ligne : administrateurs et managers seulement (05/11/2026) */
+  voirMontants: boolean;
   onQty: (id: string, val: string) => void; onRetirer: (ing: Ingredient) => void;
 };
 const fmtMoney = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
-export const LigneInventaire = React.memo(function LigneInventaire({ ing, pack, rawQty, totalAllZones, prevQty, theo, zoneCouleur, supplier, isActive, readOnly, color, onQty, onRetirer }: LigneInventaireProps) {
+export const LigneInventaire = React.memo(function LigneInventaire({ ing, pack, rawQty, totalAllZones, prevQty, theo, zoneCouleur, supplier, isActive, readOnly, color, voirMontants, onQty, onRetirer }: LigneInventaireProps) {
                                                                             const rawQtyNum = typeof rawQty === "number" ? rawQty : 0;
     const hasQty = rawQtyNum > 0;
     const isZeroConfirmed = rawQty === 0;
-    const valeur = hasQty && ing.cost_per_unit != null
+    const valeur = voirMontants && hasQty && ing.cost_per_unit != null
       ? rawQtyNum * ing.cost_per_unit : null;
 
     // For pack items: decompose stored qty into cartons + loose

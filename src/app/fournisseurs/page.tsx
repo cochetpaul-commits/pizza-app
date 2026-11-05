@@ -8,6 +8,7 @@ import { getSupplierColor } from "@/lib/supplierColors";
 import { ColorPicker } from "@/components/ColorPicker";
 
 import { RequireRole } from "@/components/RequireRole";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import { useEtablissement } from "@/lib/EtablissementContext";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { TableauMobile } from "@/components/ui/TableauMobile";
@@ -155,6 +156,8 @@ const titreSection: React.CSSProperties = { fontSize: 11, fontWeight: 700, lette
 
 export default function FournisseursPage() {
   const bureau = useBureau();
+  // Montants réservés aux administrateurs et managers (05/11/2026) : franco en euros
+  const voirMontants = useVoirMontants();
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [stats, setStats] = useState<Map<string, SupplierStats>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -722,12 +725,12 @@ export default function FournisseursPage() {
           <div style={{ marginBottom: 6 }}>
             {/* Franco row */}
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
-              <div>
+              {voirMontants && <div>
                 <div style={labelStyle}>Franco de port (EUR HT)</div>
                 <input style={{ ...inputStyle, width: 110 }} value={form.franco_minimum} onChange={(e) => setForm((f) => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 200" type="number" min="0" step="10" />
-              </div>
+              </div>}
               <div>
-                <div style={labelStyle}>ou franco en bouteilles</div>
+                <div style={labelStyle}>{voirMontants ? "ou franco en bouteilles" : "Franco en bouteilles"}</div>
                 <input style={{ ...inputStyle, width: 110 }} value={form.franco_bouteilles} onChange={(e) => setForm((f) => ({ ...f, franco_bouteilles: e.target.value }))} placeholder="ex: 36" type="number" min="0" step="6" />
               </div>
               <div>

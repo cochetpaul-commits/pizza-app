@@ -48,6 +48,7 @@ import { BlocStock } from "@/components/produits/BlocStock";
 import type { StockItem } from "@/lib/stockTypes";
 import { useBureau } from "@/hooks/useBureau";
 import { useProfile } from "@/lib/ProfileContext";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import DuplicatePanel from "@/components/DuplicatePanel";
@@ -101,6 +102,8 @@ function IngredientsPageInner() {
   const router = useRouter();
   const { can } = useProfile();
   const userCanWrite = can("achats.edit");
+  // Montants réservés aux administrateurs et managers, jamais la tablette (05/11/2026) : prix d'achat, variations, franco
+  const voirMontants = useVoirMontants();
   const { current: etab } = useEtablissement();
 
   const [q, setQ] = useState("");
@@ -1285,7 +1288,7 @@ function IngredientsPageInner() {
       <main style={{ padding: bureau ? "18px 28px 60px" : "12px 14px 90px", boxSizing: "border-box" }}>
 
         {/* Variations panel */}
-        {isVariations && userId && (
+        {isVariations && userId && voirMontants && (
           <div style={{ marginTop: 20 }}><PriceAlertsPanel userId={userId} /></div>
         )}
 
@@ -1299,7 +1302,7 @@ function IngredientsPageInner() {
               <ImportExportModal etabSlug={etab?.slug ?? "bello_mio"} onClose={() => { setShowImportExport(false); void mutate(); }} onDone={() => { void mutate(); }} />
             )}
             {bureau && showCreateForm && (
-              <VoletDroit titre="Nouveau produit" sousTitre="Nom, catégorie, fournisseur et prix : le reste se complète dans la fiche." onFermer={() => setShowCreateForm(false)} largeur={560}>
+              <VoletDroit titre="Nouveau produit" sousTitre={voirMontants ? "Nom, catégorie, fournisseur et prix : le reste se complète dans la fiche." : "Nom, catégorie et fournisseur : le reste se complète dans la fiche."} onFermer={() => setShowCreateForm(false)} largeur={560}>
                 <form onSubmit={(e) => { void addIngredient(e).then((ok) => { if (ok) setShowCreateForm(false); }); }} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   <div><div className={lCls}>Ingrédient</div><input className={iCls} placeholder="Ex: Huile d'olive" value={newName} onChange={(e) => handleNewNameChange(e.target.value)} autoFocus /></div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -1321,9 +1324,9 @@ function IngredientsPageInner() {
                         <option value="kg">Kilo (kg)</option><option value="l">Litre (L)</option><option value="pc">Pièce (pc)</option>
                       </select>
                     </div>
-                    <div><div className={lCls}>Prix ({newUnit === "kg" ? "€/kg" : newUnit === "l" ? "€/L" : "€/pc"})</div>
+                    {voirMontants && <div><div className={lCls}>Prix ({newUnit === "kg" ? "€/kg" : newUnit === "l" ? "€/L" : "€/pc"})</div>
                       <input className={iCls} placeholder={newUnit === "pc" ? "Ex: 1.79" : newUnit === "l" ? "Ex: 2.07" : "Ex: 12.50"} inputMode="decimal" value={newUnitPrice} onChange={(e) => setNewUnitPrice(e.target.value)} />
-                    </div>
+                    </div>}
                   </div>
                   <button type="submit" style={{ width: "100%", height: 44, borderRadius: 10, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
                     Ajouter le produit
@@ -1354,9 +1357,9 @@ function IngredientsPageInner() {
                         <option value="kg">Kilo (kg)</option><option value="l">Litre (L)</option><option value="pc">Pièce (pc)</option>
                       </select>
                     </div>
-                    <div><div className={lCls}>Prix ({newUnit === "kg" ? "€/kg" : newUnit === "l" ? "€/L" : "€/pc"})</div>
+                    {voirMontants && <div><div className={lCls}>Prix ({newUnit === "kg" ? "€/kg" : newUnit === "l" ? "€/L" : "€/pc"})</div>
                       <input className={iCls} placeholder={newUnit === "pc" ? "Ex: 1.79" : newUnit === "l" ? "Ex: 2.07" : "Ex: 12.50"} inputMode="decimal" value={newUnitPrice} onChange={(e) => setNewUnitPrice(e.target.value)} />
-                    </div>
+                    </div>}
                   </div>
                   <button type="submit" style={{
                     width: "100%", height: 48, borderRadius: 14, border: "none",
@@ -1551,7 +1554,7 @@ function IngredientsPageInner() {
                     {rendement ? `${(rendement * 100).toFixed(1)} %` : "—"}
                   </span>
                 </div>
-                {parentPrice != null && (
+                {voirMontants && parentPrice != null && (
                   <>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                       <span style={{ fontSize: 12, color: "#999" }}>Prix parent</span>
@@ -1565,7 +1568,7 @@ function IngredientsPageInner() {
                     </div>
                   </>
                 )}
-                {parentPrice == null && (
+                {voirMontants && parentPrice == null && (
                   <div style={{ fontSize: 12, color: "#D97706", marginTop: 4 }}>Aucun prix trouvé pour cet ingrédient.</div>
                 )}
               </div>
@@ -1650,7 +1653,7 @@ function IngredientsPageInner() {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                   <div><div style={lblSt}>Email</div><input style={inpSt} value={supplierForm.email} onChange={(e) => setSupplierForm(f => ({ ...f, email: e.target.value }))} placeholder="contact@fournisseur.fr" type="email" /></div>
-                  <div><div style={lblSt}>Franco minimum (EUR HT)</div><input style={inpSt} value={supplierForm.franco_minimum} onChange={(e) => setSupplierForm(f => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 800" /></div>
+                  {voirMontants && <div><div style={lblSt}>Franco minimum (EUR HT)</div><input style={inpSt} value={supplierForm.franco_minimum} onChange={(e) => setSupplierForm(f => ({ ...f, franco_minimum: e.target.value }))} placeholder="ex: 800" /></div>}
                 </div>
                 <div style={{ marginBottom: 16 }}><div style={lblSt}>Notes</div><textarea style={{ ...inpSt, resize: "vertical" }} value={supplierForm.notes} onChange={(e) => setSupplierForm(f => ({ ...f, notes: e.target.value }))} placeholder="Delai de livraison, conditions..." rows={2} /></div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

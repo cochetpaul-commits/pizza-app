@@ -13,6 +13,7 @@ import { clesPersonnel, estLignePersonnel } from "@/lib/achats/personnel";
 import { probablePersonnel } from "@/lib/achats/probablePersonnel";
 import { CAT_LABELS } from "@/types/ingredients";
 import { employeTabletteActif } from "@/lib/tablette/store";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 
 /**
  * Repas du personnel (30/10/2026, d'après Paul) : pas un menu, un bouton dans Commandes.
@@ -34,6 +35,8 @@ const libelleCat = (c: string) => (CAT_LABELS as Record<string, string>)[c] ?? c
 export function CoursesPersonnel({ bureau }: { bureau: boolean }) {
   const { current: etab } = useEtablissement();
   const etabId = etab?.id ?? "";
+  // Montants réservés aux administrateurs et managers (05/11/2026) : le relevé chiffré du cabinet ne s'affiche qu'à eux
+  const voirMontants = useVoirMontants();
   const [produits, setProduits] = useState<Produit[] | null>(null);
   const [fournisseurs, setFournisseurs] = useState<Map<string, string>>(new Map());
   const [coches, setCoches] = useState<Set<string>>(new Set());
@@ -72,7 +75,7 @@ export function CoursesPersonnel({ bureau }: { bureau: boolean }) {
 
   // Relevé du mois : lignes des factures importées dont le nom est celui d'un produit du personnel
   useEffect(() => {
-    if (!etabId || !produits) return;
+    if (!etabId || !produits || !voirMontants) return;
     let annule = false;
     (async () => {
       const cles = clesPersonnel(perso);
@@ -94,7 +97,7 @@ export function CoursesPersonnel({ bureau }: { bureau: boolean }) {
       if (!annule) setLignes({ mois, lignes: res });
     })();
     return () => { annule = true; };
-  }, [etabId, produits, perso, mois]);
+  }, [etabId, produits, perso, mois, voirMontants]);
 
   const groupes = useMemo(() => {
     const m = new Map<string, Produit[]>();
@@ -222,7 +225,7 @@ export function CoursesPersonnel({ bureau }: { bureau: boolean }) {
       )}
 
       {/* Relevé du mois pour le cabinet : avantages en nature (647), d'après les factures importées */}
-      <section style={CADRE}>
+      {voirMontants && <section style={CADRE}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "14px 16px 10px", borderBottom: `1px solid ${BORD}` }}>
           <div>
             <div style={INTERTITRE}>Relevé pour le cabinet · avantages en nature</div>
@@ -256,7 +259,7 @@ export function CoursesPersonnel({ bureau }: { bureau: boolean }) {
             </table>
           </div>
         )}
-      </section>
+      </section>}
     </div>
   );
 }

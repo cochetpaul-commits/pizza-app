@@ -76,6 +76,7 @@ import { couleurRayon } from "@/lib/rayons";
 import { styleBarreCategorie, styleChevronBarre, stylePastilleBarre, styleTitreCategorie } from "@/lib/styleCategories";
 import { BoutonCrayon, Compteur } from "@/components/TuileProduit";
 import { CelluleProduit, TableauMobile } from "@/components/ui/TableauMobile";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 
 /**
  * Aller-retour vers la fiche produit (admins, managers) : l'état de l'écran est gardé le temps de corriger
@@ -109,6 +110,8 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   const router = useRouter();
   const { canWrite: peutCorrigerFiche, role } = useProfile();
   const estResponsable = role === "group_admin" || role === "manager";
+  // Montants réservés aux administrateurs et managers (05/11/2026)
+  const voirMontants = useVoirMontants();
   /** État à restaurer en revenant de la fiche produit (lu une fois, au montage) */
   const [retour] = useState<EtatRetour | null>(() => (typeof window === "undefined" ? null : lireRetour(supplierId)));
   const [onglet, setOnglet] = useState<Onglet>(retour?.onglet ?? "jour");
@@ -369,11 +372,11 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
                 onMoins={() => fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2))}
                 onPlus={() => fixerMaPart(a, m, Math.round((maPart + pas) * 2) / 2)} />
             )) : <span style={{ fontWeight: 700 }}>{total > 0 ? qteTexte(total) : "—"}</span>}
-            {total > 0 && prix != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{euros(total * prix)}</span>}
+            {voirMontants && total > 0 && prix != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{euros(total * prix)}</span>}
           </div>
         }>
           <div style={{ fontSize: 11.5, color: "#6f6656" }}>
-            {unite}{prix != null ? ` · ${euros(prix)} HT` : ""}{a.ref ? ` · réf. ${a.ref}` : ""}
+            {unite}{voirMontants && prix != null ? ` · ${euros(prix)} HT` : ""}{a.ref ? ` · réf. ${a.ref}` : ""}
             {a.zones.length > 0 && <span style={{ display: "inline-flex", gap: 4, marginLeft: 6, verticalAlign: "middle" }}>{a.zones.map((z) => <span key={z.nom} className="pastille" style={{ "--pastille-c": z.couleur ?? "#8a8378" } as React.CSSProperties}>{libelleZone(z.nom)}</span>)}</span>}
           </div>
           {(indication || a.stock_objectif != null) && (
@@ -436,7 +439,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
           )}
         </td>
         <td style={{ ...TD, color: "#6f6656", fontSize: 12.5 }}>{unite}{a.ref ? <span style={{ color: "#a39d92" }}> · réf. {a.ref}</span> : null}</td>
-        <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: prix != null ? "#1a1a1a" : "#a39d92" }}>{prix != null ? `${euros(prix)} HT` : "—"}</td>
+        {voirMontants && <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: prix != null ? "#1a1a1a" : "#a39d92" }}>{prix != null ? `${euros(prix)} HT` : "—"}</td>}
         <td style={TD}>
           <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             {a.zones.map((z) => <span key={z.nom} className="pastille" style={{ "--pastille-c": z.couleur ?? "#8a8378" } as React.CSSProperties}>{libelleZone(z.nom)}</span>)}
@@ -471,9 +474,9 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
             </span>
           )) : <span style={{ fontWeight: 700 }}>{total > 0 ? qteTexte(total) : "—"}</span>}
         </td>
-        <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: total > 0 && prix != null ? "#1a1a1a" : "#a39d92" }}>
+        {voirMontants && <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: total > 0 && prix != null ? "#1a1a1a" : "#a39d92" }}>
           {total > 0 && prix != null ? euros(total * prix) : "—"}
-        </td>
+        </td>}
         <td style={{ ...TD, textAlign: "right", width: 40 }}>
           {estResponsable && <BoutonEpingle actif={a.toujours} onClick={() => void basculerToujours(a)} />}
           {peutCorrigerFiche && <BoutonCrayon onClick={() => void ouvrirFiche(a)} title="Ouvrir la fiche produit" />}
@@ -493,8 +496,8 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 960 }}>
           <thead><tr>
-            <th style={{ ...TH, padding: 0, width: 4 }} /><th style={TH}>Produit</th><th style={TH}>Conditionnement</th><th style={{ ...TH, textAlign: "right" }}>Prix</th>
-            <th style={TH}>Zones</th><th style={TH}>Repère</th><th style={TH}>Unité</th><th style={{ ...TH, textAlign: "right" }}>Quantité</th><th style={{ ...TH, textAlign: "right" }}>Total HT</th><th style={TH} />
+            <th style={{ ...TH, padding: 0, width: 4 }} /><th style={TH}>Produit</th><th style={TH}>Conditionnement</th>{voirMontants && <th style={{ ...TH, textAlign: "right" }}>Prix</th>}
+            <th style={TH}>Zones</th><th style={TH}>Repère</th><th style={TH}>Unité</th><th style={{ ...TH, textAlign: "right" }}>Quantité</th>{voirMontants && <th style={{ ...TH, textAlign: "right" }}>Total HT</th>}<th style={TH} />
           </tr></thead>
           <tbody>{articles.map((a) => ligne(a, couleur))}</tbody>
         </table>
@@ -535,9 +538,9 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
         <div style={{ fontSize: 14, color: "#1a1a1a" }}>
           <strong style={{ fontFamily: OSWALD, fontSize: 18 }}>{resume.nb}</strong> produit{resume.nb > 1 ? "s" : ""} dans la {onglet === "precommande" ? "précommande" : "commande"}
         </div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>
+        {voirMontants && <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>
           {euros(resume.total)} HT{resume.prixInconnu ? " *" : ""}
-        </div>
+        </div>}
       </div>
       {!brouillon && (
         <div style={{ background: "#fbf0dc", borderRadius: 12, padding: "10px 12px", fontSize: 13, color: "#7a5a2b", marginBottom: 12 }}>
@@ -595,7 +598,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
           Envoyer la précommande
         </button>
       )}
-      {resume.prixInconnu && <div style={{ fontSize: 11, color: "#999", marginTop: 8 }}>* un ou plusieurs prix inconnus, non comptés dans le total</div>}
+      {voirMontants && resume.prixInconnu && <div style={{ fontSize: 11, color: "#999", marginTop: 8 }}>* un ou plusieurs prix inconnus, non comptés dans le total</div>}
     </div>
   );
 }
