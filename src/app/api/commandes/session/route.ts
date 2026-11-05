@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { acteurAction } from "@/lib/tablette/acteur";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import { notifyGroupAdmins } from "@/lib/pushNotify";
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
       etablissement_id: etabId,
       status: "brouillon",
       created_by: userId,
+      created_by_nom: (await acteurAction(req, userId, etabId)).nom,
     })
     .select()
     .single();
@@ -120,7 +122,10 @@ export async function PATCH(req: NextRequest) {
     if (refus) return NextResponse.json({ error: refus }, { status: 403 });
   }
 
-  const update: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+  // Qui valide ou rouvre (05/11/2026) : l'employé de la tablette ou le compte connecté
+  const nomActeur = (await acteurAction(req, userId, etabId)).nom;
+  const update: Record<string, unknown> = { status, updated_at: new Date().toISOString(), modifie_par_nom: nomActeur };
+  if (status === "validee") update.valide_par_nom = nomActeur;
   if (notes !== undefined) update.notes = notes;
 
   // Recalculer total_ht

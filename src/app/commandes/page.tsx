@@ -1,5 +1,6 @@
 "use client";
 
+import { useMajCommande } from "@/hooks/useMajCommande";
 import React, { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -47,6 +48,11 @@ type Session = {
   created_at: string;
   email_sent_at?: string | null;
   email_sent_to?: string | null;
+  /** Qui a fait quoi (05/11/2026) : employé de la tablette ou compte connecté */
+  created_by_nom?: string | null;
+  modifie_par_nom?: string | null;
+  valide_par_nom?: string | null;
+  updated_at?: string | null;
   lignes: Ligne[];
 };
 
@@ -720,7 +726,8 @@ function CommandesPage() {
   // ── Save ligne ────────────────────────────────────────────────────────
 
   async function saveLigne(sessionId: string, ingredientId: string, qty: number | "", unite: string | null, prixUnitaire: number | null) {
-    await fetchApi("/api/commandes/ligne", {
+    marquerEcriture();
+    const r = await fetchApi("/api/commandes/ligne", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -731,6 +738,12 @@ function CommandesPage() {
         prix_unitaire_ht: prixUnitaire ?? undefined,
       }),
     });
+    marquerEcriture();
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      alert(j.error ?? "Quantité non enregistrée");
+      void reloadSession();
+    }
   }
 
   async function handleQtyChange(ingredientId: string, val: number | "") {
@@ -860,6 +873,8 @@ function CommandesPage() {
     if (!selectedSupplierId) return;
     await loadForSupplier(selectedSupplierId);
   }
+  // Mise à jour en direct quand quelqu'un d'autre modifie cette commande
+  const marquerEcriture = useMajCommande(session?.id, () => { void reloadSession(); });
 
   async function validerSession(sessionId: string) {
     setSaving(true);
@@ -1711,6 +1726,14 @@ function CommandesPage() {
 
     return (
       <div>
+        {/* Qui a fait quoi (05/11/2026) */}
+        {(session.created_by_nom || session.modifie_par_nom || session.valide_par_nom) && (
+          <div style={{ fontSize: 12.5, color: "#6f6a61", marginBottom: 8, display: "flex", flexWrap: "wrap", gap: "2px 12px" }}>
+            {session.created_by_nom && <span>Commencée par <b style={{ color: "#1a1a1a" }}>{session.created_by_nom}</b></span>}
+            {session.modifie_par_nom && <span>Dernière modification : <b style={{ color: "#1a1a1a" }}>{session.modifie_par_nom}</b>{session.updated_at ? ` à ${new Date(session.updated_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>}
+            {session.valide_par_nom && session.status !== "brouillon" && <span>Validée par <b style={{ color: "#1a1a1a" }}>{session.valide_par_nom}</b></span>}
+          </div>
+        )}
         {/* Status banner */}
         <div style={{
           background: statusBannerBg[session.status] ?? "#f5f5f5",

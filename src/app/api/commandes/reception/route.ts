@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { acteurAction } from "@/lib/tablette/acteur";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement } from "@/lib/getEtablissement";
 import { ETATS, montantReclame, quantiteEnStock, type EtatReception, type LigneControle } from "@/lib/reception";
@@ -82,12 +83,19 @@ export async function GET(req: NextRequest) {
 type LigneEntree = { id: string; etat_reception: EtatReception | null; qty_received: number | null; prix_recu: number | null; facture_sur_bon: boolean; reception_note?: string | null };
 
 export async function PATCH(req: NextRequest) {
-  let userId: string | null = null;
-  try { userId = (await getEtablissement(req)).userId; } catch { /* appel sans jeton : on enregistre sans auteur */ }
+  let userId: string | null = null, etabId: string | null = null;
+  try { ({ userId, etabId } = await getEtablissement(req)); } catch { /* appel sans jeton : on enregistre sans auteur */ }
 
   const body = await req.json().catch(() => null) as { session_id?: string; lines?: LigneEntree[]; finalize?: boolean } | null;
   const { session_id, lines, finalize } = body ?? {};
   if (!session_id || !Array.isArray(lines)) return NextResponse.json({ error: "session_id et lines requis" }, { status: 400 });
+  // La commande doit être celle de l'établissement de l'appelant (05/11/2026)
+  if (etabId) {
+    const { data: s0 } = await supabaseAdmin.from("commande_sessions").select("id").eq("id", session_id).eq("etablissement_id", etabId).maybeSingle();
+    if (!s0) return NextResponse.json({ error: "Commande introuvable dans cet établissement" }, { status: 404 });
+  }
+  // Qui contrôle : l'employé de la tablette ou le compte connecté
+  const nomActeur = userId ? (await acteurAction(req, userId, etabId)).nom : null;
 
   const { data: existantes, error: errLignes } = await supabaseAdmin
     .from("commande_lignes")
@@ -126,6 +134,7 @@ export async function PATCH(req: NextRequest) {
         litige_statut: litige,
         controle_at: etat ? maintenant : null,
         controle_par: etat ? userId : null,
+        controle_par_nom: etat ? nomActeur : null,
       })
       .eq("id", entree.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -134,7 +143,7 @@ export async function PATCH(req: NextRequest) {
   if (finalize) {
     const { data: sess, error: errSess } = await supabaseAdmin
       .from("commande_sessions")
-      .update({ status: "recue", received_at: maintenant })
+      .update({ status: "recue", received_at: maintenant, recu_par_nom: nomActeur })
       .eq("id", session_id)
       .select("etablissement_id, created_by")
       .single();

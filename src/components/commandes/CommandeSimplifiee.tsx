@@ -1,5 +1,6 @@
 "use client";
 
+import { useMajCommande } from "@/hooks/useMajCommande";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
@@ -148,6 +149,8 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
   }, [supplierId, onglet]);
 
   useEffect(() => { void charger(); }, [charger]);
+  // Mise à jour en direct quand quelqu'un d'autre modifie ce brouillon (05/11/2026)
+  const marquerEcriture = useMajCommande(data?.session?.id, () => { void charger(); });
 
   // Retour de la fiche produit : même position de défilement, une fois la liste affichée
   const yARestaurer = useRef<number | null>(retour?.y ?? null);
@@ -231,6 +234,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     enVol.current.add(cle);
     let ok = false;
     try {
+      marquerEcriture();
       const res = await fetchApi("/api/commandes/simplifiee", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -273,7 +277,7 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     const vide = !d?.session || !(d.lignes ?? []).some((x) => x.quantite > 0);
     if (dernierVide.current !== null && vide !== dernierVide.current) onChange?.();
     dernierVide.current = vide;
-  }, [supplierId, onChange, onglet]);
+  }, [supplierId, onChange, onglet, marquerEcriture]);
 
   /** Appui sur + / − / « + 1 » : affichage immédiat, enregistrement 400 ms après le dernier appui */
   function fixerMaPart(a: Article, m: Mode, nouvelle: number) {

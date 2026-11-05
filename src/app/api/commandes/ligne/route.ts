@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { acteurAction } from "@/lib/tablette/acteur";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 
 /** Total HT de la commande recalculé après chaque changement de ligne (vécu 28/09 : total figé après une suppression) */
-async function recalculerTotal(sessionId: string) {
+async function recalculerTotal(sessionId: string, nom?: string | null) {
   const { data } = await supabaseAdmin.from("commande_lignes").select("total_ligne_ht").eq("session_id", sessionId);
   const total = Math.round((data ?? []).reduce((t, l) => t + (Number(l.total_ligne_ht) || 0), 0) * 100) / 100;
-  await supabaseAdmin.from("commande_sessions").update({ total_ht: total, updated_at: new Date().toISOString() }).eq("id", sessionId);
+  await supabaseAdmin.from("commande_sessions").update({ total_ht: total, updated_at: new Date().toISOString(), ...(nom ? { modifie_par_nom: nom } : {}) }).eq("id", sessionId);
 }
 
 /**
@@ -15,9 +16,9 @@ async function recalculerTotal(sessionId: string) {
  * Body: { session_id, ingredient_id, quantite, unite?, prix_unitaire_ht?, nom_libre? }
  */
 export async function POST(req: NextRequest) {
-  let etabId: string;
+  let etabId: string, userId: string;
   try {
-    ({ etabId } = await getEtablissement(req));
+    ({ etabId, userId } = await getEtablissement(req));
   } catch (e) {
     if (e instanceof EtabError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
   // Verify the session belongs to this etablissement
   const { data: sess } = await supabaseAdmin
     .from("commande_sessions")
-    .select("id")
+    .select("id, status")
     .eq("id", session_id)
     .eq("etablissement_id", etabId)
     .maybeSingle();
@@ -41,6 +42,12 @@ export async function POST(req: NextRequest) {
   if (!sess) {
     return NextResponse.json({ error: "session introuvable" }, { status: 404 });
   }
+  // Une commande validée ou envoyée ne se modifie plus ligne par ligne (05/11/2026) : on la repasse en brouillon d'abord
+  if (sess.status && sess.status !== "brouillon" && sess.status !== "en_attente") {
+    return NextResponse.json({ error: "Commande validée : repasse-la en brouillon pour la modifier" }, { status: 409 });
+  }
+  // Qui modifie : l'employé de la tablette ou le compte connecté
+  const nom = (await acteurAction(req, userId, etabId)).nom;
 
   const totalLigne = prix_unitaire_ht && quantite
     ? Number((prix_unitaire_ht * quantite).toFixed(2))
@@ -69,19 +76,19 @@ export async function POST(req: NextRequest) {
           .from("commande_lignes")
           .delete()
           .eq("id", keepId);
-        { await recalculerTotal(session_id); return NextResponse.json({ ok: true, deleted: true }); }
+        { await recalculerTotal(session_id, nom); return NextResponse.json({ ok: true, deleted: true }); }
       }
 
       // Mise à jour
       const { data: ligne, error } = await supabaseAdmin
         .from("commande_lignes")
-        .update({ quantite, unite, prix_unitaire_ht, total_ligne_ht: totalLigne })
+        .update({ quantite, unite, prix_unitaire_ht, total_ligne_ht: totalLigne, modifie_par_nom: nom })
         .eq("id", keepId)
         .select("*, ingredients(name, category, default_unit)")
         .single();
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      { await recalculerTotal(session_id); return NextResponse.json({ ok: true, ligne }); }
+      { await recalculerTotal(session_id, nom); return NextResponse.json({ ok: true, ligne }); }
     }
   }
 
@@ -96,6 +103,7 @@ export async function POST(req: NextRequest) {
     unite,
     prix_unitaire_ht,
     total_ligne_ht: totalLigne,
+    modifie_par_nom: nom,
   };
 
   if (ingredient_id) {
@@ -109,7 +117,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  { await recalculerTotal(session_id); return NextResponse.json({ ok: true, ligne }); }
+  { await recalculerTotal(session_id, nom); return NextResponse.json({ ok: true, ligne }); }
 }
 
 /**

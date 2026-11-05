@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { acteurAction } from "@/lib/tablette/acteur";
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
@@ -89,9 +90,11 @@ export async function POST(request: NextRequest) {
   if (pb) return NextResponse.json({ error: pb, bloque_hors_production: pb.startsWith("Envoi bloqué") }, { status: pb.startsWith("Envoi bloqué") ? 403 : 400 });
 
   const sessionId = envoi.session.id;
+  // Qui envoie (05/11/2026) : l'employé de la tablette ou le compte connecté
+  const envoyeParNom = (await acteurAction(request, userId, etabId)).nom;
   const journal = (x: { succes: boolean; sujet: string; resend_id?: string | null; erreur?: string | null; canal?: string; destinataires?: string[] }) =>
     supabaseAdmin.from("commande_envois").insert({
-      session_id: sessionId, envoye_par: userId, destinataires: x.destinataires ?? envoi.destinataires, sujet: x.sujet,
+      session_id: sessionId, envoye_par: userId, envoye_par_nom: envoyeParNom, destinataires: x.destinataires ?? envoi.destinataires, sujet: x.sujet,
       livraison_prevue: envoi.livraison?.date ?? null, resend_id: x.resend_id ?? null, succes: x.succes, erreur: x.erreur ?? null, canal: x.canal ?? "email",
     });
 

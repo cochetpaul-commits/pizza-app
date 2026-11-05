@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import type { Acteur } from "@/lib/tablette/acteur";
 import { toutesLesPages } from "@/lib/supabaseChunks";
 import { zonesPour, type ZoneEtabRow } from "@/lib/zonesEtablissement";
 import { libelleColisage, libelleElement, nomUnite, prixUniteCommande, type CommandeArticle, type OffrePrix, type UniteCommande } from "@/lib/commandeArticles";
@@ -106,7 +107,12 @@ async function sessionEnCours(ficheId: string, etabId: string, type: TypeCommand
 }
 
 /** Données de l'écran de commande simplifiée pour la fiche fournisseur de l'établissement */
-export async function ecranCommande(supplierId: string, etabId: string, userId: string, typeDemande: unknown = "jour"): Promise<Reponse> {
+/** Clé de la quantité d'une personne (05/11/2026) : l'employé de la tablette (« e:<id> »), sinon le compte connecté */
+export const cleAuteur = (acteur?: Acteur | null) => (acteur?.source === "tablette" && acteur.employeId ? `e:${acteur.employeId}` : "");
+type ApportBrut = { user_id: string; auteur?: string | null; auteur_nom?: string | null; quantite: number };
+const cleApport = (a: ApportBrut) => (a.auteur ? a.auteur : a.user_id);
+
+export async function ecranCommande(supplierId: string, etabId: string, userId: string, typeDemande: unknown = "jour", acteur?: Acteur | null): Promise<Reponse> {
   const type = typeDe(typeDemande);
 
   const f = await resoudreFiche(supplierId, etabId);
@@ -232,7 +238,7 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
   let lignes: { ingredient_id: string; unite: string | null; quantite: number; apports: { user_id: string; nom: string; quantite: number }[] }[] = [];
   if (session) {
     const { data: ls } = await supabaseAdmin.from("commande_lignes")
-      .select("id, ingredient_id, unite, quantite, commande_ligne_apports(user_id, quantite)")
+      .select("id, ingredient_id, unite, quantite, commande_ligne_apports(user_id, auteur, auteur_nom, quantite)")
       .eq("session_id", session.id);
     const userIds = new Set<string>();
     for (const l of ls ?? []) for (const a of (l.commande_ligne_apports ?? []) as { user_id: string }[]) userIds.add(a.user_id);
@@ -250,9 +256,9 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
       ingredient_id: l.ingredient_id as string,
       unite: libelleActuel(l.ingredient_id as string, l.unite as string | null),
       quantite: Number(l.quantite),
-      apports: ((l.commande_ligne_apports ?? []) as { user_id: string; quantite: number }[])
+      apports: ((l.commande_ligne_apports ?? []) as ApportBrut[])
         .filter((a) => Number(a.quantite) > 0)
-        .map((a) => ({ user_id: a.user_id, nom: nomDe.get(a.user_id) ?? "?", quantite: Number(a.quantite) })),
+        .map((a) => ({ user_id: cleApport(a), nom: a.auteur_nom ?? nomDe.get(a.user_id) ?? "?", quantite: Number(a.quantite) })),
     }));
   }
 
@@ -260,7 +266,7 @@ export async function ecranCommande(supplierId: string, etabId: string, userId: 
     fournisseur: { id: f.ficheId, nom: f.nom },
     type,
     a_precommande: aPrecommande,
-    moi: userId,
+    moi: cleAuteur(acteur) || userId,
     rayons: rayons ?? [],
     indication: f.indication,
     articles: sortie.map((s) => ({ ...s, habituel: habituels.get(s.ingredient_id) ?? null, derniere: derniere.get(s.ingredient_id) ?? null })),
@@ -284,7 +290,8 @@ export async function fixerToujours(body: unknown, etabId: string, userId: strin
   return rep({ ok: true, toujours: b.toujours });
 }
 
-export async function fixerApport(body: unknown, etabId: string, userId: string): Promise<Reponse> {
+export async function fixerApport(body: unknown, etabId: string, userId: string, acteur?: Acteur | null): Promise<Reponse> {
+  const auteur = cleAuteur(acteur);
   const { supplier_id, ingredient_id, mode } = body as { supplier_id?: string; ingredient_id?: string; mode?: string };
   const type = typeDe((body as { type?: unknown }).type);
   const quantiteBrute = Number((body as { quantite?: unknown }).quantite);
@@ -322,7 +329,7 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
   if (!session) {
     if (quantite === 0) return rep({ ok: true, session_id: null, ligne: null, total_ht: 0 });
     const { data: cree, error } = await supabaseAdmin.from("commande_sessions")
-      .insert({ supplier_id: f.ficheId, etablissement_id: etabId, status: "brouillon", created_by: userId, type })
+      .insert({ supplier_id: f.ficheId, etablissement_id: etabId, status: "brouillon", created_by: userId, created_by_nom: acteur?.nom ?? null, type })
       .select("id, status, created_at").single();
     if (error) return rep({ error: error.message }, 500);
     session = cree as { id: string; status: string; created_at: string };
@@ -349,10 +356,10 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
   // Quantité de CETTE personne ; le total de la ligne est recalculé par la base
   if (quantite > 0) {
     const { error } = await supabaseAdmin.from("commande_ligne_apports")
-      .upsert({ ligne_id: ligneId, user_id: userId, quantite, updated_at: new Date().toISOString() }, { onConflict: "ligne_id,user_id" });
+      .upsert({ ligne_id: ligneId, user_id: userId, auteur, auteur_nom: acteur?.nom ?? null, employe_id: acteur?.employeId ?? null, quantite, updated_at: new Date().toISOString() }, { onConflict: "ligne_id,user_id,auteur" });
     if (error) return rep({ error: error.message }, 500);
   } else {
-    await supabaseAdmin.from("commande_ligne_apports").delete().eq("ligne_id", ligneId).eq("user_id", userId);
+    await supabaseAdmin.from("commande_ligne_apports").delete().eq("ligne_id", ligneId).eq("user_id", userId).eq("auteur", auteur);
     const { count } = await supabaseAdmin.from("commande_ligne_apports").select("id", { count: "exact", head: true }).eq("ligne_id", ligneId);
     if (!count) await supabaseAdmin.from("commande_lignes").delete().eq("id", ligneId);
   }
@@ -360,12 +367,12 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
   // Réponse : la ligne à jour (détail par personne) et le total, pour ne rien recharger côté écran
   const [{ data: totaux }, { data: ligneMaj }] = await Promise.all([
     supabaseAdmin.from("commande_lignes").select("total_ligne_ht").eq("session_id", session.id),
-    supabaseAdmin.from("commande_lignes").select("ingredient_id, unite, quantite, commande_ligne_apports(user_id, quantite)").eq("id", ligneId).maybeSingle(),
+    supabaseAdmin.from("commande_lignes").select("ingredient_id, unite, quantite, commande_ligne_apports(user_id, auteur, auteur_nom, quantite)").eq("id", ligneId).maybeSingle(),
   ]);
   const total = Math.round((totaux ?? []).reduce((s, l) => s + (Number(l.total_ligne_ht) || 0), 0) * 100) / 100;
-  const apports = ((ligneMaj?.commande_ligne_apports ?? []) as { user_id: string; quantite: number }[]).filter((a) => Number(a.quantite) > 0);
+  const apports = ((ligneMaj?.commande_ligne_apports ?? []) as ApportBrut[]).filter((a) => Number(a.quantite) > 0);
   const [, { data: profils }] = await Promise.all([
-    supabaseAdmin.from("commande_sessions").update({ total_ht: total, updated_at: new Date().toISOString() }).eq("id", session.id),
+    supabaseAdmin.from("commande_sessions").update({ total_ht: total, updated_at: new Date().toISOString(), modifie_par_nom: acteur?.nom ?? null }).eq("id", session.id),
     apports.length
       ? supabaseAdmin.from("profiles").select("id, display_name").in("id", apports.map((a) => a.user_id))
       : Promise.resolve({ data: [] as { id: string; display_name: string | null }[] }),
@@ -375,7 +382,7 @@ export async function fixerApport(body: unknown, etabId: string, userId: string)
     ingredient_id: ligneMaj.ingredient_id as string,
     unite: ligneMaj.unite as string | null,
     quantite: Number(ligneMaj.quantite),
-    apports: apports.map((a) => ({ user_id: a.user_id, nom: nomDe.get(a.user_id) ?? "?", quantite: Number(a.quantite) })),
+    apports: apports.map((a) => ({ user_id: cleApport(a), nom: a.auteur_nom ?? nomDe.get(a.user_id) ?? "?", quantite: Number(a.quantite) })),
   } : null;
 
   return rep({ ok: true, session_id: session.id, ligne, unite, total_ht: total });
