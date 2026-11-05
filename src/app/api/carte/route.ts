@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * Pilotage › Produits (/api/ventes/marges) pour que les deux pages racontent la même chose.
  */
 
-export type LigneRecette = { nom: string; qty: number | null; unit: string | null; preparation: boolean };
+export type LigneRecette = { ingredient_id: string | null; nom: string; qty: number | null; unit: string | null; preparation: boolean };
 
 export type ArticleCarte = {
   id: string;
@@ -42,6 +42,9 @@ export type ArticleCarte = {
     allergenes: string[];
     lignes: LigneRecette[];
     total_cost: number | null;
+    pivot_ingredient_id: string | null;
+    etapes: string[];
+    paton_g: number | null;
   } | null;
   produit: { id: string; nom: string; dose: string | null; allergenes: string[] } | null;
   /** Coût matière d'une vente (une part, une pizza, une dose) */
@@ -79,6 +82,10 @@ export type FicheCarte = {
   in_catalogue: boolean;
   /** Préparation : poids produit (g) si connu */
   poids_g: number | null;
+  /** Produire depuis la Carte (05/11/2026) : ingrédient phare, étapes, poids du pâton */
+  pivot_ingredient_id: string | null;
+  etapes: string[];
+  paton_g: number | null;
 };
 export type CategorieFiche = { slug: string; nom: string; couleur: string; ordre: number; famille: string };
 export type VinCarte = { id: string; nom: string; domaine: string | null; couleur: string | null; prix: number | null };
@@ -149,7 +156,7 @@ export async function GET(req: NextRequest) {
     supabaseAdmin.rpc("ventes_par_produit", { p_etab: etabId, p_from: periode.from, p_to: periode.to }),
     supabaseAdmin
       .from("kitchen_recipes")
-      .select("id, name, category, sous_categorie, fiche_type, statut, nb_parts, portions_count, total_cost, cost_per_portion, cost_per_kg, description_courte, resume_salle, photo_url, output_ingredient_id, sell_price, vat_rate, in_catalogue, establishments, is_active, yield_grams"),
+      .select("id, name, category, sous_categorie, fiche_type, statut, nb_parts, portions_count, total_cost, cost_per_portion, cost_per_kg, description_courte, resume_salle, photo_url, output_ingredient_id, sell_price, vat_rate, in_catalogue, establishments, is_active, yield_grams, procedure, pivot_ingredient_id, ball_weight_g"),
     supabaseAdmin.from("kitchen_recipe_lines").select("recipe_id, ingredient_id, qty, unit, sort_order").order("sort_order"),
     supabaseAdmin.from("popina_dose_map").select("popina_product_id, ingredient_id, dose, dose_unit"),
     supabaseAdmin.from("etablissements").select("slug").eq("id", etabId).maybeSingle(),
@@ -255,9 +262,12 @@ export async function GET(req: NextRequest) {
     allergenes: allergenesFiche(f.id),
     lignes: (lignesParFiche.get(f.id) ?? []).map((l) => {
       const ing = l.ingredient_id ? ingParId.get(l.ingredient_id) : undefined;
-      return { nom: ing?.name ?? "?", qty: l.qty != null ? Number(l.qty) : null, unit: l.unit ?? null, preparation: !!(l.ingredient_id && ficheParSortie.has(l.ingredient_id)) };
+      return { ingredient_id: (l.ingredient_id as string | null) ?? null, nom: ing?.name ?? "?", qty: l.qty != null ? Number(l.qty) : null, unit: l.unit ?? null, preparation: !!(l.ingredient_id && ficheParSortie.has(l.ingredient_id)) };
     }),
     total_cost: f.total_cost != null ? arrondi(Number(f.total_cost)) : null,
+    pivot_ingredient_id: (f.pivot_ingredient_id as string | null) ?? null,
+    etapes: (() => { try { const p = typeof f.procedure === "string" ? JSON.parse(f.procedure) : f.procedure; return Array.isArray(p) ? p.map(String) : []; } catch { return []; } })(),
+    paton_g: f.ball_weight_g != null ? Number(f.ball_weight_g) : null,
   });
 
   const articles: ArticleCarte[] = (touches ?? []).map((t) => {
