@@ -469,6 +469,7 @@ export default function EmpatementFormV2({ recipeId, initialProdMode }: Props) {
       <main className="container safe-bottom">
 
         <RecipeHero
+          signature={{ table: "recipes", id: recipeId }}
           title={title}
           accent={ACCENT}
           isEdit={true}

@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { employeTabletteActif } from "@/lib/tablette/store";
 
 /**
  * Verrou de session sans attente infinie.
@@ -30,10 +31,24 @@ async function safeLock<R>(name: string, _acquireTimeout: number, fn: () => Prom
   return fn();
 }
 
+/**
+ * Tablette (05/11/2026) : chaque écriture en base porte l'employé identifié par son code (en-tête x-employe-id),
+ * lu par les déclencheurs de signature (« créée par », « modifiée par »). Seulement vers l'API REST.
+ */
+const fetchSigne: typeof fetch = (input, init) => {
+  const emp = typeof window !== "undefined" ? employeTabletteActif() : null;
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (!emp?.id || !url.includes("/rest/v1/")) return fetch(input, init);
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+  headers.set("x-employe-id", emp.id);
+  return fetch(input, { ...init, headers });
+};
+
 export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   {
+    global: { fetch: fetchSigne },
     auth: {
       persistSession: true,
       autoRefreshToken: true,

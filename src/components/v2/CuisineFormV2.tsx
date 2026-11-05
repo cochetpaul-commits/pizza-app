@@ -794,6 +794,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
       <main className="container safe-bottom">
 
         <RecipeHero
+          signature={{ table: "kitchen_recipes", id: recipeId }}
           title={title}
           accent={ficheAccent}
           isEdit={true}

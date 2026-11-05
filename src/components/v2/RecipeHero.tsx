@@ -1,5 +1,6 @@
 "use client";
 
+import { supabase } from "@/lib/supabaseClient";
 import { useVoirMontants } from "@/lib/useVoirMontants";
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
@@ -17,12 +18,32 @@ interface RecipeHeroProps {
   typeLabel?: string;
   onBack: () => void;
   actions: React.ReactNode;
+  /** Qui a créé et modifié la fiche (05/11/2026) : lu dans la table de la fiche */
+  signature?: { table: "kitchen_recipes" | "recipes" | "prep_recipes"; id: string | null | undefined };
+}
+
+export function useSignature(sig: RecipeHeroProps["signature"]) {
+  const [texte, setTexte] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sig?.id) return;
+    let annule = false;
+    void supabase.from(sig.table).select("cree_par_nom, modifie_par_nom, modifie_le").eq("id", sig.id).maybeSingle().then(({ data }) => {
+      if (annule || !data) return;
+      const d = data as { cree_par_nom: string | null; modifie_par_nom: string | null; modifie_le: string | null };
+      const quand = d.modifie_le ? new Date(d.modifie_le).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : null;
+      const parts = [d.cree_par_nom ? `Créée par ${d.cree_par_nom}` : null, d.modifie_par_nom ? `modifiée par ${d.modifie_par_nom}${quand ? ` le ${quand}` : ""}` : null].filter(Boolean);
+      setTexte(parts.length ? parts.join(" · ") : null);
+    });
+    return () => { annule = true; };
+  }, [sig?.table, sig?.id]);
+  return texte;
 }
 
 export function RecipeHero({
   title, accent, isEdit, photoPreview, etabName, typeLabel,
-  onBack, actions,
+  onBack, actions, signature,
 }: RecipeHeroProps) {
+  const texteSignature = useSignature(signature);
   return (
     <div style={{
       background: `linear-gradient(135deg, ${accent} 0%, ${accent}DD 100%)`,
@@ -45,6 +66,7 @@ export function RecipeHero({
             Fiche technique
           </div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, fontFamily: "var(--font-oswald), 'Oswald', sans-serif", textTransform: "uppercase", letterSpacing: 1, color: "#fff" }}>{title}</h1>
+          {texteSignature && <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>{texteSignature}</div>}
         </div>
       </div>
       {(etabName || typeLabel) && (

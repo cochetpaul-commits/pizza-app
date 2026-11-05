@@ -516,6 +516,7 @@ export default function CocktailFormV2({ cocktailId, initialProdMode }: Props) {
       <main className="container safe-bottom">
 
         <RecipeHero
+          signature={{ table: "kitchen_recipes", id: cocktailId }}
           title={title}
           accent={ACCENT}
           isEdit={true}

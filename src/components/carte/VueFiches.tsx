@@ -1,5 +1,6 @@
 "use client";
 
+import { useSignature } from "@/components/v2/RecipeHero";
 import { useVoirMontants } from "@/lib/useVoirMontants";
 import React, { useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { triParLibelle } from "@/lib/tri";
@@ -149,6 +150,8 @@ function VoletLecture({ fiche, groupe, peutEcrire, onFermer, onEditer }: { fiche
   const prep = CATEGORIES_PREP.has(fiche.categorie);
   // Montants réservés aux administrateurs et managers (05/11/2026)
   const voir = useVoirMontants();
+  // Qui a créé et modifié la fiche (05/11/2026)
+  const signature = useSignature({ table: "kitchen_recipes", id: fiche.id });
   const sousTitre = [groupe.libelle, fiche.sous_categorie, fiche.statut ? STATUTS[fiche.statut]?.libelle : null, `${fiche.lignes.length} ingrédient${fiche.lignes.length > 1 ? "s" : ""}`].filter(Boolean).join(" · ");
   const pied = (
     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -160,6 +163,7 @@ function VoletLecture({ fiche, groupe, peutEcrire, onFermer, onEditer }: { fiche
     <VoletDroit titre={fiche.nom} sousTitre={sousTitre} onFermer={onFermer} pied={pied}>
       <div style={{ display: "grid", gap: 10, alignContent: "start" }}>
         {fiche.photo_url && <div style={{ height: 160, borderRadius: 12, background: `url(${fiche.photo_url}) center/cover` }} />}
+        {signature && <div style={{ fontSize: 12, color: MUTED }}>{signature}</div>}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           {!voir ? (
             <Kpi l="Ingrédients" val={String(fiche.lignes.length)} s={fiche.allergenes.length ? `${fiche.allergenes.length} allergène${fiche.allergenes.length > 1 ? "s" : ""}` : "aucun allergène"} />

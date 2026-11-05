@@ -633,6 +633,7 @@ export default function PizzaFormV2({ pizzaId, initialProdMode }: Props) {
       <main className="container safe-bottom">
 
         <RecipeHero
+          signature={{ table: "kitchen_recipes", id: pizzaId }}
           title={title}
           accent={ACCENT}
           isEdit={true}
