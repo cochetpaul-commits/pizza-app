@@ -309,8 +309,10 @@ export function Cave({ vueInitiale }: { vueInitiale?: "service" | "cave" }) {
           <h1 style={h1(bureau)}>La cave</h1>
           <div style={{ color: MUTED, fontSize: 13 }}>Le vin de la table, et la phrase pour le vendre.</div>
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {(["service", "cave"] as const).map((t) => <button key={t} type="button" onClick={() => setVue(t)} style={styleFiltre(vue === t)}>{t === "service" ? "Service" : "Cave"}</button>)}
+          {/* Quiz vins (05/11/2026) : s'entraîner avant le service */}
+          <Link href="/cave/quiz" style={{ ...BTN, textDecoration: "none", background: "#1a1a1a", color: "#f2ede4", borderColor: "#1a1a1a" }}>S&apos;entraîner</Link>
         </div>
       </div>
       {erreur && <p style={{ color: ROUGE }}>{erreur}</p>}
