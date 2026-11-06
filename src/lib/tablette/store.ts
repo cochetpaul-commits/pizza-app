@@ -10,7 +10,7 @@ import { useSyncExternalStore } from "react";
 export type EmployeTablette = { id: string; prenom: string; nom: string; equipe: string | null; depuis: number; /** jeton signé (API /api/tablette/identifier) : qui est devant l'écran */ jeton?: string };
 export type EtatTablette = { actif: boolean; delai: number; employe: EmployeTablette | null };
 export const DELAIS: { valeur: number; libelle: string }[] = [
-  { valeur: 30, libelle: "30 secondes" }, { valeur: 60, libelle: "1 minute" }, { valeur: 300, libelle: "5 minutes" }, { valeur: 0, libelle: "Jamais" },
+  { valeur: 30, libelle: "30 secondes" }, { valeur: 60, libelle: "1 minute" }, { valeur: 120, libelle: "2 minutes" }, { valeur: 300, libelle: "5 minutes" }, { valeur: 600, libelle: "10 minutes" }, { valeur: 0, libelle: "Jamais" },
 ];
 const CLE_ACTIF = "tablette:actif", CLE_DELAI = "tablette:delai", CLE_EMPLOYE = "tablette:employe";
 const abonnes = new Set<() => void>();
@@ -56,10 +56,35 @@ export function identifierEmploye(e: Omit<EmployeTablette, "depuis">) {
   try { sessionStorage.setItem(CLE_EMPLOYE, JSON.stringify({ ...e, depuis: Date.now() })); } catch { /* stockage indisponible */ }
   notifier();
 }
-export function verrouillerTablette() {
-  try { sessionStorage.removeItem(CLE_EMPLOYE); } catch { /* stockage indisponible */ }
+/**
+ * Verrouillage (06/11/2026, retour de Paul) : `auto` = par inactivité. On note alors la page et l'employé : si la
+ * même personne retape son code, elle revient là où elle en était au lieu de l'accueil.
+ */
+const CLE_REPRISE = "tablette:reprise";
+export function verrouillerTablette(auto = false) {
+  try {
+    const e = snapshot().employe;
+    if (auto && e && typeof window !== "undefined") sessionStorage.setItem(CLE_REPRISE, JSON.stringify({ path: window.location.pathname + window.location.search, employe: e.id, quand: Date.now() }));
+    else sessionStorage.removeItem(CLE_REPRISE);
+    sessionStorage.removeItem(CLE_EMPLOYE);
+  } catch { /* stockage indisponible */ }
   notifier();
 }
+/** La page à rouvrir après le code, si c'est la même personne qui revient (moins de 2 h), sinon null */
+export function repriseApresCode(employeId: string): string | null {
+  try {
+    const brut = sessionStorage.getItem(CLE_REPRISE);
+    sessionStorage.removeItem(CLE_REPRISE);
+    if (!brut) return null;
+    const r = JSON.parse(brut) as { path: string; employe: string; quand: number };
+    return r.employe === employeId && Date.now() - r.quand < 2 * 3600000 && r.path && r.path !== "/tablette" ? r.path : null;
+  } catch { return null; }
+}
+
+/** Pages qui tiennent la tablette éveillée (fournée en cours…) : pas de verrouillage par inactivité tant qu'une clé est posée */
+const eveil = new Set<string>();
+export function tenirEveille(cle: string, actif: boolean) { if (actif) eveil.add(cle); else eveil.delete(cle); }
+export function estTenueEveillee(): boolean { return eveil.size > 0; }
 /** L'état lu tout de suite (hors rendu) : pour décider d'une redirection sans attendre l'hydratation */
 export function etatTablette(): EtatTablette { return snapshot(); }
 

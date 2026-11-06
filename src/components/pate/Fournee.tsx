@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchApi } from "@/lib/fetchApi";
-import { useTablette } from "@/lib/tablette/store";
+import { tenirEveille, useTablette } from "@/lib/tablette/store";
 import { BON, ATTENTION, MAUVAIS, INFO, BORD, MUTED, FAIBLE, CADRE, INTERTITRE, OSWALD, BTN, CHAMP, pastille } from "@/components/ui/charte";
 import type { PateResult, Phase } from "@/lib/pateEngine";
 import { formatG, lignesPesee, nomFarine, nomPhase } from "@/lib/pateAffichage";
@@ -227,6 +227,8 @@ function Deroule({ lot, tb, occupe, peutLancer, conseil, appliquer }: { lot: Lot
   const ageBiga = lot.type === "biga" ? etatBiga(lot.biga_froid_at) : null;
   const bigaAConfirmer = phaseCourante === "final" && lot.type === "biga" && !tempsFinalOk && !lot.biga_confirmee && (ageBiga?.niveau === "jeune" || ageBiga?.niveau === "depassee");
   const [annulation, setAnnulation] = useState(false);
+  // Fournée en cours : la tablette ne se verrouille pas par inactivité (06/11/2026, retour de Paul)
+  useEffect(() => { tenirEveille("fournee", true); return () => tenirEveille("fournee", false); }, []);
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
