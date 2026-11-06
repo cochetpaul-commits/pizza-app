@@ -83,7 +83,8 @@ export function Empatements() {
       {!recettes && !erreur && <div style={{ textAlign: "center", padding: 60, color: MUTED }}>Chargement…</div>}
       {recettes && recettes.length === 0 && <div style={CADRE}><EtatVide titre="Aucun empâtement" texte="Créez-en un depuis la Carte, onglet Préparations." /></div>}
       {/* Bureau et tablette : deux empâtements par ligne, les quatre tiennent sur l'écran sans défiler (29/10) */}
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: bureau ? "repeat(2, minmax(0, 1fr))" : "1fr" }}>
+      {/* Une recette par bloc, sur toute la largeur, les blocs empilés (06/11/2026, demande de Paul) */}
+      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr" }}>
         {recettes?.map((r) => <CarteEmpatement key={r.id} recette={r} bureau={bureau} onReglages={() => router.push(`/recettes/empatement/${r.id}`)} />)}
       </div>
     </div>
@@ -160,8 +161,8 @@ export function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: R
         {fournee ? null : <>
         {/* Le réglage du jour : les pâtons, en gros, avec ±1 et ±10 ; sur bureau, le compteur est la première des quatre tuiles */}
         {!bureau && <Compteur libelle="Pâtons" valeur={patons} onChange={setPatons} pas={1} grandPas={10} couleur={couleur} />}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          {bureau && <div style={{ gridColumn: "1 / -1" }}><Tuile compacte couleur={couleur} libelle="Pâtons" valeur={
+        <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, minmax(0, 1fr))" : "1fr 1fr", gap: 10 }}>
+          {bureau && <div><Tuile compacte couleur={couleur} libelle="Pâtons" valeur={
             <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 10))} taille={32} couleur={couleur} label="−10" aria="Moins dix" clair />
               <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 1))} taille={32} couleur={couleur} label="−" aria="Moins un" />
@@ -173,7 +174,7 @@ export function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: R
             </span>
           } /></div>}
           {/* Sur bureau le poids prend toute la ligne, comme le compteur : les boutons ne se chevauchent plus (29/10) */}
-          <div style={bureau ? { gridColumn: "1 / -1" } : undefined}><Tuile compacte couleur={couleur} libelle="Poids d'un pâton" valeur={
+          <div><Tuile compacte couleur={couleur} libelle="Poids d'un pâton" valeur={
             <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
               <BoutonRond onClick={() => setPoids(Math.max(1, (Number(poids) || r.ball_weight) - pasPoids))} taille={32} couleur={couleur} label="−" aria="Moins" clair />
               <span style={{ textAlign: "center", fontSize: Number(poids) >= 1000 ? 20 : 24, whiteSpace: "nowrap", minWidth: 76 }}>{poids ? `${Number(poids).toLocaleString("fr-FR")} g` : "—"}
@@ -238,8 +239,10 @@ export function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: R
 
 /** Les pesées, une table par phase : farines nommées, eau de départ et de bassinage, sel, miel, levure là où elle va */
 function Pesees({ resultat, couleur }: { resultat: PateResult; couleur: string }) {
+  const bureau = useBureau();
+  // Sur bureau, les phases côte à côte (biga à gauche, pâte finale à droite) : le bloc prend toute la largeur
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+    <div style={{ display: "grid", gridTemplateColumns: bureau && resultat.phases.length > 1 ? `repeat(${resultat.phases.length}, minmax(0, 1fr))` : "1fr", gap: 10 }}>
       {resultat.phases.map((ph) => {
         const pesees = lignesPesee(ph);
         return (
