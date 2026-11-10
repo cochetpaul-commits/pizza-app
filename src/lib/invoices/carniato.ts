@@ -190,7 +190,61 @@ function extractServices(text: string): number | null {
   return m ? parseFrenchNumber(m[1].replace(/\s/g, "")) : null;
 }
 
+/**
+ * Facture électronique (10/11/2026) : depuis la réforme, Carniato envoie du XML ; la plateforme en fait un PDF au
+ * gabarit commun (« Facture électronique reçue au format XML uniquement »). Chaque produit tient sur quatre lignes :
+ *   « 12.0 DROITS: » · « 000000000000020410 7,50 € 20.00 90,38 € » · « Pièce +0,38 € » · « MONTEPULCIANO ABRUZZO DOC 0,75 »
+ * Le total de ligne comprend les droits d'accises ; les frais (« SERVICES +59,77 € ») font une ligne à part.
+ */
+const E_FACTURE_RE = /Facture électronique reçue au format XML|Identifiant de spécification/i;
+const E_LIGNE_RE = /^0*(\d{3,8})\s+(-?[\d\s]+,\d{2,4})\s*€\s+(?:(?:-|[\d.,]+\s*%)\s+)?(\d{1,2}[.,]\d{1,2})\s+(-?[\d\s]+,\d{2})\s*€$/;
+
+function parseEFacture(text: string): ParsedInvoice {
+  const rows = text.split(/\r?\n/).map((r) => r.trim());
+  const montant = (re: RegExp) => { const m = text.match(re); return m ? parseFrenchNumber(m[1].replace(/\s/g, "")) : null; };
+  const lines: ParsedLine[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const m = E_LIGNE_RE.exec(rows[i]);
+    if (!m) continue;
+    // Quantité : la ligne du dessus (« 168.0 », « 12.0 DROITS: »)
+    let qty: number | null = null;
+    for (let k = i - 1; k >= Math.max(0, i - 2) && qty == null; k--) { const q = /^(-?\d+(?:[.,]\d+)?)(?:\s+DROITS\s*:?)?$/i.exec(rows[k]); if (q) qty = Number(q[1].replace(",", ".")); }
+    // Unité puis nom : les lignes du dessous (« Pièce +0,38 € », puis le libellé)
+    let k = i + 1;
+    const uniteBrute = rows[k] ?? "";
+    const estUnite = /^(Pi[èe]ce|Kilogramme|Litre|Unit[ée]|Colis|Carton|Bouteille)\b/i.test(uniteBrute);
+    if (estUnite) k++;
+    const name = (rows[k] ?? "").replace(/\s+/g, " ").trim();
+    if (!name || E_LIGNE_RE.test(name) || /^(SERVICES|Sous-total)/i.test(name)) continue;
+    const pu = parseFrenchNumber(m[2].replace(/\s/g, ""));
+    const total = parseFrenchNumber(m[4].replace(/\s/g, ""));
+    const taux = Number(m[3].replace(",", "."));
+    // Coût = total de ligne ÷ quantité, droits d'accises inclus (même règle que l'ancien format)
+    const puDroitsInclus = total != null && qty != null && qty > 0 ? Math.round((total / qty) * 10000) / 10000 : pu;
+    const unit: ParsedLine["unit"] = /^Kilo/i.test(uniteBrute) ? "kg" : /^Litre/i.test(uniteBrute) ? "l" : "pc";
+    lines.push({
+      sku: m[1], name, quantity: qty, unit, unit_price: puDroitsInclus, total_price: total, tax_rate: taux,
+      notes: pu != null && puDroitsInclus != null && Math.abs(pu - puDroitsInclus) > 0.0001 ? `droits inclus (P.U. hors droits ${pu})` : null,
+      piece_weight_g: null, piece_volume_ml: null,
+    });
+  }
+  const total_ht = montant(/Total HT\s+(-?[\d\s]+,\d{2})\s*€/i);
+  const total_ttc = montant(/Total TTC\s+(-?[\d\s]+,\d{2})\s*€/i) ?? montant(/Montant à payer\s+(-?[\d\s]+,\d{2})\s*€/i);
+  // Frais (transport, frais fixes) : une ligne de frais, jamais une fiche ni une offre, pour recoller au total HT
+  const services = montant(/^SERVICES\s+\+?(-?[\d\s]+,\d{2})\s*€/im) ?? montant(/Total frais\s+(-?[\d\s]+,\d{2})\s*€/i);
+  if (services != null && services > 0) {
+    const somme = lines.reduce((a, l) => a + (l.total_price ?? 0), 0);
+    if (total_ht == null || Math.abs(somme + services - total_ht) < 0.02) {
+      lines.push({ sku: "FRAIS", name: "PARTICIPATION TRANSPORT (frais)", quantity: 1, unit: "pc", unit_price: services, total_price: services, tax_rate: 20, notes: "frais | TVA=20", piece_weight_g: null, piece_volume_ml: null });
+    }
+  }
+  const num = text.match(/Num[ée]ro\s+(\d{6,12})/i);
+  const date = text.match(/Date d[’']émission\s+(\d{2}\/\d{2}\/\d{4})/i);
+  return { supplier: "CARNIATO", invoice_number: num ? num[1].replace(/^0+/, "") : null, invoice_date: date ? date[1] : null, total_ht, total_ttc, lines, raw_text_preview: text.slice(0, 2000) };
+}
+
 export function parseCarniatoInvoiceText(text: string): ParsedInvoice {
+  if (E_FACTURE_RE.test(text)) return parseEFacture(text);
   const meta = extractMeta(text);
   const lines = parseLines(text);
   // Participation transport / frais fixes (colonne SERVICES) : une ligne de frais, jamais une fiche ni une offre,

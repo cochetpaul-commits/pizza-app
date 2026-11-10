@@ -1,0 +1,80 @@
+Facture électronique reçue au format XML uniquement
+Nous avons généré ce PDF pour faciliter son traitement. Pour vérifier l’ensemble des informations, contactez votre
+fournisseur.
+Émetteur ou émettrice
+Facture
+CARNIATO EUROPE
+Numéro 0201033004
+6 route de Stains
+Date d’émission 09/11/2026 94380, BONNEUIL SUR MARNE, France
+Date d’échéance 30/12/2026
+Type de Facture commerciale Client ou cliente
+document
+BELLO MIO
+Aucun escompte ne sera accordé en cas de paiement anticipé.
+913217386
+Dans le cadre de l'art.T L.441-6 du Code de Commerce nous
+vousprécisons que tout retard de paiement engendre une pénalité 3 PLACE DU PONCEL
+exigible à compter de la date d’échéance, calculée sur la base de trois
+France
+fois letaux d’intérêt légal.
+N° de TVA FR78913217386
+Tout retard de paiement donnera lieu à une indemnité forfaitairepour
+frais de recouvrement de 40€.
+Produits Qté Prix u. HT Rem. TVA (%) Total HT
+168.0
+000000000000025604 1,50 € - 5.50 252,00 €
+Pièce
+ACQUA FILETTE ABSOL FRIZZ 0,75
+12.0 DROITS:
+000000000000020410 7,50 € 20.00 90,38 €
+Pièce +0,38 €
+MONTEPULCIANO ABRUZZO DOC 0,75
+6.0 DROITS:
+000000000000005988 4,55 € 20.00 27,77 €
+Pièce +0,47 €
+LAMBRUSCO GRASP CAST DOC* 0,75
+48.0
+000000000000025602 1,50 € - 5.50 72,00 €
+Pièce
+ACQUA FILETTE NATURALE 0,75L
+50.0
+000000000000025608 1,05 € - 5.50 52,50 €
+Pièce
+ACQUA FILETTE FRIZZANTE 0,47L
+48.0
+000000000000007053 1,10 € - 5.50 52,80 €
+Pièce
+MOLECOLA S SUCRE BTL V 33CL
+24.0
+000000000000007046 1,50 € - 5.50 36,00 €
+Pièce
+JUS DE POMME 20CL
+48.0
+000000000000007052 1,10 € - 5.50 52,80 €
+Pièce
+MOLECOLA CLASS BTL VERRE 33CL
+SERVICES +59,77 €
+Sous-total 696,02 €
+RCS N° SIREN 340783828 | N° de TVA FR14340783828 Automatiquement générée par
+Détails TVA Récapitulatif
+Taux Montant Base H.T Total HT 696,02 €
+20.00 35,58 € 177,92 € Total TVA 64,08 €
+5.50 28,50 € 518,10 €
+Total TTC 760,10 €
+Ensemble des informations de la facture
+Nom du champ Valeur
+Référence bon de commande 69262ed046934946945515a42d562b8e
+Processus métier B1
+Identifiant de spécification urn:cen.eu:en16931:2017
+Date de livraison 09/11/2026
+Nom commercial vendeur CARNIATO EUROPE
+Adresse électronique vendeur 340783828
+Nom commercial acheteur BELLO MIO
+N° de TVA acheteur FR78913217386
+Adresse électronique acheteur 913217386_91321738600014
+Total montant net des lignes 636,25 €
+Total remises 0,00 €
+Total frais 59,77 €
+Montant à payer 760,10 €
+RCS N° SIREN 340783828 | N° de TVA FR14340783828 Automatiquement générée par
