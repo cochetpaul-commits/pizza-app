@@ -179,7 +179,11 @@ export function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: R
           <div><Tuile compacte couleur={couleur} libelle="Poids d'un pâton" valeur={
             <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
               <BoutonRond onClick={() => setPoids(Math.max(1, (Number(poids) || r.ball_weight) - pasPoids))} taille={32} couleur={couleur} label="−" aria="Moins" clair />
-              <span style={{ textAlign: "center", fontSize: Number(poids) >= 1000 ? 20 : 24, whiteSpace: "nowrap", minWidth: 76 }}>{poids ? `${Number(poids).toLocaleString("fr-FR")} g` : "—"}
+              <span style={{ textAlign: "center", fontSize: Number(poids) >= 1000 ? 20 : 24, whiteSpace: "nowrap", minWidth: 76 }}>
+                {/* Poids saisissable au clavier en touchant le chiffre (12/11/2026) */}
+                <input type="number" inputMode="numeric" min={1} value={poids} aria-label="Poids d'un pâton en grammes"
+                  onChange={(e) => setPoids(e.target.value === "" ? "" : Math.max(0, Math.floor(Number(e.target.value))))} onFocus={(e) => e.target.select()}
+                  style={{ width: Number(poids) >= 1000 ? 70 : 58, textAlign: "center", font: "inherit", color: "inherit", border: "none", borderBottom: `1px solid ${BORD}`, background: "transparent", outline: "none", padding: 0, fontVariantNumeric: "tabular-nums", MozAppearance: "textfield" }} /> g
                 {resultat && resultat.summary.poidsCalcule_g !== resultat.summary.poidsPaton_g && <div style={{ fontSize: 11, fontWeight: 500, fontFamily: "inherit", color: MUTED, letterSpacing: 0 }}>calculé à {resultat.summary.poidsCalcule_g} g</div>}
               </span>
               <BoutonRond onClick={() => setPoids((Number(poids) || r.ball_weight) + pasPoids)} taille={32} couleur={couleur} label="+" aria="Plus" clair />
