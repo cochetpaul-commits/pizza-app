@@ -161,7 +161,8 @@ export function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: R
         {fournee ? null : <>
         {/* Le réglage du jour : les pâtons, en gros, avec ±1 et ±10 ; sur bureau, le compteur est la première des quatre tuiles */}
         {!bureau && <Compteur libelle="Pâtons" valeur={patons} onChange={setPatons} pas={1} grandPas={10} couleur={couleur} />}
-        <div style={{ display: "grid", gridTemplateColumns: bureau ? "repeat(4, minmax(0, 1fr))" : "1fr 1fr", gap: 10 }}>
+        {/* Deux tuiles par ligne (11/11/2026) : à quatre sur la tablette, les boutons des pâtons et du poids se chevauchaient */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
           {bureau && <div><Tuile compacte couleur={couleur} libelle="Pâtons" valeur={
             <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               <BoutonRond onClick={() => setPatons(Math.max(1, (Number(patons) || 0) - 10))} taille={32} couleur={couleur} label="−10" aria="Moins dix" clair />
