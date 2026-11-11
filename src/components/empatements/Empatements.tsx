@@ -131,7 +131,8 @@ export function CarteEmpatement({ recette: r, onReglages, bureau }: { recette: R
     ...(r.oil_percent > 0 ? [`Huile ${r.oil_percent.toLocaleString("fr-FR")} %`] : []),
     ...(r.type === "biga" ? [`Biga ${r.biga_percent.toLocaleString("fr-FR")} %`, `Levure biga ${r.biga_yeast_percent.toLocaleString("fr-FR")} %`] : [`Levure ${r.yeast_percent.toLocaleString("fr-FR")} %`]),
   ];
-  const pasPoids = r.ball_weight >= 1000 ? 50 : 2;
+  // Au gramme près pour toutes les pâtes (12/11/2026, demande de Paul) : avant, 2 g, et 50 g pour la focaccia
+  const pasPoids = 1;
   // Empâtement dans la page (05/11/2026, demande de Paul) : pâtons et pesées en haut, « Lancer l'empâtement » en bas,
   // le déroulé s'ouvre sur place ; un lot ouvert masque les pesées (le lot a les siennes, figées au lancement)
   const avecFournee = r.type === "biga" || r.type === "direct";
