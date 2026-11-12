@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getEtablissement, EtabError, callerProfile } from "@/lib/getEtablissement";
 import { acteurAction } from "@/lib/tablette/acteur";
 import { genererQuiz, resumeEquipe, score, type Question, type QuestionRepondue, type SessionQuiz, type VinQuiz } from "@/lib/quizVins";
-import { classementMois, genererQuizCarte, jourParis, lundiDe, type PlatQuiz, type SerieSemaine } from "@/lib/quizCarte";
+import { classementMois, genererQuizCarte, jourParis, lundiDe, nomIngredient, type PlatQuiz, type SerieSemaine } from "@/lib/quizCarte";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +18,8 @@ export const dynamic = "force-dynamic";
 const THEMES = ["carte", "vins", "semaine"] as const;
 type Theme = (typeof THEMES)[number];
 const NB = 10;
-/** Les familles de la caisse posées dans le quiz carte (les vins ont leur quiz, les messages ne sont pas des produits) */
+/** Les familles de la caisse posées dans le quiz carte : les plats, ceux qui ont une fiche technique */
 const CUISINE = ["ANTIPASTI", "PIZZE", "CUCINA", "DOLCI"];
-const BOISSONS = ["BEVANDE", "BEVANDE CALDE", "ALCOOL", "DIGESTIVI"];
 
 async function auth(req: NextRequest) {
   try { return await getEtablissement(req); } catch (e) {
@@ -45,25 +44,72 @@ async function vinsDeLaCarte(couleur: string | null): Promise<VinQuiz[]> {
   return couleur && couleur !== "tous" ? liste.filter((v) => v.couleur === couleur) : liste;
 }
 
-async function platsDeLaCarte(familles: string[]): Promise<PlatQuiz[]> {
-  const { data: touches } = await supabaseAdmin.from("popina_products").select("id, name, category, price_ttc, kitchen_recipe_id").eq("active", true).in("category", familles).gt("price_ttc", 0);
-  const ficheIds = [...new Set((touches ?? []).map((t) => t.kitchen_recipe_id).filter((x): x is string => !!x))];
-  const { data: lignes } = ficheIds.length
-    ? await supabaseAdmin.from("kitchen_recipe_lines").select("recipe_id, sort_order, ingredients(name)").in("recipe_id", ficheIds).order("sort_order")
-    : { data: [] as never[] };
-  const ingredientsDe = new Map<string, string[]>();
-  for (const l of (lignes ?? []) as unknown as { recipe_id: string; ingredients: { name: string } | { name: string }[] | null }[]) {
+function lireAllergenes(brut: unknown): string[] {
+  if (Array.isArray(brut)) return brut.filter((x): x is string => typeof x === "string");
+  if (typeof brut === "string") { try { const v = JSON.parse(brut); return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []; } catch { return []; } }
+  return [];
+}
+/**
+ * Les plats de la carte qui ont une fiche technique, et les préparations maison qui entrent dans ces plats.
+ * Les allergènes sont ceux de la fiche, préparations comprises (comme dans la Carte) ; une pizza porte le gluten
+ * de sa pâte, qui n'est pas une ligne de la fiche.
+ */
+async function fichesDeLaCarte(filtre: string | null): Promise<PlatQuiz[]> {
+  const [{ data: touches }, { data: fiches }, { data: lignes }] = await Promise.all([
+    supabaseAdmin.from("popina_products").select("id, name, category, kitchen_recipe_id").eq("active", true).in("category", CUISINE).not("kitchen_recipe_id", "is", null),
+    supabaseAdmin.from("kitchen_recipes").select("id, name, category, output_ingredient_id"),
+    supabaseAdmin.from("kitchen_recipe_lines").select("recipe_id, ingredient_id, sort_order, ingredients(name, allergens)").order("sort_order").limit(5000),
+  ]);
+  type Ligne = { recipe_id: string; ingredient_id: string | null; nom: string; allergenes: string[] };
+  const lignesDe = new Map<string, Ligne[]>();
+  for (const l of (lignes ?? []) as unknown as { recipe_id: string; ingredient_id: string | null; ingredients: { name: string; allergens: unknown } | { name: string; allergens: unknown }[] | null }[]) {
     const ing = Array.isArray(l.ingredients) ? l.ingredients[0] : l.ingredients;
-    if (ing?.name) ingredientsDe.set(l.recipe_id, [...(ingredientsDe.get(l.recipe_id) ?? []), ing.name]);
+    if (!ing?.name) continue;
+    lignesDe.set(l.recipe_id, [...(lignesDe.get(l.recipe_id) ?? []), { recipe_id: l.recipe_id, ingredient_id: l.ingredient_id, nom: ing.name, allergenes: lireAllergenes(ing.allergens) }]);
   }
-  const vus = new Set<string>(); const plats: PlatQuiz[] = [];
+  const ficheParId = new Map((fiches ?? []).map((f) => [f.id as string, f]));
+  const ficheParSortie = new Map((fiches ?? []).filter((f) => f.output_ingredient_id).map((f) => [f.output_ingredient_id as string, f.id as string]));
+  const allergenesDe = (ficheId: string, vus = new Set<string>()): Set<string> => {
+    const out = new Set<string>();
+    if (vus.has(ficheId)) return out;
+    vus.add(ficheId);
+    for (const l of lignesDe.get(ficheId) ?? []) {
+      for (const x of l.allergenes) out.add(x);
+      const sous = l.ingredient_id ? ficheParSortie.get(l.ingredient_id) : undefined;
+      if (sous) for (const x of allergenesDe(sous, vus)) out.add(x);
+    }
+    return out;
+  };
+  const contenu = (ficheId: string) => {
+    const al = allergenesDe(ficheId);
+    if (ficheParId.get(ficheId)?.category === "pizza") al.add("Gluten");
+    return { ingredients: (lignesDe.get(ficheId) ?? []).map((l) => l.nom), allergenes: [...al].sort((x, y) => x.localeCompare(y, "fr")) };
+  };
+
+  const vus = new Set<string>(); const plats: PlatQuiz[] = []; const fichesDesPlats: string[] = [];
   for (const t of touches ?? []) {
-    const nom = String(t.name ?? "").trim(); const cle = nom.toLowerCase();
-    if (!nom || vus.has(cle)) continue;
-    vus.add(cle);
-    plats.push({ id: t.id as string, nom, categorie: String(t.category ?? ""), prix: Number(t.price_ttc) || 0, ingredients: t.kitchen_recipe_id ? ingredientsDe.get(t.kitchen_recipe_id as string) ?? [] : [] });
+    const nom = String(t.name ?? "").trim(); const cle = nom.toLowerCase(); const ficheId = t.kitchen_recipe_id as string;
+    if (!nom || vus.has(cle) || !(lignesDe.get(ficheId)?.length)) continue;
+    vus.add(cle); fichesDesPlats.push(ficheId);
+    plats.push({ id: t.id as string, nom, categorie: String(t.category ?? ""), ...contenu(ficheId) });
   }
-  return plats;
+  // Les préparations maison qui entrent dans ces plats (et celles qui entrent dans ces préparations)
+  const preps = new Map<string, PlatQuiz>();
+  const pile = [...fichesDesPlats]; const parcourues = new Set<string>();
+  while (pile.length) {
+    const id = pile.pop() as string;
+    if (parcourues.has(id)) continue;
+    parcourues.add(id);
+    for (const l of lignesDe.get(id) ?? []) {
+      const sous = l.ingredient_id ? ficheParSortie.get(l.ingredient_id) : undefined;
+      if (!sous || preps.has(sous) || !(lignesDe.get(sous)?.length)) continue;
+      preps.set(sous, { id: sous, nom: nomIngredient(l.nom) || l.nom, categorie: "PREPARATIONS", preparation: true, ...contenu(sous) });
+      pile.push(sous);
+    }
+  }
+  if (filtre === "PREPARATIONS") return [...preps.values()];
+  if (filtre && CUISINE.includes(filtre)) return plats.filter((p) => p.categorie === filtre);
+  return [...plats, ...preps.values()];
 }
 
 function melanger<T>(liste: T[]): T[] {
@@ -120,14 +166,13 @@ export async function GET(req: NextRequest) {
   let questions: Question[] = [];
   if (theme === "vins") questions = genererQuiz(await vinsDeLaCarte(filtre), NB);
   else if (theme === "carte") {
-    const familles = filtre === "boissons" ? BOISSONS : filtre && CUISINE.includes(filtre) ? [filtre] : CUISINE;
-    questions = genererQuizCarte(await platsDeLaCarte(familles), NB);
+    questions = genererQuizCarte(await fichesDeLaCarte(filtre), NB);
   } else {
     const acteur = await acteurAction(req, a.userId, a.etabId);
     const faite = await maSemaine(a.etabId, cleDe(acteur.employeId, a.userId, acteur.nom));
     if (faite) return NextResponse.json({ error: `Quiz de la semaine déjà fait : ${faite.score} / ${faite.nb_questions}. Le prochain ouvre lundi.` }, { status: 409 });
     // Six questions sur la carte, quatre sur les vins ; si l'un des deux manque, l'autre complète
-    const [plats, vins] = await Promise.all([platsDeLaCarte(CUISINE), vinsDeLaCarte(null)]);
+    const [plats, vins] = await Promise.all([fichesDeLaCarte(null), vinsDeLaCarte(null)]);
     const qv = genererQuiz(vins, 4);
     const qc = genererQuizCarte(plats, NB - qv.length);
     questions = melanger([...qc, ...(qc.length + qv.length < NB ? genererQuiz(vins, NB - qc.length) : qv)]);

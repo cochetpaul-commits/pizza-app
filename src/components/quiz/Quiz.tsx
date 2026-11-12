@@ -21,7 +21,7 @@ type Etat = {
   equipe: ReturnType<typeof resumeEquipe> | null;
 };
 const FILTRES: Record<"carte" | "vins", { cle: string; nom: string }[]> = {
-  carte: [{ cle: "tous", nom: "Toute la cuisine" }, { cle: "ANTIPASTI", nom: "Antipasti" }, { cle: "CUCINA", nom: "Cucina" }, { cle: "DOLCI", nom: "Dolci" }, { cle: "PIZZE", nom: "Pizze" }, { cle: "boissons", nom: "Boissons (prix)" }],
+  carte: [{ cle: "tous", nom: "Toute la cuisine" }, { cle: "ANTIPASTI", nom: "Antipasti" }, { cle: "CUCINA", nom: "Cucina" }, { cle: "DOLCI", nom: "Dolci" }, { cle: "PIZZE", nom: "Pizze" }, { cle: "PREPARATIONS", nom: "Préparations maison" }],
   vins: [{ cle: "tous", nom: "Toute la cave" }, { cle: "blanc", nom: "Blanc" }, { cle: "bulles", nom: "Bulles" }, { cle: "champagne", nom: "Champagne" }, { cle: "doux", nom: "Doux" }, { cle: "rose", nom: "Rosé" }, { cle: "rouge", nom: "Rouge" }],
 };
 const moisPrecedent = (mois: string) => { const [a, m] = mois.split("-").map(Number); return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, "0")}`; };
@@ -115,7 +115,7 @@ export function Quiz({ themeInitial }: { themeInitial?: "carte" | "vins" }) {
               {FILTRES[theme].map((f) => <button key={f.cle} type="button" onClick={() => setSelection(f.cle)} style={filtre(selection === f.cle)}>{f.nom}</button>)}
             </div>
             <button type="button" onClick={() => void commencer(theme)} disabled={occupe} style={{ ...BTN, height: 44, fontSize: 15, fontWeight: 700, background: "#1a1a1a", color: "#f2ede4", borderColor: "#1a1a1a", opacity: occupe ? 0.6 : 1 }}>S&apos;entraîner · 10 questions</button>
-            <div style={{ fontSize: 12.5, color: MUTED }}>{theme === "carte" ? "Prix, composition des plats, « lequel de ces ingrédients », l'intrus." : "Cépages, région, domaine, appellation, prix de la bouteille, accords avec la carte."} Après chaque réponse, la fiche du plat ou la phrase à dire à la table.</div>
+            <div style={{ fontSize: 12.5, color: MUTED }}>{theme === "carte" ? "Composition des plats et des préparations maison, « lequel de ces ingrédients », l'intrus, les allergènes." : "Cépages, région, domaine, appellation, « quel vin a cette bouche », accords mets et vins."} Après chaque réponse, la fiche du plat ou la phrase à dire à la table.</div>
           </div>
         </>
       )}

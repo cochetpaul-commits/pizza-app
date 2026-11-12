@@ -1,16 +1,18 @@
 /**
  * Quiz sur la carte (12/11/2026, demande de Paul) : comme le quiz vins, les questions sont fabriquées depuis ce qui
- * existe déjà (touches de caisse Popina, prix, fiches techniques reliées), rien à saisir. Logique pure, testée.
- * Pas de question sur les allergènes tant que les fiches ne sont pas toutes vérifiées : un quiz faux serait pire
- * que pas de quiz.
+ * existe déjà (touches de caisse Popina, fiches techniques reliées, préparations maison), rien à saisir. Logique pure,
+ * testée. Pas de question de prix (Paul, 12/11 : ce qui compte, c'est la conception, les ingrédients, les allergènes).
+ * Allergènes : seulement des questions dont la bonne réponse est un allergène PRÉSENT sur la fiche. On ne demande
+ * jamais « quel plat proposer à un allergique » : une fiche incomplète ferait enseigner qu'un plat est sûr.
  * Les questions gardent la forme du quiz vins (`vin_id`, `vin_nom` = le sujet de la question) pour que les séries
  * enregistrées se lisent toutes de la même façon.
  */
 import type { Question, TypeQuestion } from "@/lib/quizVins";
+import { ALLERGENS } from "@/lib/allergens";
 
-export type PlatQuiz = { id: string; nom: string; categorie: string; prix: number; ingredients: string[] };
+/** Un plat de la carte ou une préparation maison (`preparation`), avec les ingrédients et les allergènes de sa fiche */
+export type PlatQuiz = { id: string; nom: string; categorie: string; ingredients: string[]; allergenes: string[]; preparation?: boolean };
 
-const eur = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
 const cle = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 
 function melanger<T>(liste: T[], alea: () => number): T[] {
@@ -67,38 +69,51 @@ function assembler(type: TypeQuestion, plat: PlatQuiz, question: string, bonne: 
   const options = melanger([bonne, ...distincts], alea);
   return { type, vin_id: plat.id, vin_nom: plat.nom, question, options, bonne: options.indexOf(bonne), explication };
 }
-/** Les autres plats, ceux de la même catégorie d'abord */
+/** Les autres fiches du même genre (plats avec plats, préparations avec préparations), la même catégorie d'abord */
 function voisins(plats: PlatQuiz[], plat: PlatQuiz, alea: () => number): PlatQuiz[] {
-  const autres = plats.filter((p) => p.id !== plat.id);
+  const autres = plats.filter((p) => p.id !== plat.id && !!p.preparation === !!plat.preparation);
   return [...melanger(autres.filter((p) => p.categorie === plat.categorie), alea), ...melanger(autres.filter((p) => p.categorie !== plat.categorie), alea)];
 }
 
-/** Toutes les questions possibles pour un plat */
+/** Toutes les questions possibles pour un plat ou une préparation */
 export function questionsPourPlat(plat: PlatQuiz, plats: PlatQuiz[], alea: () => number): Question[] {
   const out: Question[] = [];
   const pousser = (q: Question | null) => { if (q) out.push(q); };
   const ings = ingredientsMarquants(plat);
   const proches = voisins(plats, plat, alea);
-  const fiche = ings.length ? `${plat.nom} : ${ings.join(", ")}. ${eur(plat.prix)}.` : `${plat.nom} : ${eur(plat.prix)}.`;
-
-  if (plat.prix > 0) pousser(assembler("prix_plat", plat, `À quel prix : ${plat.nom} ?`, eur(plat.prix), proches.filter((p) => p.prix > 0).map((p) => eur(p.prix)), fiche, alea));
+  const nom = plat.preparation ? `${plat.nom} (préparation maison)` : plat.nom;
+  const fiche = `${plat.nom} : ${ings.length ? ings.join(", ") : "pas de composition sur la fiche"}.${plat.allergenes.length ? ` Allergènes de la fiche : ${plat.allergenes.join(", ")}.` : ""}`;
 
   if (ings.length >= 3) {
-    // Retrouver le plat à sa composition : seulement face à des plats qui ont eux aussi une fiche
     const liste = ings.slice(0, 6).join(", ");
-    pousser(assembler("plat_compo", plat, `Quel plat : ${liste} ?`, plat.nom, proches.filter((p) => p.ingredients.length).map((p) => p.nom), fiche, alea));
+    pousser(assembler("plat_compo", plat, `${plat.preparation ? "Quelle préparation maison" : "Quel plat"} : ${liste} ?`, plat.nom, proches.filter((p) => p.ingredients.length).map((p) => p.nom), fiche, alea));
   }
   if (ings.length) {
     const miens = new Set(ings.map(cle));
-    const ailleurs = [...new Map(proches.flatMap((p) => ingredientsMarquants(p)).filter((n) => !miens.has(cle(n))).map((n) => [cle(n), n])).values()];
+    const ailleurs = [...new Map(plats.filter((p) => p.id !== plat.id).flatMap((p) => ingredientsMarquants(p)).filter((n) => !miens.has(cle(n))).map((n) => [cle(n), n])).values()];
     // Un ingrédient du plat qui ne répète pas son nom (la truffe des « arancini al tartufo » ne se demande pas)
     const motsNom = new Set(cle(plat.nom).split(" ").filter((m) => m.length > 3));
     const candidats = ings.filter((n) => !cle(n).split(" ").some((m) => motsNom.has(m)));
     const bon = melanger(candidats.length ? candidats : ings, alea)[0];
-    pousser(assembler("ingredient_dans", plat, `Lequel de ces ingrédients est dans : ${plat.nom} ?`, bon, melanger(ailleurs, alea), fiche, alea));
+    pousser(assembler("ingredient_dans", plat, `Lequel de ces ingrédients est dans : ${nom} ?`, bon, melanger(ailleurs, alea), fiche, alea));
     if (ings.length >= 3 && ailleurs.length) {
       const intrus = melanger(ailleurs, alea)[0];
-      pousser(assembler("intrus", plat, `Lequel n'est PAS dans : ${plat.nom} ?`, intrus, melanger(ings, alea), fiche, alea));
+      pousser(assembler("intrus", plat, `Lequel n'est PAS dans : ${nom} ?`, intrus, melanger(ings, alea), fiche, alea));
+    }
+  }
+  if (plat.allergenes.length) {
+    // La bonne réponse est toujours un allergène présent sur la fiche ; les fausses, des allergènes qui n'y sont pas,
+    // ceux qu'on croise ailleurs sur la carte d'abord
+    const presents = new Set(plat.allergenes);
+    const surLaCarte = new Set(plats.flatMap((p) => p.allergenes));
+    const absents = (ALLERGENS as readonly string[]).filter((a) => !presents.has(a));
+    const faux = [...melanger(absents.filter((a) => surLaCarte.has(a)), alea), ...melanger(absents.filter((a) => !surLaCarte.has(a)), alea)];
+    pousser(assembler("allergene_dans", plat, `Quel allergène dans : ${nom} ?`, melanger(plat.allergenes, alea)[0], faux, fiche, alea));
+    // Quel plat contient cet allergène : il faut trois autres fiches renseignées qui ne l'ont pas
+    for (const a of melanger(plat.allergenes, alea)) {
+      const sans = proches.filter((p) => p.ingredients.length && !p.allergenes.includes(a)).map((p) => p.nom);
+      const q = assembler("plat_allergene", plat, `${plat.preparation ? "Laquelle de ces préparations" : "Lequel de ces plats"} contient : ${a.toLowerCase()} ?`, plat.nom, sans, fiche, alea);
+      if (q) { out.push(q); break; }
     }
   }
   return out;

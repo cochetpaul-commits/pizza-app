@@ -21,7 +21,7 @@ describe("quiz vins", () => {
   it("la bonne réponse est celle de la fiche", () => {
     const qs = questionsPourVin(VINS[0], VINS, alea);
     expect(qs.find((q) => q.type === "cepages")?.options[qs.find((q) => q.type === "cepages")!.bonne]).toBe("Cépage 1");
-    expect(qs.find((q) => q.type === "prix_bouteille")?.options[qs.find((q) => q.type === "prix_bouteille")!.bonne]).toBe("21 €");
+    expect(qs.some((q) => q.type === "prix_bouteille")).toBe(false);
     expect(qs.find((q) => q.type === "accord_plat")?.question).toContain("Pizza Diavola");
   });
   it("les mauvaises réponses viennent d'abord des vins de la même couleur", () => {

@@ -259,7 +259,8 @@ export async function GET(req: NextRequest) {
   const contenuFiche = (f: FicheBrute, parts: number): NonNullable<ArticleCarte["fiche"]> => ({
     id: f.id, nom: f.name, categorie: f.category, fiche_type: f.fiche_type ?? null, statut: f.statut ?? null, nb_parts: parts,
     description: f.description_courte ?? null, resume_salle: f.resume_salle ?? null, photo_url: f.photo_url ?? null,
-    allergenes: allergenesFiche(f.id),
+    // La pâte n'est pas une ligne de la fiche d'une pizza : le gluten s'ajoute d'office (12/11/2026)
+    allergenes: f.category === "pizza" ? [...new Set(["Gluten", ...allergenesFiche(f.id)])].sort() : allergenesFiche(f.id),
     lignes: (lignesParFiche.get(f.id) ?? []).map((l) => {
       const ing = l.ingredient_id ? ingParId.get(l.ingredient_id) : undefined;
       return { ingredient_id: (l.ingredient_id as string | null) ?? null, nom: ing?.name ?? "?", qty: l.qty != null ? Number(l.qty) : null, unit: l.unit ?? null, preparation: !!(l.ingredient_id && ficheParSortie.has(l.ingredient_id)) };

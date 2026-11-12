@@ -12,7 +12,7 @@ export type VinQuiz = {
 };
 export type TypeQuestion = "cepages" | "region" | "domaine" | "appellation" | "accord_plat" | "accord_vin" | "prix_bouteille" | "bouche"
   // Quiz sur la carte (quizCarte.ts) : `vin_id` et `vin_nom` portent alors le plat
-  | "prix_plat" | "plat_compo" | "ingredient_dans" | "intrus";
+  | "prix_plat" | "plat_compo" | "ingredient_dans" | "intrus" | "allergene_dans" | "plat_allergene";
 export type Question = {
   type: TypeQuestion; vin_id: string; vin_nom: string;
   question: string; options: string[]; bonne: number;
@@ -22,7 +22,6 @@ export type Question = {
 export type QuestionRepondue = Question & { reponse: number | null };
 
 const COULEURS: Record<string, string> = { rouge: "rouge", blanc: "blanc", rose: "rosé", bulles: "bulles", doux: "doux", champagne: "champagne" };
-const eur = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
 const propre = (s: string | null | undefined) => (s ?? "").trim();
 
 function melanger<T>(liste: T[], alea: () => number): T[] {
@@ -62,11 +61,7 @@ export function questionsPourVin(vin: VinQuiz, vins: VinQuiz[], alea: () => numb
   if (propre(vin.region)) pousser(assembler("region", vin, `D'où vient ${le} ?`, propre(vin.region), distracteurs(vins, vin, (v) => v.region ?? "", propre(vin.region), alea), pitchDe(vin), alea));
   if (propre(vin.domaine)) pousser(assembler("domaine", vin, `Quel domaine produit ${le} ?`, propre(vin.domaine), distracteurs(vins, vin, (v) => v.domaine ?? "", propre(vin.domaine), alea), pitchDe(vin), alea));
   if (propre(vin.appellation)) pousser(assembler("appellation", vin, `Quelle appellation pour ${le} ?`, propre(vin.appellation), distracteurs(vins, vin, (v) => v.appellation ?? "", propre(vin.appellation), alea), pitchDe(vin), alea));
-  const b = vin.prix?.b;
-  if (b != null && b > 0) {
-    const faux = distracteurs(vins, vin, (v) => (v.prix?.b != null && v.prix.b > 0 ? eur(v.prix.b) : ""), eur(b), alea);
-    pousser(assembler("prix_bouteille", vin, `À quel prix la bouteille de ${vin.nom} ?`, eur(b), faux, `${vin.nom} : ${eur(b)} la bouteille${vin.prix?.v ? `, ${eur(vin.prix.v)} le verre` : ""}.`, alea));
-  }
+  // Pas de question de prix (Paul, 12/11/2026) : ce qui compte, c'est le vin, pas son tarif
   if (propre(vin.bouche)) {
     const faux = distracteurs(vins, vin, (v) => v.nom, vin.nom, alea);
     pousser(assembler("bouche", vin, `Quel vin a cette bouche : « ${propre(vin.bouche)} » ?`, vin.nom, faux, pitchDe(vin), alea));
