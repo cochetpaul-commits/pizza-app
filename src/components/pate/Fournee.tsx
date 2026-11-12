@@ -614,7 +614,8 @@ const formatHeuresCourt = (h: number) => { const hh = Math.floor(h), mm = Math.r
 function MiseEnPlace({ lot, calcul, conseil }: { lot: Lot; calcul: PateResult; conseil: Conseil }) {
   const fin = calcul.phases.find((p) => p.kind !== "biga");
   if (!fin) return null;
-  const [b1, b2, b3] = tiersBassinage(fin.water_bassinage_g ?? 0);
+  const bassinage = fin.water_bassinage_g ?? 0, eauDepart = fin.water_start_g ?? fin.water_g;
+  const [b1, b2, b3] = tiersBassinage(bassinage);
   const ligne = (libelle: React.ReactNode, g: string, note?: string) => (
     <div key={String(libelle)} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "7px 0", borderTop: "1px solid #f3efe7" }}>
       <span style={{ fontSize: 15 }}>{libelle}{note && <span style={{ display: "block", fontSize: 12, color: MUTED }}>{note}</span>}</span>
@@ -626,11 +627,18 @@ function MiseEnPlace({ lot, calcul, conseil }: { lot: Lot; calcul: PateResult; c
       <div style={{ ...CADRE, padding: "10px 14px" }}>
         <div style={INTERTITRE}>Mise en place · pâte finale</div>
         {fin.flours.map((f) => ligne(nomFarine(f.name), formatG(f.grams)))}
-        {ligne("Eau de départ", formatG(fin.water_start_g ?? fin.water_g), fin.honey_g > 0 ? "miel dissous dedans" : undefined)}
+        {/* L'eau regroupée (12/11/2026, demande de Paul) : départ, bassinage, puis le total en gros pour tout couler d'un coup et répartir ensuite dans les pichets */}
+        {ligne("Eau de départ", formatG(eauDepart), fin.honey_g > 0 ? "miel dissous dedans" : undefined)}
+        {bassinage > 0 && ligne("Eau de bassinage, 3 pichets", formatG(bassinage), `${formatG(b1)} · ${formatG(b2)} · ${formatG(b3)}`)}
+        {bassinage > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "10px 12px", margin: "4px -6px 6px", borderRadius: 10, background: `${INFO}14`, boxShadow: `inset 6px 0 0 ${INFO}` }}>
+            <span style={{ fontSize: 16, fontWeight: 700 }}>Eau totale à couler<span style={{ display: "block", fontSize: 12, fontWeight: 500, color: MUTED }}>départ + bassinage</span></span>
+            <b style={{ fontFamily: OSWALD, fontSize: 40, lineHeight: 1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: INFO }}>{formatG(eauDepart + bassinage)}</b>
+          </div>
+        )}
         {fin.honey_g > 0 && ligne("Miel", formatG(fin.honey_g))}
         {ligne("Sel", formatG(fin.salt_g))}
         {fin.yeast_g > 0 && ligne("Levure fraîche", formatG(fin.yeast_g, true))}
-        {(fin.water_bassinage_g ?? 0) > 0 && ligne("Bassinage, 3 pichets", formatG(fin.water_bassinage_g ?? 0), `${formatG(b1)} · ${formatG(b2)} · ${formatG(b3)}`)}
       </div>
       <div style={{ ...CADRE, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div><div style={INTERTITRE}>Bacs à préparer</div><div style={{ fontSize: 12.5, color: MUTED }}>{lot.nb_patons} pâtons, {PATONS_PAR_BAC} par bac</div></div>

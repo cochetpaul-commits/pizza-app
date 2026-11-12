@@ -11,7 +11,7 @@ import { openApiFile } from "@/lib/fetchApi";
 import { Fournee } from "@/components/pate/Fournee";
 import { Tuile } from "@/components/ui/Tuile";
 import { EtatVide } from "@/components/ui/EtatVide";
-import { ACCENT, ATTENTION, BORD, BTN, CADRE, INTERTITRE, MUTED, OSWALD, TD, TH, h1, liseret } from "@/components/ui/charte";
+import { ACCENT, ATTENTION, BORD, BTN, INFO, CADRE, INTERTITRE, MUTED, OSWALD, TD, TH, h1, liseret } from "@/components/ui/charte";
 import { degradeCategorie, stylePastilleBarre } from "@/lib/styleCategories";
 
 /**
@@ -273,6 +273,14 @@ function Pesees({ resultat, couleur }: { resultat: PateResult; couleur: string }
                     </tr>
                   );
                 })}
+                {/* Eau totale (12/11/2026) : départ + bassinage, pour tout couler d'un coup puis répartir dans les pichets */}
+                {(ph.water_bassinage_g ?? 0) > 0 && (
+                  <tr>
+                    <td style={{ ...liseret(INFO), borderBottom: 0, borderTop: `1px solid ${BORD}` }} />
+                    <td style={{ ...TD, fontSize: 14, fontWeight: 700, borderBottom: 0, borderTop: `1px solid ${BORD}`, background: `${INFO}14` }}>Eau totale à couler<span style={{ color: MUTED, fontSize: 12, fontWeight: 500 }}> · départ + bassinage</span></td>
+                    <td style={{ ...TD, textAlign: "right", fontFamily: OSWALD, fontWeight: 700, fontSize: 26, lineHeight: 1.1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", borderBottom: 0, borderTop: `1px solid ${BORD}`, background: `${INFO}14`, color: INFO }}>{formatG((ph.water_start_g ?? ph.water_g) + (ph.water_bassinage_g ?? 0))}</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
