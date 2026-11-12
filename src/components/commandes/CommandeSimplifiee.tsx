@@ -179,11 +179,15 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     // Aucun habituel (fournisseur rare, historique court) : tous les articles, l'écran n'est jamais vide.
     const habituelsOuCommandes = duJour.filter((a) => estHabituel(a) || a.toujours || enCommande(a));
     const visibles = onglet === "precommande" || habituelsOuCommandes.length === 0 ? duJour : habituelsOuCommandes;
-    return data.rayons
+    // Un produit sans rayon (ou d'un rayon disparu) se range dans « Autres produits » : avant le 12/11/2026 il n'était
+    // dans aucune section, donc introuvable sans la recherche, même épinglé (la roquette de Terre Azur).
+    const connus = new Set(data.rayons.map((r) => r.code));
+    const AUTRES = "__autres";
+    return [...data.rayons, { code: AUTRES, libelle: "Autres produits", ordre: 999 }]
       .map((r) => ({
         ...r,
         articles: visibles
-          .filter((a) => a.rayon === r.code)
+          .filter((a) => (r.code === AUTRES ? !a.rayon || !connus.has(a.rayon) : a.rayon === r.code))
           // D'abord les produits achetés ces 90 derniers jours, puis les autres ; chaque groupe par ordre
           // alphabétique sans accents ni casse (« Crème » / « Creme » ensemble, « Œuf » avec les O), comme le mail et le PDF
           .sort((x, y) => (Number((y.habituel?.nb_achats ?? 0) > 0 || y.toujours) - Number((x.habituel?.nb_achats ?? 0) > 0 || x.toujours))
