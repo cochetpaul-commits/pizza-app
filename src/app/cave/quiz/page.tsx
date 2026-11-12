@@ -1,8 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { RequireRole } from "@/components/RequireRole";
-import { QuizVins } from "@/components/cave/QuizVins";
-
+/** Le quiz vins a rejoint le menu Quiz (12/11/2026) */
 export default function Page() {
-  return <RequireRole permission="operations.recettes"><QuizVins /></RequireRole>;
+  redirect("/quiz?theme=vins");
 }

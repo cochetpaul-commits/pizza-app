@@ -314,7 +314,7 @@ export function Cave({ vueInitiale }: { vueInitiale?: "service" | "cave" }) {
           {/* Quiz vins (05/11/2026) : s'entraîner avant le service */}
           {/* Vini d'Italia (12/11/2026) : le livret de formation salle */}
           <Link href="/cave/livret" style={{ ...BTN, textDecoration: "none" }}>Livret</Link>
-          <Link href="/cave/quiz" style={{ ...BTN, textDecoration: "none", background: "#1a1a1a", color: "#f2ede4", borderColor: "#1a1a1a" }}>S&apos;entraîner</Link>
+          <Link href="/quiz?theme=vins" style={{ ...BTN, textDecoration: "none", background: "#1a1a1a", color: "#f2ede4", borderColor: "#1a1a1a" }}>S&apos;entraîner</Link>
         </div>
       </div>
       {erreur && <p style={{ color: ROUGE }}>{erreur}</p>}

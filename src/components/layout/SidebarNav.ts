@@ -113,6 +113,8 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     // Piccola Mia (30/10/2026) : la caisse est Kezia, pas reliée ; la page ne sert qu'aux fiches techniques et préparations
     { kind: "page", label: piccola ? "Fiches techniques" : "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
     ...(piccola ? [] : [{ kind: "page", label: "Cave", href: "/cave", icon: "tag", permission: "operations.recettes" } as NavEntry]),
+    // Quiz carte et vins, avec le quiz de la semaine et le classement du mois (12/11/2026)
+    ...(piccola ? [] : [{ kind: "page", label: "Quiz", href: "/quiz", icon: "clipboard", permission: "operations.recettes" } as NavEntry]),
     // Clôture de caisse : Bello Mio seulement pour l'instant (Popina + TPE Flatpay)
     ...(piccola ? [] : [{ kind: "page", label: "Clôture", href: "/cloture", icon: "calculator", permission: "caisse.cloture" } as NavEntry]),
     ...(piccola ? [{ kind: "group", label: "Événementiel", icon: "calendarEvent", roles: MANAGERS, items: EVENEMENTIEL_ITEMS } as NavEntry] : []),
@@ -147,6 +149,7 @@ export const NAV_EQUIPIER: NavEntry[] = [
   { kind: "divider", label: "Service" },
   { kind: "page", label: "Carte", href: "/carte", icon: "book", permission: "operations.recettes" },
   { kind: "page", label: "Cave", href: "/cave", icon: "tag", permission: "operations.recettes" },
+  { kind: "page", label: "Quiz", href: "/quiz", icon: "clipboard", permission: "operations.recettes" },
   { kind: "page", label: "Clôture", href: "/cloture", icon: "calculator", permission: "caisse.cloture" },
   { kind: "divider", label: "Cuisine" },
   { kind: "page", label: "Empâtements", href: "/empatements", icon: "chefHat", permission: "operations.recettes" },

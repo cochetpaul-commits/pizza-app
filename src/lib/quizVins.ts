@@ -10,7 +10,9 @@ export type VinQuiz = {
   prix: { v?: number | null; b?: number | null } | null;
   accords: string[];
 };
-export type TypeQuestion = "cepages" | "region" | "domaine" | "appellation" | "accord_plat" | "accord_vin" | "prix_bouteille" | "bouche";
+export type TypeQuestion = "cepages" | "region" | "domaine" | "appellation" | "accord_plat" | "accord_vin" | "prix_bouteille" | "bouche"
+  // Quiz sur la carte (quizCarte.ts) : `vin_id` et `vin_nom` portent alors le plat
+  | "prix_plat" | "plat_compo" | "ingredient_dans" | "intrus";
 export type Question = {
   type: TypeQuestion; vin_id: string; vin_nom: string;
   question: string; options: string[]; bonne: number;

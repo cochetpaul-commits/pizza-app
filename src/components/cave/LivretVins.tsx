@@ -122,7 +122,7 @@ export function LivretVins() {
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           <Link href="/cave" style={{ ...BTN, textDecoration: "none" }}>← La cave</Link>
-          <Link href="/cave/quiz" style={{ ...BTN, textDecoration: "none", background: "#1a1a1a", color: "#f2ede4", borderColor: "#1a1a1a" }}>S&apos;entraîner</Link>
+          <Link href="/quiz?theme=vins" style={{ ...BTN, textDecoration: "none", background: "#1a1a1a", color: "#f2ede4", borderColor: "#1a1a1a" }}>S&apos;entraîner</Link>
         </div>
       </div>
 
