@@ -1,7 +1,8 @@
 /**
  * Vini d'Italia, livret de formation salle (édition Estate 26, rédaction Paul et Pierre Cochet), intégré à la Cave
- * le 12/11/2026. Le texte est celui du livret ; les vins cités ont été alignés sur la carte du 12/11/2026 (les vins
- * sortis de la carte ne sont plus donnés en exemple). Le mémo de la carte et les accords ne sont pas ici : ils sont
+ * le 12/11/2026. Le texte est celui du livret ; les vins cités ont été alignés sur la carte du 12/11/2026 (Chiaretto, Villamagna,
+ * Langhe Nebbiolo et Voerzio, sortis de la carte, ne sont plus donnés en exemple ; le Barbaresco Ca' del Baio revient à la carte
+ * et la Campanie reste comme base de connaissance, décision de Paul). Le mémo de la carte et les accords ne sont pas ici : ils sont
  * lus en direct dans la Cave, donc toujours à jour.
  */
 export type Bloc =
@@ -20,7 +21,7 @@ export const LIVRET: Chapitre[] = [
     id: "avant-propos", court: "Avant-propos", titre: "Pourquoi ce livret",
     chapeau: "Un client ne commande pas un cépage. Il commande une histoire, une assurance, un moment. Ce livret vous donne les trois.",
     blocs: [
-      { type: "p", texte: "La carte Estate 26 marque un tournant : nous travaillons désormais avec Oenoplaisir, caviste malouin, et nous avons fait entrer des domaines de référence : Feudo Montoni en Sicile, Novaia en Valpolicella, Cascina Galarin dans l'Asti, San Donato à San Gimignano, Torre Zambra et Pajaru pour le Sud. Beaucoup sont certifiés bio : c'est un argument, utilisez-le." },
+      { type: "p", texte: "La carte Estate 26 marque un tournant : nous travaillons désormais avec Oenoplaisir, caviste malouin, et nous avons fait entrer des domaines de référence : Feudo Montoni en Sicile, Ca' del Baio dans le Barbaresco, Novaia en Valpolicella, Cascina Galarin dans l'Asti, San Donato à San Gimignano, Torre Zambra et Pajaru pour le Sud. Beaucoup sont certifiés bio : c'est un argument, utilisez-le." },
       { type: "p", texte: "Chaque chapitre se lit en dix minutes. Les chapitres 5, 6 et 7 sont vos outils de service : lisez-les en premier. Le mémo de la carte tient toute la carte sur une page, avec les prix du jour." },
     ],
   },
@@ -35,7 +36,7 @@ export const LIVRET: Chapitre[] = [
         ["Frais", "Acidité vive, désaltérant", "Grillo Timpa, Pinot Grigio, Vernaccia"],
         ["Fruité", "Le fruit domine, peu de bois", "Valpolicella Novaia, Barbera Mugiot"],
         ["Charnu", "Riche, généreux, mûr", "Solu Primitivo, Madia"],
-        ["Structuré", "Tanins présents, vin de garde", "Barolo, Amarone, Chianti Classico Riserva"],
+        ["Structuré", "Tanins présents, vin de garde", "Barolo, Barbaresco, Amarone"],
       ] },
       { type: "h", texte: "Les arômes à connaître par cœur" },
       { type: "table", entetes: ["Famille", "Arômes", "On les trouve dans…"], lignes: [
@@ -45,7 +46,7 @@ export const LIVRET: Chapitre[] = [
         ["Fruits noirs", "Mûre, myrtille, pruneau", "Primitivo, Madia, Amarone"],
         ["Floral", "Rose, violette, jasmin", "Nebbiolo, Moscato d'Asti, Nero di Troia"],
         ["Épices et bois", "Réglisse, vanille, tabac", "Ripasso, Barolo, Vino Nobile"],
-        ["Minéral", "Pierre, iode, fumé", "Etna Bianco, Lugana"],
+        ["Minéral", "Pierre, iode, fumé", "Etna Bianco, Greco di Tufo"],
       ] },
       { type: "encadre", titre: "Réflexe accords", texte: "Un plat iodé appelle un blanc salin (Grillo, Vernaccia). Un plat riche appelle soit un rouge charnu qui l'accompagne, soit un blanc vif qui le tranche. Le rosé et le Lambrusco frais rattrapent presque toutes les tables d'été." },
     ],
@@ -55,7 +56,7 @@ export const LIVRET: Chapitre[] = [
     chapeau: "L'Italie est une échelle de 1 200 km entre Alpes et Afrique. Plus on descend, plus le soleil gagne, et plus les vins gagnent en générosité.",
     blocs: [
       { type: "h", texte: "Le Nord : fraîcheur et noblesse" },
-      { type: "p", texte: "Piémont : la Bourgogne italienne. Le Nebbiolo y donne le Barolo, la Barbera le quotidien gourmand, l'Arneis les blancs délicats, le Moscato la douceur. Nos maisons : Cascina Galarin (Asti), Piazzo, Scrimaglio, Tenuta Garetto." },
+      { type: "p", texte: "Piémont : la Bourgogne italienne. Le Nebbiolo y donne Barolo et Barbaresco, la Barbera le quotidien gourmand, l'Arneis les blancs délicats, le Moscato la douceur. Nos maisons : Cascina Galarin (Asti), Ca' del Baio, Piazzo, Scrimaglio, Tenuta Garetto." },
       { type: "p", texte: "Lombardie : le Lugana d'Olivini, blanc tendu du lac de Garde." },
       { type: "p", texte: "Vénétie : la Valpolicella et sa pyramide (Classico → Ripasso → Amarone), chez nous en version bio par Novaia. Aussi : Prosecco (Edoardo Rota), Pinot Grigio (Durante), rosé Trevenezie." },
       { type: "p", texte: "Émilie-Romagne : le Lambrusco, bulle rouge de Modène, celle qui accompagne la mortadelle." },
@@ -64,10 +65,11 @@ export const LIVRET: Chapitre[] = [
       { type: "p", texte: "Marches : le Pecorino de Muròla, salin et méditerranéen." },
       { type: "p", texte: "Abruzzes : le Montepulciano (le cépage, pas la ville toscane !). Torre Zambra, famille De Cerchio depuis 1961 : le Madia bio, au verre et en bouteille." },
       { type: "h", texte: "Le Sud : le soleil dans le verre" },
+      { type: "p", texte: "Campanie : le Greco di Tufo, blanc volcanique iodé." },
       { type: "p", texte: "Pouilles : le talon de la botte. Tenuta del Pajaru (bio) : Solu Primitivo charnu, Auru Nero di Troia floral. Le pajaru est l'abri en pierre sèche des bergers." },
       { type: "p", texte: "Sicile : deux mondes. L'intérieur avec Feudo Montoni, domaine historique d'altitude, bio, l'un des plus réputés d'Italie (Grillo Timpa, Lagnusa, Terre di Elio), le Zibibbo de Pellegrino à Marsala, et l'Etna volcanique (Gamma de Curtaz, Etna Rosso Murgo)." },
       { type: "p", texte: "Sardaigne : le Su'Aro de Su'Entu, blanc gras et solaire." },
-      { type: "encadre", titre: "À retenir", texte: "Dix régions italiennes sur la carte. Si le client hésite, vendez le voyage : « on démarre au Piémont, on finit en Sicile »." },
+      { type: "encadre", titre: "À retenir", texte: "Onze régions à connaître. Si le client hésite, vendez le voyage : « on démarre au Piémont, on finit en Sicile »." },
     ],
   },
   {
@@ -83,13 +85,14 @@ export const LIVRET: Chapitre[] = [
         ["Arneis", "Pêche, amande salée, élégant", "Barivel, Galarin"],
         ["Turbiana", "Tendu, minéral (Lugana)", "Olivini"],
         ["Pecorino", "Citron confit, herbes", "Muròla"],
+        ["Greco", "Iodé, pierre à fusil", "Greco di Tufo (Campanie)"],
         ["Carricante", "Volcanique, grande finesse", "Gamma Etna, Curtaz"],
         ["Moscato", "Jasmin, pêche, doux", "Pra Donè, Galarin"],
         ["Zibibbo", "Muscat doux de Sicile", "Pellegrino"],
       ] },
       { type: "h", texte: "Les rouges" },
       { type: "table", entetes: ["Cépage", "Profil", "Sur la carte"], lignes: [
-        ["Nebbiolo", "Roi du Piémont : rose, goudron, tanins nobles", "Barolo Scrimaglio, Barolo Piazzo"],
+        ["Nebbiolo", "Roi du Piémont : rose, goudron, tanins nobles", "Barolo, Barbaresco Ca' del Baio"],
         ["Barbera", "Fruit vif, tanins souples", "Mugiot, Garetto"],
         ["Corvina / Corvinone", "Cerise ; base de l'Amarone", "Novaia (Classico, Ripasso, Amarone)"],
         ["Lambrusco", "Bulle rouge, fruitée", "Cavicchioli"],
@@ -109,7 +112,7 @@ export const LIVRET: Chapitre[] = [
     blocs: [
       { type: "h", texte: "La pyramide des appellations" },
       { type: "table", entetes: ["Sigle", "Signifie", "Sur notre carte"], lignes: [
-        ["DOCG", "Sommet : origine + dégustation d'agrément, bandeau numéroté au col", "Barolo, Amarone, Chianti Classico, Vino Nobile, Vernaccia, Moscato d'Asti"],
+        ["DOCG", "Sommet : origine + dégustation d'agrément, bandeau numéroté au col", "Barolo, Barbaresco, Amarone, Chianti Classico, Greco di Tufo, Vernaccia, Moscato d'Asti"],
         ["DOC", "Origine contrôlée, cahier des charges strict", "Lugana, Etna Rosso, Prosecco, Valpolicella, Madia (Montepulciano d'Abruzzo)"],
         ["IGT / IGP", "Indication régionale, plus de liberté : pas un défaut !", "Solu Primitivo (Puglia), Terre Siciliane, Su'Aro"],
         ["Vino", "Vin de table", ""],
@@ -178,7 +181,7 @@ export const LIVRET: Chapitre[] = [
       { type: "p", texte: "Verre → pichet : dès que deux personnes prennent le même verre, « en pichet, c'est comme trois verres et demi au prix de trois ». Pichet → bouteille : à quatre convives ou sur les vins qui existent en bouteille. Montée en gamme : proposer un cran au-dessus une fois sur deux (« et si vous voulez découvrir le niveau au-dessus, le Ripasso… »)." },
       { type: "h", texte: "Six objections, six réponses" },
       { type: "qr", items: [
-        { q: "« C'est cher pour un vin italien »", r: "« Le Barolo Sottocastello di Novello de Piazzo est un cru du Barolo : à Paris, il serait 30 € plus cher. »" },
+        { q: "« C'est cher pour un vin italien »", r: "« Le Barbaresco de Ca' del Baio est un cru historique noté 95 points : à Paris, il serait 30 € plus cher. »" },
         { q: "« Je ne connais pas »", r: "« C'est justement pour ça qu'on l'a choisi. Je vous sers un fond pour goûter ? » (le geste coûte 2 cl et vend un verre)" },
         { q: "« Le Lambrusco, c'est sucré non ? »", r: "« Le nôtre se sert bien frais : c'est la bulle de la mortadelle. »" },
         { q: "« Un rouge en été, trop lourd »", r: "« Le Valpolicella se sert frais comme un rosé : c'est le rouge d'été des Vénitiens. »" },
@@ -213,7 +216,7 @@ export const GLOSSAIRE: [string, string][] = [
   ["Cépage", "La variété de raisin."],
   ["Charnu", "Vin riche en matière, qui « remplit » la bouche."],
   ["Classico", "Cœur historique d'une appellation."],
-  ["Cru", "Parcelle ou lieu-dit reconnu pour sa qualité (ex. Sottocastello di Novello)."],
+  ["Cru", "Parcelle ou lieu-dit reconnu pour sa qualité (ex. Vallegrande)."],
   ["Cuvée", "Assemblage ou sélection spécifique d'un domaine."],
   ["DOC / DOCG", "Appellations d'origine ; la DOCG est le sommet, bandeau au col."],
   ["Élevage", "Repos du vin (cuve, bois, bouteille) avant commercialisation."],
