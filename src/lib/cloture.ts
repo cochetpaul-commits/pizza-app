@@ -192,7 +192,7 @@ export function calculerCloture(s: SaisieCloture, jour?: string | null): Resulta
   const enveloppe = tiroirCompte != null && p.especes != null ? r2(p.especes) : null;
   const manquePourValider = [
     ...(p.especes == null ? ["les espèces de l'écran Popina"] : []),
-    ...(tiroirCompte == null ? ["le comptage du tiroir"] : []),
+    ...(tiroirCompte == null ? ["le montant du tiroir"] : []),
   ];
   const pourboiresPaie = r2(v0(z.pourboires) + v0(z.conecsPourboires));
 

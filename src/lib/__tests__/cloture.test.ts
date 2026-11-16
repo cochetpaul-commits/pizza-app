@@ -136,7 +136,7 @@ describe("clôture du soir (cas réels du brief)", () => {
   it("valider demande les espèces Popina et le comptage", () => {
     const r = calculerCloture(saisie({ total: 100, pourboires: 0, conecs: 0 }, { cb: 100, conecs: 0 }));
     expect(r.niveau).toBe("ok");
-    expect(r.manquePourValider).toEqual(["les espèces de l'écran Popina", "le comptage du tiroir"]);
+    expect(r.manquePourValider).toEqual(["les espèces de l'écran Popina", "le montant du tiroir"]);
   });
   it("saisie incomplète", () => {
     expect(calculerCloture(VIDE).niveau).toBe("vide");

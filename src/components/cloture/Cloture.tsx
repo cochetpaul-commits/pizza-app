@@ -62,10 +62,15 @@ const propre = (c: Comptage | null | undefined): Comptage | null => {
   const o = Object.fromEntries(Object.entries(c ?? {}).filter(([, n]) => n > 0));
   return Object.keys(o).length ? o : null;
 };
-const assembler = (t: Textes, coupures: Comptage, ajustement: number | null, cagnotte: Comptage | null): SaisieCloture => {
+/**
+ * Le tiroir et la cagnotte se saisissent en un montant (Paul, 16/11/2026 : compter coupure par coupure était trop long).
+ * Le détail par coupure reste possible : quand il est donné, c'est lui qui fait le total.
+ */
+const assembler = (t: Textes, coupures: Comptage | null, ajustement: number | null, cagnotte: Comptage | null, cagnotteTotal: number | null): SaisieCloture => {
   const s = versSaisie(t);
-  return { ...s, tiroir: { ...s.tiroir, coupures: propre(coupures) }, ajustement, cagnotte: cagnotte ? { total: null, coupures: propre(cagnotte) } : null };
+  return { ...s, tiroir: { ...s.tiroir, coupures: propre(coupures) }, ajustement, cagnotte: cagnotte ? { total: cagnotteTotal, coupures: propre(cagnotte) } : null };
 };
+const texteMontant = (v: number | null | undefined) => (v == null ? "" : v.toFixed(2).replace(".", ","));
 const estVendredi = (jour: string) => new Date(`${jour}T12:00:00Z`).getUTCDay() === 5;
 const estLundi = (jour: string) => new Date(`${jour}T12:00:00Z`).getUTCDay() === 1;
 const FOND_CIBLE_LUNDI = totalComptage(Object.fromEntries(Object.entries(idealPourJour("2026-10-26")).map(([k, n]) => [k, n]))) / 100;
@@ -86,6 +91,10 @@ export function Cloture() {
   const [coupures, setCoupures] = useState<Comptage>({});
   /** Cagnotte des pourboires espèces, vidée et comptée le vendredi (null : pas ce soir) */
   const [cagnotte, setCagnotte] = useState<Comptage | null>(null);
+  /** Montant de la cagnotte tapé directement, et les deux détails par coupure, repliés par défaut */
+  const [cagnotteTotal, setCagnotteTotal] = useState("");
+  const [detailTiroir, setDetailTiroir] = useState(false);
+  const [detailCagnotte, setDetailCagnotte] = useState(false);
 
   const [historique, setHistorique] = useState<Historique[]>([]);
   const [corrections, setCorrections] = useState<string[]>([]);
@@ -124,6 +133,10 @@ export function Cloture() {
         setCoupures(lue.tiroir?.coupures ?? {});
         setAjustement(lue.ajustement ?? null);
         setCagnotte(lue.cagnotte?.coupures ?? (lue.cagnotte?.total != null ? {} : null));
+        setCagnotteTotal(texteMontant(lue.cagnotte?.total));
+        // Une clôture comptée par coupure se rouvre avec son détail
+        setDetailTiroir(!!propre(lue.tiroir?.coupures));
+        setDetailCagnotte(!!propre(lue.cagnotte?.coupures));
 
         setCorrections(Array.isArray(c?.corrections) ? c.corrections : []);
         setNotes(c?.notes ?? "");
@@ -131,7 +144,7 @@ export function Cloture() {
         setControle(c?.controle ? { c: c.controle as ControleNuit, at: c.controle_at as string } : null);
         setControleEnCours(null);
         setTransactions(j.transactions ?? []);
-        dernier.current = JSON.stringify({ s: assembler(versTextes(lue), lue.tiroir?.coupures ?? {}, lue.ajustement ?? null, lue.cagnotte?.coupures ?? null), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
+        dernier.current = JSON.stringify({ s: assembler(versTextes(lue), lue.tiroir?.coupures ?? null, lue.ajustement ?? null, lue.cagnotte?.coupures ?? (lue.cagnotte?.total != null ? {} : null), lue.cagnotte?.total ?? null), c: Array.isArray(c?.corrections) ? c.corrections : [], n: c?.notes ?? "" });
         setEtat((e) => ({ ...e, chargement: false }));
         charge.current = true;
       } catch (e) { if (!annule) setEtat((s) => ({ ...s, chargement: false, erreur: e instanceof Error ? e.message : "Chargement impossible" })); }
@@ -139,7 +152,8 @@ export function Cloture() {
     return () => { annule = true; };
   }, [jour]);
 
-  const saisie = useMemo(() => assembler(textes, coupures, ajustement, cagnotte), [textes, coupures, ajustement, cagnotte]);
+  const saisie = useMemo(() => assembler(textes, detailTiroir ? coupures : null, ajustement, cagnotte ? (detailCagnotte ? cagnotte : {}) : null, lireMontant(cagnotteTotal)),
+    [textes, coupures, ajustement, cagnotte, cagnotteTotal, detailTiroir, detailCagnotte]);
 
   // Historique : enveloppes de la semaine pour le dépôt en banque
   const chargerHistorique = useCallback(async () => {
@@ -298,6 +312,7 @@ export function Cloture() {
   );
 
   const BTN: CSSProperties = { ...PILULE, height: 38, padding: "0 16px", fontSize: 14, fontWeight: 700 };
+  const LIEN: CSSProperties = { border: "none", background: "none", padding: 0, color: MUTED, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline", justifySelf: "start", textAlign: "left" };
   /** Billets de 200 € et 100 € : repliés sauf s'il y en a (presque jamais en caisse) */
   const gros = (k: number) => k >= 10000;
   const grille = (valeurs: Comptage, changer: (k: number, n: number) => void, repartition?: CompositionFond | null) => {
@@ -401,7 +416,7 @@ export function Cloture() {
 
           {/* Tiroir : comptage par coupure, fond à laisser, enveloppe de la banque */}
           <section style={{ ...CADRE, minWidth: 0, display: "grid", gap: 10, paddingBottom: 16 }}>
-            <div style={entete(BON)}><div style={titre(BON)}>Tiroir</div><div style={SOUS_ENTETE}>Compte tout le tiroir, fond compris, sans la cagnotte des pourboires.</div></div>
+            <div style={entete(BON)}><div style={titre(BON)}>Tiroir</div><div style={SOUS_ENTETE}>Tout ce qu&apos;il y a dans le tiroir, fond compris, sans la cagnotte des pourboires.</div></div>
             <div style={{ padding: "0 16px", display: "grid", gap: 10 }}>
             <label style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 14.5, fontWeight: 600 }}>
               Fond de caisse
@@ -409,7 +424,20 @@ export function Cloture() {
                 style={{ ...SAISIE, width: 96 }} />
               <span style={{ color: MUTED, fontWeight: 400, fontSize: 13 }}>€</span>
             </label>
-            {grille(coupures, changerCoupure, resultat.fondCaisse)}
+            {detailTiroir ? grille(coupures, changerCoupure, resultat.fondCaisse) : (
+              <label style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 14.5, fontWeight: 600 }}>
+                Espèces dans le tiroir
+                <input inputMode="decimal" autoComplete="off" value={textes.tiroir.compte ?? ""} onChange={(e) => changer("tiroir", "compte", e.target.value)} placeholder="0,00"
+                  onBlur={(e) => { const v = lireMontant(e.target.value); if (v != null) changer("tiroir", "compte", texteMontant(v)); }}
+                  style={{ ...SAISIE, width: 128, height: 44, fontSize: 18 }} />
+                <span style={{ color: MUTED, fontWeight: 400, fontSize: 13 }}>€</span>
+              </label>
+            )}
+            <button type="button" style={LIEN} onClick={() => {
+              // En repassant au montant, on garde le total déjà compté
+              if (detailTiroir && totalComptage(coupures) > 0) changer("tiroir", "compte", texteMontant(totalComptage(coupures) / 100));
+              setDetailTiroir(!detailTiroir);
+            }}>{detailTiroir ? "Saisir le montant directement" : "Compter par coupure (détail du fond et de l'enveloppe)"}</button>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", alignItems: "baseline", borderTop: `1px solid ${BORD}`, paddingTop: 10 }}>
               <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22 }}>{resultat.tiroirCompte != null ? eur(resultat.tiroirCompte) : "—"}</span>
               <span style={{ color: MUTED, fontSize: 13.5 }}>compté · {eur(resultat.tiroirAttendu)} attendu (fond + espèces Popina)</span>
@@ -422,6 +450,12 @@ export function Cloture() {
                   : `Il manque ${eur(-resultat.ecartTiroir)} : à prendre dans les pourboires`}</span>
               )}
             </div>
+            {!resultat.fondCaisse && resultat.enveloppe != null && (
+              <div style={panneau(AMBRE)}>
+                <div style={{ fontWeight: 700, color: AMBRE, fontSize: 14 }}>Enveloppe banque · {eur(resultat.enveloppe)}</div>
+                <div style={{ fontSize: 12.5, color: MUTED, marginTop: 2 }}>Les espèces de Popina. Laisse {eur(saisie.tiroir.fond ?? 0)} de fond dans le tiroir.</div>
+              </div>
+            )}
             {resultat.fondCaisse && (() => {
               const f = resultat.fondCaisse;
               return (
@@ -525,12 +559,24 @@ export function Cloture() {
                 <button type="button" onClick={() => setCagnotte({})} style={{ ...BTN, borderColor: AMBRE, color: AMBRE }}>{estVendredi(jour) ? "Compter la cagnotte" : "La compter quand même ce soir"}</button>
               </div>
             ) : (<>
-              <div style={{ color: MUTED, fontSize: 12.5, marginTop: -4 }}>Compte tout ce qu&apos;il y a dans la cagnotte, billets et pièces. Le total part dans le pot du mois. Toutes les pièces passent au tiroir contre des billets : les pourboires ressortent en billets et partent à la banque avec la remise du lundi.</div>
-              {grille(cagnotte, changerCagnotte)}
+              <div style={{ color: MUTED, fontSize: 12.5, marginTop: -4 }}>Tout ce qu&apos;il y a dans la cagnotte, billets et pièces. Le total part dans le pot du mois{detailCagnotte ? ". Toutes les pièces passent au tiroir contre des billets : les pourboires ressortent en billets et partent à la banque avec la remise du lundi" : ""}.</div>
+              {detailCagnotte ? grille(cagnotte, changerCagnotte) : (
+                <label style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 14.5, fontWeight: 600 }}>
+                  Montant de la cagnotte
+                  <input inputMode="decimal" autoComplete="off" value={cagnotteTotal} onChange={(e) => setCagnotteTotal(e.target.value)} placeholder="0,00"
+                    onBlur={(e) => { const v = lireMontant(e.target.value); if (v != null) setCagnotteTotal(texteMontant(v)); }}
+                    style={{ ...SAISIE, width: 128, height: 44, fontSize: 18 }} />
+                  <span style={{ color: MUTED, fontWeight: 400, fontSize: 13 }}>€</span>
+                </label>
+              )}
+              <button type="button" style={LIEN} onClick={() => {
+                if (detailCagnotte && totalComptage(cagnotte) > 0) setCagnotteTotal(texteMontant(totalComptage(cagnotte) / 100));
+                setDetailCagnotte(!detailCagnotte);
+              }}>{detailCagnotte ? "Saisir le montant directement" : "Compter par coupure (pour faire la monnaie avec le tiroir)"}</button>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", alignItems: "baseline", borderTop: `1px solid ${BORD}`, paddingTop: 10 }}>
                 <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 22 }}>{eur(resultat.pourboiresEspeces ?? 0)}</span>
                 <span style={{ color: MUTED, fontSize: 13.5 }}>de pourboires espèces pour le pot du mois</span>
-                <button type="button" onClick={() => setCagnotte(null)} style={{ border: "none", background: "none", padding: 0, color: MUTED, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>Finalement pas ce soir</button>
+                <button type="button" onClick={() => { setCagnotte(null); setCagnotteTotal(""); }} style={{ border: "none", background: "none", padding: 0, color: MUTED, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>Finalement pas ce soir</button>
               </div>
               {resultat.echange ? (
                 <div style={{ ...panneau(AMBRE), fontSize: 13.5, lineHeight: 1.45 }}>
@@ -540,7 +586,7 @@ export function Cloture() {
                   <div style={{ color: MUTED, fontSize: 12.5, marginTop: 2 }}>Le fond et l&apos;enveloppe ci-dessus sont calculés après cet échange : les pourboires sortent en billets, toute la monnaie reste au tiroir.</div>
                   {resultat.cagnotteCoupures && <div style={{ marginTop: 4 }}>La cagnotte repart avec : <strong>{listerCoupures(resultat.cagnotteCoupures)}</strong>.</div>}
                 </div>
-              ) : resultat.tiroirCompte != null && (resultat.pourboiresEspeces ?? 0) > 0 ? (
+              ) : detailCagnotte && detailTiroir && resultat.tiroirCompte != null && (resultat.pourboiresEspeces ?? 0) > 0 ? (
                 <div style={{ fontSize: 12.5, color: MUTED }}>Pas de monnaie à faire : il faut au moins 5 € de pièces dans la cagnotte et autant en billets dans le tiroir.</div>
               ) : null}
             </>)}
