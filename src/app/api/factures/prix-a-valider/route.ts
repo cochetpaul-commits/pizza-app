@@ -43,9 +43,16 @@ export async function POST(req: NextRequest) {
     const dateNouvelle = String(offre.valid_from ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
     const alias = await aliasFournisseur(supabaseAdmin, row.supplier_id as string);
     const { data: actives } = await supabaseAdmin.from("supplier_offers").select("id, valid_from").eq("ingredient_id", row.ingredient_id).in("supplier_id", alias).eq("is_active", true);
+    const parValidTo = new Map<string, string[]>();
     for (const a of actives ?? []) {
       const vf = a.valid_from ? String(a.valid_from).slice(0, 10) : null;
-      const off = await supabaseAdmin.from("supplier_offers").update({ is_active: false, valid_to: vf && vf > dateNouvelle ? vf : dateNouvelle }).eq("id", a.id);
+      const valt = vf && vf > dateNouvelle ? vf : dateNouvelle;
+      const ids = parValidTo.get(valt) ?? [];
+      ids.push(a.id as string);
+      parValidTo.set(valt, ids);
+    }
+    for (const [valt, ids] of parValidTo) {
+      const off = await supabaseAdmin.from("supplier_offers").update({ is_active: false, valid_to: valt }).in("id", ids);
       if (off.error) return NextResponse.json({ error: off.error.message }, { status: 500 });
     }
     const ins = await supabaseAdmin.from("supplier_offers").insert({ ...offre, is_active: true, valid_to: null });

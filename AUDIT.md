@@ -206,13 +206,29 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
        → remplacé par un seul `upsert(rows, { onConflict: "id" })` groupé
        (`{ id, remuneration }` uniquement, même patron que `settings/categories`
        et `fournisseurs` ci-dessus — ne touche à aucune autre colonne du contrat).
-     - `api/factures/prix-a-valider/route.ts` (fermeture des offres actives,
-       valeurs calculées par ligne), `api/ingredients/merge/route.ts`
-       (suppression de doublons par table lors d'une fusion de fiche),
+     - [x] *(16/11/2026)* `api/factures/prix-a-valider/route.ts` : la fermeture
+       des offres actives du fournisseur (acceptation d'une baisse de prix)
+       faisait un `update()` par offre active trouvée pour calculer sa propre
+       `valid_to`. Comme cette date ne prend que deux valeurs possibles (la
+       date de l'offre acceptée, ou la `valid_from` de l'offre si elle est
+       postérieure), les offres sont maintenant regroupées par date de fin
+       calculée puis fermées par groupe avec `.in(ids)` — même patron que le
+       regroupement déjà fait dans `importEngine.ts` (l.656-657). Résultat
+       strictement identique (chaque offre reçoit la même `valid_to`
+       qu'avant), juste moins d'allers-retours base pour les cas avec
+       plusieurs offres actives (plusieurs établissements sur le même alias
+       fournisseur).
+     - `api/ingredients/merge/route.ts` (suppression de doublons par table
+       lors d'une fusion de fiche) : volontairement pas touché — c'est une
+       logique de fusion/suppression de fiches ingrédients, sensible (fiches
+       partagées entre les deux établissements), à ne modifier qu'avec un
+       vrai test base/navigateur.
        `lib/invoices/importEngine.ts` (import de facture),
        `api/ventes/import/route.ts` (import de ventes) : N généralement petit
-       à moyen (quelques unités à quelques dizaines), actions ponctuelles —
-       gain réel mais plus modeste, remis à une prochaine exécution.
+       à moyen (quelques unités à quelques dizaines), actions ponctuelles,
+       logique plus complexe et critique (import factures/ventes en
+       production) — gain réel mais plus modeste, remis à une prochaine
+       exécution avec plus de budget pour vérifier chaque cas.
 4. **Dashboard / bello-mio / piccola-mia / tresorerie** paginent
    `ventes_lignes` par 1000 côté client pour faire de simples sommes →
    déplacer l'agrégation côté serveur (comme `/api/ventes/stats`).
