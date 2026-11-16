@@ -2,6 +2,7 @@
 
 import { useMajCommande } from "@/hooks/useMajCommande";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { VOIR_COMMANDE } from "@/components/commandes/BarreCommande";
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/ProfileContext";
 import { fetchApi } from "@/lib/fetchApi";
@@ -204,6 +205,15 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     return duJour.filter((a) => { const n = norm(a.nom); return mots.every((m) => n.includes(m)); }).slice(0, 30);
   }, [recherche, duJour]);
 
+  /** Les produits déjà dans la commande, par ordre alphabétique (liste déroulée depuis le résumé) */
+  const dansLaCommande = useMemo(() => duJour.filter(enCommande).sort((x, y) => x.nom.localeCompare(y.nom, "fr", { sensitivity: "base" })), [duJour, enCommande]);
+  const [voirCommande, setVoirCommande] = useState(false);
+  const refResume = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const ouvrir = () => { setVoirCommande(true); refResume.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+    window.addEventListener(VOIR_COMMANDE, ouvrir);
+    return () => window.removeEventListener(VOIR_COMMANDE, ouvrir);
+  }, []);
   const resume = useMemo(() => {
     let nb = 0, total = 0, prixInconnu = false;
     for (const l of data?.lignes ?? []) {
@@ -535,16 +545,23 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
           boxShadow: "0 4px 14px rgba(0,0,0,0.2)", maxWidth: "90vw", textAlign: "center",
         }}>{alerte}</div>
       )}
-      <div style={{
-        background: "#fff", borderRadius: 14, border: "1px solid #ddd6c8", padding: "12px 14px", marginBottom: 12,
-        display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
-      }}>
-        <div style={{ fontSize: 14, color: "#1a1a1a" }}>
-          <strong style={{ fontFamily: OSWALD, fontSize: 18 }}>{resume.nb}</strong> produit{resume.nb > 1 ? "s" : ""} dans la {onglet === "precommande" ? "précommande" : "commande"}
-        </div>
-        {voirMontants && <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>
-          {euros(resume.total)} HT{resume.prixInconnu ? " *" : ""}
-        </div>}
+      {/* Le résumé se déroule (Paul, 16/11/2026) : toucher « 9 produits » montre ce qui est déjà dans la commande, modifiable sur place */}
+      <div ref={refResume} style={{ scrollMarginTop: 70, background: "#fff", borderRadius: 14, border: `1px solid ${voirCommande && resume.nb > 0 ? "#1a1a1a" : "#ddd6c8"}`, marginBottom: 12, overflow: "hidden" }}>
+        <button type="button" onClick={() => setVoirCommande((v) => !v)} disabled={resume.nb === 0} aria-expanded={voirCommande && resume.nb > 0}
+          style={{
+            width: "100%", border: "none", background: "transparent", padding: "12px 14px", fontFamily: "inherit", textAlign: "left",
+            display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, cursor: resume.nb === 0 ? "default" : "pointer", color: "#1a1a1a", minHeight: 48, touchAction: "manipulation",
+          }}>
+          <span style={{ fontSize: 14 }}>
+            <strong style={{ fontFamily: OSWALD, fontSize: 18 }}>{resume.nb}</strong> produit{resume.nb > 1 ? "s" : ""} dans la {onglet === "precommande" ? "précommande" : "commande"}
+            {resume.nb > 0 && <span style={{ color: "#6f6a61", fontSize: 12.5 }}> · {voirCommande ? "masquer" : "voir la liste"}</span>}
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: 10, whiteSpace: "nowrap" }}>
+            {voirMontants && <span style={{ fontSize: 15, fontWeight: 700 }}>{euros(resume.total)} HT{resume.prixInconnu ? " *" : ""}</span>}
+            {resume.nb > 0 && <span aria-hidden style={{ fontSize: 11, color: "#6f6a61", transform: voirCommande ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>}
+          </span>
+        </button>
+        {voirCommande && resume.nb > 0 && <div style={{ borderTop: "1px solid #ddd6c8" }}>{tableau(dansLaCommande)}</div>}
       </div>
       {!brouillon && (
         <div style={{ background: "#fbf0dc", borderRadius: 12, padding: "10px 12px", fontSize: 13, color: "#7a5a2b", marginBottom: 12 }}>

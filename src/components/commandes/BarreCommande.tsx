@@ -10,6 +10,9 @@ import React, { useEffect, useRef, useState } from "react";
  * et la page réserve en bas la hauteur de cette barre (globals.css).
  */
 
+/** Événement envoyé à l'écran de commande pour dérouler la liste des articles commandés */
+export const VOIR_COMMANDE = "commande:voir-liste";
+
 export function BarreCommande({ nbArticles, onEnvoyer, desactive, envoiAdmin }: {
   nbArticles: number;
   onEnvoyer: () => void;
@@ -20,12 +23,14 @@ export function BarreCommande({ nbArticles, onEnvoyer, desactive, envoiAdmin }: 
   const inactif = desactive || nbArticles === 0 || envoiAdmin;
   return (
     <div className="barre-commande">
-      <div style={{ minWidth: 0 }}>
+      {/* Toucher le nombre d'articles déroule la liste de la commande, en haut de l'écran (16/11/2026) */}
+      <button type="button" disabled={nbArticles === 0} onClick={() => window.dispatchEvent(new Event(VOIR_COMMANDE))} aria-label="Voir les articles de la commande"
+        style={{ minWidth: 0, border: "none", background: "transparent", padding: "0 6px 0 0", textAlign: "left", fontFamily: "inherit", cursor: nbArticles === 0 ? "default" : "pointer", touchAction: "manipulation" }}>
         <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, color: "#1a1a1a", lineHeight: 1 }}>
           {nbArticles}
         </div>
-        <div style={{ fontSize: 12, color: "#8a8378", marginTop: 2 }}>{nbArticles > 1 ? "articles" : "article"}</div>
-      </div>
+        <div style={{ fontSize: 12, color: "#8a8378", marginTop: 2, textDecoration: nbArticles > 0 ? "underline" : "none" }}>{nbArticles > 1 ? "articles" : "article"}</div>
+      </button>
       <button type="button" onClick={onEnvoyer} disabled={inactif}
         style={{
           flex: 1, maxWidth: 320, height: 52, borderRadius: 14, border: "none",
