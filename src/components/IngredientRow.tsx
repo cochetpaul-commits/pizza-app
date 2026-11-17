@@ -474,7 +474,7 @@ export const IngredientRow = React.memo(function IngredientRow({
       {/* ── DUPLICATE ALERT ── */}
       {isEditing && duplicateMatch && (
         <div style={{
-          margin: "0 8px 8px", padding: "10px 14px", borderRadius: 10,
+          margin: volet ? "0 0 12px" : "0 8px 8px", padding: "10px 14px", borderRadius: 10,
           background: "#fef3c7", border: "1.5px solid #f59e0b",
           display: "flex", flexDirection: "column", gap: 8,
         }}>
@@ -484,7 +484,7 @@ export const IngredientRow = React.memo(function IngredientRow({
           <div style={{ fontSize: 13, color: "#1a1a1a" }}>
             Un produit similaire existe : <strong>{duplicateMatch.name}</strong>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button"
               onClick={() => onMergeDuplicate?.(duplicateMatch.id, x.id)}
               style={{
@@ -901,8 +901,8 @@ export const IngredientRow = React.memo(function IngredientRow({
         // pour que le rapprochement reconnaisse la fiche même si le libellé diffère. Les codes supplémentaires
         // (autre calibre, autre origine) sont des alias, gérés dans le bouton à côté.
         const champCodeFournisseur = (hauteur: number, taille: number) => (
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 8, padding: "0 10px", height: hauteur }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1.5px solid #e5ddd0", borderRadius: 8, padding: "0 10px", height: hauteur }}>
               <span style={{ fontSize: 10, color: "#aaa", fontWeight: 600, whiteSpace: "nowrap" }}>Code fournisseur :</span>
               <input value={edit.supplierSku} onChange={(e) => onEditChange({ ...edit, supplierSku: e.target.value })} placeholder="réf. sur la facture (ex. 106921)"
                 style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "monospace", fontSize: taille + 1, minWidth: 0 }} />
@@ -911,10 +911,10 @@ export const IngredientRow = React.memo(function IngredientRow({
           </div>
         );
         const ligneImport = (hauteur: number, taille: number) => (
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, background: "#f5f0e8", border: "1.5px solid #e5ddd0", borderRadius: 8, padding: "6px 10px", fontSize: taille, color: "#999", height: hauteur }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 6, background: "#f5f0e8", border: "1.5px solid #e5ddd0", borderRadius: 8, padding: "6px 10px", fontSize: taille, color: "#999", height: hauteur }}>
               <span style={{ fontSize: 10, color: "#aaa", fontWeight: 600 }}>Import:</span>
-              <span style={{ fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{edit.importName || "—"}</span>
+              <span style={{ fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{edit.importName || "—"}</span>
             </div>
             <button type="button" onClick={() => onEditImportName(x.id, edit.importName)} title="Changer le nom d'import (clé de rapprochement des factures)"
               style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, border: "1.5px solid #e5ddd0", background: "white", color: "#888", cursor: "pointer", height: hauteur }}>✎</button>
@@ -927,9 +927,10 @@ export const IngredientRow = React.memo(function IngredientRow({
           return (
             <div>
               <div style={{ ...titreSection, margin: "0 0 10px", paddingTop: 0, borderTop: "none" }}>Identité</div>
-              <div style={{ display: "grid", gap: 10 }}>
+              {/* minmax(0, 1fr) partout (17/11/2026) : sur téléphone, le nom d'import (une ligne, non coupable) élargissait toute la fiche */}
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10 }}>
                 {champNom}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 10 }}>
                   {champCategorie}{champSousCategorie}{champFournisseur}
                   <div><div style={fieldLabel}>Statut</div>{selectStatut}</div>
                 </div>
@@ -965,7 +966,7 @@ export const IngredientRow = React.memo(function IngredientRow({
           {/* ═══ MOBILE TOP BAR: stacked rows ═══ */}
           <div className="md:hidden" style={{ marginBottom: 10 }}>
             <div style={{ marginBottom: 6 }}>{champNom}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 6, marginBottom: 6 }}>
               {champCategorie}
               {champSousCategorie}
               {champFournisseur}
