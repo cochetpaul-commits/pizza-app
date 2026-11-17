@@ -108,7 +108,7 @@ export function Doublons() {
       <div style={CADRE}>
         {etat.chargement ? <Chargement texte="Comparaison des noms…" /> : paires.length === 0 ? <EtatVide icone="produit" titre="Aucun doublon probable" texte={q ? "Rien ne correspond à ce filtre." : "Tous les noms de produits sont distincts, ou les paires ont été écartées."} /> : (
           <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-            <colgroup><col style={{ width: 6 }} /><col style={{ width: 40 }} /><col />{bureau && <col style={{ width: 150 }} />}{bureau && <col style={{ width: 140 }} />}<col style={{ width: 90 }} /></colgroup>
+            <colgroup><col style={{ width: 6 }} /><col style={{ width: 40 }} /><col />{bureau && <col style={{ width: 150 }} />}{bureau && <col style={{ width: 140 }} />}<col style={{ width: bureau ? 90 : 68 }} /></colgroup>
             <thead><tr>
               <th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={TH}>Produit</th>{bureau && <th style={TH}>Catégorie</th>}{bureau && <th style={TH}>Fournisseur</th>}<th style={{ ...TH, textAlign: "right" }}>Proximité</th>
             </tr></thead>
@@ -126,7 +126,8 @@ export function Doublons() {
                           <td style={{ ...TD, padding: "9px 0 9px 12px" }}><input type="radio" name={`garde-${p.pairKey}`} checked={on} onChange={() => setGarde((g) => ({ ...g, [p.pairKey]: x.id }))} style={{ accentColor: BON, width: 16, height: 16, cursor: "pointer" }} /></td>
                           <td style={{ ...TD, minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                              <span style={{ fontWeight: on ? 700 : 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.name}</span>
+                              {/* Téléphone (17/11/2026) : le nom s'écrit en entier sur plusieurs lignes, c'est lui qui distingue les deux produits */}
+                              <span style={bureau ? { fontWeight: on ? 700 : 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : { fontWeight: on ? 700 : 600, overflowWrap: "anywhere", lineHeight: 1.25 }}>{x.name}</span>
                               {on && <span style={pastille(BON)}>à garder</span>}
                             </div>
                             {!bureau && <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{fournisseur(x)}</div>}
