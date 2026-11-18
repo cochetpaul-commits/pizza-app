@@ -244,7 +244,11 @@ function Deroule({ lot, tb, occupe, peutLancer, conseil, appliquer }: { lot: Lot
       {lot.statut === "biga_au_froid" && <EtatBiga froidAt={lot.biga_froid_at} />}
 
       {bigaAConfirmer ? (
-        <ControleBiga lot={lot} occupe={occupe} appliquer={appliquer} />
+        <>
+          <ControleBiga lot={lot} occupe={occupe} appliquer={appliquer} />
+          {/* Les pesées de la suite, repliées (Paul, 18/11/2026) : on peut commencer à peser pendant qu'on contrôle la biga */}
+          {calcul && <Depliant titre="Ingrédients à peser pour la suite" sousTitre="Pâte finale, eau et bacs"><MiseEnPlace lot={lot} calcul={calcul} conseil={conseil} /></Depliant>}
+        </>
       ) : besoinTemps ? (
         <>
           {phaseCourante === "final" && calcul && <MiseEnPlace lot={lot} calcul={calcul} conseil={conseil} />}
@@ -586,6 +590,21 @@ function CorrigerBiga({ lot, occupe, appliquer }: { lot: Lot; occupe: boolean; a
 }
 
 /* ── Pétrissage chronométré (04/11/2026, retour terrain) ─────────────────────────────────────────────── */
+
+/** Volet déroulant : une ligne à toucher, le contenu dessous */
+function Depliant({ titre, sousTitre, children }: { titre: string; sousTitre?: string; children: React.ReactNode }) {
+  const [ouvert, setOuvert] = useState(false);
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <button type="button" onClick={() => setOuvert((o) => !o)} aria-expanded={ouvert}
+        style={{ ...CADRE, borderColor: ouvert ? "#1a1a1a" : undefined, padding: "14px 16px", minHeight: 56, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, cursor: "pointer", fontFamily: "inherit", textAlign: "left", color: "#1a1a1a", width: "100%", touchAction: "manipulation" }}>
+        <span style={{ fontSize: 15, fontWeight: 700 }}>{titre}{sousTitre && <span style={{ display: "block", fontSize: 12.5, fontWeight: 400, color: MUTED }}>{sousTitre}</span>}</span>
+        <span aria-hidden style={{ fontSize: 12, color: MUTED, transform: ouvert ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▼</span>
+      </button>
+      {ouvert && children}
+    </div>
+  );
+}
 
 /** Ouverture du pétrissage : biga hors de sa fenêtre de 20 à 30 h, confirmation obligatoire */
 function ControleBiga({ lot, occupe, appliquer }: { lot: Lot; occupe: boolean; appliquer: (corps: Record<string, unknown>) => Promise<boolean> }) {
