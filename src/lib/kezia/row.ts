@@ -45,6 +45,9 @@ export function keziaDailyRow(parsed: KeziaDaily, rawText: string) {
     virements: r2(parsed.virements),
     marge_total: r2(parsed.marge_total),
     taux_marque: Math.round(parsed.taux_marque * 10000) / 10000,
+    // Sur place / emporté : seulement si le journal les donne (leur somme fait le CA TTC), sinon inconnu
+    ...(Math.abs(parsed.sur_place_ttc + parsed.emporte_ttc - parsed.ca_ttc) < 0.06 && parsed.ca_ttc > 0
+      ? { sur_place_ttc: r2(parsed.sur_place_ttc), emporte_ttc: r2(parsed.emporte_ttc) } : {}),
     rayons: { rayons, total },
     tva_details: parsed.tva_details.map((t) => ({ taux: t.taux, montant: r2(t.montant), base_ht: r2(t.base_ht), base_ttc: r2(t.base_ttc) })),
     reglements: parsed.reglements,

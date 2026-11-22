@@ -25,6 +25,9 @@ export type KeziaDaily = {
   virements: number;
   marge_total: number;
   taux_marque: number; // percentage as decimal e.g. 0.2989
+  /** « Total TTC Sur Place » et « Total TTC Emporté » du journal (22/11/2026) ; 0 si la ligne manque */
+  sur_place_ttc: number;
+  emporte_ttc: number;
   rayons: Array<{
     name: string;
     qty: number;
@@ -343,6 +346,8 @@ export function parseKeziaSynthese(textBrut: string): KeziaDaily {
     virements,
     marge_total: margeTotal,
     taux_marque: tauxMarque,
+    sur_place_ttc: findValueAfterLabel(lines, /Total\s+TTC\s+Sur\s+Place/i, { sameLineOnly: true }),
+    emporte_ttc: findValueAfterLabel(lines, /Total\s+TTC\s+Emport\S*/i, { sameLineOnly: true }),
     rayons,
     tva_details: tvaDetails,
   };

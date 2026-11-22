@@ -190,7 +190,7 @@ type Stats = ReturnType<typeof aggregate>;
  * relu tel quel ; sinon les lignes sont chargées, agrégées, et le résultat remplace le cache.
  * Vécu 08/10 : chaque ouverture de la page rechargeait trois périodes complètes de lignes.
  */
-const VERSION_CALCUL = "2026-11-03a"; // 03/11 : pagination à ordre strict, plus de résultat partiel en cache
+const VERSION_CALCUL = "2026-11-22a"; // 22/11 : sur place / emporté de Kezia ; avant : 2026-11-03a // 03/11 : pagination à ordre strict, plus de résultat partiel en cache
 
 /** Ce que le tableau de l'équipe a le droit de voir : CA, tickets, couverts et ticket moyen par service, à emporter. Rien d'autre. */
 function resumeEquipe(s: Record<string, unknown> | null): Record<string, unknown> | null {
@@ -1015,12 +1015,14 @@ type DailySalesRow = {
   taux_marque: number;
   tva_total: number;
   rayons: unknown;
+  sur_place_ttc: number | null;
+  emporte_ttc: number | null;
 };
 
 async function buildFromDailySales(etabId: string, from: string, to: string) {
   const { data, error } = await supabase
     .from("daily_sales")
-    .select("date,ca_ttc,ca_ht,tickets,couverts,panier_moyen,marge_total,taux_marque,tva_total,rayons")
+    .select("date,ca_ttc,ca_ht,tickets,couverts,panier_moyen,marge_total,taux_marque,tva_total,rayons,sur_place_ttc,emporte_ttc")
     .eq("etablissement_id", etabId)
     .not("source", "in", '("kezia_products","kezia_article_stats")')
     .gte("date", from)
@@ -1290,6 +1292,19 @@ async function buildFromDailySales(etabId: string, from: string, to: string) {
       avgDurMin: 0, byZone: [], bySvc: [], avgRotation: 0, rotByZone: [], totalOrders: 0,
     },
     // Extra: marge data for daily_sales source
+    // Sur place / à emporter du journal Kezia (22/11/2026) : le journal ne donne que des totaux TTC, le HT est
+    // réparti au prorata. Les journées importées avant cette date n'ont pas la répartition : elles sont comptées à part.
+    repartition_kezia: (() => {
+      const r2 = (n: number) => Math.round(n * 100) / 100;
+      const jours = rows.map((d) => {
+        const ttc = Number(d.ca_ttc) || 0, ht = Number(d.ca_ht) || 0;
+        const connu = d.sur_place_ttc != null && d.emporte_ttc != null && ttc > 0;
+        const part = connu ? Number(d.sur_place_ttc) / ttc : 0;
+        return { date: d.date, connu, sp_ht: connu ? r2(ht * part) : 0, emp_ht: connu ? r2(ht - ht * part) : 0, inconnu_ht: connu ? 0 : r2(ht) };
+      });
+      const somme = (f: (j: (typeof jours)[number]) => number) => r2(jours.reduce((t, j) => t + f(j), 0));
+      return { jours, sp_ht: somme((j) => j.sp_ht), emp_ht: somme((j) => j.emp_ht), inconnu_ht: somme((j) => j.inconnu_ht), jours_connus: jours.filter((j) => j.connu).length, jours_total: jours.length };
+    })(),
     marge_total: Math.round(totalMarge * 100) / 100,
     marge_pct: ca_ht > 0 ? Math.round(totalMarge / ca_ht * 10000) / 100 : 0,
     day_marge,

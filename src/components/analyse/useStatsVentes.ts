@@ -19,6 +19,8 @@ export type StatsVentes = {
   place_sur_ttc: number; place_sur_ht: number; place_emp_ttc: number; place_emp_ht: number;
   cov_sur: number; cov_emp: number; cov_midi: number; cov_soir: number; tickets_midi: number; tickets_soir: number;
   services: ServiceJour[];
+  /** Piccola Mia (journal Kezia) : sur place et à emporter par jour, HT au prorata ; absent pour Popina */
+  repartition_kezia?: { jours: { date: string; connu: boolean; sp_ht: number; emp_ht: number; inconnu_ht: number }[]; sp_ht: number; emp_ht: number; inconnu_ht: number; jours_connus: number; jours_total: number };
   food_ttc: number; food_ht: number; drink_ttc: number; drink_ht: number;
   hourly_ttc: number[];
   /* Produits, attache, encaissements (page Par produit, 29/10/2026) */

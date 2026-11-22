@@ -14,6 +14,8 @@ export const maxDuration = 60;
  * Config : KEZIA_DRIVE_FOLDER_ID (dossier racine ou dossier année, partagé
  * « tous les utilisateurs disposant du lien ») et GOOGLE_DRIVE_API_KEY.
  * ?days=N : ne regarde que les N derniers jours (défaut 10, max 400).
+ * ?refaire=1 : relit aussi les journées déjà importées (pour compléter l'historique, par exemple le
+ * sur place / à emporter ajouté le 22/11/2026) ; 40 journaux par appel, les plus récents d'abord.
  */
 const DRIVE = "https://www.googleapis.com/drive/v3";
 
@@ -58,6 +60,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "GOOGLE_DRIVE_API_KEY / KEZIA_DRIVE_FOLDER_ID non configurés — dépôt via /api/cron/kezia-ingest en attendant" }, { status: 200 });
   }
   const days = Math.min(Math.max(parseInt(req.nextUrl.searchParams.get("days") ?? "10", 10) || 10, 1), 400);
+  const refaire = req.nextUrl.searchParams.get("refaire") === "1";
+  const sauter = Math.max(0, parseInt(req.nextUrl.searchParams.get("sauter") ?? "0", 10) || 0);
   const depuis = new Date(); depuis.setDate(depuis.getDate() - days);
   const depuisIso = depuis.toISOString().slice(0, 10);
 
@@ -65,8 +69,9 @@ export async function GET(req: NextRequest) {
     const [journaux, deja] = await Promise.all([collectJournaux(folderId, key), datesDejaImportees()]);
     const aFaire = journaux
       .map((f) => ({ ...f, date: f.name.slice(8, 18) }))
-      .filter((f) => f.date >= depuisIso && !deja.has(f.date))
-      .sort((a, b) => a.date.localeCompare(b.date));
+      .filter((f) => f.date >= depuisIso && (refaire || !deja.has(f.date)))
+      .sort((a, b) => (refaire ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)))
+      .slice(sauter);
 
     const resultats: (IngestResult & { fichier: string })[] = [];
     for (const f of aFaire.slice(0, 40)) {

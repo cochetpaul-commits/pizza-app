@@ -36,6 +36,11 @@ export function ChiffreAffaires() {
   const meilleur = semaine.length ? semaine.reduce((a, b) => (b.ht > a.ht ? b : a)) : null;
   const pire = semaine.length > 1 ? semaine.reduce((a, b) => (b.ht < a.ht ? b : a)) : null;
   const tva = stats ? stats.ca_ttc - stats.ca_ht : 0;
+  // Piccola Mia (22/11/2026) : pas de service midi / soir, la caisse Kezia distingue sur place et à emporter
+  const kz = stats?.repartition_kezia ?? null, kzPrec = prec?.repartition_kezia ?? null;
+  const kzJour = useMemo(() => new Map((kz?.jours ?? []).map((j) => [j.date, j])), [kz]);
+  const kzPartiel = kz && kz.jours_connus < kz.jours_total ? `sur ${kz.jours_connus} des ${kz.jours_total} jours` : null;
+  const partKz = (v: number) => (kz && kz.sp_ht + kz.emp_ht > 0 ? `${pct((v / (kz.sp_ht + kz.emp_ht)) * 100)} du réparti` : undefined);
   // CA par zone de la caisse (31/10/2026, demande de Paul) : salle, pergolas, terrasse, à emporter, face à la période comparée
   const zones = useMemo(() => {
     if (!stats) return [];
@@ -55,29 +60,40 @@ export function ChiffreAffaires() {
 
       {stats && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: bureau ? `repeat(${evt.estPiccola ? 6 : 5}, 1fr)` : "repeat(2, 1fr)", gap: bureau ? 10 : 8, opacity: chargement ? 0.6 : 1 }}>
+          <div style={{ display: "grid", gridTemplateColumns: bureau ? `repeat(${kz ? (evt.estPiccola && evt.totaux ? 5 : 4) : evt.estPiccola ? 6 : 5}, 1fr)` : "repeat(2, 1fr)", gap: bureau ? 10 : 8, opacity: chargement ? 0.6 : 1 }}>
             <TuileVariation compacte={!bureau} icone="euro" libelle="CA HT" valeur={euros(stats.ca_ht)} actuel={stats.ca_ht} precedent={prec?.ca_ht} sous={`${euros(stats.ca_ttc)} TTC`} />
             {evt.estPiccola && evt.totaux && (
               <Link href="/evenementiel" style={{ textDecoration: "none", color: "inherit", display: "contents" }}>
                 <TuileVariation compacte={!bureau} icone="facture" libelle="Événementiel facturé" valeur={euros(evt.totaux.facture_ht)} actuel={evt.totaux.facture_ht} precedent={null} sous={`${evt.totaux.nb_factures} facture${evt.totaux.nb_factures > 1 ? "s" : ""} Pennylane · ${euros(evt.totaux.a_encaisser_ttc)} à encaisser`} />
               </Link>
             )}
-            <TuileVariation compacte={!bureau} icone="ticket" couleur={COULEUR_MIDI} libelle="Midi" valeur={euros(midi)} actuel={midi} precedent={midiPrec} sous={stats.ca_ht ? `${pct((midi / stats.ca_ht) * 100)} du CA` : undefined} />
-            <TuileVariation compacte={!bureau} icone="ticket" couleur={COULEUR_SOIR} libelle="Soir" valeur={euros(soir)} actuel={soir} precedent={soirPrec} sous={stats.ca_ht ? `${pct((soir / stats.ca_ht) * 100)} du CA` : undefined} />
-            <TuileVariation compacte={!bureau} icone="camion" couleur={COULEUR_EMPORTER} libelle="À emporter" valeur={euros(stats.place_emp_ht)} actuel={stats.place_emp_ht} precedent={prec?.place_emp_ht} sous={stats.ca_ht ? `${pct((stats.place_emp_ht / stats.ca_ht) * 100)} du CA` : undefined} />
+            {kz ? (<>
+              <TuileVariation compacte={!bureau} icone="ticket" couleur={COULEUR_MIDI} libelle="Sur place" valeur={euros(kz.sp_ht)} actuel={kz.sp_ht} precedent={kzPrec && kzPrec.jours_connus === kzPrec.jours_total ? kzPrec.sp_ht : null} sous={kzPartiel ?? partKz(kz.sp_ht)} />
+              <TuileVariation compacte={!bureau} icone="camion" couleur={COULEUR_EMPORTER} libelle="À emporter" valeur={euros(kz.emp_ht)} actuel={kz.emp_ht} precedent={kzPrec && kzPrec.jours_connus === kzPrec.jours_total ? kzPrec.emp_ht : null} sous={kzPartiel ?? partKz(kz.emp_ht)} />
+            </>) : (<>
+  <TuileVariation compacte={!bureau} icone="ticket" couleur={COULEUR_MIDI} libelle="Midi" valeur={euros(midi)} actuel={midi} precedent={midiPrec} sous={stats.ca_ht ? `${pct((midi / stats.ca_ht) * 100)} du CA` : undefined} />
+              <TuileVariation compacte={!bureau} icone="ticket" couleur={COULEUR_SOIR} libelle="Soir" valeur={euros(soir)} actuel={soir} precedent={soirPrec} sous={stats.ca_ht ? `${pct((soir / stats.ca_ht) * 100)} du CA` : undefined} />
+              <TuileVariation compacte={!bureau} icone="camion" couleur={COULEUR_EMPORTER} libelle="À emporter" valeur={euros(stats.place_emp_ht)} actuel={stats.place_emp_ht} precedent={prec?.place_emp_ht} sous={stats.ca_ht ? `${pct((stats.place_emp_ht / stats.ca_ht) * 100)} du CA` : undefined} />
+            </>)}
             <TuileVariation compacte={!bureau} icone="couverts" libelle="Ticket moyen" valeur={euros(ticketMoyen(stats), 1)} actuel={ticketMoyen(stats)} precedent={prec ? ticketMoyen(prec) : null} sous="TTC par couvert sur place" />
           </div>
 
           {/* Midi, soir, à emporter en un coup d'œil (30/10/2026) */}
-          <ResumeServices stats={stats} prec={prec} />
+          {!kz && <ResumeServices stats={stats} prec={prec} />}
 
-          <Cadre titre="CA par jour" sous="Hors taxes : midi, soir et à emporter empilés ; la courbe grise est la période précédente, jour pour jour.">
+          <Cadre titre="CA par jour" sous={kz ? "Hors taxes : sur place et à emporter empilés ; la courbe grise est la période précédente, jour pour jour." : "Hors taxes : midi, soir et à emporter empilés ; la courbe grise est la période précédente, jour pour jour."}>
             {chargement ? <Chargement /> : (
               <GraphBarres empile format={(v) => euros(v)} etiquettes={jours.map((j) => jourCourt(j.date))} libelleAxe="CA HT par jour"
                 series={[
-                  { libelle: "Midi", couleur: COULEUR_MIDI, valeurs: jours.map((j) => j.midi) },
-                  { libelle: "Soir", couleur: COULEUR_SOIR, valeurs: jours.map((j) => j.soir) },
-                  { libelle: "À emporter", couleur: COULEUR_EMPORTER, valeurs: jours.map((j) => j.emporter) },
+                  ...(kz ? [
+                    { libelle: "Sur place", couleur: COULEUR_MIDI, valeurs: jours.map((j) => kzJour.get(j.date)?.sp_ht ?? 0) },
+                    { libelle: "À emporter", couleur: COULEUR_EMPORTER, valeurs: jours.map((j) => kzJour.get(j.date)?.emp_ht ?? 0) },
+                    ...(kz.inconnu_ht > 0 ? [{ libelle: "Non réparti", couleur: "#cfc8bb", valeurs: jours.map((j) => kzJour.get(j.date)?.inconnu_ht ?? 0) }] : []),
+                  ] : [
+                    { libelle: "Midi", couleur: COULEUR_MIDI, valeurs: jours.map((j) => j.midi) },
+                    { libelle: "Soir", couleur: COULEUR_SOIR, valeurs: jours.map((j) => j.soir) },
+                    { libelle: "À emporter", couleur: COULEUR_EMPORTER, valeurs: jours.map((j) => j.emporter) },
+                  ]),
                   ...(joursPrec.length ? [{ libelle: "Période précédente", couleur: "#b8b0a3", courbe: true, valeurs: jours.map((_, i) => joursPrec[i]?.ht ?? 0) }] : []),
                 ]} />
             )}
@@ -114,7 +130,7 @@ export function ChiffreAffaires() {
             droite={meilleur && pire && meilleur !== pire ? <div style={{ fontSize: 12.5, color: MUTED }}>Meilleur jour <b style={{ color: VERT }}>{meilleur.jour}</b> · plus faible <b style={{ color: ROUGE }}>{pire.jour}</b></div> : undefined} sansMarge>
             <div style={{ overflowX: "auto", marginTop: 10 }}>
               <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                <thead><tr><th style={TH}>Jour</th><th style={{ ...TH, textAlign: "right" }}>Jours</th><th style={{ ...TH, textAlign: "right" }}>Midi</th><th style={{ ...TH, textAlign: "right" }}>Soir</th>{bureau && <th style={{ ...TH, textAlign: "right" }}>À emporter</th>}<th style={{ ...TH, textAlign: "right" }}>CA HT / jour</th>{bureau && <th style={{ ...TH, textAlign: "right" }}>Couverts</th>}<th style={{ ...TH, textAlign: "right" }}>Part</th></tr></thead>
+                <thead><tr><th style={TH}>Jour</th><th style={{ ...TH, textAlign: "right" }}>Jours</th>{!kz && <><th style={{ ...TH, textAlign: "right" }}>Midi</th><th style={{ ...TH, textAlign: "right" }}>Soir</th>{bureau && <th style={{ ...TH, textAlign: "right" }}>À emporter</th>}</>}<th style={{ ...TH, textAlign: "right" }}>CA HT / jour</th>{bureau && <th style={{ ...TH, textAlign: "right" }}>Couverts</th>}<th style={{ ...TH, textAlign: "right" }}>Part</th></tr></thead>
                 <tbody>
                   {semaine.map((j) => {
                     const total = semaine.reduce((t, x) => t + x.ht * x.n, 0);
@@ -123,9 +139,9 @@ export function ChiffreAffaires() {
                       <tr key={j.jour}>
                         <td style={{ ...TD, fontWeight: 700, color: couleur }}>{j.jour}</td>
                         <td style={{ ...TDN, color: MUTED }}>{j.n}</td>
-                        <td style={TDN}>{euros(j.midi)}</td>
+                        {!kz && <><td style={TDN}>{euros(j.midi)}</td>
                         <td style={TDN}>{euros(j.soir)}</td>
-                        {bureau && <td style={TDN}>{euros(j.emporter)}</td>}
+                        {bureau && <td style={TDN}>{euros(j.emporter)}</td>}</>}
                         <td style={{ ...TDN, fontWeight: 700, color: couleur }}>{euros(j.ht)}</td>
                         {bureau && <td style={TDN}>{nombre(j.cov)}</td>}
                         <td style={{ ...TDN, color: MUTED }}>{total ? pct((j.ht * j.n / total) * 100) : "—"}</td>
