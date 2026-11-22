@@ -17,7 +17,11 @@ import { BON, BORD, BTN, CADRE, CHAMP, FAIBLE, MAUVAIS, MUTED, TD, TH, alpha, h1
  * produits : deux fiches actives du même fournisseur dont les noms se ressemblent à 80 % ou plus
  * (accents, casse et ponctuation ignorés). Pour chaque paire on garde une fiche ; l'autre est fusionnée
  * dedans par /api/ingredients/merge (prix, lignes de recettes, mouvements réaffectés, puis suppression).
+ * Depuis le 22/11/2026 (demande de Paul) : on choisit pour chaque paire « Fusionner » ou « Pas un doublon », rien ne
+ * part tout de suite, puis on valide tous les choix d'un coup. L'ancien « Tout fusionner » fusionnait aussi des
+ * produits seulement voisins (gants taille L et taille M).
  */
+type Choix = "fusion" | "non";
 const CLE_IGNORES = "ingredient-duplicate-ignores";
 const lireIgnores = (): Set<string> => { try { return new Set(JSON.parse(localStorage.getItem(CLE_IGNORES) ?? "[]") as string[]); } catch { return new Set(); } };
 
@@ -31,6 +35,7 @@ export function Doublons() {
   const [supprimes, setSupprimes] = useState<Set<string>>(new Set());
   const [fusionnes, setFusionnes] = useState(0);
   const [tout, setTout] = useState<{ fait: number; total: number } | null>(null);
+  const [choix, setChoix] = useState<Record<string, Choix>>({});
   const [version, setVersion] = useState(0);
   useEffect(() => { setIgnores(lireIgnores()); }, [version]);
   const etat = useDoublons(ignores, version);
@@ -43,42 +48,57 @@ export function Doublons() {
       .sort((x, y) => x.a.name.localeCompare(y.a.name, "fr"));
   }, [etat.paires, faits, supprimes, q]);
 
-  const ignorer = (p: DuplicatePair) => {
-    const n = new Set(ignores); n.add(p.pairKey);
-    try { localStorage.setItem(CLE_IGNORES, JSON.stringify([...n])); } catch { /* navigation privée */ }
-    setIgnores(n);
-  };
-  const fusionner = async (p: DuplicatePair, sansConfirmation = false): Promise<boolean> => {
+  const choisir = (p: DuplicatePair, c: Choix) => setChoix((x) => { const n = { ...x }; if (n[p.pairKey] === c) delete n[p.pairKey]; else n[p.pairKey] = c; return n; });
+  /** Le même choix sur toutes les paires affichées (le filtre compte), ou tout effacer */
+  const choisirTout = (c: Choix | null) => setChoix((x) => { const n = { ...x }; for (const p of paires) { if (c) n[p.pairKey] = c; else delete n[p.pairKey]; } return n; });
+  const aFusionner = useMemo(() => etat.paires.filter((p) => choix[p.pairKey] === "fusion" && !faits.has(p.pairKey) && !supprimes.has(p.a.id) && !supprimes.has(p.b.id)), [etat.paires, choix, faits, supprimes]);
+  const aEcarter = useMemo(() => etat.paires.filter((p) => choix[p.pairKey] === "non"), [etat.paires, choix]);
+
+  const fusionner = async (p: DuplicatePair): Promise<boolean> => {
     const keepId = garde[p.pairKey] ?? p.a.id;
     const deleteId = keepId === p.a.id ? p.b.id : p.a.id;
-    const gardeNom = keepId === p.a.id ? p.a.name : p.b.name;
-    if (!sansConfirmation && !confirm(`Fusionner dans « ${gardeNom} » ?\nLes prix, lignes de recettes et mouvements sont réaffectés, le doublon supprimé.`)) return false;
     setBusy(p.pairKey);
     try {
       const res = await fetchApi("/api/ingredients/merge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keepId, deleteId }) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json.ok === false) throw new Error(json.error ?? `Erreur ${res.status}`);
-      setFaits((s) => new Set(s).add(p.pairKey));
-      setSupprimes((s) => new Set(s).add(deleteId));
+      setFaits((x) => new Set(x).add(p.pairKey));
+      setSupprimes((x) => new Set(x).add(deleteId));
       setFusionnes((n) => n + 1);
       return true;
-    } catch (e) { alert(`Fusion interrompue : ${e instanceof Error ? e.message : "erreur"}`); return false; }
+    } catch (e) { alert(`Fusion interrompue sur « ${p.a.name} » : ${e instanceof Error ? e.message : "erreur"}`); return false; }
     finally { setBusy(null); }
   };
-  const fusionnerTout = async () => {
-    const liste = paires;
-    if (!confirm(`Fusionner ${liste.length} paire${liste.length > 1 ? "s" : ""}, chacune dans le produit coché ?\nLes prix, lignes de recettes et mouvements sont réaffectés, les doublons supprimés.`)) return;
-    setTout({ fait: 0, total: liste.length });
-    const deja = new Set<string>();
-    for (let i = 0; i < liste.length; i++) {
-      const p = liste[i];
-      if (deja.has(p.a.id) || deja.has(p.b.id)) { setTout({ fait: i + 1, total: liste.length }); continue; }
-      const ok = await fusionner(p, true);
-      if (!ok) break;
-      deja.add((garde[p.pairKey] ?? p.a.id) === p.a.id ? p.b.id : p.a.id);
-      setTout({ fait: i + 1, total: liste.length });
+  /** Applique tous les choix : les paires écartées d'abord (sans risque), puis les fusions une à une */
+  const valider = async () => {
+    const fusions = aFusionner, ecartees = aEcarter;
+    if (fusions.length === 0 && ecartees.length === 0) return;
+    const phrases = [
+      fusions.length ? `Fusionner ${fusions.length} paire${fusions.length > 1 ? "s" : ""}, chacune dans le produit coché « à garder » (prix, recettes et mouvements réaffectés, le doublon supprimé : on ne peut pas revenir en arrière)` : null,
+      ecartees.length ? `Écarter ${ecartees.length} paire${ecartees.length > 1 ? "s" : ""} qui ne sont pas des doublons` : null,
+    ].filter(Boolean);
+    if (!confirm(`${phrases.join("\n\n")}\n\nValider ?`)) return;
+    if (ecartees.length) {
+      const n = new Set(ignores); for (const p of ecartees) n.add(p.pairKey);
+      try { localStorage.setItem(CLE_IGNORES, JSON.stringify([...n])); } catch { /* navigation privée */ }
+      setIgnores(n);
     }
-    setTout(null);
+    if (fusions.length) {
+      setTout({ fait: 0, total: fusions.length });
+      // Une fiche supprimée par une fusion précédente ne peut plus servir dans une autre paire
+      const parties = new Set<string>();
+      for (let i = 0; i < fusions.length; i++) {
+        const p = fusions[i];
+        if (!parties.has(p.a.id) && !parties.has(p.b.id)) {
+          const ok = await fusionner(p);
+          if (!ok) break;
+          parties.add((garde[p.pairKey] ?? p.a.id) === p.a.id ? p.b.id : p.a.id);
+        }
+        setTout({ fait: i + 1, total: fusions.length });
+      }
+      setTout(null);
+    }
+    setChoix({});
     setVersion((v) => v + 1);
   };
   const cat = (p: Ingredient) => { const c = CAT_COLORS[(p.category ?? "") as Category] ?? FAIBLE; return <span style={pastille(couleurTexte(c), alpha(c, 0.14))}>{CAT_LABELS[p.category as Category] ?? p.category ?? "—"}</span>; };
@@ -98,19 +118,22 @@ export function Doublons() {
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filtrer par nom…" style={{ ...CHAMP, borderRadius: 20, flex: "1 1 200px", minWidth: 0, maxWidth: 420 }} />
-        {paires.length > 1 && (
-          <button type="button" onClick={() => void fusionnerTout()} disabled={busy !== null || tout !== null} style={{ ...BTN, background: BON, borderColor: BON, color: "#fff", fontWeight: 700, opacity: busy !== null || tout !== null ? 0.6 : 1 }}>
-            {tout ? `Fusion ${tout.fait} / ${tout.total}…` : `Tout fusionner (${paires.length})`}
-          </button>
-        )}
       </div>
+      {paires.length > 1 && (
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", fontSize: 12.5, color: MUTED }}>
+          <span>Pour les {paires.length} paires affichées :</span>
+          <button type="button" onClick={() => choisirTout("non")} style={{ ...BTN, fontSize: 12.5 }}>Toutes « pas un doublon »</button>
+          <button type="button" onClick={() => choisirTout("fusion")} style={{ ...BTN, fontSize: 12.5 }}>Toutes « fusionner »</button>
+          <button type="button" onClick={() => choisirTout(null)} style={{ ...BTN, fontSize: 12.5, color: MUTED }}>Effacer les choix</button>
+        </div>
+      )}
       {etat.erreur && <div style={{ color: MAUVAIS, fontSize: 13 }}>{etat.erreur}</div>}
       <div style={CADRE}>
         {etat.chargement ? <Chargement texte="Comparaison des noms…" /> : paires.length === 0 ? <EtatVide icone="produit" titre="Aucun doublon probable" texte={q ? "Rien ne correspond à ce filtre." : "Tous les noms de produits sont distincts, ou les paires ont été écartées."} /> : (
           <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
             <colgroup><col style={{ width: 6 }} /><col style={{ width: 40 }} /><col />{bureau && <col style={{ width: 150 }} />}{bureau && <col style={{ width: 140 }} />}<col style={{ width: bureau ? 90 : 68 }} /></colgroup>
             <thead><tr>
-              <th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={TH}>Produit</th>{bureau && <th style={TH}>Catégorie</th>}{bureau && <th style={TH}>Fournisseur</th>}<th style={{ ...TH, textAlign: "right" }}>Proximité</th>
+              <th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={TH}>Produit</th>{bureau && <th style={TH}>Catégorie</th>}{bureau && <th style={TH}>Fournisseur</th>}<th style={{ ...TH, textAlign: "right", ...(bureau ? {} : { paddingLeft: 0, paddingRight: 10 }) }}>{bureau ? "Proximité" : "Proche"}</th>
             </tr></thead>
             <tbody>
               {paires.map((p) => {
@@ -142,10 +165,15 @@ export function Doublons() {
                       <td style={{ ...liseret("transparent"), borderBottom: `1px solid ${BORD}` }} />
                       <td colSpan={bureau ? 5 : 3} style={{ ...TD, borderBottom: `1px solid ${BORD}`, padding: "8px 14px 12px", background: "#faf7f1" }}>
                         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-                          <button type="button" onClick={() => ignorer(p)} disabled={busy === p.pairKey} style={{ ...BTN, color: MUTED }}>Ce ne sont pas des doublons</button>
-                          <button type="button" onClick={() => void fusionner(p)} disabled={busy !== null || tout !== null} style={{ ...BTN, background: BON, borderColor: BON, color: "#fff", fontWeight: 700, opacity: busy && busy !== p.pairKey ? 0.5 : 1 }}>
-                            {busy === p.pairKey ? "Fusion…" : "Fusionner dans le produit coché"}
-                          </button>
+                          {([["non", "Pas un doublon", MUTED], ["fusion", "Fusionner", BON]] as const).map(([c, libelle, couleur]) => {
+                            const actif = choix[p.pairKey] === c;
+                            return (
+                              <button key={c} type="button" aria-pressed={actif} onClick={() => choisir(p, c)} disabled={tout !== null}
+                                style={{ ...BTN, minHeight: 38, padding: "6px 14px", fontWeight: actif ? 700 : 600, color: actif ? "#fff" : couleur, background: actif ? (c === "fusion" ? BON : "#1a1a1a") : "#fff", borderColor: actif ? (c === "fusion" ? BON : "#1a1a1a") : BORD }}>
+                                {actif ? "✓ " : ""}{libelle}
+                              </button>
+                            );
+                          })}
                         </div>
                       </td>
                     </tr>
@@ -156,6 +184,19 @@ export function Doublons() {
           </table>
         )}
       </div>
+      {/* Barre de validation, collée en bas tant qu'il y a des choix */}
+      {(aFusionner.length > 0 || aEcarter.length > 0 || tout) && (
+        <div style={{ position: "sticky", bottom: bureau ? 12 : 8, zIndex: 20, background: "#fff", border: "1px solid #1a1a1a", borderRadius: 14, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", boxShadow: "0 6px 20px rgba(0,0,0,0.12)" }}>
+          <div style={{ fontSize: 13.5 }}>
+            <b>{aFusionner.length}</b> à fusionner · <b>{aEcarter.length}</b> à écarter
+            <div style={{ fontSize: 12, color: MUTED }}>{paires.length - paires.filter((p) => choix[p.pairKey]).length} paire{paires.length - paires.filter((p) => choix[p.pairKey]).length > 1 ? "s" : ""} sans choix : elles restent dans la liste</div>
+          </div>
+          <button type="button" onClick={() => void valider()} disabled={busy !== null || tout !== null}
+            style={{ ...BTN, background: BON, borderColor: BON, color: "#fff", fontWeight: 700, height: 44, padding: "0 20px", fontSize: 15, opacity: busy !== null || tout !== null ? 0.6 : 1 }}>
+            {tout ? `Fusion ${tout.fait} / ${tout.total}…` : "Valider mes choix"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
