@@ -310,7 +310,7 @@ export default function CongesPage() {
   // Initialisé sur l'établissement courant, modifiable en haut de page.
   const [filtreEtabId, setFiltreEtabId] = useState<string | null>(ctxEtab?.id ?? null);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setFiltreEtabId(ctxEtab?.id ?? null);
   }, [ctxEtab?.id]);
   const etab = isEquipier
@@ -419,7 +419,7 @@ export default function CongesPage() {
 
   useEffect(() => {
     if (!etab && isEquipier) return;
-    loadData(); // eslint-disable-line react-hooks/set-state-in-effect
+    loadData();  
   }, [etab, isEquipier, loadData]);
 
   /* ── Equipier: auto-select own employee ─────────────────────── */

@@ -1020,12 +1020,12 @@ function PizzaPricingInterne({
   const [paramsOpen, setParamsOpen] = useState(true);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     if (!coeffEditing) setCoeffLocal(sellCoeff != null ? String(sellCoeff) : "");
   }, [sellCoeff, coeffEditing]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     if (!ttcEditing) setTtcLocal(prixTTCPart != null ? prixTTCPart.toFixed(2) : "");
   }, [prixTTCPart, ttcEditing]);
 

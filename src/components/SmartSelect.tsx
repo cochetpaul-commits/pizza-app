@@ -30,7 +30,7 @@ export function useSmartSelectCache(cacheKey: string, loader: () => Promise<Smar
   useEffect(() => {
     const cached = optionsCache.get(cacheKey);
     if (cached && Date.now() - cached.ts < CACHE_TTL) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setOptions(cached.options);
       return;
     }

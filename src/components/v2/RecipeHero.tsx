@@ -453,7 +453,7 @@ function EditablePrice({ value, onChange }: { value: number | null; onChange: (v
   const [editing, setEditing] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     if (!editing) setLocal(value != null ? value.toFixed(2) : "");
   }, [value, editing]);
 
@@ -499,7 +499,7 @@ function EditableCoeff({ value, onChange }: { value: number | null; onChange: (v
   const [editing, setEditing] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     if (!editing) setLocal(value != null ? value.toFixed(2) : "");
   }, [value, editing]);
 

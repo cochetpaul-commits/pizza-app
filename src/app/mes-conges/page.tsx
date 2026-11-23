@@ -163,7 +163,7 @@ export default function MesCongesPage() {
     setLoading(false);
   }, []);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
   useEffect(() => { void load(); }, [load]);
 
   /* ── Calendrier ─────────────────────────────────────────────── */

@@ -1618,12 +1618,12 @@ function CuisinePricingInterne({
   const [paramsOpen, setParamsOpen] = useState(true);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     if (!coeffEditing) setCoeffLocal(sellCoeff != null ? String(sellCoeff) : "");
   }, [sellCoeff, coeffEditing]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     if (!ttcEditing) setTtcLocal(prixTTCUnit != null ? prixTTCUnit.toFixed(2) : "");
   }, [prixTTCUnit, ttcEditing]);
 

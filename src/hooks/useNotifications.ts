@@ -33,7 +33,7 @@ export function useNotifications() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { void fetch(); }, [fetch]); // eslint-disable-line react-hooks/set-state-in-effect
+  useEffect(() => { void fetch(); }, [fetch]);  
 
   // Realtime subscription
   useEffect(() => {

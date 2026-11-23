@@ -43,7 +43,7 @@ export default function InstallerPage() {
   useEffect(() => {
     const ua = navigator.userAgent;
     const ios = /iPhone|iPad|iPod/.test(ua) || (ua.includes("Mac") && "ontouchend" in document);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setPlatform(ios ? "ios" : /Android/.test(ua) ? "android" : "desktop");
     if (window.matchMedia("(display-mode: standalone)").matches) setDejaInstallee(true);
 

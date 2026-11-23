@@ -52,7 +52,7 @@ export default function LabellerPage() {
   const product = products.find((p) => p.id === productId);
   const baseDays = KINDS.find((k) => k.value === kind)?.shelfDaysBase;
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setShelfDays(baseDays ?? product?.shelf_life_days ?? 3);
   }, [baseDays, product?.shelf_life_days]);
 

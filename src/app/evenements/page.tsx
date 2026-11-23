@@ -233,7 +233,7 @@ export default function EventsPage() {
   // Congés (validés + en attente) chevauchant le mois affiché
   useEffect(() => {
     if (congesEtabId === "off") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setAbsencesCal([]);
       return;
     }

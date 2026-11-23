@@ -100,7 +100,7 @@ function AutoImportJournal() {
     setRows((data ?? []) as Row[]);
   }, []);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     void charger();
   }, [charger]);
 

@@ -52,7 +52,7 @@ export default function CategoriesPage() {
 
   // Load on mount
   const [loadKey, setLoadKey] = useState(0);
-  useEffect(() => { load(); }, [loadKey]); // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
+  useEffect(() => { load(); }, [loadKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const reload = () => setLoadKey(k => k + 1);
 
   const handleSave = async () => {

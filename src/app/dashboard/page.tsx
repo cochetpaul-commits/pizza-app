@@ -288,7 +288,7 @@ function GroupContent() {
     setLoading(false);
   }, [etablissements, range, prevRange, a1Range, fiscalStart, today]);
 
-  useEffect(() => { fetchData(); }, [fetchData]); // eslint-disable-line react-hooks/set-state-in-effect
+  useEffect(() => { fetchData(); }, [fetchData]);  
 
   // Derived totals
   const totalCa = Object.values(etabData).reduce((s, d) => s + d.ca, 0);

@@ -445,7 +445,7 @@ export function CroisiereSimulateur({ etabId, etabColor }: { etabId: string; eta
       salleMidi: 3, salleSoir: 5, cuisineMidi: 3, cuisineSoir: 4, hMidi: 5, hSoir: 6, coutHoraire: 18, covParServeur: 25,
       caCible: 0,
     };
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setSim(saved ? { ...base, ...saved } : base);
   }, [reel, charges, sim, simSaved, etabId, semaines]);
   const up = (patch: Partial<Sim>) => setSim(s => {
