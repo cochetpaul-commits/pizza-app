@@ -24,6 +24,24 @@ export function EmployeTabletteBouton({ compact }: { compact?: boolean }) {
     }, 2000);
     return () => { evts.forEach((e) => window.removeEventListener(e, toucher)); window.clearInterval(timer); };
   }, [actif, delai]);
+  // Écran allumé tant que le mode tablette est actif (23/11/2026) : sans cela l'iPad se met en veille selon son
+  // propre réglage (30 secondes au plus court). Le navigateur relâche le verrou quand l'onglet passe en arrière-plan :
+  // on le redemande au retour et au premier toucher.
+  const modeTablette = t.actif;
+  useEffect(() => {
+    if (!modeTablette) return;
+    type Verrou = { release: () => Promise<void>; released?: boolean };
+    let verrou: Verrou | null = null, fini = false;
+    const nav = navigator as Navigator & { wakeLock?: { request: (type: "screen") => Promise<Verrou> } };
+    const demander = () => {
+      if (fini || document.visibilityState !== "visible" || (verrou && !verrou.released)) return;
+      nav.wakeLock?.request("screen").then((v) => { if (fini) void v.release().catch(() => undefined); else verrou = v; }).catch(() => undefined);
+    };
+    demander();
+    document.addEventListener("visibilitychange", demander);
+    window.addEventListener("pointerdown", demander, { passive: true });
+    return () => { fini = true; document.removeEventListener("visibilitychange", demander); window.removeEventListener("pointerdown", demander); void verrou?.release().catch(() => undefined); };
+  }, [modeTablette]);
   if (!actif || !t.employe) return null;
   const e = t.employe;
   return (

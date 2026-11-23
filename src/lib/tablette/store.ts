@@ -10,22 +10,25 @@ import { useSyncExternalStore } from "react";
 export type EmployeTablette = { id: string; prenom: string; nom: string; equipe: string | null; depuis: number; /** jeton signé (API /api/tablette/identifier) : qui est devant l'écran */ jeton?: string };
 export type EtatTablette = { actif: boolean; delai: number; employe: EmployeTablette | null };
 export const DELAIS: { valeur: number; libelle: string }[] = [
-  { valeur: 30, libelle: "30 secondes" }, { valeur: 60, libelle: "1 minute" }, { valeur: 120, libelle: "2 minutes" }, { valeur: 300, libelle: "5 minutes" }, { valeur: 600, libelle: "10 minutes" }, { valeur: 0, libelle: "Jamais" },
+  { valeur: 300, libelle: "5 minutes" }, { valeur: 600, libelle: "10 minutes" }, { valeur: 1800, libelle: "30 minutes" }, { valeur: 0, libelle: "Jamais" },
 ];
+/** Délai le plus court (23/11/2026, retour de Paul : l'iPad repassait au code au bout de 30 secondes). Les anciens réglages plus courts sont relevés. */
+export const DELAI_MIN = 300;
 const CLE_ACTIF = "tablette:actif", CLE_DELAI = "tablette:delai", CLE_EMPLOYE = "tablette:employe";
 const abonnes = new Set<() => void>();
 let cache: EtatTablette | null = null;
-const VIDE: EtatTablette = { actif: false, delai: 60, employe: null };
+const VIDE: EtatTablette = { actif: false, delai: DELAI_MIN, employe: null };
 
 function lire(): EtatTablette {
   try {
     const actif = localStorage.getItem(CLE_ACTIF) === "1";
-    const delai = Number(localStorage.getItem(CLE_DELAI) ?? "60");
+    const brutDelai = Number(localStorage.getItem(CLE_DELAI) ?? String(DELAI_MIN));
+    const delai = Number.isFinite(brutDelai) ? (brutDelai > 0 && brutDelai < DELAI_MIN ? DELAI_MIN : brutDelai) : DELAI_MIN;
     const brut = sessionStorage.getItem(CLE_EMPLOYE);
     let employe = brut ? (JSON.parse(brut) as EmployeTablette) : null;
     // Le jeton vaut 16 h (05/11/2026) : au-delà, la tablette se reverrouille au lieu de signer au nom du compte tablette
     if (employe && Date.now() - (employe.depuis ?? 0) > 16 * 3600000) { sessionStorage.removeItem(CLE_EMPLOYE); employe = null; }
-    return { actif, delai: Number.isFinite(delai) ? delai : 60, employe };
+    return { actif, delai, employe };
   } catch { return VIDE; }
 }
 function snapshot(): EtatTablette {
