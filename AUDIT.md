@@ -56,6 +56,40 @@ Fait par Claude sur le commit `86a62a3` (dernier de main, déployé en productio
      `npm audit fix` (sans `--force`) plante ici (`Cannot read properties of
      null (reading 'edgesOut')`) et n'a donc pas pu être tenté même pour ces
      paquets-là.
+   - [x] *(23/11/2026, sur demande de Paul)* **Next.js 15.5.19 → 16.4.6** fait,
+     sur la branche `chore/next-16-upgrade` (pas sur `main` — toujours aucune
+     variable d'environnement disponible dans cette routine pour lancer un
+     `next build` complet jusqu'au bout). `react`/`react-dom`/`@types/react*` →
+     19.3.1, `eslint-config-next` → 16.4.6. Ce qui a été vérifié :
+     - `tsc --noEmit`, `eslint --max-warnings 0`, les 377 tests Vitest : verts.
+     - `next build` : compile et passe la vérification TypeScript ; échoue
+       ensuite exactement comme sur `main` (« supabaseUrl is required » à la
+       collecte des données de `/api/combo/sync-employee`, faute de variables
+       Supabase) — donc rien à imputer à la montée de version elle-même.
+     - **`favicon.ico` corrigé** : Turbopack (nouveau compilateur par défaut
+       en v16) refuse les PNG intégrés sans canal alpha ; régénéré à l'identique
+       (0 pixel de différence vérifié) avec un canal alpha ajouté.
+     - **`eslint.config.mjs`** : `eslint-config-next` 16 embarque une nouvelle
+       version d'`eslint-plugin-react-hooks` qui anticipe le React Compiler
+       (non activé ici) et signalait 62 endroits avec des patterns existants et
+       sans risque sous le runtime classique — désactivées avec une note
+       explicative (à réévaluer seulement si le React Compiler est activé un
+       jour). Même traitement pour `no-location-assign-relative-destination`
+       (10 cas, tous des rechargements complets volontaires après
+       connexion/déconnexion/suppression).
+     - `tsconfig.json` (`jsx: "react-jsx"`) et `next-env.d.ts` : changements
+       automatiques exigés par Next lui-même au premier build.
+     - `src/middleware.ts` **pas renommé** en `proxy.ts` : c'est un middleware
+       Edge (pas de `runtime` configuré), et le guide officiel dit que ce type
+       doit justement rester en `middleware.ts` — seul le renommage pour le
+       runtime Node est nécessaire, pas celui-ci (juste un avertissement de
+       dépréciation, pas bloquant).
+     - **Pas vérifié** (pas de Supabase/navigateur dans cette routine) : le
+       vrai build complet avec variables d'environnement, et le rendu visuel
+       de l'appli. **À faire par Paul avant de merger sur `main`** : ouvrir
+       cette branche en PR (ou la pousser sur `develop`) pour que le build
+       Vercel (qui a les vraies variables) la valide pour de vrai, puis
+       vérifier l'appli dans un navigateur avant de merger.
 
 ## Chantiers livrés depuis le 15/08 (pour mémoire)
 
