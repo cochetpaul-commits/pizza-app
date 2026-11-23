@@ -46,6 +46,16 @@ Fait par Claude sur le commit `86a62a3` (dernier de main, déployé en productio
 7. **Dépendances** : Next 15.5.19 (CLAUDE.md annonce Next 16 — le dépôt est en fait resté
    en 15 ; 16.3 disponible), supabase-js 2.94 → 2.117, @react-pdf 4.3 → 4.9, pdfjs 5 → 6.
    Rien d'urgent ; à faire branche par branche avec `build:check`.
+   - *(23/11/2026)* `npm audit` : 24 failles (1 critique, 14 hautes, 8 modérées,
+     1 basse). La critique et la quasi-totalité des « hautes » tiennent à cette
+     même version de Next (RCE/DoS corrigés en 16.x) — même chantier que
+     ci-dessus, même traitement : migration majeure à faire sur une branche
+     dédiée avec `next build` complet (env Supabase requis), pas lors de cette
+     routine hebdomadaire sans `.env`. Le reste (vitest, eslint, browserslist,
+     js-yaml…) est dans les devDependencies, sans exposition en production ;
+     `npm audit fix` (sans `--force`) plante ici (`Cannot read properties of
+     null (reading 'edgesOut')`) et n'a donc pas pu être tenté même pour ces
+     paquets-là.
 
 ## Chantiers livrés depuis le 15/08 (pour mémoire)
 
@@ -164,6 +174,18 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
      `catTrendChartRef` en haut de page (~150 lignes) est très imbriqué avec
      l'état de la page (filtres, données de tendance) — son extraction
      mérite une exécution dédiée avec plus de budget.
+   - [x] *(23/11/2026, constat)* Les deux points ci-dessus sont périmés :
+     `ventes/page.tsx` a depuis été entièrement refondu (commentaire en tête
+     de fichier : « 29/10/2026, remplace l'ancien rapport de vente »). Le
+     fichier ne fait plus que 13 lignes (un garde `RequireRole` autour de
+     `<Produits />`, dans `src/components/analyse/Produits.tsx`, 372 lignes).
+     Plus aucune trace de `catTrendChartRef`/`chart.js` dans `ventes/*` —
+     le point « Découverte (12/10/2026) » plus bas (code mort du graphique
+     jamais branché) est donc lui aussi résolu, par cette refonte et non par
+     une suppression ciblée. Recherche sur tout `src/app`+`src/components` :
+     plus un seul `chart.js/auto`/`recharts` statique hors des composants
+     dédiés déjà chargés en `next/dynamic` — le chantier graphiques est
+     intégralement terminé, rien de plus à faire sur ce point.
 2. **`v_latest_offers` téléchargée en entier** (toutes les offres de tous les
    fournisseurs) à chaque ouverture d'un formulaire de recette — 6 composants
    concernés. Filtrer par les ingrédients affichés, comme le fait déjà
@@ -229,11 +251,40 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
        logique plus complexe et critique (import factures/ventes en
        production) — gain réel mais plus modeste, remis à une prochaine
        exécution avec plus de budget pour vérifier chaque cas.
-4. **Dashboard / bello-mio / piccola-mia / tresorerie** paginent
+4. ~~**Dashboard / bello-mio / piccola-mia / tresorerie** paginent
    `ventes_lignes` par 1000 côté client pour faire de simples sommes →
-   déplacer l'agrégation côté serveur (comme `/api/ventes/stats`).
+   déplacer l'agrégation côté serveur (comme `/api/ventes/stats`).~~
+   - [x] *(23/11/2026, constat)* **Périmé, rien à faire.** Vérifié sur le code
+     actuel : `dashboard/page.tsx` est déjà passé par des RPC SQL
+     (`ventes_ca_tickets`, `ventes_par_jour_categorie`) — un commentaire du
+     fichier (l.137-141) documente que cette bascule a déjà été faite.
+     `bello-mio`/`piccola-mia` ne sont que des coquilles qui rendent
+     `AccueilEtablissement.tsx`, lui-même déjà entièrement sur RPC
+     (`accueil_ventes_jour`, `accueil_compteurs`, `ventes_par_produit`), aucune
+     des deux ne contient de pagination `ventes_lignes`. `/tresorerie`
+     n'existe plus du tout dans le dépôt (ni fichier ni historique git) — à
+     confirmer avec Paul/Pierre ce qui a pris sa place, cf. la question déjà
+     ouverte plus bas (`/finances` doublonnée par `/pilotage`/`/tresorerie` ?).
+     Recherche `.range(` + `ventes_lignes` sur tout `src/app` : plus aucun
+     résultat hors de `/api/ventes/stats/route.ts` (qui pagine déjà côté
+     serveur, avec cache). Rien à committer ici.
 5. Pages géantes à découper (commandes 2852 l., ventes 2667 l., catalogue
    2232 l.…) : extraire onglets/modales en `next/dynamic`.
+   - [x] *(23/11/2026, constat)* `ventes` est réglée (voir le point 1 ci-dessus,
+     page refondue à 13 lignes). Les autres pages visées ont grossi plutôt que
+     rétréci (`commandes/page.tsx` 2670 l., `CatalogueTab.tsx` 2393 l.,
+     `rh/employe/[id]/page.tsx` 2205 l., `rh/conges/page.tsx` 2169 l.) :
+     contrairement à `ventes`, aucune des quatre n'a de composant isolable à
+     gain réel — tout l'état vit dans **une seule fonction** par page/fichier
+     (`CommandesPage`, `CatalogueContent`, `CongesPage`…), sans frontière
+     modale/onglet propre. Seul usage de lib lourde trouvé hors composants déjà
+     lazy : `@hello-pangea/dnd` dans `CatalogueTab.tsx`, mais il enrobe
+     l'affichage principal de la page (toujours visible, pas un onglet
+     secondaire) — le passer en `next/dynamic({ ssr: false })` retarderait le
+     rendu initial au lieu de l'alléger, donc pas un gain. Rien d'extrait cette
+     fois : ce chantier demande une vraie refonte (sortir des bouts d'état
+     dans des sous-composants) testable uniquement dans un navigateur, pas une
+     extraction mécanique comme pour les graphiques.
 
 ### Décisions produit (à trancher par Paul/Pierre)
 - `/messagerie` (376 l. + hook) : aucune entrée de menu n'y mène. Feature à
@@ -262,22 +313,12 @@ Fait par Claude ; les éléments cochés sont **déjà corrigés et déployés**
   changeraient le rendu visuel (recadrage ou lettrboxing) par rapport à
   l'actuel « hauteur max, largeur libre », à vérifier dans un navigateur
   avant de toucher — pas fait cette fois, pas de navigateur disponible ici.
-- **Découverte (12/10/2026) — code mort probable dans `ventes/page.tsx`** :
-  tout le bloc « graphique tendance par catégorie » (états `catTrendData`,
-  `catTrendRange`, `catTrendFilterCat`, `catTrendFilterProd`, `prodTrendData`,
-  `trendCatProducts`, `catTrendChartRef`, les 2 `useEffect` qui vont chercher
-  `/api/ventes/marges/trend`, et le `useEffect` de ~175 lignes qui construit
-  et dessine le graphique Chart.js — lignes ~258-567) n'a **aucun** `<canvas
-  ref={catTrendChartRef}>` dans le JSX de la page : la condition
-  `if (!catTrendChartRef.current || ...) return;` est donc toujours vraie et
-  le graphique n'est jamais dessiné. Le code fait quand même 2 appels réseau
-  à chaque ouverture de `/ventes` pour rien. C'est probablement un chantier
-  commencé puis non branché à l'écran (le point n°1 de cette liste parlait
-  encore de ce graphique comme s'il était affiché — ce n'est pas le cas).
-  **Pas supprimé cette fois** : pourrait être un travail en cours de Paul/Pierre
-  pour une future UI, décision à trancher par eux. Si l'intention est
-  abandonnée, supprimer tout le bloc (states + 2 effects + le rendu de
-  graphique) fera gagner ~190 lignes et 2 requêtes réseau inutiles par visite.
+- [x] *(23/11/2026, constat)* **Découverte (12/10/2026) — code mort probable
+  dans `ventes/page.tsx`** : résolue par la refonte du 29/10/2026 (voir point 1
+  plus haut). La page a été entièrement remplacée par `<Produits />` ; le bloc
+  `catTrendChartRef` et les 2 appels à `/api/ventes/marges/trend` n'existent
+  plus. Pas d'action de notre part — disparu avec la refonte, pas par une
+  suppression ciblée.
 
 ## Règles pour la suite (leçons de cette nuit)
 
