@@ -1083,20 +1083,31 @@ function CommandesPage() {
   async function partagerWhatsapp() {
     const a = envoiAConfirmer?.apercu;
     if (!a || !pdfWhatsapp) return;
-    if (typeof navigator !== "undefined" && navigator.canShare?.({ files: [pdfWhatsapp] })) {
-      try {
-        await navigator.share({ files: [pdfWhatsapp], title: `${a.type === "precommande" ? "Précommande" : "Commande"} ${a.fournisseur}` });
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return; // partage annulé : rien n'est marqué
-        setEnvoiAConfirmer((x) => x && { ...x, erreur: "Partage impossible : utilise « Télécharger le PDF »." });
-        return;
+    const titre = `${a.type === "precommande" ? "Précommande" : "Commande"} ${a.fournisseur}`;
+    // Android (23/11/2026, téléphone de Gwendal) : le partage refusait le fichier et laissait l'écran sans issue.
+    // On essaie le fichier tel quel, puis avec un nom simple et sans titre (certains navigateurs Android refusent
+    // les accents et les espaces) ; si rien ne passe, on bascule sur l'envoi à la main au lieu d'une erreur.
+    const simple = new File([pdfWhatsapp], pdfWhatsapp.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9._-]+/g, "_") || "commande.pdf", { type: "application/pdf" });
+    const essais: ShareData[] = [{ files: [pdfWhatsapp], title: titre }, { files: [simple] }];
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      for (const donnees of essais) {
+        if (navigator.canShare && !navigator.canShare(donnees)) continue;
+        try {
+          await navigator.share(donnees);
+          await confirmerEnvoi("whatsapp");
+          return;
+        } catch (e) {
+          if (e instanceof DOMException && e.name === "AbortError") return; // partage annulé : rien n'est marqué
+          // NotAllowedError après un premier essai : le geste de l'utilisateur est consommé, inutile d'insister
+          if (e instanceof DOMException && e.name === "NotAllowedError" && donnees !== essais[0]) break;
+        }
       }
-      await confirmerEnvoi("whatsapp");
-      return;
     }
+    // Pas de partage de fichier (ordinateur, ou Android qui le refuse) : le PDF est téléchargé, WhatsApp s'ouvre
+    // sur le numéro s'il y en a un, et la personne confirme quand c'est envoyé.
     const url = URL.createObjectURL(pdfWhatsapp);
     const lien = document.createElement("a");
-    lien.href = url; lien.download = pdfWhatsapp.name; lien.click();
+    lien.href = url; lien.download = simple.name; document.body.appendChild(lien); lien.click(); lien.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     const numero = (a.whatsapp?.numero ?? "").replace(/\D/g, "");
     if (numero) window.open(`https://wa.me/${numero}`, "_blank");
@@ -2550,6 +2561,11 @@ function CommandesPage() {
               )}
               {erreur && (
                 <div style={{ fontSize: 14, background: "#fbeaea", color: "#8a2b2b", borderRadius: 8, padding: "10px 12px", marginBottom: 14 }}>{erreur}</div>
+              )}
+              {a && !erreur && a.canal === "whatsapp" && whatsappManuel && (
+                <div style={{ fontSize: 14, background: "#fbf0dc", color: "#7a5a2b", borderRadius: 8, padding: "10px 12px", marginBottom: 14, lineHeight: 1.4 }}>
+                  Le partage direct n&apos;est pas possible sur cet appareil : le PDF vient d&apos;être <strong>téléchargé</strong>. Ouvre WhatsApp, {a.whatsapp?.groupe ? <>le groupe <strong>« {a.whatsapp.groupe} »</strong></> : "la conversation du fournisseur"}, joins-y le fichier (trombone, Document), puis reviens ici confirmer.
+                </div>
               )}
               <div style={{ display: "flex", gap: 10 }}>
                 <button type="button" onClick={() => setEnvoiAConfirmer(null)} disabled={sendingEmail}
