@@ -54,6 +54,7 @@ import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from 
 import DuplicatePanel from "@/components/DuplicatePanel";
 import { similarity } from "@/lib/duplicateDetection";
 import { clePaire, useDoublonsEcartes } from "@/lib/doublonsEcartes";
+import { pointsAControler } from "@/lib/produits/aControler";
 import { useDoublons } from "@/lib/useDoublons";
 import { normaliserSousCategorie } from "@/lib/styleCategories";
 import { BottomSheet } from "@/components/layout/BottomSheet";
@@ -359,6 +360,28 @@ function IngredientsPageInner() {
   const selectionInactifs = [...selectedIds].some((id) => items.find((x) => x.id === id)?.is_active === false);
 
   const selectAllFiltered = () => setSelectedIds(new Set(filtered.map((x) => x.id)));
+  // À contrôler (24/11/2026) : les fiches sans point à corriger, cochées d'un coup puis validées d'un coup
+  const aUnPrixFiche = useCallback((x: Ingredient) => offerHasPrice(offersByIngredientId.get(x.id), { piece_volume_ml: x.piece_volume_ml }) || legacyHasPrice(x), [offersByIngredientId]);
+  const pretsAValider = useMemo(() => filtered.filter((x) => x.is_active !== false && ((x.status ?? "to_check") as IngredientStatus) !== "validated"
+    && pointsAControler(x, offersByIngredientId.get(x.id), aUnPrixFiche(x)).length === 0), [filtered, offersByIngredientId, aUnPrixFiche]);
+  const bulkValider = async () => {
+    const choisis = items.filter((x) => selectedIds.has(x.id) && ((x.status ?? "to_check") as IngredientStatus) !== "validated");
+    if (!choisis.length) { alert("Rien à valider dans la sélection : ces fiches sont déjà validées."); return; }
+    if (!userId) { alert("Utilisateur non connecté."); return; }
+    const avecPrix = choisis.filter(aUnPrixFiche), sansPrix = choisis.length - avecPrix.length;
+    const reste = avecPrix.filter((x) => pointsAControler(x, offersByIngredientId.get(x.id), true).length > 0).length;
+    if (!avecPrix.length) { alert("Aucune fiche de la sélection n'a de prix : ajoute un prix avant de valider."); return; }
+    if (!confirm(`Valider ${avecPrix.length} fiche${avecPrix.length > 1 ? "s" : ""} ?${reste ? `\n\nAttention : ${reste} ont encore un point signalé (catégorie, prix ou nom). Elles seront validées quand même.` : ""}${sansPrix ? `\n\n${sansPrix} sans prix ne seront pas validées.` : ""}`)) return;
+    setBulkActing(true);
+    const ids = avecPrix.map((x) => x.id);
+    for (let i = 0; i < ids.length; i += 100) {
+      const { error } = await supabase.from("ingredients").update({ status: "validated", validated_at: new Date().toISOString(), validated_by: userId, status_note: null }).in("id", ids.slice(i, i + 100));
+      if (error) { alert(error.message); setBulkActing(false); return; }
+    }
+    mutate();
+    clearSelection();
+    setBulkActing(false);
+  };
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showRecover, setShowRecover] = useState(false);
@@ -1407,6 +1430,8 @@ function IngredientsPageInner() {
                 onToggleSelect={toggleSelect}
                 onToutSelectionner={selectAllFiltered}
                 onToutDecocher={clearSelection}
+                nbPrets={pretsAValider.length}
+                onSelectionnerPrets={() => setSelectedIds(new Set(pretsAValider.map((x) => x.id)))}
                 editingId={editingId}
                 onOuvrir={userCanWrite ? startEdit : (x) => router.push(`/ingredients/${x.id}`)}
                 onOpenSupplier={openSupplierModal}
@@ -1712,6 +1737,17 @@ function IngredientsPageInner() {
           }}>
             Réactiver
           </button>}
+
+          {/* Valider (24/11/2026) : fiches à contrôler vérifiées d'un coup */}
+          {[...selectedIds].some((id) => ((items.find((x) => x.id === id)?.status ?? "to_check") as IngredientStatus) !== "validated") && (
+            <button onClick={() => void bulkValider()} disabled={bulkActing} title="Passe les fiches cochées en « validées » (celles qui ont un prix)" style={{
+              padding: "6px 14px", borderRadius: 8, border: "1px solid #4a6741",
+              background: "#4a6741", color: "#fff", fontSize: 12, fontWeight: 700,
+              cursor: "pointer", opacity: bulkActing ? 0.5 : 1,
+            }}>
+              Valider
+            </button>
+          )}
 
           {/* Désactiver (réversible, historique conservé) */}
           <button onClick={bulkDeactivate} disabled={bulkActing} title="Fiche inactive, offres fermées, historique conservé" style={{

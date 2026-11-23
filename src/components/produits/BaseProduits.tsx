@@ -1,5 +1,6 @@
 "use client";
 
+import { LIBELLE_POINT, pointsAControler } from "@/lib/produits/aControler";
 import React, { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { triParLibelle } from "@/lib/tri";
 import { CAT_COLORS, CAT_LABELS, type Category, type Ingredient, type IngredientStatus, type LatestOffer, type Supplier, type Tab } from "@/types/ingredients";
@@ -68,11 +69,17 @@ function dateCourte(iso: string | null | undefined): string | null {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
-/** Pastille d'état : seulement les exceptions (un produit en ordre n'en a pas ; 94 % des fiches sont validées) */
-function etatFiche(x: Ingredient, aUnPrix: boolean): { libelle: string; fond: string; couleur: string } | null {
+/** Pastille d'état : seulement les exceptions (un produit en ordre n'en a pas ; 94 % des fiches sont validées).
+ * Une fiche à contrôler dit ce qui cloche (24/11/2026) : catégorie, prix, nom de facture ; sinon « Prêt à valider ». */
+function etatFiche(x: Ingredient, aUnPrix: boolean, offer: LatestOffer | undefined): { libelle: string; fond: string; couleur: string } | null {
   if (x.is_active === false) return { libelle: "Désactivée", fond: "rgba(0,0,0,0.06)", couleur: "#999" };
   if (!aUnPrix) return { libelle: "Sans prix", fond: "rgba(180,68,58,0.12)", couleur: MAUVAIS };
-  if (((x.status ?? "to_check") as IngredientStatus) !== "validated") return { libelle: "À contrôler", fond: "rgba(183,121,31,0.12)", couleur: ATTENTION };
+  if (((x.status ?? "to_check") as IngredientStatus) !== "validated") {
+    const points = pointsAControler(x, offer, aUnPrix);
+    return points.length
+      ? { libelle: points.map((k) => LIBELLE_POINT[k]).join(" · "), fond: "rgba(183,121,31,0.12)", couleur: ATTENTION }
+      : { libelle: "Prêt à valider", fond: "rgba(74,103,65,0.12)", couleur: BON };
+  }
   return null;
 }
 
@@ -129,7 +136,7 @@ function affichageProduit(x: Ingredient, offer: LatestOffer | undefined) {
     prix: aUnPrix ? formatIngredientPrice(x, offer ?? null) : "—",
     colisage: article ? libelleColisage(article) : null,
     maj: dateCourte(offer?.updated_at),
-    etat: etatFiche(x, aUnPrix),
+    etat: etatFiche(x, aUnPrix, offer),
   };
 }
 
@@ -301,6 +308,9 @@ export type BaseProduitsProps = {
   onAjouter: () => void;
   onImportExport: () => void;
   onRecuperer: () => void;
+  /** Onglet « à contrôler » : coche d'un coup les fiches sans point à corriger */
+  nbPrets?: number;
+  onSelectionnerPrets?: () => void;
 };
 
 export function BaseProduits(p: BaseProduitsProps) {
@@ -354,6 +364,12 @@ export function BaseProduits(p: BaseProduitsProps) {
       title="Coche toutes les fiches affichées (filtres et recherche compris) pour une action groupée"
       style={{ ...BTN, height: 32, padding: "0 10px", fontSize: 12, color: "#D4775A", borderColor: "#D4775A", background: "transparent" }}>
       {toutCoche ? "Tout décocher" : `Tout sélectionner (${tries.length})`}
+    </button>
+  );
+  const boutonPrets = p.peutEcrire && p.tab === "to_check" && !!p.nbPrets && p.onSelectionnerPrets && (
+    <button type="button" onClick={p.onSelectionnerPrets} title="Coche les fiches classées, avec un prix plausible et un nom propre : il ne reste qu'à les valider"
+      style={{ ...BTN, height: 32, padding: "0 10px", fontSize: 12, color: "#fff", borderColor: BON, background: BON, fontWeight: 700 }}>
+      Sélectionner les prêts ({p.nbPrets})
     </button>
   );
   const champRecherche = (
@@ -515,7 +531,7 @@ export function BaseProduits(p: BaseProduitsProps) {
             <span>{p.loading ? "Chargement…" : compteur}</span>
             {bascule}
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>{caseInactives}{boutonTout}</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>{caseInactives}{boutonPrets}{boutonTout}</div>
         </div>
 
         {p.erreur && (
@@ -620,7 +636,7 @@ export function BaseProduits(p: BaseProduitsProps) {
         <label style={FILTRE}>Zone :{selectZone(SELECT)}</label>
         {caseInactives}
         <span style={{ marginLeft: "auto", color: MUTED, fontSize: 12.5, whiteSpace: "nowrap" }}>{compteur}</span>
-        {boutonTout}
+        {boutonPrets}{boutonTout}
         {bascule}
       </div>
 
