@@ -53,6 +53,7 @@ import { cachedSupplierColor, loadSupplierColors } from "@/lib/supplierColors";
 import { updateDerivedIngredients, computeDerivedPrice, computeRendement } from "@/lib/rendement";
 import DuplicatePanel from "@/components/DuplicatePanel";
 import { similarity } from "@/lib/duplicateDetection";
+import { clePaire, useDoublonsEcartes } from "@/lib/doublonsEcartes";
 import { useDoublons } from "@/lib/useDoublons";
 import { normaliserSousCategorie } from "@/lib/styleCategories";
 import { BottomSheet } from "@/components/layout/BottomSheet";
@@ -375,10 +376,8 @@ function IngredientsPageInner() {
   const [rcPoidsNet, setRcPoidsNet] = useState<number | "">(625);
   const [rcDeriveName, setRcDeriveName] = useState("");
   const [rcSaving, setRcSaving] = useState(false);
-  const [ignoreKeys, setIgnoreKeys] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("ingredient-duplicate-ignores") ?? "[]")); }
-    catch { return new Set(); }
-  });
+  // Paires « pas un doublon » partagées entre appareils (24/11/2026)
+  const { ignores: ignoreKeys, ecarter: ecarterDoublons } = useDoublonsEcartes();
 
   // Même source que la page Doublons (29/10) : toutes les fiches actives, pas seulement celles chargées ici
   const { paires: duplicatePairs } = useDoublons(ignoreKeys);
@@ -1101,14 +1100,14 @@ function IngredientsPageInner() {
     if (!current || current.status === "validated") return null;
     let best: { id: string; name: string; score: number } | null = null;
     for (const other of items) {
-      if (other.id === editingId) continue;
+      if (other.id === editingId || ignoreKeys.has(clePaire(editingId, other.id))) continue;
       const score = similarity(current.name, other.name);
       if (score >= 0.75 && (!best || score > best.score)) {
         best = { id: other.id, name: other.name, score };
       }
     }
     return best;
-  }, [editingId, items]);
+  }, [editingId, items, ignoreKeys]);
 
   const handleMergeDuplicate = useCallback(async (keepId: string, deleteId: string) => {
     const keepName = items.find(i => i.id === keepId)?.name ?? "";
@@ -1250,15 +1249,7 @@ function IngredientsPageInner() {
       onToggleEstablishment: userCanWrite ? toggleEstablishment : undefined,
       duplicateMatch: enEdition ? editingDuplicateMatch : null,
       onMergeDuplicate: userCanWrite ? handleMergeDuplicate : undefined,
-      onIgnoreDuplicate: (id1, id2) => {
-        const key = [id1, id2].sort().join(":");
-        setIgnoreKeys(prev => {
-          const next = new Set(prev);
-          next.add(key);
-          localStorage.setItem("ingredient-duplicate-ignores", JSON.stringify([...next]));
-          return next;
-        });
-      },
+      onIgnoreDuplicate: (id1, id2) => { void ecarterDoublons([clePaire(id1, id2)]); },
       subCategorySuggestions: sousCategoriesParCategorie[(enEdition && edit ? edit.category : x.category)] ?? [],
     };
   };
@@ -1489,12 +1480,7 @@ function IngredientsPageInner() {
           suppliers={suppliers}
           onClose={() => setShowDuplicates(false)}
           onMerged={() => { setShowDuplicates(false); mutate(); }}
-          onIgnore={(key) => {
-            const next = new Set(ignoreKeys);
-            next.add(key);
-            setIgnoreKeys(next);
-            localStorage.setItem("ingredient-duplicate-ignores", JSON.stringify([...next]));
-          }}
+          onIgnore={(key) => { void ecarterDoublons([key]); }}
         />
       )}
 

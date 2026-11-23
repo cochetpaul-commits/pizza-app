@@ -1,11 +1,12 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchApi } from "@/lib/fetchApi";
 import { useBureau } from "@/hooks/useBureau";
 import type { DuplicatePair } from "@/lib/duplicateDetection";
 import { useDoublons } from "@/lib/useDoublons";
+import { useDoublonsEcartes } from "@/lib/doublonsEcartes";
 import { CAT_COLORS, CAT_LABELS, type Category, type Ingredient } from "@/types/ingredients";
 import { couleurTexte } from "@/lib/styleCategories";
 import { EtatVide } from "@/components/ui/EtatVide";
@@ -22,12 +23,11 @@ import { BON, BORD, BTN, CADRE, CHAMP, FAIBLE, MAUVAIS, MUTED, TD, TH, alpha, h1
  * produits seulement voisins (gants taille L et taille M).
  */
 type Choix = "fusion" | "non";
-const CLE_IGNORES = "ingredient-duplicate-ignores";
-const lireIgnores = (): Set<string> => { try { return new Set(JSON.parse(localStorage.getItem(CLE_IGNORES) ?? "[]") as string[]); } catch { return new Set(); } };
 
 export function Doublons() {
   const bureau = useBureau();
-  const [ignores, setIgnores] = useState<Set<string>>(new Set());
+  // Paires écartées : partagées entre appareils depuis le 24/11/2026 (table doublons_ecartes)
+  const { ignores, pret: ignoresPrets, erreur: erreurEcartes, ecarter } = useDoublonsEcartes();
   const [q, setQ] = useState("");
   const [garde, setGarde] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -37,7 +37,6 @@ export function Doublons() {
   const [tout, setTout] = useState<{ fait: number; total: number } | null>(null);
   const [choix, setChoix] = useState<Record<string, Choix>>({});
   const [version, setVersion] = useState(0);
-  useEffect(() => { setIgnores(lireIgnores()); }, [version]);
   const etat = useDoublons(ignores, version);
 
   const paires = useMemo(() => {
@@ -78,10 +77,9 @@ export function Doublons() {
       ecartees.length ? `Écarter ${ecartees.length} paire${ecartees.length > 1 ? "s" : ""} qui ne sont pas des doublons` : null,
     ].filter(Boolean);
     if (!confirm(`${phrases.join("\n\n")}\n\nValider ?`)) return;
-    if (ecartees.length) {
-      const n = new Set(ignores); for (const p of ecartees) n.add(p.pairKey);
-      try { localStorage.setItem(CLE_IGNORES, JSON.stringify([...n])); } catch { /* navigation privée */ }
-      setIgnores(n);
+    if (ecartees.length && !(await ecarter(ecartees.map((p) => p.pairKey)))) {
+      alert("Les paires « pas un doublon » n'ont pas pu être enregistrées (réseau ?). Rien n'a été fusionné : réessaie.");
+      return;
     }
     if (fusions.length) {
       setTout({ fait: 0, total: fusions.length });
@@ -127,9 +125,9 @@ export function Doublons() {
           <button type="button" onClick={() => choisirTout(null)} style={{ ...BTN, fontSize: 12.5, color: MUTED }}>Effacer les choix</button>
         </div>
       )}
-      {etat.erreur && <div style={{ color: MAUVAIS, fontSize: 13 }}>{etat.erreur}</div>}
+      {(etat.erreur || erreurEcartes) && <div style={{ color: MAUVAIS, fontSize: 13 }}>{etat.erreur ?? `Paires écartées : ${erreurEcartes}`}</div>}
       <div style={CADRE}>
-        {etat.chargement ? <Chargement texte="Comparaison des noms…" /> : paires.length === 0 ? <EtatVide icone="produit" titre="Aucun doublon probable" texte={q ? "Rien ne correspond à ce filtre." : "Tous les noms de produits sont distincts, ou les paires ont été écartées."} /> : (
+        {etat.chargement || !ignoresPrets ? <Chargement texte="Comparaison des noms…" /> : paires.length === 0 ? <EtatVide icone="produit" titre="Aucun doublon probable" texte={q ? "Rien ne correspond à ce filtre." : "Tous les noms de produits sont distincts, ou les paires ont été écartées."} /> : (
           <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
             <colgroup><col style={{ width: 6 }} /><col style={{ width: 40 }} /><col />{bureau && <col style={{ width: 150 }} />}{bureau && <col style={{ width: 140 }} />}<col style={{ width: bureau ? 90 : 68 }} /></colgroup>
             <thead><tr>
