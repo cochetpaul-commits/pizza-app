@@ -52,6 +52,7 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/mercuriale":      "achats.view",
   // Pilotage
   "/analyse":         "performances.view",
+  "/analyse/depenses": "performances.pilotage",
   "/analyse/marge":   "performances.pilotage",
   "/analyse/masse-salariale": "performances.pilotage",
   "/analyse/ca-personne": "performances.pilotage",

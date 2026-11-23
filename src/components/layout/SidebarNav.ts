@@ -50,6 +50,8 @@ export const RENTABILITE_ITEMS: NavItemV2[] = [
 export const ACHATS_ITEMS: NavItemV2[] = [
   { label: "Suivi des achats", href: "/achats", icon: "fileText", permission: "achats.view" },
   { label: "Variations de prix", href: "/variations-prix", icon: "trendingUp", permission: "achats.view" },
+  // 24/11/2026 : toutes les catégories Pennylane (énergie, loyer, URSSAF…), pas seulement les fournisseurs
+  { label: "Toutes les dépenses", href: "/analyse/depenses", icon: "wallet", permission: "performances.pilotage" },
 ];
 export const EQUIPE_COUT_ITEMS: NavItemV2[] = [
   { label: "Masse salariale", href: "/analyse/masse-salariale", icon: "wallet", permission: "performances.pilotage" },
