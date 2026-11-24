@@ -1,5 +1,6 @@
 "use client";
 
+import { openApiFile } from "@/lib/fetchApi";
 import { useSignature } from "@/components/v2/RecipeHero";
 import { useVoirMontants } from "@/lib/useVoirMontants";
 import { ProduireFiche } from "@/components/fiche/ProduireFiche";
@@ -168,6 +169,8 @@ function VoletLecture({ fiche, groupe, peutEcrire, onFermer, onEditer }: { fiche
   const pied = (
     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
       <button type="button" onClick={onFermer} style={BTN}>Fermer</button>
+      {/* La fiche technique en PDF (24/11/2026) : le bouton n'existait que sur les touches de caisse et dans l'éditeur */}
+      <button type="button" onClick={() => openApiFile(`/api/recettes/pdf?id=${fiche.id}`)} style={BTN}>Imprimer</button>
       {fiche.lignes.length > 0 && <button type="button" onClick={() => setProduire(true)} style={{ ...BTN, background: "#D4775A", color: "#fff", border: "none", fontWeight: 700 }}>Produire</button>}
       {peutEcrire && <button type="button" onClick={() => onEditer({ recipeId: fiche.id })} style={{ ...BTN, background: "#1a1a1a", color: "#f2ede4", border: "none", fontWeight: 700 }}>Modifier la fiche</button>}
     </div>

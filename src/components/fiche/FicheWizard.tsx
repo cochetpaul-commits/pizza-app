@@ -339,7 +339,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
             empatement: (rec.empatement as string) ?? "FOCACCIA",
             lignes: ficheLines,
             pivot_ingredient_id: (rec.pivot_ingredient_id as string) ?? null,
-            etapes: (() => { try { return typeof rec.procedure === "string" ? JSON.parse(rec.procedure as string) : ((rec.procedure as string[]) ?? []); } catch { return []; } })(),
+            // Texte simple accepté (24/11/2026) : avant, il donnait une liste vide, effacée à l'enregistrement
+            etapes: (() => { try { return typeof rec.procedure === "string" ? JSON.parse(rec.procedure as string) : ((rec.procedure as string[]) ?? []); } catch { return String(rec.procedure ?? "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean); } })(),
             notes: (rec.notes as string) ?? "",
             portions: (rec.portions_count as number) ?? 1,
             coeff: rec.sell_price && rec.cost_per_portion ? Number(rec.sell_price) / Number(rec.cost_per_portion) : 3,

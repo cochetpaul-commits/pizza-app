@@ -47,12 +47,16 @@ export async function GET(req: NextRequest) {
 
   const ingMap = new Map((ingredients ?? []).map(i => [i.id, i]));
 
-  // Parse steps from notes (JSON array or null)
-  let steps: string[] = [];
-  try {
-    const parsed = JSON.parse(recipe.notes ?? "null");
-    if (Array.isArray(parsed)) steps = parsed;
-  } catch { /* notes is plain text */ }
+  // Étapes : la fiche les range dans « procedure » (éditeur actuel) ; les anciennes fiches dans « notes » (24/11/2026 :
+  // le PDF ne lisait que « notes », les étapes des fiches récentes n'étaient pas imprimées)
+  const lireEtapes = (v: unknown): string[] => {
+    if (v == null) return [];
+    try { const p = typeof v === "string" ? JSON.parse(v) : v; if (Array.isArray(p)) return p.map(String).filter((x) => x.trim()); } catch { /* texte simple */ }
+    // Texte simple, une étape par ligne (fiches saisies ou importées hors éditeur, ex. Caponata)
+    return typeof v === "string" ? v.split(/\r?\n/).map((x) => x.trim()).filter(Boolean) : [];
+  };
+  let steps: string[] = lireEtapes(recipe.procedure);
+  if (!steps.length) steps = lireEtapes(recipe.notes);
 
   // Fetch dough recipe if applicable
   let doughName: string | null = null;

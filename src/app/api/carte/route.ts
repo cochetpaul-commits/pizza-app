@@ -267,7 +267,8 @@ export async function GET(req: NextRequest) {
     }),
     total_cost: f.total_cost != null ? arrondi(Number(f.total_cost)) : null,
     pivot_ingredient_id: (f.pivot_ingredient_id as string | null) ?? null,
-    etapes: (() => { try { const p = typeof f.procedure === "string" ? JSON.parse(f.procedure) : f.procedure; return Array.isArray(p) ? p.map(String) : []; } catch { return []; } })(),
+    // Étapes en JSON (éditeur) ou en texte simple, une par ligne (24/11/2026)
+    etapes: (() => { try { const p = typeof f.procedure === "string" ? JSON.parse(f.procedure) : f.procedure; if (Array.isArray(p)) return p.map(String); } catch { /* texte simple */ } return typeof f.procedure === "string" ? f.procedure.split(/\r?\n/).map((x: string) => x.trim()).filter(Boolean) : []; })(),
     paton_g: f.ball_weight_g != null ? Number(f.ball_weight_g) : null,
   });
 

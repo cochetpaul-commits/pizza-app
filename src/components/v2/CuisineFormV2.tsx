@@ -428,7 +428,7 @@ export default function CuisineFormV2({ recipeId, initialProdMode, initialCatego
             else setPricingMode("portion");
           }
           if (r.procedure) {
-            try { setSteps(JSON.parse(String(r.procedure)) as string[]); } catch { setSteps([]); }
+            try { setSteps(JSON.parse(String(r.procedure)) as string[]); } catch { setSteps(String(r.procedure).split(/\r?\n/).map((x) => x.trim()).filter(Boolean)); }
           }
           setPivotIngredientId(String(r.pivot_ingredient_id ?? "") || null);
         }
