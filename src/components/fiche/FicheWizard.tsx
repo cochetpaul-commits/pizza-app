@@ -766,6 +766,15 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const units = ["g", "kg", "cl", "ml", "L", "pcs"];
   const currentUrl = (() => { if (typeof window === "undefined") return ""; const u = new URL(window.location.href); u.searchParams.set("draft", draftIdRef.current); return u.pathname + u.search; })();
   const poidsCru = fiche.lignes.reduce((acc: number, l: LigneIngredient) => acc + ligneWeightG(l), 0) + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
+  // Prix au kilo (24/11/2026, brief de Paul) : coût brut (poids des ingrédients) et coût cuit (poids après cuisson,
+  // s'il est saisi). Le poids de référence est le même partout (bloc, Traiteur, enregistrement) : cuit sinon brut.
+  const poidsCuit = fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? fiche.cooked_weight_g : null;
+  const coutKgBrut = poidsCru > 0 && totalCost > 0 ? (totalCost / poidsCru) * 1000 : null;
+  const coutKgCuit = poidsCuit && totalCost > 0 ? (totalCost / poidsCuit) * 1000 : null;
+  const coutKgRef = coutKgCuit ?? coutKgBrut;
+  // Coefficient affiché « Sur place » : prix TTC ÷ coût, la même règle que le prix à la portion (prixTTC = coût × coeff)
+  const coeffAffiche = costPerPortion > 0 && ttc > 0 ? ttc / costPerPortion : fiche.coeff;
+  const kg = (g: number) => `${(g / 1000).toFixed(2).replace(".", ",")} kg`;
 
   return (
     <div style={enVolet ? undefined : { maxWidth: 760, margin: "0 auto", padding: "16px 16px 40px" }}>
@@ -969,23 +978,43 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
               {[2.5, 3, 3.5, 4].map(c => <button key={c} type="button" onClick={() => update({ coeff: c, prix_ttc_manuel: null })} style={{ ...PETIT, height: 30, fontSize: 12.5, padding: "0 10px" }}>×{String(c).replace(".", ",")}</button>)}
             </div>
 
-            {/* Traiteur : prix au kilo, poids après cuisson */}
+            {/* Prix au kilo : brut et après cuisson, côte à côte */}
+            {poidsCru > 0 && (
+              <div style={{ background: "#f7f3ec", borderRadius: 12, padding: "12px 14px", display: "grid", gap: 10 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 18px" }}>
+                  <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Poids brut</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, lineHeight: 1.1 }}>{kg(poidsCru)}</div></div>
+                  <label style={{ display: "grid", gap: 2 }}>
+                    <span style={{ fontSize: 12, color: "#6f6a61" }}>Poids après cuisson <span style={AIDE}>{poidsCuit ? `· rendement ${Math.round((poidsCuit / poidsCru) * 100)} %` : "· facultatif"}</span></span>
+                    <input type="number" step={10} min={0} value={fiche.cooked_weight_g ?? ""} placeholder="en grammes" onChange={e => update({ cooked_weight_g: e.target.value ? Number(e.target.value) : null })} style={{ ...INPUT, height: 38, width: 150 }} />
+                  </label>
+                </div>
+                {coutKgBrut != null && (
+                  <div style={{ display: "grid", gridTemplateColumns: coutKgCuit != null ? "1fr 1fr" : "1fr", gap: 10 }}>
+                    {[["brut", coutKgBrut] as const, ...(coutKgCuit != null ? [["cuit", coutKgCuit] as const] : [])].map(([qui, cout]) => (
+                      <div key={qui} style={{ background: "#fff", borderRadius: 10, padding: "8px 12px", boxShadow: qui === "cuit" ? "inset 4px 0 0 #4a6741" : undefined }}>
+                        <div style={{ fontSize: 12, color: "#6f6a61" }}>Coût {qui}</div>
+                        <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, lineHeight: 1.15 }}>{eur(cout)} / kg</div>
+                        <div style={{ fontSize: 12.5, color: "#6f6a61" }}>Conseillé {qui} : <b style={{ color: "#1a1a1a" }}>{eur(cout * coeffAffiche)} / kg TTC</b></div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={NOTE}>Conseillé = coût au kilo × le coefficient affiché pour « sur place » (×{coeffAffiche.toFixed(1).replace(".", ",")}), la même règle que le prix à la portion. Une préparation vendue au poids se calcule sur le poids cuit.</div>
+              </div>
+            )}
+
+            {/* Traiteur : prix de vente au kilo (le poids après cuisson est saisi dans le bloc ci-dessus) */}
             <details style={{ border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
-              <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Traiteur : prix au kilo et poids après cuisson</summary>
+              <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Traiteur : prix de vente au kilo</summary>
               {(() => {
-                const wRef = fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? fiche.cooked_weight_g : poidsCru;
-                const coutKg = wRef > 0 && totalCost > 0 ? (totalCost / wRef) * 1000 : null;
+                const coutKg = coutKgRef; // même poids de référence que le bloc « prix au kilo » et l'enregistrement
                 const ttcKg = fiche.sell_price_per_kg;
                 const coeffKg = coutKg != null && ttcKg != null && ttcKg > 0 ? ttcKg / coutKg : null;
                 const htKg = ttcKg != null ? ttcKg / (1 + fiche.tva / 100) : null;
                 const conseilleKg = coutKg != null ? prixConseille(coutKg, fam.objectif_fc, fiche.tva) : 0;
                 return (
                   <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                      <div>
-                        <label style={LBL}>Poids après cuisson <span style={AIDE}>· cru {poidsCru >= 1000 ? `${(poidsCru / 1000).toFixed(2)} kg` : `${Math.round(poidsCru)} g`}</span></label>
-                        <input type="number" step={10} min={0} value={fiche.cooked_weight_g ?? ""} placeholder="g" onChange={e => update({ cooked_weight_g: e.target.value ? Number(e.target.value) : null })} style={INPUT} />
-                      </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, maxWidth: 320 }}>
                       <div>
                         <label style={LBL}>Prix TTC au kilo <span style={AIDE}>{coeffKg != null ? `· coeff. ×${coeffKg.toFixed(2)}` : ""}</span></label>
                         <input type="number" step="0.5" min={0} value={ttcKg ?? ""} placeholder={conseilleKg > 0 ? conseilleKg.toFixed(2) : ""} onChange={e => update({ sell_price_per_kg: e.target.value ? Number(e.target.value) : null })} style={INPUT} />
@@ -1031,7 +1060,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
             <span>Coût matière{isPizza && patonCost > 0 ? <span style={NOTE}> · dont pâton {eur(patonCost)}</span> : null}</span>
             <span><b style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20 }}>{eur(totalCost)}</b>{canSeeMoney && ht > 0 && <span style={{ color: fcCouleur, fontWeight: 700 }}> &nbsp;{fc.toFixed(1).replace(".", ",")} %</span>}</span>
           </div>
-          {poidsCru > 0 && <div style={NOTE}>Poids cru {poidsCru >= 1000 ? `${(poidsCru / 1000).toFixed(2)} kg` : `${Math.round(poidsCru)} g`}{fiche.portions > 1 ? ` · ${Math.round(poidsCru / fiche.portions)} g la ${fam.portions_label}` : ""}{totalCost > 0 ? ` · ${(totalCost / poidsCru * 1000).toFixed(2).replace(".", ",")} € le kilo` : ""}. Prix d&apos;achat du jour.</div>}
+          {poidsCru > 0 && <div style={NOTE}>Poids cru {poidsCru >= 1000 ? `${(poidsCru / 1000).toFixed(2)} kg` : `${Math.round(poidsCru)} g`}{fiche.portions > 1 ? ` · ${Math.round(poidsCru / fiche.portions)} g la ${fam.portions_label}` : ""}{coutKgBrut != null ? ` · coût brut ${eur(coutKgBrut)} / kg` : ""}{coutKgCuit != null ? ` · coût cuit ${eur(coutKgCuit)} / kg` : ""}. Prix d&apos;achat du jour.</div>}
         </div>
 
         {/* PRÉPARATION */}
