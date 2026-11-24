@@ -10,6 +10,7 @@ import { POLE_COLORS } from "@/lib/poleColors";
 import { parseAllergens, mergeAllergens } from "@/lib/allergens";
 import { getEtablissement, EtabError } from "@/lib/getEtablissement";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { montantsAutorises } from "@/lib/montantsServeur";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -262,6 +263,8 @@ export async function POST(req: Request) {
       photoUrl,
       accentColor: POLE_COLORS.cuisine,
       allergens: mergeAllergens(ingAllergens),
+      // Coûts et marges réservés aux responsables (24/11/2026)
+      montants: await montantsAutorises(req),
     };
 
     const documentElement = KitchenPdfDocument({ data }) as unknown as React.ReactElement<DocumentProps>;

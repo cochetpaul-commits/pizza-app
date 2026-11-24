@@ -31,6 +31,8 @@ export type KitchenPdfData = {
   accentColor?: string;
   allergens?: string[];
   establishment?: string | null;
+  /** false : coûts, prix et marges masqués (employés, tablette) ; absent = affichés */
+  montants?: boolean;
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -53,6 +55,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   sauce: "Sauce",
   dessert: "Dessert",
   autre: "Autre",
+  pizza: "Pizza",
+  antipasti: "Antipasti",
 };
 
 const ALLERGEN_COLORS: Record<string, string> = {
@@ -478,7 +482,7 @@ export function KitchenPdfDocument({ data }: { data: KitchenPdfData }) {
         </View>
 
         {/* KPI BANNER — masqué pour les préparations/sauces (fiche prod) */}
-        {data.category !== "preparation" && data.category !== "sauce" && (
+        {data.montants !== false && data.category !== "preparation" && data.category !== "sauce" && (
           <View style={styles.kpiBanner}>
             <View style={styles.kpiBox}>
               <Text style={styles.kpiLabel}>Cout revient</Text>
@@ -539,7 +543,7 @@ export function KitchenPdfDocument({ data }: { data: KitchenPdfData }) {
             </View>
           );
         })}
-        {data.category !== "preparation" && data.category !== "sauce" && (
+        {data.montants !== false && data.category !== "preparation" && data.category !== "sauce" && (
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>TOTAL COUT MATIERE</Text>
             <Text style={styles.totalValue}>{fmtMoney(data.totalCost)}</Text>
