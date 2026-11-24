@@ -104,7 +104,7 @@ export function GlobalSearch() {
     const out: Resultat[] = [];
     for (const e of ecrans) if (norm(e.label).includes(nq)) out.push({ type: "ecran", id: e.href, titre: e.label, href: e.href });
     for (const r of (data ?? []) as { type: string; id: string; titre: string; sous: string | null; extra: string | null }[]) {
-      if (r.type === "produit") out.push({ type: "produit", id: r.id, titre: r.titre, sous: r.sous, href: `/ingredients/${r.id}` });
+      if (r.type === "produit") out.push({ type: "produit", id: r.id, titre: r.titre, sous: r.sous, href: `/ingredients?edit=${r.id}` }); // la fiche dans la Base produits (24/11/2026)
       else if (r.type === "fiche") out.push({ type: "fiche", id: r.id, titre: r.titre, sous: r.sous, href: r.extra === "cocktail" ? `/recettes/cocktail/${r.id}` : `/fiche/${r.id}` });
       else if (r.type === "pizza") out.push({ type: "fiche", id: `pizza-${r.id}`, titre: r.titre, sous: "Pizza", href: `/recettes/pizza/${r.id}` });
       else if (r.type === "fournisseur") out.push({ type: "fournisseur", id: r.id, titre: r.titre, href: `/fournisseurs/${r.id}` });

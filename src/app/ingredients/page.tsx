@@ -1433,7 +1433,7 @@ function IngredientsPageInner() {
                 nbPrets={pretsAValider.length}
                 onSelectionnerPrets={() => setSelectedIds(new Set(pretsAValider.map((x) => x.id)))}
                 editingId={editingId}
-                onOuvrir={userCanWrite ? startEdit : (x) => router.push(`/ingredients/${x.id}`)}
+                onOuvrir={startEdit}
                 onOpenSupplier={openSupplierModal}
                 onAjouter={() => setShowCreateForm(true)}
                 onImportExport={() => setShowImportExport(true)}

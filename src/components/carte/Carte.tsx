@@ -302,7 +302,7 @@ function VoletArticle({ article, peutEcrire, periode, onFermer, onRecharger, rel
       {article.fiche && <button type="button" onClick={() => openApiFile(`/api/recettes/pdf?id=${article.fiche!.id}`)} style={BTN}>Imprimer la fiche</button>}
       {bureau && <button type="button" onClick={() => router.push("/analyse/plats")} style={BTN}>Rentabilité des plats</button>}
       <span style={{ flex: 1 }} />
-      {article.produit && <button type="button" onClick={() => router.push(`/ingredients/${article.produit!.id}`)} style={BTN}>Ouvrir le produit</button>}
+      {article.produit && <button type="button" onClick={() => router.push(`/ingredients?edit=${article.produit!.id}&back=${encodeURIComponent("/carte")}`)} style={BTN}>Ouvrir le produit</button>}
       {article.fiche
         ? <button type="button" onClick={() => onEditer({ recipeId: article.fiche!.id })} style={{ ...BTN, background: "#1a1a1a", color: "#f2ede4", border: "none", fontWeight: 700 }}>{peutEcrire ? "Modifier la fiche" : "Voir la fiche"}</button>
         : peutEcrire && <button type="button" onClick={() => onEditer(creation)} style={{ ...BTN, background: ACCENT, color: "#fff", border: "none", fontWeight: 700 }}>Créer la fiche</button>}

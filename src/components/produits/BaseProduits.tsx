@@ -245,10 +245,6 @@ const LigneProduit = React.memo(function LigneProduit({ x, offer, fournisseur, a
           <Interrupteur actif={!inactive} onChange={() => onToggleActif(x)} titre={inactive ? "Inactif : cliquer pour réactiver (listes, commandes, inventaire)" : "Actif : cliquer pour désactiver (sort des listes, des commandes et du prochain inventaire)"} />
         </td>
       )}
-      <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
-        <a href={`/ingredients/${x.id}`} title="Fiche détaillée (historique des prix, recettes)"
-          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 8, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", textDecoration: "none", fontWeight: 700, fontSize: 13 }}>→</a>
-      </td>
     </tr>
   );
 });
@@ -442,7 +438,7 @@ export function BaseProduits(p: BaseProduitsProps) {
       selectionnee={p.selectedIds.has(l.x.id)} enEdition={p.editingId === l.x.id} peutEcrire={p.peutEcrire} sansCategorie={sansCategorie}
       onOuvrir={p.onOuvrir} onToggleSelect={p.onToggleSelect} onOpenSupplier={p.onOpenSupplier} voirMontants={voirMontants} />
   );
-  const nbColonnes = (sansCategorie: boolean) => 9 + (p.peutEcrire ? 1 : 0) + (p.peutEcrire && p.onToggleActif ? 1 : 0) - (sansCategorie ? 1 : 0);
+  const nbColonnes = (sansCategorie: boolean) => 8 + (p.peutEcrire ? 1 : 0) + (p.peutEcrire && p.onToggleActif ? 1 : 0) - (sansCategorie ? 1 : 0);
   const enTete = (sansCategorie: boolean) => (
     <thead>
       <tr>
@@ -457,7 +453,6 @@ export function BaseProduits(p: BaseProduitsProps) {
         <th className="bp-col-zone" style={TH}>Zone</th>
         <th className="bp-col-etat" style={TH}>État</th>
         {p.peutEcrire && p.onToggleActif && <th style={{ ...TH, width: 44 }}>Actif</th>}
-        <th style={TH} />
       </tr>
     </thead>
   );

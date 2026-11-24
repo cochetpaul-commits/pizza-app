@@ -436,7 +436,6 @@ export const IngredientRow = React.memo(function IngredientRow({
             <button type="button" onClick={(e) => { e.stopPropagation(); onCreateDerived(x); }} title="Créer un produit dérivé (paré, cuit…)" style={{ ...BTN_ACTION, width: 22, height: 22, borderRadius: 6, background: "rgba(124,58,237,0.10)", color: "#7C3AED", fontSize: 11, fontWeight: 700 }}>⚗</button>
           )}
           <BoutonCrayon onClick={ouvrir} title={isEditing ? "Fermer la fiche" : "Modifier la fiche"} />
-          <a href={`/ingredients/${x.id}`} onClick={(e) => e.stopPropagation()} title="Fiche détaillée" style={{ ...BTN_ACTION, width: 22, height: 22, borderRadius: 6, background: "rgba(26,26,26,0.06)", color: "#1a1a1a", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>→</a>
           <BoutonCroix onClick={() => onDelete(x.id, x.name)} title="Supprimer le produit" />
         </>}
         infos={compactMode ? undefined : <>
