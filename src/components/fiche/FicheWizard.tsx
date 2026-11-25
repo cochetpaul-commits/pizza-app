@@ -22,6 +22,8 @@ import { openApiFile } from "@/lib/fetchApi";
 import { ProduireFiche } from "./ProduireFiche";
 import { couleurTexte } from "@/lib/styleCategories";
 import { useBureau } from "@/hooks/useBureau";
+import { MODES_VENTE, estModeVente, modeVenteParDefaut, avecRestaurant, avecTraiteur, calculKilo, etatFoodCost } from "@/lib/fiche/modeVente";
+import { filtre } from "@/components/ui/charte";
 import { fermerOffresActives } from "@/lib/offerClosing";
 import { chargerReferentielFicheSur, invaliderReferentielFiche } from "@/lib/referentielFiche";
 
@@ -348,6 +350,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
             prix_ttc_manuel: rec.sell_price ? Number(rec.sell_price) * (1 + (rec.vat_rate ? Number(rec.vat_rate) : 0.1)) : null,
             prix_ttc_emporter: rec.sell_price_emporter ? Number(rec.sell_price_emporter) : null,
             tva_emporter: rec.vat_rate_emporter != null ? Number(rec.vat_rate_emporter) * 100 : 5.5,
+            mode_vente: estModeVente(rec.mode_vente) ? rec.mode_vente : null,
+            tva_kg: rec.vat_rate_kg != null ? Number(rec.vat_rate_kg) * 100 : 5.5,
             sell_price_per_kg: rec.sell_price_per_kg ? Number(rec.sell_price_per_kg) : null,
             sell_price_per_portion: rec.sell_price_per_portion ? Number(rec.sell_price_per_portion) : null,
             cooked_weight_g: rec.cooked_weight_g ? Number(rec.cooked_weight_g) : null,
@@ -375,6 +379,22 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
     }
     })();
   }, [recipeId, recipeType, etabSlug]);
+
+  // Fiches où cette recette sert d'ingrédient (« Utilisée dans : Lasagnes bolognaise »)
+  const [utiliseeDans, setUtiliseeDans] = useState<string[]>([]);
+  useEffect(() => {
+    const ingId = fiche.output_ingredient_id;
+    if (!ingId) { setUtiliseeDans([]); return; }
+    let annule = false;
+    (async () => {
+      const { data: lignes } = await supabase.from("kitchen_recipe_lines").select("recipe_id").eq("ingredient_id", ingId);
+      const ids = [...new Set((lignes ?? []).map((l: { recipe_id: string }) => l.recipe_id))].filter((id) => id !== fiche.id);
+      if (ids.length === 0) { if (!annule) setUtiliseeDans([]); return; }
+      const { data: recs } = await supabase.from("kitchen_recipes").select("name").in("id", ids).eq("is_active", true);
+      if (!annule) setUtiliseeDans(triParLibelle((recs ?? []) as { name: string }[], (r) => r.name).map((r) => r.name));
+    })();
+    return () => { annule = true; };
+  }, [fiche.output_ingredient_id, fiche.id]);
 
   // ── Derived ──
   // Type de liaison Popina attendu par Pilotage › Produits (marges) :
@@ -600,6 +620,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       sell_price_emporter: fiche.prix_ttc_emporter != null && fiche.prix_ttc_emporter > 0 ? fiche.prix_ttc_emporter : null,
       vat_rate_emporter: fiche.tva_emporter / 100,
       margin_rate: saveHt > 0 ? (1 - saveCostPerPortion / saveHt) : 0.65,
+      mode_vente: fiche.mode_vente,
+      vat_rate_kg: (fiche.tva_kg ?? 5.5) / 100,
       sell_price_per_kg: fiche.sell_price_per_kg,
       sell_price_per_portion: fiche.sell_price_per_portion,
       cooked_weight_g: fiche.cooked_weight_g,
@@ -772,8 +794,7 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
   const coutKgBrut = poidsCru > 0 && totalCost > 0 ? (totalCost / poidsCru) * 1000 : null;
   const coutKgCuit = poidsCuit && totalCost > 0 ? (totalCost / poidsCuit) * 1000 : null;
   const coutKgRef = coutKgCuit ?? coutKgBrut;
-  // Coefficient affiché « Sur place » : prix TTC ÷ coût, la même règle que le prix à la portion (prixTTC = coût × coeff)
-  const coeffAffiche = costPerPortion > 0 && ttc > 0 ? ttc / costPerPortion : fiche.coeff;
+  const modeVente = fiche.mode_vente ?? modeVenteParDefaut(fiche.categorie_slug, fiche.establishments);
   const kg = (g: number) => `${(g / 1000).toFixed(2).replace(".", ",")} kg`;
 
   return (
@@ -913,121 +934,147 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
           )}
         </div>
 
-        {/* PRIX DE VENTE (valeurs monétaires) */}
+        {/* PRIX (25/11/2026, avec Paul) : un socle commun (coût, poids, coût au kilo, coût portion), puis le mode de vente.
+            Restaurant = par assiette, Traiteur = au kilo (TVA 5,5 % par défaut), Préparation = sert dans d'autres fiches.
+            Même objectif de food cost partout (celui de la famille). */}
         {canSeeMoney && (
           <div style={SEC}>
-            <h2 style={H2}>Prix de vente <span style={AIDE}>{popinaLie ? `Popina : ${popinaLie.price_ttc?.toFixed(2).replace(".", ",")} € TTC` : "TTC saisi, HT calculé"}</span></h2>
-            <div style={{ display: "grid", gap: 8 }}>
-              {/* Sur place */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 96px", gap: 10, alignItems: "center", border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
-                <div><b style={{ fontSize: 14 }}>Sur place</b><small style={{ display: "block", color: "#6f6a61", fontSize: 12 }}>{eur(ht)} HT · coeff. ×{(costPerPortion > 0 ? ttc / costPerPortion : fiche.coeff).toFixed(1)}</small></div>
-                <input type="number" step="0.5" min={0} value={ttc > 0 ? Number(ttc.toFixed(2)) : ""} placeholder="0,00" onChange={e => update({ prix_ttc_manuel: Number(e.target.value) || 0 })} aria-label="Prix TTC sur place"
-                  style={{ ...INPUT, height: 40, padding: "0 10px", textAlign: "right", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 19, fontWeight: 700 }} />
-                <select value={fiche.tva} onChange={e => update({ tva: Number(e.target.value) })} aria-label="TVA sur place" style={{ ...SELECT, height: 40, padding: "0 8px", fontSize: 13 }}>
-                  <option value={10}>TVA 10 %</option><option value={5.5}>TVA 5,5 %</option><option value={20}>TVA 20 %</option>
-                </select>
+            <h2 style={H2}>Coût et prix <span style={AIDE}>{popinaLie ? `Popina : ${popinaLie.price_ttc?.toFixed(2).replace(".", ",")} € TTC` : "prix d'achat du jour"}</span></h2>
+
+            {/* Socle */}
+            <div style={{ background: "#f7f3ec", borderRadius: 12, padding: "12px 14px", display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "10px 22px" }}>
+                <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Coût de la recette</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, lineHeight: 1.1 }}>{eur(totalCost)}</div></div>
+                <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Poids brut</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, lineHeight: 1.1 }}>{poidsCru > 0 ? kg(poidsCru) : "—"}</div></div>
+                <label style={{ display: "grid", gap: 2 }}>
+                  <span style={{ fontSize: 12, color: "#6f6a61" }}>Poids après cuisson <span style={AIDE}>{poidsCuit && poidsCru > 0 ? `· rendement ${Math.round((poidsCuit / poidsCru) * 100)} %` : "· facultatif"}</span></span>
+                  <input type="number" step={10} min={0} value={fiche.cooked_weight_g ?? ""} placeholder="en grammes" onChange={e => update({ cooked_weight_g: e.target.value ? Number(e.target.value) : null })} style={{ ...INPUT, height: 36, width: 140 }} />
+                </label>
               </div>
-              {/* À emporter */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 96px", gap: 10, alignItems: "center", border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
-                <div><b style={{ fontSize: 14 }}>À emporter</b><small style={{ display: "block", color: "#6f6a61", fontSize: 12 }}>{htEmporter != null ? `${eur(htEmporter)} HT` : "même prix que sur place si vide"}</small></div>
-                <input type="number" step="0.5" min={0} value={fiche.prix_ttc_emporter ?? ""} placeholder={ttc > 0 ? ttc.toFixed(2) : "0,00"} onChange={e => update({ prix_ttc_emporter: e.target.value ? Number(e.target.value) : null })} aria-label="Prix TTC à emporter"
-                  style={{ ...INPUT, height: 40, padding: "0 10px", textAlign: "right", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 19, fontWeight: 700 }} />
-                <select value={fiche.tva_emporter} onChange={e => update({ tva_emporter: Number(e.target.value) })} aria-label="TVA à emporter" style={{ ...SELECT, height: 40, padding: "0 8px", fontSize: 13 }}>
-                  <option value={5.5}>TVA 5,5 %</option><option value={10}>TVA 10 %</option><option value={20}>TVA 20 %</option>
-                </select>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div style={{ background: "#fff", borderRadius: 10, padding: "8px 12px" }}>
+                  <div style={{ fontSize: 12, color: "#6f6a61" }}>Coût au kilo <span style={AIDE}>· {coutKgCuit != null ? "cuit" : "cru"}</span></div>
+                  <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, lineHeight: 1.15 }}>{coutKgRef != null ? `${eur(coutKgRef)} / kg` : "—"}</div>
+                  {coutKgCuit != null && coutKgBrut != null && <div style={{ fontSize: 12, color: "#6f6a61" }}>cru : {eur(coutKgBrut)} / kg</div>}
+                </div>
+                <div style={{ background: "#fff", borderRadius: 10, padding: "8px 12px" }}>
+                  <div style={{ fontSize: 12, color: "#6f6a61" }}>Coût {fiche.portions > 1 ? `d'une ${fam.portions_label}` : `de la ${fam.portions_label}`}</div>
+                  <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, lineHeight: 1.15 }}>{eur(costPerPortion)}</div>
+                  <div style={{ fontSize: 12, color: "#6f6a61" }}>{fiche.portions} {fiche.portions > 1 ? fam.portions_label_pluriel : fam.portions_label} dans la recette{fiche.portions > 1 && poidsCru > 0 ? ` · ${Math.round((poidsCuit ?? poidsCru) / fiche.portions)} g` : ""}</div>
+                </div>
               </div>
-              {/* Autres prix */}
-              {fiche.prix_lignes.map((pl, i) => {
-                const ttcL = pl.prix_ht * (1 + pl.tva / 100);
-                const libelle = pl.mode === "custom" ? pl.label : pl.mode === "kg" ? "Au kilo" : pl.mode === "piece" ? "À la pièce" : pl.mode === "litre" ? "Au litre" : "À la portion";
-                return (
-                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 110px 96px 32px", gap: 10, alignItems: "center", border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
-                    <div style={{ minWidth: 0 }}>
-                      <select value={pl.mode} onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, mode: e.target.value as PrixLigne["mode"] }; update({ prix_lignes: next }); }} style={{ border: "none", background: "transparent", fontWeight: 700, fontSize: 14, fontFamily: "inherit", padding: 0, color: "#1a1a1a" }}>
-                        <option value="portion">À la portion</option><option value="kg">Au kilo</option><option value="piece">À la pièce</option><option value="litre">Au litre</option><option value="custom">Autre</option>
-                      </select>
-                      {pl.mode === "custom" && <input value={pl.label} placeholder="Libellé (livraison, traiteur…)" onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, label: e.target.value }; update({ prix_lignes: next }); }} style={{ ...INPUT, height: 32, fontSize: 13, marginTop: 4 }} />}
-                      <small style={{ display: "block", color: "#6f6a61", fontSize: 12 }}>{pl.mode === "custom" ? "" : `${libelle} · `}{eur(pl.prix_ht)} HT</small>
-                    </div>
-                    <input type="number" step="0.5" min={0} value={ttcL > 0 ? Number(ttcL.toFixed(2)) : ""} placeholder="0,00" onChange={e => { const t = Number(e.target.value) || 0; const next = [...fiche.prix_lignes]; next[i] = { ...pl, prix_ht: t / (1 + pl.tva / 100) }; update({ prix_lignes: next }); }} aria-label="Prix TTC"
-                      style={{ ...INPUT, height: 40, padding: "0 10px", textAlign: "right", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 19, fontWeight: 700 }} />
-                    <select value={pl.tva} onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, tva: Number(e.target.value) }; update({ prix_lignes: next }); }} aria-label="TVA" style={{ ...SELECT, height: 40, padding: "0 8px", fontSize: 13 }}>
-                      {[5.5, 10, 20, 0].map(v => <option key={v} value={v}>TVA {String(v).replace(".", ",")} %</option>)}
-                    </select>
-                    <button type="button" onClick={() => update({ prix_lignes: fiche.prix_lignes.filter((_, j) => j !== i) })} aria-label="Retirer ce prix" style={{ border: "none", background: "transparent", color: "#b4443a", fontSize: 18, cursor: "pointer", fontFamily: "inherit" }}>×</button>
-                  </div>
-                );
-              })}
-              <button type="button" onClick={() => update({ prix_lignes: [...fiche.prix_lignes, { mode: "custom", label: "", prix_ht: 0, tva: 10, coeff: fiche.coeff }] })}
-                style={{ border: `1px dashed ${BORD}`, borderRadius: 12, padding: "10px 14px", color: "#D4775A", fontWeight: 700, fontSize: 14, background: "transparent", textAlign: "left", cursor: "pointer", fontFamily: "inherit" }}>
-                + Ajouter un prix (livraison, traiteur au kilo, à la part…)
-              </button>
-            </div>
-            {/* Repères */}
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", background: "#f7f3ec", borderRadius: 12, padding: "12px 14px" }}>
-              <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Coût matière</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{eur(costPerPortion)}</div></div>
-              <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Food cost</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1.1, color: fcCouleur }}>{ht > 0 ? `${fc.toFixed(1).replace(".", ",")} %` : "—"}</div></div>
-              <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Marge HT</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{ht > 0 ? eur(marge) : "—"}</div></div>
-            </div>
-            <div style={{ ...NOTE, display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <span>Food cost sur le prix HT sur place, par {fam.portions_label}. Objectif {fam.label.toLowerCase()} : {fam.objectif_fc} %{conseille > 0 ? ` · prix conseillé ${eur(conseille)} TTC` : ""}.</span>
-              {conseille > 0 && fcCol !== "ok" && <button type="button" onClick={() => { update({ prix_ttc_manuel: conseille }); showToast("Prix conseillé appliqué"); }} style={PETIT}>Appliquer {eur(conseille)}</button>}
-            </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              <span style={NOTE}>Coefficient :</span>
-              {[2.5, 3, 3.5, 4].map(c => <button key={c} type="button" onClick={() => update({ coeff: c, prix_ttc_manuel: null })} style={{ ...PETIT, height: 30, fontSize: 12.5, padding: "0 10px" }}>×{String(c).replace(".", ",")}</button>)}
+              {utiliseeDans.length > 0 && <div style={NOTE}>Utilisée dans : {utiliseeDans.join(", ")}.</div>}
             </div>
 
-            {/* Prix au kilo : brut et après cuisson, côte à côte */}
-            {poidsCru > 0 && (
-              <div style={{ background: "#f7f3ec", borderRadius: 12, padding: "12px 14px", display: "grid", gap: 10 }}>
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 18px" }}>
-                  <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Poids brut</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, lineHeight: 1.1 }}>{kg(poidsCru)}</div></div>
-                  <label style={{ display: "grid", gap: 2 }}>
-                    <span style={{ fontSize: 12, color: "#6f6a61" }}>Poids après cuisson <span style={AIDE}>{poidsCuit ? `· rendement ${Math.round((poidsCuit / poidsCru) * 100)} %` : "· facultatif"}</span></span>
-                    <input type="number" step={10} min={0} value={fiche.cooked_weight_g ?? ""} placeholder="en grammes" onChange={e => update({ cooked_weight_g: e.target.value ? Number(e.target.value) : null })} style={{ ...INPUT, height: 38, width: 150 }} />
-                  </label>
-                </div>
-                {coutKgBrut != null && (
-                  <div style={{ display: "grid", gridTemplateColumns: coutKgCuit != null ? "1fr 1fr" : "1fr", gap: 10 }}>
-                    {[["brut", coutKgBrut] as const, ...(coutKgCuit != null ? [["cuit", coutKgCuit] as const] : [])].map(([qui, cout]) => (
-                      <div key={qui} style={{ background: "#fff", borderRadius: 10, padding: "8px 12px", boxShadow: qui === "cuit" ? "inset 4px 0 0 #4a6741" : undefined }}>
-                        <div style={{ fontSize: 12, color: "#6f6a61" }}>Coût {qui}</div>
-                        <div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 20, fontWeight: 700, lineHeight: 1.15 }}>{eur(cout)} / kg</div>
-                        <div style={{ fontSize: 12.5, color: "#6f6a61" }}>Conseillé {qui} : <b style={{ color: "#1a1a1a" }}>{eur(cout * coeffAffiche)} / kg TTC</b></div>
-                      </div>
-                    ))}
-                  </div>
+            {/* Mode de vente */}
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={NOTE}>Vendu :</span>
+              {MODES_VENTE.map(m => <button key={m.id} type="button" onClick={() => update({ mode_vente: m.id })} style={filtre(modeVente === m.id)}>{m.libelle}</button>)}
+              {fiche.mode_vente == null && <span style={AIDE}>par défaut</span>}
+            </div>
+
+            {modeVente === "preparation" && (
+              <div style={NOTE}>Ne se vend pas telle quelle : elle entre dans d&apos;autres fiches à son coût au kilo{fiche.comme_ingredient ? "" : " (coche « utilisable comme ingrédient » plus bas pour la proposer dans les autres fiches)"}. Pour la vendre aussi en vitrine, choisis « Traiteur ».</div>
+            )}
+
+            {/* Restaurant : par assiette */}
+            {avecRestaurant(modeVente) && (
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#6f6a61" }}>Restaurant · par {fam.portions_label}</div>
+                {fiche.portions <= 1 && poidsCru >= 2500 && (
+                  <div style={{ ...NOTE, color: "#b7791f" }}>La recette fait {kg(poidsCru)} pour 1 {fam.portions_label} : indique le nombre de {fam.portions_label_pluriel} plus bas (« Quantités pour »), sinon le prix est celui de toute la recette.</div>
                 )}
-                <div style={NOTE}>Conseillé = coût au kilo × le coefficient affiché pour « sur place » (×{coeffAffiche.toFixed(1).replace(".", ",")}), la même règle que le prix à la portion. Une préparation vendue au poids se calcule sur le poids cuit.</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 96px", gap: 10, alignItems: "center", border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
+                  <div><b style={{ fontSize: 14 }}>Sur place</b><small style={{ display: "block", color: "#6f6a61", fontSize: 12 }}>{eur(ht)} HT · coeff. ×{(costPerPortion > 0 ? ttc / costPerPortion : fiche.coeff).toFixed(1)}</small></div>
+                  <input type="number" step="0.5" min={0} value={ttc > 0 ? Number(ttc.toFixed(2)) : ""} placeholder="0,00" onChange={e => update({ prix_ttc_manuel: Number(e.target.value) || 0 })} aria-label="Prix TTC sur place"
+                    style={{ ...INPUT, height: 40, padding: "0 10px", textAlign: "right", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 19, fontWeight: 700 }} />
+                  <select value={fiche.tva} onChange={e => update({ tva: Number(e.target.value) })} aria-label="TVA sur place" style={{ ...SELECT, height: 40, padding: "0 8px", fontSize: 13 }}>
+                    <option value={10}>TVA 10 %</option><option value={5.5}>TVA 5,5 %</option><option value={20}>TVA 20 %</option>
+                  </select>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 96px", gap: 10, alignItems: "center", border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
+                  <div><b style={{ fontSize: 14 }}>À emporter</b><small style={{ display: "block", color: "#6f6a61", fontSize: 12 }}>{htEmporter != null ? `${eur(htEmporter)} HT` : "même prix que sur place si vide"}</small></div>
+                  <input type="number" step="0.5" min={0} value={fiche.prix_ttc_emporter ?? ""} placeholder={ttc > 0 ? ttc.toFixed(2) : "0,00"} onChange={e => update({ prix_ttc_emporter: e.target.value ? Number(e.target.value) : null })} aria-label="Prix TTC à emporter"
+                    style={{ ...INPUT, height: 40, padding: "0 10px", textAlign: "right", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 19, fontWeight: 700 }} />
+                  <select value={fiche.tva_emporter} onChange={e => update({ tva_emporter: Number(e.target.value) })} aria-label="TVA à emporter" style={{ ...SELECT, height: 40, padding: "0 8px", fontSize: 13 }}>
+                    <option value={5.5}>TVA 5,5 %</option><option value={10}>TVA 10 %</option><option value={20}>TVA 20 %</option>
+                  </select>
+                </div>
+                {fiche.prix_lignes.map((pl, i) => {
+                  const ttcL = pl.prix_ht * (1 + pl.tva / 100);
+                  const libelle = pl.mode === "custom" ? pl.label : pl.mode === "kg" ? "Au kilo" : pl.mode === "piece" ? "À la pièce" : pl.mode === "litre" ? "Au litre" : "À la portion";
+                  return (
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 110px 96px 32px", gap: 10, alignItems: "center", border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <select value={pl.mode} onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, mode: e.target.value as PrixLigne["mode"] }; update({ prix_lignes: next }); }} style={{ border: "none", background: "transparent", fontWeight: 700, fontSize: 14, fontFamily: "inherit", padding: 0, color: "#1a1a1a" }}>
+                          <option value="portion">À la portion</option><option value="kg">Au kilo</option><option value="piece">À la pièce</option><option value="litre">Au litre</option><option value="custom">Autre</option>
+                        </select>
+                        {pl.mode === "custom" && <input value={pl.label} placeholder="Libellé (livraison, à la part…)" onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, label: e.target.value }; update({ prix_lignes: next }); }} style={{ ...INPUT, height: 32, fontSize: 13, marginTop: 4 }} />}
+                        <small style={{ display: "block", color: "#6f6a61", fontSize: 12 }}>{pl.mode === "custom" ? "" : `${libelle} · `}{eur(pl.prix_ht)} HT</small>
+                      </div>
+                      <input type="number" step="0.5" min={0} value={ttcL > 0 ? Number(ttcL.toFixed(2)) : ""} placeholder="0,00" onChange={e => { const t = Number(e.target.value) || 0; const next = [...fiche.prix_lignes]; next[i] = { ...pl, prix_ht: t / (1 + pl.tva / 100) }; update({ prix_lignes: next }); }} aria-label="Prix TTC"
+                        style={{ ...INPUT, height: 40, padding: "0 10px", textAlign: "right", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 19, fontWeight: 700 }} />
+                      <select value={pl.tva} onChange={e => { const next = [...fiche.prix_lignes]; next[i] = { ...pl, tva: Number(e.target.value) }; update({ prix_lignes: next }); }} aria-label="TVA" style={{ ...SELECT, height: 40, padding: "0 8px", fontSize: 13 }}>
+                        {[5.5, 10, 20, 0].map(v => <option key={v} value={v}>TVA {String(v).replace(".", ",")} %</option>)}
+                      </select>
+                      <button type="button" onClick={() => update({ prix_lignes: fiche.prix_lignes.filter((_, j) => j !== i) })} aria-label="Retirer ce prix" style={{ border: "none", background: "transparent", color: "#b4443a", fontSize: 18, cursor: "pointer", fontFamily: "inherit" }}>×</button>
+                    </div>
+                  );
+                })}
+                <button type="button" onClick={() => update({ prix_lignes: [...fiche.prix_lignes, { mode: "custom", label: "", prix_ht: 0, tva: 10, coeff: fiche.coeff }] })}
+                  style={{ border: `1px dashed ${BORD}`, borderRadius: 12, padding: "10px 14px", color: "#D4775A", fontWeight: 700, fontSize: 14, background: "transparent", textAlign: "left", cursor: "pointer", fontFamily: "inherit" }}>
+                  + Ajouter un prix (livraison, à la part…)
+                </button>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", background: "#f7f3ec", borderRadius: 12, padding: "12px 14px" }}>
+                  <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Coût {fam.portions_label}</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{eur(costPerPortion)}</div></div>
+                  <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Food cost</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1.1, color: fcCouleur }}>{ht > 0 ? `${fc.toFixed(1).replace(".", ",")} %` : "—"}</div></div>
+                  <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Marge HT</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{ht > 0 ? eur(marge) : "—"}</div></div>
+                </div>
+                <div style={{ ...NOTE, display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                  <span>Food cost sur le prix HT sur place, par {fam.portions_label}. Objectif {fam.label.toLowerCase()} : {fam.objectif_fc} %{conseille > 0 ? ` · prix conseillé ${eur(conseille)} TTC` : ""}.</span>
+                  {conseille > 0 && fcCol !== "ok" && <button type="button" onClick={() => { update({ prix_ttc_manuel: conseille }); showToast("Prix conseillé appliqué"); }} style={PETIT}>Appliquer {eur(conseille)}</button>}
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={NOTE}>Coefficient :</span>
+                  {[2.5, 3, 3.5, 4].map(c => <button key={c} type="button" onClick={() => update({ coeff: c, prix_ttc_manuel: null })} style={{ ...PETIT, height: 30, fontSize: 12.5, padding: "0 10px" }}>×{String(c).replace(".", ",")}</button>)}
+                </div>
               </div>
             )}
 
-            {/* Traiteur : prix de vente au kilo (le poids après cuisson est saisi dans le bloc ci-dessus) */}
-            <details style={{ border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
-              <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Traiteur : prix de vente au kilo</summary>
-              {(() => {
-                const coutKg = coutKgRef; // même poids de référence que le bloc « prix au kilo » et l'enregistrement
-                const ttcKg = fiche.sell_price_per_kg;
-                const coeffKg = coutKg != null && ttcKg != null && ttcKg > 0 ? ttcKg / coutKg : null;
-                const htKg = ttcKg != null ? ttcKg / (1 + fiche.tva / 100) : null;
-                const conseilleKg = coutKg != null ? prixConseille(coutKg, fam.objectif_fc, fiche.tva) : 0;
-                return (
-                  <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, maxWidth: 320 }}>
-                      <div>
-                        <label style={LBL}>Prix TTC au kilo <span style={AIDE}>{coeffKg != null ? `· coeff. ×${coeffKg.toFixed(2)}` : ""}</span></label>
-                        <input type="number" step="0.5" min={0} value={ttcKg ?? ""} placeholder={conseilleKg > 0 ? conseilleKg.toFixed(2) : ""} onChange={e => update({ sell_price_per_kg: e.target.value ? Number(e.target.value) : null })} style={INPUT} />
-                      </div>
-                    </div>
-                    <div style={NOTE}>
-                      {coutKg != null ? <>Coût matière {eur(coutKg)} / kg{htKg != null ? ` · ${eur(htKg)} HT / kg` : ""}{conseilleKg > 0 ? ` · conseillé ${eur(conseilleKg)} TTC / kg` : ""}.</> : "Renseigne des quantités en g ou kg pour calculer le coût au kilo."}
-                      {coutKg != null && <> <button type="button" onClick={() => update({ sell_price_per_kg: Math.round(coutKg * 3 * 100) / 100 })} style={{ ...PETIT, height: 28, fontSize: 12, padding: "0 8px", marginLeft: 6 }}>×3</button></>}
-                    </div>
+            {/* Traiteur : au kilo */}
+            {avecTraiteur(modeVente) && (() => {
+              const k = calculKilo(coutKgRef, fiche.sell_price_per_kg, fiche.tva_kg ?? 5.5, fam.objectif_fc);
+              const etat = k.foodCost != null ? etatFoodCost(k.foodCost, fam.objectif_fc) : null;
+              const couleurKg = etat === "ok" ? "#4a6741" : etat === "attention" ? "#b7791f" : etat === "trop_haut" ? "#b4443a" : "#1a1a1a";
+              return (
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#6f6a61" }}>Traiteur · au kilo</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 96px", gap: 10, alignItems: "center", border: `1px solid ${BORD}`, borderRadius: 12, padding: "10px 14px" }}>
+                    <div><b style={{ fontSize: 14 }}>Prix au kilo</b><small style={{ display: "block", color: "#6f6a61", fontSize: 12 }}>{k.htKg != null ? `${eur(k.htKg)} HT / kg · coeff. ×${(k.coefficient ?? 0).toFixed(1)}` : "TTC, à emporter"}</small></div>
+                    <input type="number" step="0.5" min={0} value={fiche.sell_price_per_kg ?? ""} placeholder={k.conseille > 0 ? k.conseille.toFixed(2) : "0,00"} onChange={e => update({ sell_price_per_kg: e.target.value ? Number(e.target.value) : null })} aria-label="Prix TTC au kilo"
+                      style={{ ...INPUT, height: 40, padding: "0 10px", textAlign: "right", fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 19, fontWeight: 700 }} />
+                    <select value={fiche.tva_kg ?? 5.5} onChange={e => update({ tva_kg: Number(e.target.value) })} aria-label="TVA au kilo" style={{ ...SELECT, height: 40, padding: "0 8px", fontSize: 13 }}>
+                      <option value={5.5}>TVA 5,5 %</option><option value={10}>TVA 10 %</option><option value={20}>TVA 20 %</option>
+                    </select>
                   </div>
-                );
-              })()}
-            </details>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", background: "#f7f3ec", borderRadius: 12, padding: "12px 14px" }}>
+                    <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Coût au kilo</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{coutKgRef != null ? eur(coutKgRef) : "—"}</div></div>
+                    <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Food cost</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1.1, color: couleurKg }}>{k.foodCost != null ? `${k.foodCost.toFixed(1).replace(".", ",")} %` : "—"}</div></div>
+                    <div><div style={{ fontSize: 12, color: "#6f6a61" }}>Marge HT / kg</div><div style={{ fontFamily: "var(--font-oswald), Oswald, sans-serif", fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{k.margeKg != null ? eur(k.margeKg) : "—"}</div></div>
+                  </div>
+                  <div style={{ ...NOTE, display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    <span>{coutKgRef != null ? <>Food cost sur le prix HT au kilo, coût au kilo {coutKgCuit != null ? "cuit" : "cru (le cuit le remplace dès qu'il est saisi)"}. Objectif {fam.label.toLowerCase()} : {fam.objectif_fc} %{k.conseille > 0 ? ` · prix conseillé ${eur(k.conseille)} TTC / kg` : ""}.</> : "Renseigne des quantités en g, kg ou cl pour calculer le coût au kilo."}</span>
+                    {k.conseille > 0 && etat !== "ok" && <button type="button" onClick={() => { update({ sell_price_per_kg: k.conseille }); showToast("Prix au kilo conseillé appliqué"); }} style={PETIT}>Appliquer {eur(k.conseille)}</button>}
+                  </div>
+                  {coutKgRef != null && (
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={NOTE}>Coefficient :</span>
+                      {[2.5, 3, 3.5, 4].map(c => <button key={c} type="button" onClick={() => update({ sell_price_per_kg: Math.round(coutKgRef * c * 2) / 2 })} style={{ ...PETIT, height: 30, fontSize: 12.5, padding: "0 10px" }}>×{String(c).replace(".", ",")}</button>)}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 

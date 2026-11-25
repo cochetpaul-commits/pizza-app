@@ -1,3 +1,4 @@
+import type { ModeVente } from "@/lib/fiche/modeVente";
 // ── Types & constantes pour le wizard fiche technique ──
 
 export type FicheStatut = "brouillon" | "validee" | "publiee";
@@ -77,6 +78,10 @@ export type FicheState = {
   prix_ttc_emporter: number | null;
   tva_emporter: number;
   // Traiteur
+  /** Mode de vente choisi ; null = défaut (Piccola en traiteur, Bello Mio en restaurant, préparations à part) */
+  mode_vente: ModeVente | null;
+  /** TVA du prix au kilo en pourcent (5,5 par défaut : plats à emporter pour plus tard) */
+  tva_kg: number;
   sell_price_per_kg: number | null;
   sell_price_per_portion: number | null;
   cooked_weight_g: number | null;
@@ -243,6 +248,8 @@ export function defaultFiche(etabSlug: string): FicheState {
     prix_ttc_manuel: null,
     prix_ttc_emporter: null,
     tva_emporter: 5.5,
+    mode_vente: null,
+    tva_kg: 5.5,
     sell_price_per_kg: null,
     sell_price_per_portion: null,
     cooked_weight_g: null,
