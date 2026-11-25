@@ -58,3 +58,21 @@ export async function reactiverProduits(ids: string[]): Promise<string | null> {
   }
   return null;
 }
+
+/**
+ * Restaurants cochés sur une fiche (26/11/2026) : cocher l'autre restaurant ne partage plus la fiche, il reçoit
+ * sa propre copie (même fiche, fournisseur de son côté), qui vit ensuite sa vie. Décocher retire ce restaurant.
+ * Renvoie les restaurants à garder sur cette fiche, et les copies créées.
+ */
+export async function appliquerEtablissements(id: string, demandes: string[], actuels: string[]): Promise<{ garder: string[]; copies: string[]; erreur: string | null }> {
+  const ajouts = demandes.filter((e) => !actuels.includes(e));
+  let garder = actuels.filter((e) => demandes.includes(e));
+  if (garder.length === 0) garder = actuels;
+  const copies: string[] = [];
+  for (const cle of ajouts) {
+    const { error } = await supabase.rpc("copier_produit_vers", { p_id: id, p_cle: cle });
+    if (error) return { garder, copies, erreur: `Copie pour ${cle === "piccola" ? "Piccola Mia" : "Bello Mio"} : ${error.message}` };
+    copies.push(cle);
+  }
+  return { garder, copies, erreur: null };
+}

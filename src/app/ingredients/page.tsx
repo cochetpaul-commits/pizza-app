@@ -59,7 +59,7 @@ import { useDoublons } from "@/lib/useDoublons";
 import { normaliserSousCategorie } from "@/lib/styleCategories";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { dateFermeture, fermerOffresActives } from "@/lib/offerClosing";
-import { desactiverProduits, reactiverProduits, retirerPartagesDuCote } from "@/lib/produitsActifs";
+import { appliquerEtablissements, desactiverProduits, reactiverProduits, retirerPartagesDuCote } from "@/lib/produitsActifs";
 
 type OfferPayload = Record<string, unknown>;
 
@@ -978,8 +978,14 @@ function IngredientsPageInner() {
       stock_min: parseNum(edit.stockMin) ?? null,
       stock_objectif: parseNum(edit.stockObjectif) ?? null,
       stock_max: parseNum(edit.stockMax) ?? null,
-      establishments: edit.establishments.length ? edit.establishments : ["bellomio", "piccola"],
     } as Record<string, unknown>;
+    // Restaurants : l'autre restaurant coché reçoit sa propre copie, la fiche reste à son restaurant (26/11/2026)
+    {
+      const avant = items.find((x) => x.id === editingId)?.establishments ?? [];
+      const choix = await appliquerEtablissements(editingId, edit.establishments.length ? edit.establishments : avant, avant);
+      if (choix.erreur) alert(choix.erreur);
+      if (choix.garder.length) (up as Record<string, unknown>).establishments = choix.garder;
+    }
     const u1 = await supabase.from("ingredients").update(up).eq("id", editingId);
     // Zone de stockage : propre à l'établissement courant (fiche partagée : l'autre restaurant garde la sienne)
     if (!u1.error) {
@@ -1096,6 +1102,14 @@ function IngredientsPageInner() {
 
   const toggleEstablishment = useCallback(async (id: string, estab: "bellomio" | "piccola", current: string[]) => {
     const has = current.includes(estab);
+    // Ajouter l'autre restaurant = lui créer sa propre copie (26/11/2026), la fiche ne se partage plus
+    if (!has) {
+      const r = await appliquerEtablissements(id, [...current, estab], current);
+      if (r.erreur) { alert(r.erreur); return; }
+      alert(`Fiche copiée pour ${estab === "piccola" ? "Piccola Mia" : "Bello Mio"} : chaque restaurant a maintenant la sienne.`);
+      await mutateOne(id);
+      return;
+    }
     const next = has ? current.filter(e => e !== estab) : [...current, estab];
     // Prevent removing all establishments
     if (next.length === 0) return;

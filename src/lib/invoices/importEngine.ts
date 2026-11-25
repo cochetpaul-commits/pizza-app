@@ -357,6 +357,31 @@ export async function runImport(options: {
     const idx = await chargerIndexFiches(supabase, supplierId, supplierAliasIds, skus);
     const { skuToIngId, nameToIngId, normalizedToIngId } = idx;
 
+    // Fiches séparées par restaurant (26/11/2026) : une ligne qui retrouve une fiche de l'AUTRE restaurant
+    // reçoit sa propre copie de ce côté (même fiche, fournisseur de cet établissement), au lieu de partager.
+    if (etabImport) {
+      const trouves = new Set<string>();
+      for (const l of lines) { const id = trouverFiche(idx, (l.sku ?? "").trim(), (l.name ?? "").trim().toUpperCase()); if (id) trouves.add(id); }
+      const ids = [...trouves];
+      const remplacer = new Map<string, string>();
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data: rows, error: eEt } = await supabase.from("ingredients").select("id, establishments").in("id", ids.slice(i, i + 200));
+        if (eEt) throw new Error(eEt.message);
+        for (const r of (rows ?? []) as { id: string; establishments: string[] | null }[]) {
+          if (!r.establishments || r.establishments.length === 0 || r.establishments.includes(etabImport)) continue;
+          const { data: copie, error: eCp } = await supabase.rpc("copier_produit_vers", { p_id: r.id, p_cle: etabImport });
+          if (eCp) throw new Error(`Copie de la fiche pour ce restaurant : ${eCp.message}`);
+          if (copie && copie !== r.id) remplacer.set(r.id, copie as string);
+        }
+      }
+      if (remplacer.size) {
+        for (const m of [idx.skuToIngId, idx.nameToIngId, idx.normalizedToIngId, idx.baseNameToIngId]) {
+          for (const [k, v] of m) { const n = remplacer.get(v); if (n) m.set(k, n); }
+        }
+        for (const [ancien, nouveau] of remplacer) { const refs = idx.refsParFiche.get(ancien); if (refs) idx.refsParFiche.set(nouveau, refs); }
+      }
+    }
+
     // 7. Création des ingrédients manquants
     const toCreate: Array<Record<string, unknown>> = [];
     for (const l of lines) {
@@ -444,7 +469,8 @@ export async function runImport(options: {
         .from("ingredients")
         .select("id,supplier_sku,is_active,supplier_id")
         .in("supplier_id", supplierAliasIds)
-        .in("supplier_sku", skus);
+        .in("supplier_sku", skus)
+        .contains("establishments", etabsFiche.length === 1 ? etabsFiche : []);
       const { data: bySku2, error: eSku2 } = await skuQ2;
 
       if (eSku2) throw new Error(eSku2.message);
@@ -464,7 +490,8 @@ export async function runImport(options: {
         .from("ingredients")
         .select("id,name,import_name")
         .eq("user_id", userId)
-        .in("name", allNames);
+        .in("name", allNames)
+        .contains("establishments", etabsFiche.length === 1 ? etabsFiche : []);
       const { data: byName2, error: eName2 } = await nameQ2;
 
       if (eName2) throw new Error(eName2.message);
