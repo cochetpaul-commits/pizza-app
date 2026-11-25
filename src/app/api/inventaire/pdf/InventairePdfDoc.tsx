@@ -18,6 +18,8 @@ export type InventairePdfData = {
   parFamille: { famille: string; valeur: number; lignes: number }[];
   parCategorie: { categorie: string; valeur: number; lignes: number }[];
   lignes: LigneValorisee[];
+  /** Saisie par zones (quantité seule) : pas de colis, unités ni familles de feuille ; détail groupé par catégorie */
+  parZones?: boolean;
 };
 
 const c = { accent: "#D4775A", green: "#4a6741", dark: "#1a1a1a", muted: "#777", bg: "#f5f0e8", border: "#ddd6c8", warn: "#b45309" };
@@ -51,11 +53,12 @@ const s = StyleSheet.create({
   footer: { position: "absolute", bottom: 18, left: 32, right: 32, flexDirection: "row", justifyContent: "space-between", fontSize: 6.5, color: c.muted },
 });
 
-const eur = (n: number | null | undefined) => n == null ? "—" : n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+// Espaces fines insécables du format français : Helvetica ne les a pas (« 12829,05 »), espace simple à la place
+const eur = (n: number | null | undefined) => n == null ? "—" : n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/[\u202f\u00a0]/g, " ") + " €";
 const nb = (n: number | null | undefined, dec = 3) => n == null ? "" : String(Math.round(n * 10 ** dec) / 10 ** dec).replace(".", ",");
 const fmtDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" });
 const fmtDateHeure = (iso: string) => new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" });
-const pluriel = (u: string, n: number) => n > 1 && !["kg", "litre", "colis", "pc"].includes(u) ? (u.endsWith("s") || u.endsWith("x") ? u : u === "plateau" ? "plateaux" : u === "seau" ? "seaux" : u + "s") : u;
+const pluriel = (u: string, n: number) => n > 1 && !["kg", "g", "cl", "ml", "l", "L", "litre", "colis", "pc", "pcs"].includes(u) ? (u.endsWith("s") || u.endsWith("x") ? u : u === "plateau" ? "plateaux" : u === "seau" ? "seaux" : u + "s") : u;
 
 function Pied({ data }: { data: InventairePdfData }) {
   return (
@@ -72,6 +75,8 @@ export function InventairePdfDocument(data: InventairePdfData) {
   const sansPrix = data.lignes.filter((l) => l.cout == null && l.quantite != null && l.quantite > 0);
   const fichesProbleme = data.lignes.filter((l) => l.fiche === "inactive" || l.fiche === "supprimee" || l.fiche === "a_verifier");
   const nonComptees = data.lignes.filter((l) => l.quantite == null);
+  // Familles de la feuille : seulement si la feuille en a (une saisie par zones n'en a pas : « Sans famille » partout)
+  const avecFamilles = !data.parZones && data.parFamille.some((f) => f.famille !== "Sans famille");
 
   return (
     <Document title={`Inventaire ${data.etabNom} ${data.date}`} author={data.raisonSociale || data.etabNom}>
@@ -110,7 +115,7 @@ export function InventairePdfDocument(data: InventairePdfData) {
         <View style={s.recapRow}><Text style={{ flex: 1, fontFamily: "Helvetica-Bold" }}>Total HT</Text><Text style={{ width: 60 }} /><Text style={{ width: 80, textAlign: "right", fontFamily: "Helvetica-Bold", color: c.accent }}>{eur(data.total)}</Text></View>
 
         <View style={{ flexDirection: "row", gap: 16 }}>
-          <View style={{ flex: 1 }}>
+          {avecFamilles && <View style={{ flex: 1 }}>
             <Text style={s.h2}>Par famille (feuille)</Text>
             {data.parFamille.map((f) => (
               <View key={f.famille} style={s.recapRow}>
@@ -118,9 +123,9 @@ export function InventairePdfDocument(data: InventairePdfData) {
                 <Text style={{ width: 70, textAlign: "right", fontFamily: "Helvetica-Bold" }}>{eur(f.valeur)}</Text>
               </View>
             ))}
-          </View>
+          </View>}
           <View style={{ flex: 1 }}>
-            <Text style={s.h2}>Par catégorie de fiche</Text>
+            <Text style={s.h2}>{avecFamilles ? "Par catégorie de fiche" : "Par catégorie"}</Text>
             {data.parCategorie.map((f) => (
               <View key={f.categorie} style={s.recapRow}>
                 <Text style={{ flex: 1 }}>{f.categorie}</Text>
@@ -135,8 +140,13 @@ export function InventairePdfDocument(data: InventairePdfData) {
       {/* ── Détail par zone ── */}
       <Page size="A4" style={s.page}>
         <Text style={s.h1}>Détail par zone</Text>
-        <Text style={s.small}>Dans l&apos;ordre de la feuille. Quantité = colis × contenu + unités. Coût unitaire HT dans l&apos;unité comptée.</Text>
-        {[...parZone.entries()].map(([zone, lignes]) => {
+        <Text style={s.small}>{data.parZones ? "Par catégorie, produits par ordre alphabétique. Coût unitaire HT dans l'unité comptée." : "Dans l'ordre de la feuille. Quantité = colis × contenu + unités. Coût unitaire HT dans l'unité comptée."}</Text>
+        {[...parZone.entries()].map(([zone, lignesZone]) => {
+          // Saisie par zones : groupes par catégorie (ordre alphabétique), produits par ordre alphabétique
+          const lignes = data.parZones
+            ? [...lignesZone].sort((a, b) => a.categorie_libelle.localeCompare(b.categorie_libelle, "fr") || (a.nom_feuille ?? a.nom).localeCompare(b.nom_feuille ?? b.nom, "fr"))
+            : lignesZone;
+          const groupe = (l: LigneValorisee) => (data.parZones ? l.categorie_libelle : l.famille);
           const total = lignes.reduce((t, l) => t + (l.valeur ?? 0), 0);
           let familleCourante: string | null | undefined;
           return (
@@ -146,30 +156,30 @@ export function InventairePdfDocument(data: InventairePdfData) {
                 <Text style={s.zoneTitle}>{eur(total)}</Text>
               </View>
               <View style={s.th}>
-                <Text style={{ ...s.cNum, ...s.thTxt }}>N°</Text>
+                {!data.parZones && <Text style={{ ...s.cNum, ...s.thTxt }}>N°</Text>}
                 <Text style={{ ...s.cNom, ...s.thTxt }}>Produit</Text>
-                <Text style={{ ...s.cCond, ...s.thTxt }}>Conditionnement</Text>
-                <Text style={{ ...s.cColis, ...s.thTxt }}>Colis</Text>
-                <Text style={{ ...s.cUnites, ...s.thTxt }}>Unités</Text>
+                {!data.parZones && <Text style={{ ...s.cCond, ...s.thTxt }}>Conditionnement</Text>}
+                {!data.parZones && <Text style={{ ...s.cColis, ...s.thTxt }}>Colis</Text>}
+                {!data.parZones && <Text style={{ ...s.cUnites, ...s.thTxt }}>Unités</Text>}
                 <Text style={{ ...s.cQte, ...s.thTxt }}>Qté</Text>
                 <Text style={{ ...s.cUnite, ...s.thTxt }}>Unité</Text>
                 <Text style={{ ...s.cCout, ...s.thTxt }}>Coût HT</Text>
                 <Text style={{ ...s.cVal, ...s.thTxt }}>Valeur HT</Text>
               </View>
               {lignes.map((l) => {
-                const nouvelleFamille = l.famille !== familleCourante;
-                familleCourante = l.famille;
+                const nouvelleFamille = groupe(l) !== familleCourante;
+                familleCourante = groupe(l);
                 const deuxChamps = l.cond_contenu != null && l.cond_contenu > 1;
                 const alerte = l.fiche === "supprimee" ? " (fiche supprimée)" : l.fiche === "inactive" ? " (fiche désactivée)" : l.fiche === "a_verifier" ? " (à vérifier)" : "";
                 return (
                   <React.Fragment key={l.id}>
-                    {nouvelleFamille && <Text style={s.famille}>{l.famille ?? "Sans famille"}</Text>}
+                    {nouvelleFamille && (data.parZones || avecFamilles) && <Text style={s.famille} minPresenceAhead={20}>{groupe(l) ?? "Sans famille"}</Text>}
                     <View style={s.row} wrap={false}>
-                      <Text style={s.cNum}>{l.ordre ?? ""}</Text>
+                      {!data.parZones && <Text style={s.cNum}>{l.ordre ?? ""}</Text>}
                       <Text style={s.cNom}>{l.nom_feuille ?? l.nom}{alerte ? <Text style={{ color: c.warn }}>{alerte}</Text> : null}</Text>
-                      <Text style={s.cCond}>{deuxChamps ? l.cond_libelle ?? "" : ""}</Text>
-                      <Text style={s.cColis}>{deuxChamps ? nb(l.colis) : ""}</Text>
-                      <Text style={s.cUnites}>{deuxChamps ? nb(l.unites) : ""}</Text>
+                      {!data.parZones && <Text style={s.cCond}>{deuxChamps ? l.cond_libelle ?? "" : ""}</Text>}
+                      {!data.parZones && <Text style={s.cColis}>{deuxChamps ? nb(l.colis) : ""}</Text>}
+                      {!data.parZones && <Text style={s.cUnites}>{deuxChamps ? nb(l.unites) : ""}</Text>}
                       <Text style={s.cQte}>{l.quantite == null ? "—" : nb(l.quantite)}</Text>
                       <Text style={s.cUnite}>{l.quantite == null ? "" : pluriel(l.unite, l.quantite)}</Text>
                       <Text style={{ ...s.cCout, color: l.cout == null ? c.warn : c.dark }}>{l.cout == null ? "sans prix" : eur(l.cout)}</Text>

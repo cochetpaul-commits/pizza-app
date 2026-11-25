@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
     nbComptees: valo.nb_comptees, nbNonComptees: valo.nb_non_comptees, nbSansPrix: valo.nb_sans_prix,
     parZone: valo.par_zone, parFamille: valo.par_famille, parCategorie: valo.par_categorie,
     lignes: valo.lignes,
+    parZones: inv.saisie !== "feuille",
   };
 
   const el = InventairePdfDocument(pdfData) as unknown as React.ReactElement<DocumentProps>;
