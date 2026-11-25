@@ -7,7 +7,40 @@ import { dateFermeture } from "@/lib/offerClosing";
  * fournisseur sont fermées ; l'historique est conservé. Réactiver remet la fiche dans les listes
  * (les offres restent à ressaisir ou reviennent avec la prochaine facture).
  */
-export async function desactiverProduits(ids: string[]): Promise<string | null> {
+export type EtabCote = { id: string; slug: string | null } | null | undefined;
+
+const cleEtab = (etab: EtabCote): "bellomio" | "piccola" | null =>
+  etab?.slug?.includes("piccola") ? "piccola" : etab?.slug?.includes("bello") ? "bellomio" : null;
+
+/**
+ * Fiches partagées entre les deux restaurants (25/11/2026) : supprimer ou désactiver d'un côté ne touche pas l'autre.
+ * La fiche perd seulement cet établissement (et ses emplacements ici) ; elle reste active chez l'autre, avec ses offres.
+ * Renvoie les fiches propres à cet établissement, à traiter normalement (désactivation ou suppression).
+ */
+export async function retirerPartagesDuCote(ids: string[], etab: EtabCote): Promise<{ propres: string[]; partages: number; erreur: string | null }> {
+  const cle = cleEtab(etab);
+  if (!cle || ids.length === 0) return { propres: ids, partages: 0, erreur: null };
+  const propres: string[] = [];
+  let partages = 0;
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await supabase.from("ingredients").select("id, establishments").in("id", ids.slice(i, i + 100));
+    if (error) return { propres, partages, erreur: error.message };
+    for (const r of (data ?? []) as { id: string; establishments: string[] | null }[]) {
+      const autres = (r.establishments ?? []).filter((e) => e !== cle);
+      if ((r.establishments ?? []).includes(cle) && autres.length > 0) {
+        const { error: e1 } = await supabase.from("ingredients").update({ establishments: autres }).eq("id", r.id);
+        if (e1) return { propres, partages, erreur: e1.message };
+        if (etab?.id) await supabase.from("ingredient_zones").delete().eq("etablissement_id", etab.id).eq("ingredient_id", r.id);
+        partages++;
+      } else propres.push(r.id);
+    }
+  }
+  return { propres, partages, erreur: null };
+}
+
+export async function desactiverProduits(idsDemandes: string[], etab?: EtabCote): Promise<string | null> {
+  const { propres: ids, erreur } = await retirerPartagesDuCote(idsDemandes, etab);
+  if (erreur) return erreur;
   for (let i = 0; i < ids.length; i += 100) {
     const lot = ids.slice(i, i + 100);
     const off = await supabase.from("supplier_offers").update({ is_active: false, valid_to: dateFermeture() }).in("ingredient_id", lot).eq("is_active", true);

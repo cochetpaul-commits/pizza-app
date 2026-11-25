@@ -59,7 +59,7 @@ import { useDoublons } from "@/lib/useDoublons";
 import { normaliserSousCategorie } from "@/lib/styleCategories";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { dateFermeture, fermerOffresActives } from "@/lib/offerClosing";
-import { desactiverProduits, reactiverProduits } from "@/lib/produitsActifs";
+import { desactiverProduits, reactiverProduits, retirerPartagesDuCote } from "@/lib/produitsActifs";
 
 type OfferPayload = Record<string, unknown>;
 
@@ -299,8 +299,11 @@ function IngredientsPageInner() {
     if (selectedIds.size === 0) return;
     if (!confirm(`Supprimer ${selectedIds.size} produit(s) ? Les produits utilises dans des recettes seront ignores.`)) return;
     setBulkActing(true);
-    let deleted = 0;
-    for (const id of selectedIds) {
+    // Fiches partagées : retirées de ce restaurant seulement, jamais effacées pour l'autre (25/11/2026)
+    const tri = await retirerPartagesDuCote([...selectedIds], etab);
+    if (tri.erreur) { alert(tri.erreur); setBulkActing(false); return; }
+    let deleted = tri.partages;
+    for (const id of tri.propres) {
       // Check usage in recipes
       const checks = await Promise.all([
         supabase.from("kitchen_recipe_lines").select("id", { count: "exact", head: true }).eq("ingredient_id", id),
@@ -327,16 +330,9 @@ function IngredientsPageInner() {
     if (selectedIds.size === 0) return;
     if (!confirm(`Désactiver ${selectedIds.size} produit(s) ? Ils disparaissent des listes et des commandes, leur historique de prix est conservé. Case « Afficher les désactivées » pour les revoir.`)) return;
     setBulkActing(true);
-    const ids = [...selectedIds];
-    for (let i = 0; i < ids.length; i += 100) {
-      const lot = ids.slice(i, i + 100);
-      const off = await supabase.from("supplier_offers")
-        .update({ is_active: false, valid_to: dateFermeture() })
-        .in("ingredient_id", lot).eq("is_active", true);
-      if (off.error) { alert(`Fermeture des offres : ${off.error.message}`); setBulkActing(false); return; }
-      const { error } = await supabase.from("ingredients").update({ is_active: false }).in("id", lot);
-      if (error) { alert(error.message); setBulkActing(false); return; }
-    }
+    // Fiches partagées : retirées de ce restaurant seulement (25/11/2026)
+    const err = await desactiverProduits([...selectedIds], etab);
+    if (err) { alert(err); setBulkActing(false); return; }
     mutate();
     clearSelection();
     setBulkActing(false);
@@ -353,7 +349,7 @@ function IngredientsPageInner() {
   };
   /** Interrupteur de la ligne : actif ↔ inactif, sans confirmation (réversible en un clic) */
   const toggleActif = async (x: Ingredient) => {
-    const err = x.is_active === false ? await reactiverProduits([x.id]) : await desactiverProduits([x.id]);
+    const err = x.is_active === false ? await reactiverProduits([x.id]) : await desactiverProduits([x.id], etab);
     if (err) { alert(err); return; }
     mutate();
   };
@@ -1072,6 +1068,10 @@ function IngredientsPageInner() {
       { table: "prep_recipe_lines", label: "préparation" },
       { table: "recipe_ingredients", label: "empâtement" },
     ] as const;
+    // Fiche partagée : retirée de ce restaurant seulement (25/11/2026)
+    const tri = await retirerPartagesDuCote([id], etab);
+    if (tri.erreur) { alert(tri.erreur); return; }
+    if (tri.partages > 0) { removeItem(id); return; }
     const checks = await Promise.all(
       recipeTables.map(async ({ table, label }) => {
         const { count } = await supabase.from(table).select("id", { count: "exact", head: true }).eq("ingredient_id", id);
@@ -1092,7 +1092,7 @@ function IngredientsPageInner() {
     const d2 = await supabase.from("ingredients").delete().eq("id", id);
     if (d2.error) { alert(d2.error.message); return; }
     removeItem(id);
-  }, [removeItem]);
+  }, [removeItem, etab]);
 
   const toggleEstablishment = useCallback(async (id: string, estab: "bellomio" | "piccola", current: string[]) => {
     const has = current.includes(estab);

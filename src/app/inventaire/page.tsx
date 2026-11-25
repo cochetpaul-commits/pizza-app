@@ -190,9 +190,9 @@ export default function InventairePage() {
   const etabId = etab?.id ?? null;
 
   async function fetchZones() {
-    let q = supabase.from("storage_zones").select("*").order("display_order").order("name");
-    if (etabId) q = q.eq("etablissement_id", etabId);
-    const { data } = await q;
+    // Jamais sans établissement (25/11/2026) : sinon les zones des deux restaurants se mélangent
+    if (!etabId) return [] as StorageZone[];
+    const { data } = await supabase.from("storage_zones").select("*").eq("etablissement_id", etabId).order("display_order").order("name");
     const zList = (data ?? []) as StorageZone[];
     setZones(zList);
     return zList;
@@ -201,6 +201,10 @@ export default function InventairePage() {
   const loadZones = fetchZones;
 
   useEffect(() => {
+    // Établissement pas encore connu (ouverture de l'appli) : on attend. Avant, une première lecture sans filtre
+    // ramenait zones et produits des deux restaurants, et pouvait arriver après la bonne et l'écraser (25/11/2026).
+    if (!etabId) return;
+    let annule = false;
     (async () => {
       // 03/11/2026 : fabriques de requêtes, lues par pages (1 142 produits et 1 414 offres dépassaient 1 000 lignes)
       const qBase = () => supabase
@@ -228,6 +232,7 @@ export default function InventairePage() {
         return (etabId ? r.eq("etablissement_id", etabId) : r).order("ingredient_id").order("zone").order("etablissement_id").order("rang").range(de, a);
       });
       const [{ data, error }, { data: zData }, { data: packData }, { data: supData }, { data: supAllData }, { data: xzData }] = await Promise.all([q, zq, packQ, supQ, supAllQ, xzQ]);
+      if (annule) return; // réponse d'un autre établissement, arrivée après le changement
       const xz: ExtraZones = {};
       for (const r of (xzData ?? []) as { ingredient_id: string; zone: string }[]) (xz[r.ingredient_id] ??= []).push(r.zone);
       setExtraZones(xz);
@@ -254,6 +259,7 @@ export default function InventairePage() {
       setIngSupplier(isMap);
       setSuppliers((supData ?? []) as { id: string; name: string }[]);
     })();
+    return () => { annule = true; };
   }, [etabId, etab?.slug]);
 
   // ── Load inventaires ──────────────────────────────────────
@@ -436,15 +442,37 @@ export default function InventairePage() {
       if (ing) upsertLigne(sess.id, id, qty, ing, zoneDb);
     }, 600);
   }, [upsertLigne]);
-  const retirerProduit = useCallback(async (ing: Ingredient) => {
-    if (!confirm(`Retirer "${ing.name}" de cet inventaire ?`)) return;
-    setQuantities((prev) => { const n = { ...prev }; delete n[ing.id]; return n; });
+  // Retirer un produit (25/11/2026) : seulement du côté de cet établissement. Une fiche partagée avec l'autre
+  // restaurant y reste active, avec ses offres ; seule une fiche propre à cet établissement est désactivée.
+  const etabCleRef = useRef<string | null>(null);
+  etabCleRef.current = etab?.slug?.includes("piccola") ? "piccola" : etab?.slug?.includes("bello") ? "bellomio" : null;
+  const etabIdRef = useRef<string | null>(null);
+  etabIdRef.current = etab?.id ?? null;
+  const retirerProduits = useCallback(async (liste: Ingredient[], confirmation: string) => {
+    if (liste.length === 0 || !confirm(confirmation)) return;
+    const ids = new Set(liste.map((i) => i.id));
+    setQuantities((prev) => { const n = { ...prev }; for (const k of Object.keys(n)) if (ids.has(k.split("|")[0])) delete n[k]; return n; });
     const sess = sessionRef.current;
-    if (sess) await supabase.from("inventaire_lignes").delete().eq("inventaire_id", sess.id).eq("ingredient_id", ing.id);
-    await supabase.from("ingredients").update({ is_active: false }).eq("id", ing.id);
-    await fermerOffresActives(supabase, ing.id);
-    setIngredients((prev) => prev.filter((p) => p.id !== ing.id));
+    const cle = etabCleRef.current;
+    const echecs: string[] = [];
+    for (const ing of liste) {
+      if (sess) await supabase.from("inventaire_lignes").delete().eq("inventaire_id", sess.id).eq("ingredient_id", ing.id);
+      const autres = (ing.establishments ?? []).filter((e) => e !== cle);
+      if (cle && (ing.establishments ?? []).includes(cle) && autres.length > 0) {
+        const { error } = await supabase.from("ingredients").update({ establishments: autres }).eq("id", ing.id);
+        if (error) { echecs.push(`${ing.name} : ${error.message}`); continue; }
+        if (etabIdRef.current) await supabase.from("ingredient_zones").delete().eq("etablissement_id", etabIdRef.current).eq("ingredient_id", ing.id);
+      } else {
+        const { error } = await supabase.from("ingredients").update({ is_active: false }).eq("id", ing.id);
+        if (error) { echecs.push(`${ing.name} : ${error.message}`); continue; }
+        await fermerOffresActives(supabase, ing.id);
+      }
+    }
+    setIngredients((prev) => prev.filter((p) => !ids.has(p.id)));
+    if (echecs.length) alert(`Pas retirés :\n${echecs.join("\n")}`);
   }, []);
+  const retirerProduit = useCallback((ing: Ingredient) => retirerProduits([ing],
+    `Retirer "${ing.name}" de cet inventaire ?${(ing.establishments ?? []).length > 1 ? "\nLa fiche reste chez l'autre restaurant." : ""}`), [retirerProduits]);
 
   // ── Bulk set category to 0 ─────────────────────────────────
 
@@ -1367,6 +1395,19 @@ export default function InventairePage() {
                         title="Confirmer tous les articles non saisis comme 0"
                       >
                         Tout à 0
+                      </span>
+                    )}
+                    {/* Retirer toute la catégorie (25/11/2026), comme une zone */}
+                    {!readOnly && items.length > 0 && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); void retirerProduits(items, `Retirer les ${items.length} produits de « ${label} » ?\nIls disparaissent de l'inventaire et de la base produits de ce restaurant ; les fiches partagées restent chez l'autre.`); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); void retirerProduits(items, `Retirer les ${items.length} produits de « ${label} » ?`); } }}
+                        style={{ ...stylePastilleBarre(color), fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}
+                        title="Retirer tous les produits de cette catégorie"
+                      >
+                        Retirer
                       </span>
                     )}
                     {/* Chevron */}
