@@ -82,6 +82,8 @@ export type FicheCarte = {
   in_catalogue: boolean;
   /** Préparation : poids produit (g) si connu */
   poids_g: number | null;
+  /** Coût au kilo (poids cuit s'il est saisi, sinon cru), enregistré par la fiche ou le recalcul */
+  cout_kg: number | null;
   /** Produire depuis la Carte (05/11/2026) : ingrédient phare, étapes, poids du pâton */
   pivot_ingredient_id: string | null;
   etapes: string[];
@@ -366,6 +368,7 @@ export async function GET(req: NextRequest) {
       popina_nom: touche?.nom ?? null,
       in_catalogue: f.in_catalogue !== false,
       poids_g: f.yield_grams != null ? Number(f.yield_grams) : null,
+      cout_kg: f.cost_per_kg != null && Number(f.cost_per_kg) > 0 ? arrondi(Number(f.cost_per_kg)) : null,
     };
   });
   const categories: CategorieFiche[] = (categoriesRows ?? []).map((c) => ({ slug: c.slug, nom: c.nom, couleur: c.couleur ?? "#939597", ordre: Number(c.sort_order) || 0, famille: c.famille_id ?? "autre" }));

@@ -9,19 +9,19 @@ import { useProfile } from "@/lib/ProfileContext";
 import { StepsList } from "@/components/v2/StepsList";
 import { IngredientListDnD, type IngredientLine } from "@/components/v2/IngredientListDnD";
 import { buildRecipeMeta, type RecipeIngredientMeta } from "@/lib/recipeMeta";
-import type { LatestOffer } from "@/types/ingredients";
 import {
   type FicheState, type Categorie, type Famille, type IngredientRef, type LigneIngredient, type Zone, type PrixLigne,
   ALLERGENES_14, PATON_BASE, coutRecetteTotal, coutPaton, coutPortion, prixTTC, prixHT,
   foodCostPct, margeBrute, prixConseille, fcColor, allergenesActifs, resumeAuto,
   eur, tmpKey, defaultFiche, ligneWeightG,
 } from "./ficheTypes";
-import { offerRowToCpu, enrichCpuWithConversions, type CpuByUnit } from "@/lib/offerPricing";
+import type { CpuByUnit } from "@/lib/offerPricing";
 import { formatCpuLabel } from "@/lib/formatPrice";
 import { openApiFile } from "@/lib/fetchApi";
 import { ProduireFiche } from "./ProduireFiche";
 import { couleurTexte } from "@/lib/styleCategories";
 import { useBureau } from "@/hooks/useBureau";
+import { construireMercuriale, estParPiece } from "@/lib/fiche/mercuriale";
 import { MODES_VENTE, estModeVente, modeVenteParDefaut, avecRestaurant, avecTraiteur, calculKilo, etatFoodCost } from "@/lib/fiche/modeVente";
 import { filtre } from "@/components/ui/charte";
 import { fermerOffresActives } from "@/lib/offerClosing";
@@ -40,8 +40,6 @@ type DraftEntry = {
 const autoCommeIngredient = (cat?: string | null, sc?: string | null) =>
   /^(preparation|production|sauce)$/i.test(cat ?? "") || /sirop|sauce|base|pr[ée]pa|infusion|pur[ée]e/i.test(sc ?? "");
 // Ingrédient maison compté à la pièce : son prix d'achat est enregistré « par pièce »
-const UNITES_PIECE = ["piece", "pièce", "unite", "unité", "pc", "pcs", "tasse", "bouteille"];
-const estParPiece = (label: unknown) => UNITES_PIECE.includes(String(label ?? "").toLowerCase().trim());
 const ARCHIVE_TTL_MS = 72 * 60 * 60 * 1000;
 const archiveKey = (etabSlug: string) => `fiche-drafts:${etabSlug}`;
 function readArchive(etabSlug: string): DraftEntry[] {
@@ -177,16 +175,9 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       for (const [k, v] of Object.entries(scMap)) scResult[k] = [...v.values()].sort((a, b) => a.localeCompare(b, "fr"));
       setExistingSubCats(scResult);
 
-      // Build CPU map from supplier offers
-      const cpuMap: Record<string, CpuByUnit> = {};
       const offerRows = (offRes.data ?? []) as Record<string, unknown>[];
-      const offerByIng: Record<string, LatestOffer> = {};
-      for (const o of offerRows) {
-        const iid = String(o.ingredient_id ?? "");
-        if (!iid) continue;
-        cpuMap[iid] = offerRowToCpu(o);
-        offerByIng[iid] = o as unknown as LatestOffer;
-      }
+      const ingList = (iRes.data ?? []) as Record<string, unknown>[];
+      const { cpuMap, offerByIng, mercs } = construireMercuriale(ingList, offerRows);
 
       // Noms des fournisseurs pour l'affichage (depuis le référentiel)
       const supNameById: Record<string, string> = ref.fournisseurs;
@@ -198,79 +189,6 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
         if (iid && sid) supByIng[iid] = supNameById[sid] ?? null;
       }
 
-      // Build mercuriale from ingredients + offers
-      const ingList = (iRes.data ?? []) as Record<string, unknown>[];
-      // Enrich CPU with ingredient meta (density, piece weight)
-      for (const i of ingList) {
-        const id = i.id as string;
-        // Fallback: purchase_price
-        const cpuOffre = cpuMap[id];
-        if (!cpuOffre || (!cpuOffre.g && !cpuOffre.ml && !cpuOffre.pcs)) {
-          const pp = Number(i.purchase_price) || 0;
-          const pu = Number(i.purchase_unit) || 1;
-          const pul = String(i.purchase_unit_label ?? "").toLowerCase().trim();
-          if (pp > 0 && pu > 0) {
-            const perUnit = pp / pu;
-            if (pul === "kg") cpuMap[id] = { g: perUnit / 1000 };
-            else if (pul === "g") cpuMap[id] = { g: perUnit };
-            else if (pul === "l" || pul === "litre") cpuMap[id] = { ml: perUnit / 1000 };
-            else if (pul === "cl") cpuMap[id] = { ml: perUnit / 10 };
-            else if (pul === "ml") cpuMap[id] = { ml: perUnit };
-            else if (estParPiece(pul)) cpuMap[id] = { pcs: perUnit };
-            else cpuMap[id] = { g: perUnit / 1000 }; // default: treat as kg
-          }
-        }
-        // Fallback: cost_per_unit (generated column, €/g)
-        if (!cpuMap[id] || (!cpuMap[id].g && !cpuMap[id].ml && !cpuMap[id].pcs)) {
-          const costPU = Number(i.cost_per_unit) || 0;
-          if (costPU > 0) cpuMap[id] = { g: costPU };
-        }
-        // Conversions (densité, poids pièce), aussi sur le prix d'achat de repli : une recette maison
-        // au kilo avec un poids par portion se compte alors à la pièce (1 tasse = 14 g de café)
-        let cpu = cpuMap[id];
-        if (cpu) {
-          cpu = enrichCpuWithConversions({
-            piece_weight_g: (i.piece_weight_g as number) ?? null,
-            density_kg_per_l: (i.density_g_per_ml as number) ?? null,
-          }, cpu);
-          // Derive ml from pcs + piece_volume_ml (e.g. bottle 750ml at 3.73€ → 0.00497 €/ml)
-          const pvml = Number(i.piece_volume_ml) || 0;
-          if (pvml > 0 && cpu.pcs != null && cpu.pcs > 0 && (cpu.ml == null || cpu.ml <= 0)) {
-            cpu = { ...cpu, ml: cpu.pcs / pvml };
-          }
-          cpuMap[id] = cpu;
-        }
-      }
-
-      const mercs: IngredientRef[] = ingList.map((i) => {
-        const id = i.id as string;
-        let allergens: string[] = [];
-        try { allergens = typeof i.allergens === "string" ? JSON.parse(i.allergens as string) : ((i.allergens as string[]) ?? []); } catch { /* */ }
-        const cpu = cpuMap[id] ?? {};
-        // Determine base unit from best available price
-        let base: "g" | "cl" | "pc" = "g";
-        let prixBase = cpu.g ?? 0;
-        if (cpu.ml != null && cpu.ml > 0 && (!cpu.g || cpu.g <= 0)) { base = "cl"; prixBase = cpu.ml * 10; } // €/ml → €/cl
-        else if (cpu.pcs != null && cpu.pcs > 0 && (!cpu.g || cpu.g <= 0) && (!cpu.ml || cpu.ml <= 0)) { base = "pc"; prixBase = cpu.pcs; }
-        // Override with density detection from category
-        const cat = String(i.category ?? "");
-        if (["vins", "spiritueux", "biere", "soft", "liqueurs", "sirops"].includes(cat) && cpu.ml != null && cpu.ml > 0) {
-          base = "cl"; prixBase = cpu.ml * 10;
-        }
-        if (i.source === "recette_maison" && estParPiece(i.purchase_unit_label) && cpu.pcs != null && cpu.pcs > 0) {
-          base = "pc"; prixBase = cpu.pcs;
-        }
-        return {
-          id,
-          nom_court: (i.name as string).replace(/\s+\d+[.,/]?\d*\s*(KG|G|GR|CL|ML|L|PCS|PIECES?|UNITE?S?|X)\b/gi, "").replace(/\s*~+\s*$/g, "").trim(),
-          nom_produit: i.name as string,
-          prix_base: prixBase,
-          unite_base: base,
-          allergenes: allergens,
-          cpu,
-          source: (i.source as string) ?? null,
-        };
-      });
       setMercuriale(mercs);
 
       // Build price labels for dropdown: "METRO · 9,30 €/kg"
@@ -600,6 +518,9 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
     const saveCostPerPortion = coutPortion(saveTotalCost, fiche.portions);
     const saveTtc = prixTTC(saveCostPerPortion, fiche.coeff, fiche.prix_ttc_manuel);
     const saveHt = prixHT(saveTtc, fiche.tva);
+    // Poids produit et coût au kilo (25/11/2026) : poids cuit s'il est saisi, sinon somme des ingrédients
+    const savePoidsCru = fiche.lignes.reduce((a: number, l: LigneIngredient) => a + ligneWeightG(l), 0) + (isPizza && fiche.paton_poids ? fiche.paton_poids : 0);
+    const savePoidsRef = fiche.cooked_weight_g && fiche.cooked_weight_g > 0 ? fiche.cooked_weight_g : savePoidsCru;
 
     const recData: Record<string, unknown> = {
       name: fiche.nom.trim(),
@@ -625,6 +546,8 @@ export default function FicheWizard({ recipeId, recipeType, initialCategorie, in
       sell_price_per_kg: fiche.sell_price_per_kg,
       sell_price_per_portion: fiche.sell_price_per_portion,
       cooked_weight_g: fiche.cooked_weight_g,
+      yield_grams: savePoidsRef > 0 ? Math.round(savePoidsRef) : 0, // colonne obligatoire (défaut 1000 = « 1 kg » trompeur)
+      cost_per_kg: savePoidsRef > 0 && saveTotalCost > 0 ? Math.round((saveTotalCost / savePoidsRef) * 1000 * 100) / 100 : null,
       prix_lignes: fiche.prix_lignes.length > 0 ? fiche.prix_lignes : null,
       description_courte: fiche.description || null,
       wine_pairing: fiche.accord || null,

@@ -15,6 +15,7 @@ import { EtatVide } from "@/components/ui/EtatVide";
 import { CelluleProduit, TableauMobile } from "@/components/ui/TableauMobile";
 import { couleurTexteSur, styleBarreCategorie } from "@/lib/styleCategories";
 import type { DonneesCarte, EditionFiche } from "./Carte";
+import { RecalculCouts } from "./RecalculCouts";
 import type { FicheCarte, ReponseCarte } from "@/app/api/carte/route";
 
 /**
@@ -108,8 +109,9 @@ function construire(d: ReponseCarte, mode: "fiches" | "preparations"): { lignes:
       id: f.id, groupe: g.cle, nom: f.nom,
       sous: prep ? rendement : (f.sous_categorie ?? f.description ?? null),
       statut: f.statut, nbIngredients: f.lignes.length,
-      cout: prep ? f.total_cost : f.cout,
-      coutLibelle: prep ? (f.total_cost != null ? "la recette" : null) : (f.cout != null ? (f.categorie === "pizza" ? "la pizza" : f.nb_parts > 1 ? "la part" : "la portion") : null),
+      // Préparations : le prix au kilo en avant, la recette en petit (25/11/2026, avec Paul)
+      cout: prep ? (f.cout_kg ?? f.total_cost) : f.cout,
+      coutLibelle: prep ? (f.cout_kg != null ? `le kilo${f.total_cost != null ? ` · ${euros(f.total_cost)} la recette` : ""}` : f.total_cost != null ? "la recette" : null) : (f.cout != null ? (f.categorie === "pizza" ? "la pizza" : f.nb_parts > 1 ? "la part" : "la portion") : null),
       prix: f.prix_ttc, prixLibelle: f.prix_source === "popina" ? "caisse" : f.prix_source === "fiche" ? "fiche" : null,
       foodCost: f.food_cost, fiche: f, href: null,
     });
@@ -237,6 +239,7 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
   const [statut, setStatut] = useState("tous");
   const [ouvertId, setOuvertId] = useState<string | null>(null);
   const [sectionsOuvertes, setSectionsOuvertes] = useState<Set<string>>(() => new Set());
+  const [recalcul, setRecalcul] = useState(false);
 
   const { lignes, groupes } = useMemo(() => (donnees ? construire(donnees, mode) : { lignes: [], groupes: [] }), [donnees, mode]);
   const groupeParCle = useMemo(() => new Map(groupes.map((g) => [g.cle, g])), [groupes]);
@@ -357,6 +360,8 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
         <select value={statut} onChange={(e) => setStatut(e.target.value)} style={SELECT}>
           <option value="tous">Statut : tous</option><option value="publiee">Publiées</option><option value="validee">Validées</option><option value="brouillon">Brouillons</option>{voir && <option value="sans_cout">Sans coût</option>}{voir && mode === "fiches" && <option value="sans_prix">Sans prix de vente</option>}
         </select>
+        {voir && peutEcrire && <button type="button" onClick={() => setRecalcul(true)} style={BTN}>Recalculer les coûts</button>}
+        {recalcul && <RecalculCouts onFermer={() => setRecalcul(false)} onApplique={source.recharger} />}
         {bureau && <span style={{ marginLeft: "auto", color: MUTED, fontSize: 12.5 }}>{filtrees.length} {mode === "fiches" ? "fiche" : "préparation"}{filtrees.length > 1 ? "s" : ""}</span>}
         <span style={{ display: "inline-flex", background: "#ece4d4", borderRadius: 10, padding: 3, gap: 3, marginLeft: bureau ? 0 : "auto" }}>
           {(["az", "cat"] as const).map((v) => (
