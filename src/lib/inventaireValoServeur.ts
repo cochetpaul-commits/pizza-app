@@ -60,7 +60,10 @@ export async function valoriserInventaire(invId: string, etabId: string): Promis
 
   const out: LigneValorisee[] = (lignes ?? []).map((l) => {
     const f = fiches.get(l.ingredient_id as string);
-    const q = totalLigne(l.colis as number | null, l.unites as number | null, l.cond_contenu as number | null);
+    // Saisie par zones (25/11/2026) : seule la quantité est enregistrée, sans colis ni unités. Une ligne de feuille
+    // non comptée a une quantité à 0 : elle reste « non comptée ». Même règle que la clôture.
+    const qFeuille = totalLigne(l.colis as number | null, l.unites as number | null, l.cond_contenu as number | null);
+    const q = qFeuille ?? (Number(l.quantite) > 0 ? Number(l.quantite) : null);
     const unite = (l.unite as string | null) ?? "pièce";
     let cout: number | null = l.cout_unitaire != null ? Number(l.cout_unitaire) : null;
     let source: string | null = cout != null ? "figé" : null;

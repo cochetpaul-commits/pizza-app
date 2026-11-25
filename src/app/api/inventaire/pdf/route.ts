@@ -4,7 +4,7 @@ import { etabAccessDenied } from "@/lib/getEtablissement";
 import React from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { InventairePdfDocument, type InventairePdfData } from "./InventairePdfDoc";
-import { valoriserInventaire } from "@/lib/inventaireValoServeur";
+import { valoriserInventaire, figerValorisation } from "@/lib/inventaireValoServeur";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,10 +29,18 @@ export async function GET(req: NextRequest) {
   const refus = await etabAccessDenied(req, inv.etablissement_id as string, ["group_admin", "manager"]);
   if (refus) return refus;
 
-  const [{ data: etab }, valo] = await Promise.all([
+  const [{ data: etab }, valoBrute] = await Promise.all([
     supabaseAdmin.from("etablissements").select("nom, slug, adresse, siret").eq("id", inv.etablissement_id).maybeSingle(),
     valoriserInventaire(invId, inv.etablissement_id as string),
   ]);
+
+  // Réparation (25/11/2026) : un inventaire « par zones » clôturé avant le correctif n'a jamais été valorisé
+  // (coûts non figés, total à 0). On le fait une fois ici, avec le calcul de la clôture serveur.
+  let valo = valoBrute;
+  if (inv.statut === "cloture" && !valo.lignes.some((l) => l.source === "figé") && valo.lignes.some((l) => l.cout != null && l.quantite != null)) {
+    await figerValorisation(invId, inv.etablissement_id as string);
+    valo = await valoriserInventaire(invId, inv.etablissement_id as string);
+  }
 
   const pdfData: InventairePdfData = {
     etabNom: (etab?.nom as string | undefined) ?? "",
@@ -52,11 +60,14 @@ export async function GET(req: NextRequest) {
 
   const el = InventairePdfDocument(pdfData) as unknown as React.ReactElement<DocumentProps>;
   const buffer = await renderToBuffer(el);
-  const dateStr = String(inv.date).replace(/-/g, "");
+  // Nom du fichier : type d'inventaire, raison sociale et établissement, date (« Inventaire mensuel - SARL SASHA Bello Mio - 25-11-2026.pdf »)
+  const [a, m, j] = String(inv.date).split("-");
+  const nomFichier = [pdfData.type, [pdfData.raisonSociale, pdfData.etabNom].filter(Boolean).join(" "), `${j}-${m}-${a}`].filter(Boolean).join(" - ") + ".pdf";
+  const nomAscii = nomFichier.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7e]/g, "").replace(/["\\]/g, "");
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="inventaire-${(etab?.slug as string | undefined) ?? "etab"}-${dateStr}.pdf"`,
+      "Content-Disposition": `inline; filename="${nomAscii}"; filename*=UTF-8''${encodeURIComponent(nomFichier)}`,
       "Cache-Control": "no-store",
     },
   });

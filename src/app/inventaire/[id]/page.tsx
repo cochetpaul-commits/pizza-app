@@ -661,7 +661,7 @@ function Feuille() {
             </button>
           )}
           {voirMontants && lignes.length > 0 && (
-            <button type="button" onClick={() => openApiFile(`/api/inventaire/pdf?id=${id}`)} style={boutonBas("#fff", "#1a1a1a")} title="Export comptable : valorisation HT par zone, famille et catégorie">
+            <button type="button" onClick={() => openApiFile(`/api/inventaire/pdf?id=${id}`, { telecharger: true })} style={boutonBas("#fff", "#1a1a1a")} title="Export comptable : valorisation HT par zone, famille et catégorie">
               PDF comptable
             </button>
           )}

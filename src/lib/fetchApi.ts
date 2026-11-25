@@ -60,14 +60,24 @@ export async function fetchApi(
  * par fetchApi pour porter le jeton (un simple lien n'en a pas).
  * L'onglet est ouvert AVANT l'attente réseau : Safari bloque sinon la popup.
  */
-export async function openApiFile(url: string): Promise<void> {
-  const w = typeof window !== "undefined" ? window.open("", "_blank") : null;
+export async function openApiFile(url: string, { telecharger = false }: { telecharger?: boolean } = {}): Promise<void> {
+  // Téléchargement (25/11/2026) : un fichier ouvert depuis la mémoire perd son nom (« Unknown.pdf ») ;
+  // téléchargé, il garde celui que donne le serveur.
+  const w = !telecharger && typeof window !== "undefined" ? window.open("", "_blank") : null;
   try {
     const res = await fetchApi(url);
     if (!res.ok) throw new Error(String(res.status));
     const blob = await res.blob();
     const objectUrl = URL.createObjectURL(blob);
-    if (w) w.location.href = objectUrl; else window.open(objectUrl, "_blank");
+    if (telecharger) {
+      const cd = res.headers.get("content-disposition") ?? "";
+      const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(cd)?.[1];
+      const simple = /filename="?([^";]+)"?/i.exec(cd)?.[1];
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = utf8 ? decodeURIComponent(utf8) : simple ?? "document.pdf";
+      document.body.appendChild(a); a.click(); a.remove();
+    } else if (w) w.location.href = objectUrl; else window.open(objectUrl, "_blank");
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
   } catch {
     if (w) w.close();

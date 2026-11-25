@@ -404,7 +404,7 @@ export default function InventairePage() {
     }
     // Plus d'unicité produit × zone en base (feuilles papier : un produit peut y être deux fois) : mise à jour, sinon création
     const a = auteurRef.current;
-    const valeurs = { quantite: qty, unite: ing.default_unit ?? null, cout_unitaire: ing.cost_per_unit ?? null, updated_at: new Date().toISOString(), saisi_par: a.user, saisi_par_nom: a.nom, saisi_par_employe: a.employe };
+    const valeurs = { quantite: qty, unite: ing.default_unit ?? null, cout_unitaire: null, updated_at: new Date().toISOString(), saisi_par: a.user, saisi_par_nom: a.nom, saisi_par_employe: a.employe };
     // Une écriture refusée se voit (05/11/2026) : avant, un comptage sur la tablette se perdait sans message
     const { data: maj, error: errMaj } = await supabase.from("inventaire_lignes").update(valeurs)
       .eq("inventaire_id", sessionId).eq("ingredient_id", ingredientId).eq("zone", zoneDb).select("id");
@@ -481,24 +481,26 @@ export default function InventairePage() {
 
     setSaving(true);
 
-    // Valeur totale : somme des quantités de TOUTES les zones par produit
-    let total = 0;
-    for (const ing of ingredients) {
-      const qty = ingTotals.totals[ing.id] ?? 0;
-      if (qty > 0 && ing.cost_per_unit != null) {
-        total += qty * ing.cost_per_unit;
+    // Clôture par le serveur (25/11/2026), comme la saisie par feuille : coûts figés au dernier prix connu, total HT
+    // et mouvements de stock. Avant, la clôture se faisait ici avec un prix au gramme : total à 0 et coûts jamais figés.
+    // Un compte sans droit de clôture serveur (tablette) garde l'ancienne voie ; le PDF valorise alors à la première ouverture.
+    let parServeur = false;
+    try {
+      const res = await fetchApi(`/api/inventaires/${session.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "cloturer" }) });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) {
+        parServeur = true;
+        if (j.avertissement) alert(String(j.avertissement));
+      } else if (res.status !== 401 && res.status !== 403) {
+        alert(j.error ?? "Clôture impossible"); setSaving(false); return;
       }
-    }
+    } catch { /* réseau : voie locale ci-dessous */ }
 
-    const { error } = await supabase.from("inventaires").update({
-      statut: "cloture",
-      total_valeur: Math.round(total * 100) / 100,
-      cloture_par: userId,
-      cloture_par_nom: auteurRef.current.nom,
-      cloture_at: new Date().toISOString(),
-    }).eq("id", session.id);
+    const { error } = await supabase.from("inventaires").update(parServeur
+      ? { cloture_par_nom: auteurRef.current.nom }
+      : { statut: "cloture", cloture_par: userId, cloture_par_nom: auteurRef.current.nom, cloture_at: new Date().toISOString() }).eq("id", session.id);
 
-    if (error) { alert(error.message); setSaving(false); return; }
+    if (error && !parServeur) { alert(error.message); setSaving(false); return; }
 
     // Mémoriser les emplacements : chaque (produit, zone) compté > 0 est retenu
     // pour le prochain inventaire (Molecola vu au BAR, à l'ANNEXE et en CARAVANE).
@@ -532,7 +534,7 @@ export default function InventairePage() {
         note: `Inventaire du ${new Date().toLocaleDateString("fr-FR")}`,
       }));
 
-    if (movements.length > 0) {
+    if (!parServeur && movements.length > 0) {
       // Remplacement atomique (idempotent) : l'ancien effacer-puis-insérer
       // pouvait perdre les mouvements si la seconde requête échouait.
       const { error: mvErr } = await supabase.rpc("inventaire_replace_movements", {
@@ -868,7 +870,7 @@ export default function InventairePage() {
                       <td style={TD}><span style={{ fontWeight: 600, fontSize: 13.5 }}>{fmtDate(inv.date)}</span> <span style={{ ...pastille(BON), marginLeft: 6 }}>Clôturé</span></td>
                       {voirMontants && <td style={{ ...TD, textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{inv.total_valeur != null ? fmtMoney(inv.total_valeur) : "-"}</td>}
                       <td style={{ ...TD, textAlign: "right" }}>
-                        {voirMontants && <button type="button" onClick={(e) => { e.stopPropagation(); openApiFile(`/api/inventaire/pdf?id=${inv.id}`); }} style={{ ...BTN, padding: "3px 10px", fontSize: 11, color: MUTED }}>PDF</button>}
+                        {voirMontants && <button type="button" onClick={(e) => { e.stopPropagation(); openApiFile(`/api/inventaire/pdf?id=${inv.id}`, { telecharger: true }); }} style={{ ...BTN, padding: "3px 10px", fontSize: 11, color: MUTED }}>PDF</button>}
                       </td>
                     </tr>
                   ))}
@@ -935,7 +937,7 @@ export default function InventairePage() {
             {/* PDF export */}
             {(isActive || isViewing) && currentInv && (
               <button
-                onClick={() => openApiFile(`/api/inventaire/pdf?id=${currentInv.id}`)}
+                onClick={() => openApiFile(`/api/inventaire/pdf?id=${currentInv.id}`, { telecharger: true })}
                 style={{ ...BTN, color: MUTED }}
               >
                 PDF
