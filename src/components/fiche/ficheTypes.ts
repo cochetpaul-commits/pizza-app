@@ -133,11 +133,27 @@ export const ALLERGENES_14 = [
 ];
 
 // ── Calculs ──
+/**
+ * Coût d'une ligne, la même règle que la colonne « Coût » de la liste d'ingrédients :
+ * quand l'unité saisie n'est pas celle du prix (crème achetée au litre, pesée en grammes),
+ * on convertit avec 1 ml ≈ 1 g au lieu de multiplier un prix au cl par des grammes.
+ */
 export function coutLigne(ligne: LigneIngredient): number {
-  if (!ligne.ingredient) return 0;
-  const u = UNITS[ligne.unite];
+  const ing = ligne.ingredient;
+  if (!ing || !(ligne.quantite > 0)) return 0;
+  const brute = ligne.unite ?? "g";
+  const u = UNITS[brute] ?? UNITS[brute.toLowerCase()] ?? (/^pcs?$/i.test(brute) ? UNITS.pc : undefined);
   if (!u) return 0;
-  return ligne.ingredient.prix_base * ligne.quantite * u.factor;
+  const q = ligne.quantite * u.factor; // en g, en cl ou en pièces
+  if (u.base === ing.unite_base) return ing.prix_base * q;
+  // Prix par g, par ml et par pièce, complétés avec 1 ml ≈ 1 g
+  const cpu = ing.cpu ?? {};
+  const parMl = cpu.ml ?? (ing.unite_base === "cl" ? ing.prix_base / 10 : undefined);
+  const parG = cpu.g ?? (ing.unite_base === "g" ? ing.prix_base : undefined);
+  const parPc = cpu.pcs ?? (ing.unite_base === "pc" ? ing.prix_base : undefined);
+  if (u.base === "g") { const p = parG ?? parMl; return p ? p * q : 0; }
+  if (u.base === "cl") { const p = parMl ?? parG; return p ? p * q * 10 : 0; }
+  return parPc ? parPc * q : 0;
 }
 
 export function coutRecetteTotal(lignes: LigneIngredient[], coutPaton: number): number {
