@@ -5,7 +5,7 @@ import path from "path";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { FicheTechniquePdf, type FicheTechniquePdfData } from "@/lib/ficheTechniquePdf";
-import { couleurCategorie, LIBELLES_CATEGORIE, moisAnnee } from "@/lib/ficheTechnique";
+import { clairCategorie, couleurCategorie, LIBELLES_CATEGORIE, moisAnnee } from "@/lib/ficheTechnique";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,11 +71,14 @@ export async function GET(req: NextRequest) {
     nom: String(r.name ?? "Recette"),
     categorie: LIBELLES_CATEGORIE[String(r.category)] ?? String(r.category ?? "Fiche"),
     couleur: couleurCategorie(r.category as string | null),
+    clair: clairCategorie(r.category as string | null),
     portions: portionsTexte,
     miseAJour: moisAnnee(new Date(String(r.updated_at ?? new Date().toISOString()))),
     logo: logo(),
     lignes: lignesPdf.map((l) => ({ nom: l.name ?? "—", qte: l.qty, unite: l.unit ?? "g", stage: l.stage })),
     etapes: listeEtapes(r.procedure).length ? listeEtapes(r.procedure) : listeEtapes(r.notes),
+    // « À retenir » : les notes, seulement quand elles ne servent pas déjà d'instructions
+    notes: listeEtapes(r.procedure).length && typeof r.notes === "string" ? r.notes : null,
   };
 
   const buffer = await renderToBuffer(FicheTechniquePdf({ data }) as unknown as React.ReactElement<DocumentProps>);

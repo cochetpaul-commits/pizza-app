@@ -9,9 +9,12 @@ export const COULEURS_CATEGORIE: Record<string, string> = {
   entree: "#c49a3c", antipasti: "#c49a3c",
   plat_cuisine: "#a63d2f", pizza: "#a63d2f", accompagnement: "#a63d2f",
   dessert: "#8b4572",
-  preparation: "#1a8a7d", sauce: "#1a8a7d",
+  preparation: "#2d5c4f", sauce: "#2d5c4f",
 };
-export const COULEUR_DEFAUT = "#1a8a7d";
+export const COULEUR_DEFAUT = "#2d5c4f";
+/** Teinte claire (fond alterné des tableaux, badge portions, onglets de phase) — brief du 26/11/2026 */
+const CLAIRS: Record<string, string> = { "#c49a3c": "#faf5eb", "#a63d2f": "#faf0ee", "#8b4572": "#f9f0f5", "#2d5c4f": "#e8f0ed" };
+export const clairCategorie = (c: string | null | undefined) => CLAIRS[couleurCategorie(c)] ?? "#e8f0ed";
 export const LIBELLES_CATEGORIE: Record<string, string> = {
   entree: "Entrée", antipasti: "Antipasti", plat_cuisine: "Plat", pizza: "Pizza", accompagnement: "Accompagnement",
   dessert: "Dessert", preparation: "Préparation", sauce: "Sauce", cocktail: "Cocktail", mocktail: "Mocktail",

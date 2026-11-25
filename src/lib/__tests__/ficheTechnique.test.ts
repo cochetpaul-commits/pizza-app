@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { couleurCategorie, decouperProcede, grouperIngredients, quantite } from "@/lib/ficheTechnique";
+import { clairCategorie, couleurCategorie, decouperProcede, grouperIngredients, quantite } from "@/lib/ficheTechnique";
 
 describe("fiche technique PDF", () => {
   it("couleurs par catégorie", () => {
     expect(couleurCategorie("entree")).toBe("#c49a3c");
     expect(couleurCategorie("plat_cuisine")).toBe("#a63d2f");
     expect(couleurCategorie("dessert")).toBe("#8b4572");
-    expect(couleurCategorie("preparation")).toBe("#1a8a7d");
-    expect(couleurCategorie("inconnue")).toBe("#1a8a7d");
+    expect(couleurCategorie("preparation")).toBe("#2d5c4f");
+    expect(couleurCategorie("inconnue")).toBe("#2d5c4f");
+    expect(clairCategorie("entree")).toBe("#faf5eb");
+    expect(clairCategorie("dessert")).toBe("#f9f0f5");
+    expect(clairCategorie("inconnue")).toBe("#e8f0ed");
   });
   it("découpe le procédé en phases, numérotation continue", () => {
     const p = decouperProcede(["PESTO : Mettre basilic dans le robot.", "Mixer.", "BASE : Chauffer l'huile.", "FAÇONNAGE : Remplir les moules."]);
