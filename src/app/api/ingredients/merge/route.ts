@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     // Verify both ingredients exist
     const { data: ings } = await supabaseAdmin
       .from("ingredients")
-      .select("id")
+      .select("id, establishments")
       .in("id", [keepId, deleteId]);
 
     if (!ings || ings.length < 2) {
@@ -76,6 +76,11 @@ export async function POST(req: Request) {
         { ok: false, error: "Un ou plusieurs ingrédients introuvables." },
         { status: 404 }
       );
+    }
+    // Fiches séparées par restaurant (26/11/2026) : jamais de fusion entre une fiche de Bello Mio et une de Piccola Mia
+    const [e1, e2] = (ings as { establishments: string[] | null }[]).map((i) => i.establishments ?? []);
+    if (e1.length && e2.length && !e1.some((e) => e2.includes(e))) {
+      return NextResponse.json({ ok: false, error: "Ces deux fiches appartiennent à deux restaurants différents : chacun garde la sienne." }, { status: 409 });
     }
 
     const errors: string[] = [];

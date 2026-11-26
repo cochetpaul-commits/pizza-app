@@ -26,7 +26,7 @@ export function useDoublons(ignores: Set<string>, version = 0): EtatDoublons & {
       try {
         const [{ data: produits, error: e1 }, { data: offres, error: e2 }, { data: fournisseurs }] = await Promise.all([
           // 03/11/2026 : par pages (1 550 produits, 1 414 offres)
-          toutesLesPages((de, a) => supabase.from("ingredients").select("id, name, category, sub_category, is_active, supplier_id").eq("is_active", true).order("name").order("id").range(de, a)),
+          toutesLesPages((de, a) => supabase.from("ingredients").select("id, name, category, sub_category, is_active, supplier_id, establishments").eq("is_active", true).order("name").order("id").range(de, a)),
           toutesLesPages((de, a) => supabase.from("supplier_offers").select("ingredient_id, supplier_id, created_at, unit_price, unit").eq("is_active", true).order("created_at", { ascending: false }).order("id").range(de, a)),
           supabase.from("suppliers").select("id, name"),
         ]);
@@ -39,6 +39,10 @@ export function useDoublons(ignores: Set<string>, version = 0): EtatDoublons & {
     })();
     return () => { annule = true; };
   }, [version]);
-  const paires = useMemo(() => detectDuplicates(etat.produits, etat.offres, ignores), [etat.produits, etat.offres, ignores]);
+  // Fiches séparées par restaurant (26/11/2026) : la copie Piccola d'une fiche Bello Mio n'est pas un doublon
+  const paires = useMemo(() => detectDuplicates(etat.produits, etat.offres, ignores).filter((p) => {
+    const a = p.a.establishments ?? [], b = p.b.establishments ?? [];
+    return a.length === 0 || b.length === 0 || a.some((e) => b.includes(e));
+  }), [etat.produits, etat.offres, ignores]);
   return { ...etat, paires };
 }
