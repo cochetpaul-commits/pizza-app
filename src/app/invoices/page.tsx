@@ -83,8 +83,12 @@ type BatchItem = {
 };
 
 
-/** Journal de la récupération automatique des factures Pennylane (Bello Mio) */
+/** Journal de la récupération automatique des factures Pennylane, pour le restaurant sélectionné (26/11/2026 : les deux) */
 function AutoImportJournal() {
+  const { current: etabCourant } = useEtablissement();
+  const etabId = etabCourant?.id ?? null;
+  const etabNom = etabCourant?.nom ?? "";
+  const etabCle = etabCourant?.slug?.includes("piccola") ? "piccola" : etabCourant?.slug?.includes("bello") ? "bello" : "";
   type Row = { pennylane_id: number; fournisseur: string | null; invoice_number: string | null; invoice_date: string | null; montant_ttc: number | null; statut: string; detail: string | null; processed_at: string };
   const [rows, setRows] = useState<Row[]>([]);
   const [ouvert, setOuvert] = useState(false);
@@ -95,10 +99,11 @@ function AutoImportJournal() {
       .from("auto_import_factures")
       .select("pennylane_id, fournisseur, invoice_number, invoice_date, montant_ttc, statut, detail, processed_at")
       .neq("statut", "hors_mercuriale")
+      .eq("etablissement_id", etabId ?? "")
       .order("processed_at", { ascending: false })
       .limit(12);
     setRows((data ?? []) as Row[]);
-  }, []);
+  }, [etabId]);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void charger();
@@ -107,9 +112,13 @@ function AutoImportJournal() {
   const lancer = async () => {
     setLancement(true);
     try {
-      const res = await fetchApi("/api/cron/factures-auto?days=10");
+      const res = await fetchApi(`/api/cron/factures-auto?days=10${etabCle ? `&etab=${etabCle}` : ""}`);
       const d = await res.json();
-      alert(d.ok ? `Terminé : ${d.importees} importée(s), ${d.dejaConnues} déjà connue(s), ${d.aVerifier} à vérifier, ${d.erreurs} erreur(s).` : `Erreur : ${d.error}`);
+      // Réponse par restaurant ({ ok, "Piccola Mia": { importees, … } }) : on additionne
+      const parts = Object.values(d as Record<string, unknown>).filter((v): v is Record<string, number> => !!v && typeof v === "object");
+      const somme = (k: string) => parts.reduce((t, p) => t + (Number(p[k]) || 0), 0);
+      const erreurPart = parts.map((p) => (p as unknown as { erreur?: string }).erreur).find(Boolean);
+      alert(d.ok ? (erreurPart ? `Erreur : ${erreurPart}` : `Terminé : ${somme("importees")} importée(s), ${somme("dejaConnues")} déjà connue(s), ${somme("aVerifier")} à vérifier, ${somme("erreurs")} erreur(s).`) : `Erreur : ${d.error}`);
       await charger();
     } catch { alert("Erreur réseau"); }
     setLancement(false);
@@ -122,9 +131,9 @@ function AutoImportJournal() {
     <div style={{ background: "#fff", border: "1px solid #ddd6c8", borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>⚙️ Récupération automatique (Bello Mio)</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>Récupération automatique{etabNom ? ` (${etabNom})` : ""}</div>
           <div style={{ fontSize: 11.5, color: "#8a8378", marginTop: 2 }}>
-            Chaque matin, les factures déposées dans Pennylane (Drive, mail, photo) sont importées toutes seules : produits et prix pour les fournisseurs nourriture, montant + catégorie pour le reste. Piccola Mia reste en import manuel.
+            Chaque matin, les factures déposées dans le Pennylane de ce restaurant (Drive, mail, photo) sont importées toutes seules : produits et prix pour les fournisseurs nourriture, montant et catégorie pour le reste. Une facture peut aussi être importée à la main ci-dessous.
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
