@@ -33,6 +33,13 @@ const FK_COLUMNS: ReadonlyArray<readonly [table: string, column: string]> = [
   ["kitchen_recipes", "pivot_ingredient_id"],
   ["kitchen_recipes", "output_ingredient_id"],
   ["ingredients", "parent_ingredient_id"],
+  // 26/11/2026 : tables sans clé étrangère ou oubliées (sinon lignes orphelines ou effacées en cascade)
+  ["inventaire_lignes", "ingredient_id"],
+  ["supplier_offers_a_valider", "ingredient_id"],
+  ["ingredient_supplier_refs", "ingredient_id"],
+  ["commande_articles", "ingredient_id"],
+  ["ingredient_zones", "ingredient_id"],
+  ["courses_personnel", "ingredient_id"],
 ] as const;
 
 export async function POST(req: Request) {
@@ -118,7 +125,26 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2. Delete supplier_offers for the deleted ingredient
+    // 2. Prix (26/11/2026) : les offres de la fiche supprimée passent sur la fiche gardée, au lieu d'être effacées.
+    // Deux offres actives chez le même fournisseur : la plus récente reste active, l'autre est fermée.
+    {
+      const aujourdhui = new Date().toISOString().slice(0, 10);
+      const dateOffre = (o: { valid_from: string | null; created_at: string | null }) => o.valid_from ?? (o.created_at ?? "").slice(0, 10);
+      const { data: offD } = await supabaseAdmin.from("supplier_offers").select("id, supplier_id, is_active, valid_from, created_at").eq("ingredient_id", deleteId);
+      const { data: offK } = await supabaseAdmin.from("supplier_offers").select("id, supplier_id, is_active, valid_from, created_at").eq("ingredient_id", keepId).eq("is_active", true);
+      for (const o of (offD ?? []).filter((x) => x.is_active)) {
+        const rival = (offK ?? []).find((k) => k.supplier_id === o.supplier_id);
+        if (!rival) continue;
+        const perdant = dateOffre(o) > dateOffre(rival) ? rival.id : o.id;
+        await supabaseAdmin.from("supplier_offers").update({ is_active: false, valid_to: aujourdhui }).eq("id", perdant);
+      }
+      if ((offD ?? []).length) {
+        const { error: mvErr } = await supabaseAdmin.from("supplier_offers").update({ ingredient_id: keepId }).eq("ingredient_id", deleteId);
+        if (mvErr) errors.push(`supplier_offers (reprise des prix) : ${mvErr.message}`);
+      }
+    }
+
+    // 2 bis. Offres restantes de la fiche supprimée (reprise impossible)
     const { error: offersErr } = await supabaseAdmin
       .from("supplier_offers")
       .delete()

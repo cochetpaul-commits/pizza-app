@@ -11,7 +11,8 @@ import { CAT_COLORS, CAT_LABELS, type Category, type Ingredient } from "@/types/
 import { couleurTexte } from "@/lib/styleCategories";
 import { EtatVide } from "@/components/ui/EtatVide";
 import { Chargement } from "@/components/analyse/Blocs";
-import { BON, BORD, BTN, CADRE, CHAMP, FAIBLE, MAUVAIS, MUTED, TD, TH, alpha, h1, liseret, pastille } from "@/components/ui/charte";
+import { ATTENTION, BON, BORD, BTN, CADRE, CHAMP, FAIBLE, MAUVAIS, MUTED, TD, TH, alpha, h1, liseret, pastille } from "@/components/ui/charte";
+import { useVoirMontants } from "@/lib/useVoirMontants";
 
 /**
  * Base produits › Doublons probables (page à part, 29/10/2026). Même détection que la tuile de la Base
@@ -24,8 +25,22 @@ import { BON, BORD, BTN, CADRE, CHAMP, FAIBLE, MAUVAIS, MUTED, TD, TH, alpha, h1
  */
 type Choix = "fusion" | "non";
 
+type OffreDoublon = { unit_price: number | null; unit: string | null; pack_price: number | null; valid_from?: string | null; created_at?: string | null };
+const dateCourte = (d: string | null | undefined) => (d ? new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "2-digit" }) : null);
+const prixOffre = (o: OffreDoublon | undefined) => {
+  if (!o) return null;
+  const eur = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  if (o.unit_price != null && o.unit_price > 0) return `${eur(o.unit_price)} / ${o.unit === "pc" ? "pièce" : o.unit ?? "u"}`;
+  if (o.pack_price != null && o.pack_price > 0) return `${eur(o.pack_price)} le colis`;
+  return null;
+};
+const dateOffre = (o: OffreDoublon | undefined) => (o ? (o.valid_from ?? o.created_at ?? null) : null);
+
 export function Doublons() {
   const bureau = useBureau();
+  // Prix d'achat : responsables seulement ; les autres voient « prix connu » ou « sans prix »
+  const voirMontants = useVoirMontants();
+  const prix = (o: OffreDoublon | undefined) => { const t = prixOffre(o); return t && !voirMontants ? "prix connu" : t; };
   // Paires écartées : partagées entre appareils depuis le 24/11/2026 (table doublons_ecartes)
   const { ignores, pret: ignoresPrets, erreur: erreurEcartes, ecarter } = useDoublonsEcartes();
   const [q, setQ] = useState("");
@@ -47,6 +62,16 @@ export function Doublons() {
       .sort((x, y) => x.a.name.localeCompare(y.a.name, "fr"));
   }, [etat.paires, faits, supprimes, q]);
 
+  // Fiche à garder par défaut (26/11/2026) : celle qui a un prix, et entre deux prix le plus récent
+  const offreDe = (id: string) => etat.offres.get(id) as unknown as OffreDoublon | undefined;
+  const parDefaut = (p: DuplicatePair) => {
+    const oa = prixOffre(offreDe(p.a.id)) ? offreDe(p.a.id) : undefined, ob = prixOffre(offreDe(p.b.id)) ? offreDe(p.b.id) : undefined;
+    if (oa && !ob) return p.a.id;
+    if (ob && !oa) return p.b.id;
+    if (oa && ob) return (dateOffre(ob) ?? "") > (dateOffre(oa) ?? "") ? p.b.id : p.a.id;
+    return p.a.id;
+  };
+  const gardee = (p: DuplicatePair) => garde[p.pairKey] ?? parDefaut(p);
   const choisir = (p: DuplicatePair, c: Choix) => setChoix((x) => { const n = { ...x }; if (n[p.pairKey] === c) delete n[p.pairKey]; else n[p.pairKey] = c; return n; });
   /** Le même choix sur toutes les paires affichées (le filtre compte), ou tout effacer */
   const choisirTout = (c: Choix | null) => setChoix((x) => { const n = { ...x }; for (const p of paires) { if (c) n[p.pairKey] = c; else delete n[p.pairKey]; } return n; });
@@ -54,7 +79,7 @@ export function Doublons() {
   const aEcarter = useMemo(() => etat.paires.filter((p) => choix[p.pairKey] === "non"), [etat.paires, choix]);
 
   const fusionner = async (p: DuplicatePair): Promise<boolean> => {
-    const keepId = garde[p.pairKey] ?? p.a.id;
+    const keepId = gardee(p);
     const deleteId = keepId === p.a.id ? p.b.id : p.a.id;
     setBusy(p.pairKey);
     try {
@@ -129,13 +154,13 @@ export function Doublons() {
       <div style={CADRE}>
         {etat.chargement || !ignoresPrets ? <Chargement texte="Comparaison des noms…" /> : paires.length === 0 ? <EtatVide icone="produit" titre="Aucun doublon probable" texte={q ? "Rien ne correspond à ce filtre." : "Tous les noms de produits sont distincts, ou les paires ont été écartées."} /> : (
           <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-            <colgroup><col style={{ width: 6 }} /><col style={{ width: 40 }} /><col />{bureau && <col style={{ width: 150 }} />}{bureau && <col style={{ width: 140 }} />}<col style={{ width: bureau ? 90 : 68 }} /></colgroup>
+            <colgroup><col style={{ width: 6 }} /><col style={{ width: 40 }} /><col />{bureau && <col style={{ width: 130 }} />}{bureau && <col style={{ width: 120 }} />}{bureau && <col style={{ width: 150 }} />}{bureau && <col style={{ width: 90 }} />}<col style={{ width: bureau ? 90 : 68 }} /></colgroup>
             <thead><tr>
-              <th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={TH}>Produit</th>{bureau && <th style={TH}>Catégorie</th>}{bureau && <th style={TH}>Fournisseur</th>}<th style={{ ...TH, textAlign: "right", ...(bureau ? {} : { paddingLeft: 0, paddingRight: 10 }) }}>{bureau ? "Proximité" : "Proche"}</th>
+              <th style={{ ...TH, padding: 0 }} /><th style={{ ...TH, padding: 0 }} /><th style={TH}>Produit</th>{bureau && <th style={TH}>Catégorie</th>}{bureau && <th style={TH}>Fournisseur</th>}{bureau && <th style={TH}>Dernier prix</th>}{bureau && <th style={TH}>Fiche créée</th>}<th style={{ ...TH, textAlign: "right", ...(bureau ? {} : { paddingLeft: 0, paddingRight: 10 }) }}>{bureau ? "Proximité" : "Proche"}</th>
             </tr></thead>
             <tbody>
               {paires.map((p) => {
-                const keepId = garde[p.pairKey] ?? p.a.id;
+                const keepId = gardee(p);
                 const c = CAT_COLORS[(p.a.category ?? "") as Category] ?? FAIBLE;
                 return (
                   <Fragment key={p.pairKey}>
@@ -151,18 +176,27 @@ export function Doublons() {
                               <span style={bureau ? { fontWeight: on ? 700 : 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : { fontWeight: on ? 700 : 600, overflowWrap: "anywhere", lineHeight: 1.25 }}>{x.name}</span>
                               {on && <span style={pastille(BON)}>à garder</span>}
                             </div>
-                            {!bureau && <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{fournisseur(x)}</div>}
+                            {!bureau && <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{fournisseur(x)} · {prix(offreDe(x.id)) ? <b style={{ color: "#1a1a1a" }}>{prix(offreDe(x.id))}</b> : <span style={{ color: MAUVAIS, fontWeight: 700 }}>sans prix</span>}{dateCourte(dateOffre(offreDe(x.id))) ? ` du ${dateCourte(dateOffre(offreDe(x.id)))}` : ""}{x.created_at ? ` · créée le ${dateCourte(x.created_at)}` : ""}</div>}
                           </td>
                           {bureau && <td style={TD}>{cat(x)}</td>}
                           {bureau && <td style={{ ...TD, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fournisseur(x)}</td>}
+                          {bureau && <td style={{ ...TD, whiteSpace: "nowrap" }}>
+                            {prix(offreDe(x.id)) ? <><div style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{prix(offreDe(x.id))}</div>{dateCourte(dateOffre(offreDe(x.id))) && <div style={{ fontSize: 11.5, color: MUTED }}>du {dateCourte(dateOffre(offreDe(x.id)))}</div>}</> : <span style={pastille(MAUVAIS)}>sans prix</span>}
+                          </td>}
+                          {bureau && <td style={{ ...TD, color: MUTED, whiteSpace: "nowrap" }}>{dateCourte(x.created_at) ?? "—"}</td>}
                           <td style={{ ...TD, textAlign: "right" }}>{x.id === p.a.id && <span style={pastille(p.score >= 0.95 ? MAUVAIS : p.score >= 0.88 ? "#b7791f" : MUTED, p.score < 0.88 ? "rgba(0,0,0,0.06)" : undefined)}>{Math.round(p.score * 100)} %</span>}</td>
                         </tr>
                       );
                     })}
                     <tr>
                       <td style={{ ...liseret("transparent"), borderBottom: `1px solid ${BORD}` }} />
-                      <td colSpan={bureau ? 5 : 3} style={{ ...TD, borderBottom: `1px solid ${BORD}`, padding: "8px 14px 12px", background: "#faf7f1" }}>
-                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                      <td colSpan={bureau ? 7 : 3} style={{ ...TD, borderBottom: `1px solid ${BORD}`, padding: "8px 14px 12px", background: "#faf7f1" }}>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
+                          {(() => {
+                            const autre = keepId === p.a.id ? p.b : p.a;
+                            const prixGarde = prix(offreDe(keepId)), prixAutre = prix(offreDe(autre.id));
+                            return !prixGarde && prixAutre ? <span style={{ fontSize: 12, color: ATTENTION, marginRight: "auto" }}>La fiche gardée n&apos;a pas de prix : celui de l&apos;autre ({prixAutre}) sera repris à la fusion.</span> : null;
+                          })()}
                           {([["non", "Pas un doublon", MUTED], ["fusion", "Fusionner", BON]] as const).map(([c, libelle, couleur]) => {
                             const actif = choix[p.pairKey] === c;
                             return (

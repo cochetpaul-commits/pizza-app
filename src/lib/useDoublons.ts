@@ -26,8 +26,8 @@ export function useDoublons(ignores: Set<string>, version = 0): EtatDoublons & {
       try {
         const [{ data: produits, error: e1 }, { data: offres, error: e2 }, { data: fournisseurs }] = await Promise.all([
           // 03/11/2026 : par pages (1 550 produits, 1 414 offres)
-          toutesLesPages((de, a) => supabase.from("ingredients").select("id, name, category, sub_category, is_active, supplier_id, establishments").eq("is_active", true).order("name").order("id").range(de, a)),
-          toutesLesPages((de, a) => supabase.from("supplier_offers").select("ingredient_id, supplier_id, created_at, unit_price, unit").eq("is_active", true).order("created_at", { ascending: false }).order("id").range(de, a)),
+          toutesLesPages((de, a) => supabase.from("ingredients").select("id, name, category, sub_category, is_active, supplier_id, establishments, created_at").eq("is_active", true).order("name").order("id").range(de, a)),
+          toutesLesPages((de, a) => supabase.from("supplier_offers").select("ingredient_id, supplier_id, created_at, valid_from, unit_price, unit, pack_price, pack_count, pack_each_qty, pack_each_unit, pack_total_qty, pack_unit, price_kind").eq("is_active", true).order("created_at", { ascending: false }).order("id").range(de, a)),
           supabase.from("suppliers").select("id, name"),
         ]);
         if (e1) throw new Error(e1.message);
