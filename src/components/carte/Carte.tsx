@@ -16,6 +16,7 @@ import { EtatVide } from "@/components/ui/EtatVide";
 import { CelluleProduit, TableauMobile } from "@/components/ui/TableauMobile";
 import { couleurTexteSur, styleBarreCategorie } from "@/lib/styleCategories";
 import { VueFiches } from "./VueFiches";
+import { ProduireListe } from "./ProduireListe";
 import { useDonneesCarte } from "./useDonneesCarte";
 import FicheWizard from "@/components/fiche/FicheWizard";
 import { useEtablissement } from "@/lib/EtablissementContext";
@@ -664,6 +665,8 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
   ];
   const [vueChoisie, setVueChoisie] = useState<VueCarte | null>(vueInitiale ?? null);
   const [edition, setEdition] = useState<EditionFiche | null>(null);
+  // Produire (27/11/2026) : les recettes étoilées, d'abord à Piccola Mia
+  const [produireOuvert, setProduireOuvert] = useState(false);
   const [rechargeTick, setRechargeTick] = useState(0);
   const source = useDonneesCarte(rechargeTick);
   // Le référentiel des fiches (produits, offres, catégories…) est préchargé dès l'arrivée sur la Carte :
@@ -704,6 +707,9 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
                 </button>
               ))}
             </span>
+            {estPiccola && (
+              <button type="button" onClick={() => setProduireOuvert(true)} style={{ ...BTN, background: "#1a1a1a", color: "#fff", border: "none", fontWeight: 700 }}>★ Produire</button>
+            )}
             {peutEcrire && (
               <button type="button" onClick={() => setEdition(vue === "preparations" ? { cat: "preparation" } : {})} style={{ ...BTN, background: ACCENT, color: "#fff", border: "none", fontWeight: 700 }}>+ Nouvelle fiche</button>
             )}
@@ -714,6 +720,7 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
         {vue === "fiches" && <VueFiches mode="fiches" bureau={bureau} peutEcrire={peutEcrire} onEditer={setEdition} editionOuverte={edition != null} source={source} />}
         {vue === "preparations" && <VueFiches mode="preparations" bureau={bureau} peutEcrire={peutEcrire} onEditer={setEdition} editionOuverte={edition != null} source={source} />}
       </div>
+      {produireOuvert && <ProduireListe fiches={source.donnees?.fiches ?? []} onFermer={() => setProduireOuvert(false)} />}
       {edition && <VoletFiche edition={edition} onFermer={() => setEdition(null)} onEnregistre={() => { setEdition(null); setRechargeTick((t) => t + 1); }} />}
     </div>
   );

@@ -155,6 +155,19 @@ const Kpi = ({ l, val, s, couleur }: { l: string; val: string; s: string; couleu
   </div>
 );
 
+/** Une fiche de la Carte prête pour le mode production (bouton « Produire » du volet et liste « Produire ») */
+export function ficheVersProduction(fiche: FicheCarte) {
+  const estPizza = fiche.categorie === "pizza";
+  const ficheProduction: FicheState = {
+    ...defaultFiche("bellomio"), id: fiche.id, nom: fiche.nom, portions: Math.max(1, fiche.nb_parts), pivot_ingredient_id: fiche.pivot_ingredient_id, etapes: fiche.etapes,
+    paton_poids: fiche.paton_g ?? 0,
+    lignes: fiche.lignes.map((l, i) => ({ key: `l${i}`, ingredient_id: l.ingredient_id, ingredient: { id: l.ingredient_id ?? "", nom_court: l.nom, nom_produit: l.nom, prix_base: 0, unite_base: "g" as const, allergenes: [] }, quantite: l.qty ?? 0, unite: l.unit ?? "g", zone: "apres_four" as const })),
+  };
+  const famProduction = { id: estPizza ? "pizza" as const : "cuisine" as const, label: estPizza ? "Pizza" : "Cuisine", objectif_fc: 30, tva_defaut: 10, portions_label: estPizza ? "pizza" : "portion", portions_label_pluriel: estPizza ? "pizze" : "portions" };
+  const poidsCru = fiche.lignes.reduce((t, l) => { const u = (l.unit ?? "").toLowerCase(); const q = l.qty ?? 0; return t + (u === "g" ? q : u === "kg" ? q * 1000 : u === "cl" ? q * 10 : u === "ml" ? q : u === "l" ? q * 1000 : 0); }, 0) + (estPizza ? fiche.paton_g ?? 0 : 0);
+  return { ficheProduction, famProduction, poidsCru, estPizza };
+}
+
 function VoletLecture({ fiche, groupe, peutEcrire, onFermer, onEditer }: { fiche: FicheCarte; groupe: Groupe; peutEcrire: boolean; onFermer: () => void; onEditer: (e: EditionFiche) => void }) {
   const v = verdict(fiche.food_cost);
   const prep = CATEGORIES_PREP.has(fiche.categorie);
@@ -164,14 +177,7 @@ function VoletLecture({ fiche, groupe, peutEcrire, onFermer, onEditer }: { fiche
   const signature = useSignature({ table: "kitchen_recipes", id: fiche.id });
   // Produire depuis la Carte (05/11/2026, demande de Paul) : la fiche mise à l'échelle sans passer par la modification
   const [produire, setProduire] = useState(false);
-  const estPizza = fiche.categorie === "pizza";
-  const ficheProduction: FicheState = {
-    ...defaultFiche("bellomio"), id: fiche.id, nom: fiche.nom, portions: Math.max(1, fiche.nb_parts), pivot_ingredient_id: fiche.pivot_ingredient_id, etapes: fiche.etapes,
-    paton_poids: fiche.paton_g ?? 0,
-    lignes: fiche.lignes.map((l, i) => ({ key: `l${i}`, ingredient_id: l.ingredient_id, ingredient: { id: l.ingredient_id ?? "", nom_court: l.nom, nom_produit: l.nom, prix_base: 0, unite_base: "g" as const, allergenes: [] }, quantite: l.qty ?? 0, unite: l.unit ?? "g", zone: "apres_four" as const })),
-  };
-  const famProduction = { id: estPizza ? "pizza" as const : "cuisine" as const, label: estPizza ? "Pizza" : "Cuisine", objectif_fc: 30, tva_defaut: 10, portions_label: estPizza ? "pizza" : "portion", portions_label_pluriel: estPizza ? "pizze" : "portions" };
-  const poidsCru = fiche.lignes.reduce((t, l) => { const u = (l.unit ?? "").toLowerCase(); const q = l.qty ?? 0; return t + (u === "g" ? q : u === "kg" ? q * 1000 : u === "cl" ? q * 10 : u === "ml" ? q : u === "l" ? q * 1000 : 0); }, 0) + (estPizza ? fiche.paton_g ?? 0 : 0);
+  const { ficheProduction, famProduction, poidsCru, estPizza } = ficheVersProduction(fiche);
   const sousTitre = [groupe.libelle, fiche.sous_categorie, fiche.statut ? STATUTS[fiche.statut]?.libelle : null, `${fiche.lignes.length} ingrédient${fiche.lignes.length > 1 ? "s" : ""}`].filter(Boolean).join(" · ");
   const pied = (
     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>

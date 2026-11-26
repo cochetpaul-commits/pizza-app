@@ -5,6 +5,10 @@ import { VoletDroit } from "@/components/produits/BaseProduits";
 import { openApiFile } from "@/lib/fetchApi";
 import { BON, BORD, CADRE, INTERTITRE, MUTED, OSWALD, filtre } from "@/components/ui/charte";
 import type { Famille, FicheState, LigneIngredient } from "./ficheTypes";
+import { decouperProcede, nomLisible, titreFiche } from "@/lib/ficheTechnique";
+
+/** Habillage aux couleurs de la fiche imprimable (27/11/2026) : bandeau, onglets de phase, pastilles numérotées */
+export type HabillageProduction = { couleur: string; clair: string; categorie: string };
 
 /**
  * Produire (05/11/2026, demande de Paul) : la fiche est écrite pour N portions ; ici on la met à l'échelle
@@ -26,8 +30,9 @@ export function quantiteLisible(q: number, unite: string): string {
 }
 const nomLigne = (l: LigneIngredient) => l.ingredient?.nom_court || l.ingredient?.nom_produit || "Ingrédient";
 
-export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, estPizza, onFermer }: {
+export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, estPizza, onFermer, habillage }: {
   fiche: FicheState; fam: Famille; poidsCru: number; totalCost: number; voirMontants: boolean; estPizza: boolean; onFermer: () => void;
+  habillage?: HabillageProduction;
 }) {
   const lignes = useMemo(() => fiche.lignes.filter((l) => l.ingredient_id && l.quantite > 0), [fiche.lignes]);
   const phare = useMemo(() => (fiche.pivot_ingredient_id ? lignes.find((l) => l.ingredient_id === fiche.pivot_ingredient_id) ?? null : null), [lignes, fiche.pivot_ingredient_id]);
@@ -68,6 +73,16 @@ export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, e
         {fiche.id && <button type="button" onClick={() => openApiFile(`/api/recettes/pdf?id=${fiche.id}&facteur=${facteur.toFixed(4)}`)} style={{ ...BOUTON, background: "#1a1a1a", color: "#f2ede4", border: "none" }}>Imprimer pour {nombre(portionsFinales, 1)} {etiquette(portionsFinales)}</button>}
       </div>}>
       <div style={{ display: "grid", gap: 14 }}>
+        {habillage && (
+          <div style={{ background: habillage.couleur, color: "#fff", borderRadius: 14, padding: "14px 18px 12px", display: "grid", gap: 2 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, fontStyle: "italic", letterSpacing: ".04em" }}>PRODUCTION</span>
+            <span style={{ fontFamily: OSWALD, fontWeight: 700, fontSize: 30, lineHeight: 1.05, textTransform: "uppercase", overflowWrap: "anywhere" }}>{titreFiche(fiche.nom)}</span>
+            <span style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, marginTop: 4 }}>
+              <span>{habillage.categorie} · fiche pour {base} {etiquette(base)}</span>
+              <b style={{ fontStyle: "italic" }}>iFRATELLI GROUP</b>
+            </span>
+          </div>
+        )}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <button type="button" onClick={() => setMode("portions")} style={filtre(mode === "portions")}>Par {fam.portions_label}</button>
           {poidsCru > 0 && <button type="button" onClick={() => setMode("poids")} style={filtre(mode === "poids")}>Par poids</button>}
@@ -112,21 +127,39 @@ export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, e
             {estPizza && fiche.paton_poids > 0 && (
               <Ligne nom="Pâton" base={`${base} × ${fiche.paton_poids} g`} valeur={quantiteLisible(fiche.paton_poids * portionsFinales, "g")} />
             )}
-            {lignes.map((l) => (
-              <Ligne key={l.key} nom={`${l.ingredient_id === fiche.pivot_ingredient_id ? "★ " : ""}${nomLigne(l)}`} base={quantiteLisible(l.quantite, l.unite)} valeur={quantiteLisible(l.quantite * facteur, l.unite)} fort={l.ingredient_id === fiche.pivot_ingredient_id} />
+            {lignes.map((l, i) => (
+              <Ligne key={l.key} nom={`${l.ingredient_id === fiche.pivot_ingredient_id ? "★ " : ""}${habillage ? nomLisible(nomLigne(l)) : nomLigne(l)}`} base={quantiteLisible(l.quantite, l.unite)} valeur={quantiteLisible(l.quantite * facteur, l.unite)} fort={l.ingredient_id === fiche.pivot_ingredient_id}
+                fond={habillage && i % 2 === 1 ? habillage.clair : undefined} couleurFort={habillage?.couleur} />
             ))}
             {lignes.length === 0 && <div style={{ padding: 12, fontSize: 13, color: MUTED }}>Aucun ingrédient avec une quantité.</div>}
           </div>
         </div>
 
-        {fiche.etapes.filter(Boolean).length > 0 && (
+        {fiche.etapes.filter(Boolean).length > 0 && (habillage ? (
+          <div>
+            <span style={INTERTITRE}>Instructions</span>
+            <div style={{ display: "grid", gap: 8, marginTop: 6 }}>
+              {decouperProcede(fiche.etapes).map((p, pi) => (
+                <div key={pi} style={{ display: "grid", gap: 8 }}>
+                  {p.phase && <div style={{ background: habillage.clair, color: habillage.couleur, borderLeft: `3px solid ${habillage.couleur}`, borderRadius: "0 8px 8px 0", padding: "6px 10px", fontWeight: 700, fontSize: 13.5 }}>{p.phase}</div>}
+                  {p.etapes.map((e) => (
+                    <div key={e.n} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                      <span style={{ flex: "0 0 auto", width: 26, height: 26, borderRadius: 6, background: habillage.couleur, color: "#fff", fontWeight: 700, fontSize: 13, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{e.n}</span>
+                      <span style={{ fontSize: 15, lineHeight: 1.4, paddingTop: 2 }}>{e.texte}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
           <div>
             <span style={INTERTITRE}>Étapes</span>
             <ol style={{ margin: "6px 0 0", paddingLeft: 20, display: "grid", gap: 6, fontSize: 14 }}>
               {fiche.etapes.filter(Boolean).map((e, i) => <li key={i}>{e}</li>)}
             </ol>
           </div>
-        )}
+        ))}
       </div>
     </VoletDroit>
   );
@@ -134,10 +167,10 @@ export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, e
 
 const BOUTON: React.CSSProperties = { height: 40, padding: "0 14px", borderRadius: 12, border: `1px solid ${BORD}`, background: "#fff", fontWeight: 700, fontSize: 16, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a" };
 
-function Ligne({ nom, base, valeur, fort }: { nom: string; base: string; valeur: string; fort?: boolean }) {
+function Ligne({ nom, base, valeur, fort, fond, couleurFort }: { nom: string; base: string; valeur: string; fort?: boolean; fond?: string; couleurFort?: string }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 12, alignItems: "baseline", padding: "9px 12px", borderBottom: "1px solid #f3efe7", background: fort ? `${BON}12` : undefined, borderRadius: 8 }}>
-      <span style={{ fontSize: 15, fontWeight: fort ? 700 : 600 }}>{nom}</span>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 12, alignItems: "baseline", padding: "9px 12px", borderBottom: "1px solid #f3efe7", background: fort ? `${couleurFort ?? BON}14` : fond, borderRadius: 8 }}>
+      <span style={{ fontSize: 15, fontWeight: fort ? 700 : 600, color: fort && couleurFort ? couleurFort : undefined }}>{nom}</span>
       <span style={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap" }}>{base}</span>
       <b style={{ fontFamily: OSWALD, fontSize: 24, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", minWidth: 90, textAlign: "right" }}>{valeur}</b>
     </div>
