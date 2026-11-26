@@ -37,6 +37,7 @@ const COULEUR_EMPATEMENT = "#A47864";
 const COULEUR_ANCIEN = "#939597";
 
 const euros = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const poidsTexte = (g: number) => (g >= 1000 ? `${(g / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} kg` : `${Math.round(g)} g`);
 const pct = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
 const qte = (q: number | null, u: string | null) => (q == null ? "—" : `${q.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${u ?? ""}`.trim());
 const STATUTS: Record<string, { libelle: string; couleur: string }> = {
@@ -82,6 +83,8 @@ type Ligne = {
   nbIngredients: number | null;
   cout: number | null;
   coutLibelle: string | null;
+  /** Préparations (26/11/2026) : colonnes séparées poids, coût au kilo, coût de la recette */
+  prep?: { poids: number | null; kg: number | null; recette: number | null };
   prix: number | null;
   prixLibelle: string | null;
   foodCost: number | null;
@@ -104,10 +107,12 @@ function construire(d: ReponseCarte, mode: "fiches" | "preparations"): { lignes:
     const prep = CATEGORIES_PREP.has(f.categorie);
     if ((mode === "preparations") !== prep) continue;
     const g = groupeDeFiche(f.categorie);
-    const rendement = f.poids_g ? `${f.poids_g >= 1000 ? `${(f.poids_g / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} kg` : `${Math.round(f.poids_g)} g`}` : f.nb_parts > 1 ? `${f.nb_parts} parts` : null;
+    // Poids réel seulement quand la fiche a été pesée (coût au kilo enregistré) : sinon c'est le « 1 kg » par défaut
+    const poidsReel = f.cout_kg != null && f.poids_g ? f.poids_g : null;
     lignes.push({
       id: f.id, groupe: g.cle, nom: f.nom,
-      sous: prep ? rendement : (f.sous_categorie ?? f.description ?? null),
+      sous: prep ? (f.sous_categorie ?? null) : (f.sous_categorie ?? f.description ?? null),
+      prep: prep ? { poids: poidsReel, kg: f.cout_kg, recette: f.total_cost } : undefined,
       statut: f.statut, nbIngredients: f.lignes.length,
       // Préparations : le prix au kilo en avant, la recette en petit (25/11/2026, avec Paul)
       cout: prep ? (f.cout_kg ?? f.total_cost) : f.cout,
@@ -280,7 +285,10 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
       {!enSection && <th style={TH}>Catégorie</th>}
       <th style={TH}>Statut</th>
       <th style={{ ...TH, textAlign: "right" }}>Ingrédients</th>
-      {voir && <th style={{ ...TH, textAlign: "right" }}>{mode === "fiches" ? "Coût matière" : "Coût recette"}</th>}
+      {voir && mode === "fiches" && <th style={{ ...TH, textAlign: "right" }}>Coût matière</th>}
+      {mode === "preparations" && <th style={{ ...TH, textAlign: "right" }}>Poids</th>}
+      {voir && mode === "preparations" && <th style={{ ...TH, textAlign: "right" }}>Coût au kilo</th>}
+      {voir && mode === "preparations" && <th style={{ ...TH, textAlign: "right" }}>Coût recette</th>}
       {voir && mode === "fiches" && <th style={{ ...TH, textAlign: "right" }}>Prix TTC</th>}
       {voir && mode === "fiches" && <th style={{ ...TH, textAlign: "right" }}>Food cost</th>}
       <th style={TH} />
@@ -299,8 +307,17 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
         {!enSection && <td style={TD}><span style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}><Point couleur={g?.couleur ?? FAIBLE} />{g?.libelle}</span></td>}
         <td style={TD}><Statut s={l.statut} /></td>
         <td style={{ ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", color: l.nbIngredients == null ? FAIBLE : "#1a1a1a" }}>{l.nbIngredients ?? "—"}</td>
-        {voir && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: l.cout == null ? FAIBLE : "#1a1a1a" }}>
+        {voir && mode === "fiches" && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: l.cout == null ? FAIBLE : "#1a1a1a" }}>
           {l.cout != null ? euros(l.cout) : "—"}{l.coutLibelle && <div style={{ fontSize: 11, color: FAIBLE }}>{l.coutLibelle}</div>}
+        </td>}
+        {mode === "preparations" && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: l.prep?.poids ? "#1a1a1a" : FAIBLE }}>
+          {l.prep?.poids ? poidsTexte(l.prep.poids) : l.prep ? <span title="Fiche pas encore recalculée : poids inconnu">—</span> : "—"}
+        </td>}
+        {voir && mode === "preparations" && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: l.prep?.kg != null ? "#1a1a1a" : FAIBLE }}>
+          {l.prep?.kg != null ? `${euros(l.prep.kg)} / kg` : "—"}
+        </td>}
+        {voir && mode === "preparations" && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: l.prep?.recette != null ? MUTED : FAIBLE }}>
+          {l.prep?.recette != null ? euros(l.prep.recette) : "—"}
         </td>}
         {voir && mode === "fiches" && <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: l.prix == null ? FAIBLE : "#1a1a1a" }}>
           {l.prix != null ? euros(l.prix) : "—"}{l.prixLibelle && <div style={{ fontSize: 11, color: FAIBLE }}>{l.prixLibelle}</div>}
@@ -316,8 +333,8 @@ export function VueFiches({ mode, bureau, peutEcrire, onEditer, editionOuverte, 
   const ligneMobile = (l: Ligne, enSection: boolean) => {
     const g = groupeParCle.get(l.groupe);
     const v = verdict(l.foodCost);
-    const valeur = !voir ? (l.nbIngredients != null ? `${l.nbIngredients} ingr.` : "") : mode === "fiches" ? (l.prix != null ? euros(l.prix) : l.cout != null ? euros(l.cout) : "—") : (l.cout != null ? euros(l.cout) : "—");
-    const detail = !voir ? null : v && l.foodCost != null ? <span style={{ color: v.couleur, fontWeight: 600 }}>{pct(l.foodCost)}</span> : l.cout != null && mode === "fiches" && l.prix != null ? <span style={{ color: FAIBLE }}>coût {euros(l.cout)}</span> : l.coutLibelle ? <span style={{ color: FAIBLE }}>{l.coutLibelle}</span> : null;
+    const valeur = !voir ? (l.nbIngredients != null ? `${l.nbIngredients} ingr.` : "") : mode === "fiches" ? (l.prix != null ? euros(l.prix) : l.cout != null ? euros(l.cout) : "—") : (l.prep?.kg != null ? `${euros(l.prep.kg)} / kg` : "—");
+    const detail = !voir ? null : l.prep ? <span style={{ color: FAIBLE }}>{[l.prep.poids ? poidsTexte(l.prep.poids) : null, l.prep.recette != null ? `recette ${euros(l.prep.recette)}` : null].filter(Boolean).join(" · ")}</span> : v && l.foodCost != null ? <span style={{ color: v.couleur, fontWeight: 600 }}>{pct(l.foodCost)}</span> : l.cout != null && mode === "fiches" && l.prix != null ? <span style={{ color: FAIBLE }}>coût {euros(l.cout)}</span> : l.coutLibelle ? <span style={{ color: FAIBLE }}>{l.coutLibelle}</span> : null;
     return (
       <tr key={l.id} className="cf-ligne" onClick={() => ouvrir(l)} style={{ cursor: "pointer" }}>
         <td style={{ ...TD, padding: 0, width: 4, background: g?.couleur }} />
