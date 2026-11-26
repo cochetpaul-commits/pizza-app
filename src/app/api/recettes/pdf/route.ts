@@ -5,7 +5,7 @@ import path from "path";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { FicheTechniquePdf, type FicheTechniquePdfData } from "@/lib/ficheTechniquePdf";
-import { clairCategorie, couleurCategorie, LIBELLES_CATEGORIE, moisAnnee } from "@/lib/ficheTechnique";
+import { clairCategorie, couleurCategorie, LIBELLES_CATEGORIE, moisAnnee, nomLisible, titreFiche } from "@/lib/ficheTechnique";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  */
 const r2 = (n: number) => Math.round(n * 100) / 100;
 function logo(): string | null {
-  try { return `data:image/png;base64,${fs.readFileSync(path.join(process.cwd(), "public", "logo-ifratelli.png")).toString("base64")}`; } catch { return null; }
+  try { return `data:image/png;base64,${fs.readFileSync(path.join(process.cwd(), "public", "logo-ifratelli-filigrane.png")).toString("base64")}`; } catch { return null; }
 }
 function listeEtapes(v: unknown): string[] {
   if (v == null) return [];
@@ -68,14 +68,14 @@ export async function GET(req: NextRequest) {
     return `${n.toLocaleString("fr-FR")} ${estPizza ? (n > 1 ? "pizzas" : "pizza") : n > 1 ? "portions" : "portion"}`;
   })();
   const data: FicheTechniquePdfData = {
-    nom: String(r.name ?? "Recette"),
+    nom: titreFiche(String(r.name ?? "Recette")),
     categorie: LIBELLES_CATEGORIE[String(r.category)] ?? String(r.category ?? "Fiche"),
     couleur: couleurCategorie(r.category as string | null),
     clair: clairCategorie(r.category as string | null),
     portions: portionsTexte,
     miseAJour: moisAnnee(new Date(String(r.updated_at ?? new Date().toISOString()))),
     logo: logo(),
-    lignes: lignesPdf.map((l) => ({ nom: l.name ?? "—", qte: l.qty, unite: l.unit ?? "g", stage: l.stage })),
+    lignes: lignesPdf.map((l) => ({ nom: l.name ? nomLisible(l.name) : "—", qte: l.qty, unite: l.unit ?? "g", stage: l.stage })),
     etapes: listeEtapes(r.procedure).length ? listeEtapes(r.procedure) : listeEtapes(r.notes),
     // « À retenir » : les notes, seulement quand elles ne servent pas déjà d'instructions
     notes: listeEtapes(r.procedure).length && typeof r.notes === "string" ? r.notes : null,

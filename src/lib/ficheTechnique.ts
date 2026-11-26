@@ -58,6 +58,28 @@ export function quantite(qte: number | null, unite: string): { q: string; u: str
   else if (u.toLowerCase() === "cl" && v >= 100) { v = v / 100; u = "l"; }
   else if (u.toLowerCase() === "ml" && v >= 1000) { v = v / 1000; u = "l"; }
   const arrondi = Math.round(v * 100) / 100;
+  // Pièces en toutes lettres (brief V3 : « 28 pièces »)
+  if (/^(pc|pcs|piece|pièce)s?$/i.test(u)) u = arrondi > 1 ? "pièces" : "pièce";
   return { q: arrondi.toLocaleString("fr-FR", { maximumFractionDigits: 2 }), u };
 }
 export const moisAnnee = (d: Date) => d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+
+/** Titre de fiche (brief V3) : sans le préfixe de travail « PM Nov24 - » */
+export const titreFiche = (nom: string) => nom.replace(/^PM\s*Nov24\s*-?\s*/i, "").trim() || nom;
+
+/**
+ * Nom d'ingrédient lisible (brief V3) : sans codes, poids d'emballage ni calibres, en casse normale.
+ * « EPINARD BRANCHE600G ROCHAMBEAU » → « Epinard branche rochambeau » ; « MASCARPONE DE VACHE 41% 500 G » → « Mascarpone de vache 41% ».
+ */
+export function nomLisible(nom: string): string {
+  let t = ` ${nom} `;
+  t = t.replace(/\([^)]*\)/g, " ");                                         // (COLIS 5 KG)
+  t = t.replace(/(\d)\s*X\s*\d+/gi, "$1 ");                                   // 42G*12, 6 X 1L
+  t = t.replace(/~?\s*\d+(?:[.,]\d+)?\s*(?:KG|GR|G|CL|ML|L|LT|LTR|LITRES?|PCS?|PIECES?)\b/gi, " "); // 500 G, 1 KG, 5 L, BRANCHE600G
+  t = t.replace(/\b\d+\s*\/\s*\d+\b/g, " ");                                   // 4/4, 50/80
+  t = t.replace(/\b(?:C1|CAT\s*1|CAT1|X\d+|BQ\d+|ART\d+|MC|VP|PET|BTE|SAC|BTL)\b/gi, " ");
+  t = t.replace(/[*~]/g, " ").replace(/\s+/g, " ").trim().replace(/[,;:\-–]+$/g, "").trim();
+  if (!t) return nom;
+  const bas = t.toLocaleLowerCase("fr-FR");
+  return bas.charAt(0).toLocaleUpperCase("fr-FR") + bas.slice(1);
+}

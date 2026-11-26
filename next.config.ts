@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   // inclus comme dependence statique.
   outputFileTracingIncludes: {
     "/api/**/*": ["./node_modules/pdfjs-dist/legacy/**/*"],
+    // Fiche technique PDF (26/11/2026) : polices Anton et Crimson Text, logo en filigrane
+    "/api/recettes/pdf": ["./public/fonts/**/*", "./public/logo-ifratelli-filigrane.png"],
   },
   images: {
     remotePatterns: [

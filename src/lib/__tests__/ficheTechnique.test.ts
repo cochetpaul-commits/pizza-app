@@ -34,5 +34,22 @@ describe("fiche technique PDF", () => {
     expect(quantite(2500, "g")).toEqual({ q: "2,5", u: "kg" });
     expect(quantite(125, "g")).toEqual({ q: "125", u: "g" });
     expect(quantite(150, "cl")).toEqual({ q: "1,5", u: "l" });
+    expect(quantite(28, "pcs")).toEqual({ q: "28", u: "pièces" });
+  });
+});
+
+import { nomLisible, titreFiche } from "@/lib/ficheTechnique";
+describe("noms lisibles (brief V3)", () => {
+  it("titre sans préfixe de travail", () => {
+    expect(titreFiche("PM Nov24 - Poivrons Rôtis")).toBe("Poivrons Rôtis");
+    expect(titreFiche("PM Nov24 Bolognese")).toBe("Bolognese");
+    expect(titreFiche("Tiramisù")).toBe("Tiramisù");
+  });
+  it("ingrédients sans poids, calibres ni codes", () => {
+    expect(nomLisible("EPINARD BRANCHE600G ROCHAMBEAU")).toBe("Epinard branche rochambeau");
+    expect(nomLisible("MASCARPONE DE VACHE 41% 500 G")).toBe("Mascarpone de vache 41%");
+    expect(nomLisible("POIVRON ROUGE ESPAGNE C1 ~200 G")).toBe("Poivron rouge espagne");
+    expect(nomLisible("OIGNON JAUNE 50/80 FRANCE C1")).toBe("Oignon jaune france");
+    expect(nomLisible("BISCUIT CUILLÈRE")).toBe("Biscuit cuillère");
   });
 });
