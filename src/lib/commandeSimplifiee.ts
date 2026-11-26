@@ -353,6 +353,23 @@ export async function fixerApport(body: unknown, etabId: string, userId: string,
     await supabaseAdmin.from("commande_lignes").update({ prix_unitaire_ht: prix }).eq("id", ligneId);
   }
 
+  // Correction par un responsable (26/11/2026) : « − » quand il n'a pas de part lui-même, la quantité saisie
+  // par l'équipe baisse, en commençant par l'apport le plus récent
+  const retirer = Number((body as { retirer?: unknown }).retirer);
+  if (Number.isFinite(retirer) && retirer > 0) {
+    const { data: prof } = await supabaseAdmin.from("profiles").select("role").eq("id", userId).maybeSingle();
+    if (prof?.role !== "group_admin" && prof?.role !== "manager") return rep({ error: "Seul un responsable peut baisser la quantité d'un autre" }, 403);
+    const { data: apportsLigne } = await supabaseAdmin.from("commande_ligne_apports").select("id, quantite, updated_at").eq("ligne_id", ligneId).order("updated_at", { ascending: false });
+    let reste = retirer;
+    for (const ap of (apportsLigne ?? []) as { id: string; quantite: number }[]) {
+      if (reste <= 0) break;
+      const q = Number(ap.quantite) || 0;
+      if (q <= reste) { await supabaseAdmin.from("commande_ligne_apports").delete().eq("id", ap.id); reste = Math.round((reste - q) * 100) / 100; }
+      else { await supabaseAdmin.from("commande_ligne_apports").update({ quantite: Math.round((q - reste) * 100) / 100, updated_at: new Date().toISOString() }).eq("id", ap.id); reste = 0; }
+    }
+    const { count } = await supabaseAdmin.from("commande_ligne_apports").select("id", { count: "exact", head: true }).eq("ligne_id", ligneId);
+    if (!count) await supabaseAdmin.from("commande_lignes").delete().eq("id", ligneId);
+  } else
   // Quantité de CETTE personne ; le total de la ligne est recalculé par la base
   if (quantite > 0) {
     const { error } = await supabaseAdmin.from("commande_ligne_apports")

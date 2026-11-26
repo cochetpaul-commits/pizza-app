@@ -308,6 +308,18 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
     minuteries.current.set(cle, setTimeout(() => { minuteries.current.delete(cle); void envoyer(cle); }, 400));
   }
 
+  /** Responsable sans part propre (26/11/2026) : « − » baisse la quantité saisie par l'équipe */
+  async function retirerAutres(a: Article, m: Mode, pas: number) {
+    marquerEcriture();
+    const res = await fetchApi("/api/commandes/simplifiee", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ supplier_id: supplierId, ingredient_id: a.ingredient_id, mode: m, quantite: 0, retirer: pas, type: onglet }),
+    }).catch(() => null);
+    if (!res || !res.ok) { const j = res ? await res.json().catch(() => ({})) : {}; setAlerte((j as { error?: string }).error ?? "Pas enregistré, réessaie"); setTimeout(() => setAlerte(null), 4000); }
+    await charger();
+    onChange?.();
+  }
+
   /** Fiche produit : les appuis en attente sont enregistrés d'abord, l'état de l'écran est gardé pour le retour */
   // Épingler (02/11/2026) : le produit reste dans la liste sans passer par la recherche
   async function basculerToujours(a: Article) {
@@ -382,8 +394,8 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
                 cursor: "pointer", touchAction: "manipulation", fontFamily: "inherit",
               }}>+ 1</button>
             ) : (
-              <Compteur valeur={qteTexte(total)} moinsActif={maPart > 0}
-                onMoins={() => fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2))}
+              <Compteur valeur={qteTexte(total)} moinsActif={maPart > 0 || (estResponsable && total > 0)}
+                onMoins={() => (maPart > 0 ? fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2)) : void retirerAutres(a, m, pas))}
                 onPlus={() => fixerMaPart(a, m, Math.round((maPart + pas) * 2) / 2)} />
             )) : <span style={{ fontWeight: 700 }}>{total > 0 ? qteTexte(total) : "—"}</span>}
             {voirMontants && total > 0 && prix != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{euros(total * prix)}</span>}
@@ -482,8 +494,8 @@ export function CommandeSimplifiee({ supplierId, onChange, onNbArticles, onEnvoy
             }}>+ 1</button>
           ) : (
             <span style={{ display: "inline-flex" }}>
-              <Compteur valeur={qteTexte(total)} moinsActif={maPart > 0}
-                onMoins={() => fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2))}
+              <Compteur valeur={qteTexte(total)} moinsActif={maPart > 0 || (estResponsable && total > 0)}
+                onMoins={() => (maPart > 0 ? fixerMaPart(a, m, Math.max(0, Math.round((maPart - pas) * 2) / 2)) : void retirerAutres(a, m, pas))}
                 onPlus={() => fixerMaPart(a, m, Math.round((maPart + pas) * 2) / 2)} />
             </span>
           )) : <span style={{ fontWeight: 700 }}>{total > 0 ? qteTexte(total) : "—"}</span>}
