@@ -38,7 +38,29 @@ export async function retirerPartagesDuCote(ids: string[], etab: EtabCote): Prom
   return { propres, partages, erreur: null };
 }
 
-export async function desactiverProduits(idsDemandes: string[], etab?: EtabCote): Promise<string | null> {
+/**
+ * Produits encore utilisés dans une fiche technique active (27/11/2026) : ils ne se désactivent pas, sinon la fiche
+ * garde un ingrédient introuvable dans la Base produits et sans prix (vécu : 18 ingrédients de fiches désactivés).
+ */
+async function utilisesEnFiche(ids: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data } = await supabase.from("kitchen_recipe_lines").select("ingredient_id, recette:kitchen_recipes!inner(name, is_active)").in("ingredient_id", ids.slice(i, i + 100)).eq("recette.is_active", true);
+    for (const l of (data ?? []) as unknown as { ingredient_id: string; recette: { name: string } | { name: string }[] }[]) {
+      const r = Array.isArray(l.recette) ? l.recette[0] : l.recette;
+      if (r && !out.has(l.ingredient_id)) out.set(l.ingredient_id, r.name);
+    }
+  }
+  return out;
+}
+
+export async function desactiverProduits(idsTous: string[], etab?: EtabCote): Promise<string | null> {
+  const utilises = await utilisesEnFiche(idsTous);
+  const idsDemandes = idsTous.filter((id) => !utilises.has(id));
+  const refus = utilises.size
+    ? `${utilises.size} produit${utilises.size > 1 ? "s" : ""} non désactivé${utilises.size > 1 ? "s" : ""} car utilisé${utilises.size > 1 ? "s" : ""} dans une fiche technique (${[...new Set(utilises.values())].slice(0, 4).join(", ")}${utilises.size > 4 ? "…" : ""}). Remplace-le d'abord dans la fiche.`
+    : null;
+  if (idsDemandes.length === 0) return refus;
   const { propres: ids, erreur } = await retirerPartagesDuCote(idsDemandes, etab);
   if (erreur) return erreur;
   for (let i = 0; i < ids.length; i += 100) {
@@ -48,7 +70,7 @@ export async function desactiverProduits(idsDemandes: string[], etab?: EtabCote)
     const { error } = await supabase.from("ingredients").update({ is_active: false }).in("id", lot);
     if (error) return error.message;
   }
-  return null;
+  return refus;
 }
 
 export async function reactiverProduits(ids: string[]): Promise<string | null> {
