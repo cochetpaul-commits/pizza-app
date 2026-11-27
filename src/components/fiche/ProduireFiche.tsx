@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { VoletDroit } from "@/components/produits/BaseProduits";
 import { openApiFile } from "@/lib/fetchApi";
 import { BON, BORD, CADRE, INTERTITRE, MUTED, OSWALD, filtre } from "@/components/ui/charte";
@@ -30,10 +30,20 @@ export function quantiteLisible(q: number, unite: string): string {
 }
 const nomLigne = (l: LigneIngredient) => l.ingredient?.nom_court || l.ingredient?.nom_produit || "Ingrédient";
 
-export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, estPizza, onFermer, habillage }: {
+export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, estPizza, onFermer, habillage, pleinePage }: {
   fiche: FicheState; fam: Famille; poidsCru: number; totalCost: number; voirMontants: boolean; estPizza: boolean; onFermer: () => void;
   habillage?: HabillageProduction;
+  /** Page entière au lieu du volet (page « Produire », tablette) */
+  pleinePage?: boolean;
 }) {
+  // Deux colonnes à partir d'un iPad en paysage ou d'un écran d'ordinateur
+  const [large, setLarge] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1000px)");
+    const maj = () => setLarge(mq.matches);
+    maj(); mq.addEventListener("change", maj);
+    return () => mq.removeEventListener("change", maj);
+  }, []);
   const lignes = useMemo(() => fiche.lignes.filter((l) => l.ingredient_id && l.quantite > 0), [fiche.lignes]);
   const phare = useMemo(() => (fiche.pivot_ingredient_id ? lignes.find((l) => l.ingredient_id === fiche.pivot_ingredient_id) ?? null : null), [lignes, fiche.pivot_ingredient_id]);
   const base = Math.max(1, fiche.portions);
@@ -51,28 +61,27 @@ export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, e
   const portionsFinales = base * facteur;
   const etiquette = (n: number) => (Math.abs(n - 1) < 0.001 ? fam.portions_label : fam.portions_label_pluriel);
 
+  // Tablette (27/11/2026) : en pleine page, de grosses touches pour les doigts
+  const grandFiltre: React.CSSProperties = pleinePage ? { minHeight: 46, fontSize: 15, padding: "8px 16px" } : {};
+  const tactile = pleinePage ? { height: 58, width: 58, fontSize: 26, borderRadius: 14 } : { width: 40 };
   const champ = (v: string, set: (s: string) => void, unite: string, pas: number) => (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-      <button type="button" onClick={() => set(String(Math.max(pas, (num(v) ?? 0) - pas)))} style={{ ...BOUTON, width: 40 }}>−</button>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: pleinePage ? 12 : 8 }}>
+      <button type="button" onClick={() => set(String(Math.max(pas, (num(v) ?? 0) - pas)))} style={{ ...BOUTON, ...tactile, touchAction: "manipulation" }}>−</button>
       <input value={v} onChange={(e) => set(e.target.value)} inputMode="decimal" onFocus={(e) => e.target.select()} aria-label="Quantité à produire"
-        style={{ width: 96, textAlign: "center", fontFamily: OSWALD, fontWeight: 700, fontSize: 30, border: "none", borderBottom: `1px solid ${BORD}`, outline: "none", background: "transparent", fontVariantNumeric: "tabular-nums" }} />
-      <button type="button" onClick={() => set(String((num(v) ?? 0) + pas))} style={{ ...BOUTON, width: 40 }}>+</button>
-      <span style={{ fontSize: 15, fontWeight: 600 }}>{unite}</span>
+        style={{ width: pleinePage ? 130 : 96, textAlign: "center", fontFamily: OSWALD, fontWeight: 700, fontSize: pleinePage ? 40 : 30, border: "none", borderBottom: `1px solid ${BORD}`, outline: "none", background: "transparent", fontVariantNumeric: "tabular-nums" }} />
+      <button type="button" onClick={() => set(String((num(v) ?? 0) + pas))} style={{ ...BOUTON, ...tactile, touchAction: "manipulation" }}>+</button>
+      <span style={{ fontSize: pleinePage ? 18 : 15, fontWeight: 600 }}>{unite}</span>
     </span>
   );
   const raccourcis = (valeurs: number[], set: (s: string) => void, courant: number | null) => (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-      {valeurs.map((v) => <button key={v} type="button" onClick={() => set(String(v))} style={filtre(courant === v)}>{v}</button>)}
+      {valeurs.map((v) => <button key={v} type="button" onClick={() => set(String(v))} style={{ ...filtre(courant === v), ...(pleinePage ? { minHeight: 44, minWidth: 52, fontSize: 16 } : {}) }}>{v}</button>)}
     </div>
   );
 
-  return (
-    <VoletDroit titre={`Produire · ${fiche.nom || "fiche"}`} sousTitre={`La fiche est écrite pour ${base} ${etiquette(base)}${poidsCru > 0 ? ` · ${quantiteLisible(poidsCru, "g")} cru` : ""}`} onFermer={onFermer} largeur={600}
-      pied={<div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-        <button type="button" onClick={onFermer} style={BOUTON}>Fermer</button>
-        {fiche.id && <button type="button" onClick={() => openApiFile(`/api/recettes/pdf?id=${fiche.id}&facteur=${facteur.toFixed(4)}`)} style={{ ...BOUTON, background: "#1a1a1a", color: "#f2ede4", border: "none" }}>Imprimer pour {nombre(portionsFinales, 1)} {etiquette(portionsFinales)}</button>}
-      </div>}>
-      <div style={{ display: "grid", gap: 14 }}>
+  const imprimer = fiche.id ? <button type="button" onClick={() => openApiFile(`/api/recettes/pdf?id=${fiche.id}&facteur=${facteur.toFixed(4)}`)} style={{ ...BOUTON, background: "#1a1a1a", color: "#f2ede4", border: "none" }}>Imprimer pour {nombre(portionsFinales, 1)} {etiquette(portionsFinales)}</button> : null;
+  const blocBandeau = (
+    <>
         {habillage && (
           <div style={{ background: habillage.couleur, color: "#fff", borderRadius: 14, padding: "14px 18px 12px", display: "grid", gap: 2 }}>
             <span style={{ fontSize: 11, fontWeight: 700, fontStyle: "italic", letterSpacing: ".04em" }}>PRODUCTION</span>
@@ -83,10 +92,14 @@ export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, e
             </span>
           </div>
         )}
+    </>
+  );
+  const blocReglage = (
+    <>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <button type="button" onClick={() => setMode("portions")} style={filtre(mode === "portions")}>Par {fam.portions_label}</button>
-          {poidsCru > 0 && <button type="button" onClick={() => setMode("poids")} style={filtre(mode === "poids")}>Par poids</button>}
-          <button type="button" onClick={() => setMode("phare")} style={filtre(mode === "phare")} disabled={!phare} title={phare ? undefined : "Choisis d'abord un ingrédient phare avec l'étoile ☆ dans la liste"}>★ Ingrédient phare</button>
+          <button type="button" onClick={() => setMode("portions")} style={{ ...filtre(mode === "portions"), ...grandFiltre }}>Par {fam.portions_label}</button>
+          {poidsCru > 0 && <button type="button" onClick={() => setMode("poids")} style={{ ...filtre(mode === "poids"), ...grandFiltre }}>Par poids</button>}
+          <button type="button" onClick={() => setMode("phare")} style={{ ...filtre(mode === "phare"), ...grandFiltre }} disabled={!phare} title={phare ? undefined : "Choisis d'abord un ingrédient phare avec l'étoile ☆ dans la liste"}>★ Ingrédient phare</button>
         </div>
 
         <div style={{ ...CADRE, padding: 16, display: "grid", gap: 10, justifyItems: "center" }}>
@@ -107,7 +120,7 @@ export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, e
           )}
           {mode === "phare" && (phare ? (
             <>
-              <span style={INTERTITRE}>★ {nomLigne(phare)} · j&apos;en ai</span>
+              <span style={INTERTITRE}>★ {habillage ? nomLisible(nomLigne(phare)) : nomLigne(phare)} · j&apos;en ai</span>
               {champ(qtePhare, setQtePhare, phare.unite, phare.unite.toLowerCase() === "g" ? 100 : phare.unite.toLowerCase() === "cl" ? 10 : 1)}
               <span style={{ fontSize: 12.5, color: MUTED, textAlign: "center" }}>La fiche en prévoit {quantiteLisible(phare.quantite, phare.unite)} pour {base} {etiquette(base)}. Le reste suit en proportion.</span>
             </>
@@ -121,6 +134,9 @@ export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, e
           <span style={{ color: MUTED }}>{poidsCru > 0 ? `${quantiteLisible(poidsCru * facteur, "g")} cru` : ""}{voirMontants && totalCost > 0 ? ` · ${nombre(totalCost * facteur, 2)} € matière` : ""}</span>
         </div>
 
+    </>
+  );
+  const blocPesees = (
         <div>
           <span style={INTERTITRE}>Pesées</span>
           <div style={{ ...CADRE, padding: 4, marginTop: 6 }}>
@@ -134,7 +150,9 @@ export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, e
             {lignes.length === 0 && <div style={{ padding: 12, fontSize: 13, color: MUTED }}>Aucun ingrédient avec une quantité.</div>}
           </div>
         </div>
-
+  );
+  const blocEtapes = (
+    <>
         {fiche.etapes.filter(Boolean).length > 0 && (habillage ? (
           <div>
             <span style={INTERTITRE}>Instructions</span>
@@ -160,6 +178,37 @@ export function ProduireFiche({ fiche, fam, poidsCru, totalCost, voirMontants, e
             </ol>
           </div>
         ))}
+    </>
+  );
+
+  // Pleine page (27/11/2026, tablette de l'épicerie) : réglage et pesées à gauche, instructions à droite sur grand écran
+  if (pleinePage) {
+    return (
+      <div style={{ display: "grid", gap: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <button type="button" onClick={onFermer} style={{ ...BOUTON, height: 48, fontSize: 17 }}>← Recettes</button>
+          {imprimer}
+        </div>
+        {blocBandeau}
+        <div style={{ display: "grid", gridTemplateColumns: large ? "minmax(0, 1fr) minmax(0, 1fr)" : "1fr", gap: 18, alignItems: "start" }}>
+          <div style={{ display: "grid", gap: 14 }}>{blocReglage}{blocPesees}</div>
+          <div style={{ display: "grid", gap: 14 }}>{blocEtapes}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <VoletDroit titre={`Produire · ${fiche.nom || "fiche"}`} sousTitre={`La fiche est écrite pour ${base} ${etiquette(base)}${poidsCru > 0 ? ` · ${quantiteLisible(poidsCru, "g")} cru` : ""}`} onFermer={onFermer} largeur={600}
+      pied={<div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+        <button type="button" onClick={onFermer} style={BOUTON}>Fermer</button>
+        {imprimer}
+      </div>}>
+      <div style={{ display: "grid", gap: 14 }}>
+        {blocBandeau}
+        {blocReglage}
+        {blocPesees}
+        {blocEtapes}
       </div>
     </VoletDroit>
   );

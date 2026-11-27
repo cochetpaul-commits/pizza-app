@@ -123,6 +123,8 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     { kind: "divider", label: "Cuisine" },
     // Les pâtons et la focaccia de tous les jours (28/10) : un geste au lieu de Carte > Préparations > Empâtements > fiche
     { kind: "page", label: "Empâtements", href: "/empatements", icon: "chefHat", permission: "operations.recettes" },
+    // Produire les recettes étoilées (27/11/2026) : Piccola Mia d'abord
+    ...(piccola ? [{ kind: "page", label: "Produire", href: "/produire", icon: "box", permission: "operations.recettes" } as NavEntry] : []),
     { kind: "group", label: "HACCP", icon: "clipboard", roles: MANAGERS, items: HACCP_ITEMS },
     { kind: "divider", label: "Achats et stock" },
     { kind: "page", label: "Commandes", href: "/commandes", icon: "shoppingBag", permission: "achats.edit" },

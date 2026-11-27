@@ -45,6 +45,11 @@ export default function AccueilTablette() {
       else if (out.length && e.kind === "page" && e.href !== "/tablette" && visible(e)) out[out.length - 1].pages.push(e);
       else if (out.length && e.kind === "group" && visible(e)) out[out.length - 1].pages.push(...e.items.filter(visible));
     }
+    // Produire (27/11/2026) : à Piccola Mia, la tuile aussi pour l'équipe (le menu équipier est commun aux deux restaurants)
+    if (piccola && can("operations.recettes")) {
+      const cuisine = out.find((s) => s.titre === "Cuisine");
+      if (cuisine && !cuisine.pages.some((p) => p.href === "/produire")) cuisine.pages.push({ kind: "page", label: "Produire", href: "/produire", icon: "box" } as NavItemV2);
+    }
     return out.filter((s) => s.pages.length);
   }, [role, can, piccola]);
 
