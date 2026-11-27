@@ -111,6 +111,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   "/evenements":      MANAGERS,
   "/evenementiel":    MANAGERS,
   "/clients":         MANAGERS,
+  "/fidelite":        MANAGERS,
   "/devis":           MANAGERS,
   "/epicerie":        MANAGERS,
   // Admin only: settings, imports, groupe, admin

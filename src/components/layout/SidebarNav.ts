@@ -78,6 +78,11 @@ export const EVENEMENTIEL_ITEMS: NavItemV2[] = [
   { label: "Factures clients", href: "/clients/factures", icon: "fileText" },
 ];
 
+// CLIENTS (Piccola Mia uniquement, 27/11/2026) : le programme de fidélité, lu depuis fidelite.piccolamia.fr ; la newsletter suivra
+export const CLIENTS_ITEMS: NavItemV2[] = [
+  { label: "Programme de fidélité", href: "/fidelite", icon: "users" },
+];
+
 // PARAMÈTRES (groupe « Configuration », en bas)
 export const PARAMETRES_ITEMS: NavItemV2[] = [
   { label: "Établissements", href: "/settings/etablissements", icon: "building", roles: ["group_admin"] },
@@ -120,6 +125,7 @@ export function navEtablissement(accueil: string, piccola: boolean): NavEntry[] 
     // Clôture de caisse : Bello Mio seulement pour l'instant (Popina + TPE Flatpay)
     ...(piccola ? [] : [{ kind: "page", label: "Clôture", href: "/cloture", icon: "calculator", permission: "caisse.cloture" } as NavEntry]),
     ...(piccola ? [{ kind: "group", label: "Événementiel", icon: "calendarEvent", roles: MANAGERS, items: EVENEMENTIEL_ITEMS } as NavEntry] : []),
+    ...(piccola ? [{ kind: "group", label: "Clients", icon: "users", roles: MANAGERS, items: CLIENTS_ITEMS } as NavEntry] : []),
     { kind: "divider", label: "Cuisine" },
     // Les pâtons et la focaccia de tous les jours (28/10) : un geste au lieu de Carte > Préparations > Empâtements > fiche
     { kind: "page", label: "Empâtements", href: "/empatements", icon: "chefHat", permission: "operations.recettes" },
