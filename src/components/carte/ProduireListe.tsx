@@ -12,7 +12,7 @@ import { ficheVersProduction } from "./VueFiches";
 import type { FicheCarte } from "@/app/api/carte/route";
 
 /**
- * Page « Produire » (27/11/2026, demande de Paul, Piccola Mia d'abord, pensée pour l'iPad de l'épicerie) : les recettes
+ * Page « Produire » (27/11/2026, demande de Paul, pensée pour la tablette ; les deux restaurants depuis le 27/11) : les recettes
  * qui ont un ingrédient phare (l'étoile), en grosses tuiles ; une touche ouvre la recette en mode production, en pleine
  * page (réglage et pesées à gauche, instructions à droite sur grand écran). Seulement les recettes étoilées : on se
  * force à mettre une étoile sur chaque recette. Aux couleurs des fiches imprimables. Rien n'est enregistré.

@@ -705,9 +705,7 @@ export function Carte({ vueInitiale }: { vueInitiale?: VueCarte | null }) {
                 </button>
               ))}
             </span>
-            {estPiccola && (
-              <button type="button" onClick={() => routeur.push("/produire")} style={{ ...BTN, background: "#1a1a1a", color: "#fff", border: "none", fontWeight: 700 }}>★ Produire</button>
-            )}
+            <button type="button" onClick={() => routeur.push("/produire")} style={{ ...BTN, background: "#1a1a1a", color: "#fff", border: "none", fontWeight: 700 }}>★ Produire</button>
             {peutEcrire && (
               <button type="button" onClick={() => setEdition(vue === "preparations" ? { cat: "preparation" } : {})} style={{ ...BTN, background: ACCENT, color: "#fff", border: "none", fontWeight: 700 }}>+ Nouvelle fiche</button>
             )}
